@@ -167,8 +167,24 @@ The same kind of control looks and sits the same on every screen.
   nothing, so the panel may reach below its foot, and nothing else in it
   reaches past its edges (`browser-tests/consistency.spec.js`). It stays
   open across the redraws its controls cause, and a press outside or Esc
-  closes it (`browser-tests/behaviour-timings.spec.js`). Closed, Timings
-  wears the mark of each timing the behaviour sets, after its name
+  closes it. An open panel takes Esc wherever focus is, before the editor
+  around it, and only a sheet, the keyboard menu or the Layers panel over it
+  takes Esc first
+  (`browser-tests/behaviour-timings.spec.js`,
+  `browser-tests/participation.spec.js`). In Layers it runs
+  on, a layer whose own switch in Settings keeps that kind off is dimmed and
+  says so at its right, *off in Behaviour settings* or *off in Combo settings*,
+  its tip giving the reason. Its switch stays live: what it holds takes effect
+  once Settings allows it, and a behaviour's counts at once for a combo's output,
+  which does not follow the layer's switch (firmware's participation policy).
+  The master switch is no layer's, so no row
+  says it: the Keymap's Behaviours and Combos tabs and a custom key's What it
+  does carry one amber banner across their top while it is off, which goes to
+  that switch on its Settings screen and marks its row. Lighting's Auto-mouse
+  fade, Combo feedback and Key feedback tabs read off and carry the same banner
+  while Auto-mouse, combos' or behaviours' master switch keeps them from
+  painting (`stageIdle`). All of them stay editable
+  (`browser-tests/participation.spec.js`). Closed, Timings wears the mark of each timing the behaviour sets, after its name
   (**Marks**), and none when all follow the defaults
   (`browser-tests/participation.spec.js`).
 - A sheet (Review, the keycode picker, Draft history) closes with one ghost

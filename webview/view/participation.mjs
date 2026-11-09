@@ -48,6 +48,17 @@ export function participationAt(model, layer, position, definition, kind = "beha
     return {placementOn, enabled: reasons.length === 0, reasons: reasons.map((reason) => reasonWords(model, kind, layer, reason))};
 }
 
+// What Settings keeps off. The master switch says it of every layer alike, so
+// of the definition rather than of any layer; a layer's own switch says it of
+// that layer, in that switch's words, and is null when it does not.
+/** @param {ParticipationModel} model @param {"behavior" | "combo"} kind */
+export const masterOff = (model, kind) => Boolean(model?.participation?.layers[0]?.[kind === "behavior" ? "behaviors" : "combos"].includes("master"));
+/** @param {ParticipationModel} model @param {number} layer @param {"behavior" | "combo"} kind @returns {Phrase | null} */
+export function layerOff(model, layer, kind) {
+    const off = model?.participation?.layers[layer]?.[kind === "behavior" ? "behaviors" : "combos"].includes("layer");
+    return off ? reasonWords(model, kind, layer, "layer") : null;
+}
+
 // Whether a key's behaviour row runs on this layer: the switches, its
 // definition and this placement let it. A row that does not run is ignored,
 // as if it were not there; the key keeps what it does without one, and the

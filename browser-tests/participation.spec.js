@@ -2,11 +2,14 @@
 "use strict";
 const {test, expect} = require("@playwright/test");
 const {demoDocument, openDraft, panelModel} = require("../tests/fixtures/published-model");
+const {editDomain} = require("../tests/fixtures/profile-document");
+const {SETTING} = require("../core/schema/settings-domain-v1");
 
-// What core publishes for the demo profile saved with `edits` (a fresh draft
-// on it, so no key reads as drafted), as the shell posts it, shown on `layer`.
-async function publish(page, edits, layer) {
-    const {draft, state} = openDraft(openDraft(demoDocument(), {edits}).draft.document);
+// What core publishes for the demo profile, or `doc`, saved with `edits` (a
+// fresh draft on it, so no key reads as drafted), as the shell posts it, shown
+// on `layer`.
+async function publish(page, edits, layer, doc = demoDocument()) {
+    const {draft, state} = openDraft(openDraft(doc, {edits}).draft.document);
     const model = panelModel(draft, state);
     await page.evaluate(async ({model, layer}) => {
         const store = await import("/webview/store.mjs");
@@ -80,6 +83,242 @@ test("participation controls post placements, shared definitions and master/sour
         await expect.poll(posted).toEqual([expect.objectContaining({type: "updateConfigDefaults", sectionId, fields: expect.arrayContaining([{macro, enabled: false}])})]);
     }
     expect(errors).toEqual([]);
+});
+
+test("Layers it runs on says which layers Settings keeps off, for its own kind, and each switch still posts", async ({page}) => {
+    const errors = [];
+    page.on("pageerror", error => errors.push(error.message));
+    await page.goto("/preview/index.html");
+    await page.locator('[data-screen="keys"]').click();
+    // Behaviours off on layer 1, combos off on layer 2.
+    await publish(page, [], 0, editDomain(demoDocument(), "settings", (settings) => {
+        settings.values[SETTING.LAYER_BEHAVIORS] &= ~(1 << 1);
+        settings.values[SETTING.LAYER_COMBOS] &= ~(1 << 2);
+    }));
+    const row = (layer) => page.locator(".def-layers .layer-grid label").filter({has: page.locator(`[data-switch-layer="${layer}"]`)});
+    const flagged = () => page.locator(".def-layers .layer-grid .layer-why:visible");
+
+    await page.locator('[data-tab="behaviours"]').click();
+    await page.getByText("Layers it runs on", {exact: true}).click();
+    await expect(flagged()).toHaveCount(1);
+    await expect(row(1).locator(".layer-why")).toHaveText("off in Behaviour settings");
+    await expect(row(1)).toHaveAttribute("data-tip", /^Behaviour settings has behaviours off on this layer \(.+\)\. For a key on this layer, this switch takes effect once that is on again; for a combo sending this behaviour, it applies now\.$/);
+    await expect(row(0).locator(".layer-why")).toHaveCount(0);
+    await expect(row(2).locator(".layer-why")).toHaveCount(0);
+    // Settings says no for now; this behaviour's own switch stays its own.
+    await page.evaluate(() => {window.__posted.length = 0;});
+    await row(1).click();
+    await expect.poll(() => page.evaluate(() => window.__posted)).toEqual([expect.objectContaining({type: "saveBehavior", behavior: expect.objectContaining({allowedLayers: 65533})})]);
+    await page.keyboard.press("Escape");
+
+    await page.locator('[data-tab="combos"]').click();
+    await page.getByRole("button", {name: "New combo", exact: true}).click();
+    await page.getByText("Layers it runs on", {exact: true}).click();
+    await expect(flagged()).toHaveCount(1);
+    await expect(row(2).locator(".layer-why")).toHaveText("off in Combo settings");
+    await expect(row(1).locator(".layer-why")).toHaveCount(0);
+    expect(errors).toEqual([]);
+});
+
+test("a master switch off says so at the top of its tab, not in Layers it runs on, where a layer's own switch still shows", async ({page}) => {
+    const errors = [];
+    page.on("pageerror", error => errors.push(error.message));
+    await page.goto("/preview/index.html");
+    await page.locator('[data-screen="keys"]').click();
+    const note = page.locator("[data-master-off]");
+    const why = page.locator(".def-layers .layer-grid .layer-why:visible");
+    const row = (layer) => page.locator(".def-layers .layer-grid label").filter({has: page.locator(`[data-switch-layer="${layer}"]`)});
+    await page.locator('[data-tab="behaviours"]').click();
+    await expect(note).toHaveCount(0);
+
+    // Behaviours off everywhere and on layer 1 too; combos still on.
+    await publish(page, [], 0, editDomain(demoDocument(), "settings", (settings) => {
+        settings.values[SETTING.BEHAVIORS_ENABLED] = 0;
+        settings.values[SETTING.LAYER_BEHAVIORS] &= ~(1 << 1);
+    }));
+    await expect(note).toHaveText("Behaviours are off. Turn them on in Behaviour settings →");
+    await expect(page.locator(".keys-bench .bench-body > .banner-over > [data-master-off]")).toBeVisible();
+    await expect(page.locator(".beh-main [data-master-off]")).toHaveCount(0);
+    await page.getByText("Layers it runs on", {exact: true}).click();
+    await expect(why).toHaveCount(1);
+    await expect(row(1).locator(".layer-why")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await page.locator('[data-tab="combos"]').click();
+    await page.getByRole("button", {name: "New combo", exact: true}).click();
+    await expect(note).toHaveCount(0);
+
+    await publish(page, [], 0, editDomain(demoDocument(), "settings", (settings) => {
+        settings.values[SETTING.COMBOS_ENABLED] = 0;
+    }));
+    await expect(note).toHaveText("Combos are off. Turn them on in Combo settings →");
+    await expect(page.locator(".keys-bench .bench-body > .banner-over > [data-master-off]")).toBeVisible();
+    await expect(page.locator(".combo-builder [data-master-off]")).toHaveCount(0);
+    await page.getByText("Layers it runs on", {exact: true}).click();
+    await expect(why).toHaveCount(0);
+    await page.getByText("Layers it runs on", {exact: true}).click();
+
+    // Pressing it goes to the switch that says so, and marks that row.
+    await note.click();
+    await expect(page.locator('[data-screen="combos"]')).toHaveAttribute("aria-current", "true");
+    await expect(page.locator('.setrow:has([data-macro="combosEnabled"])')).toHaveClass(/revealed/);
+    await expect(page.locator('[data-macro="combosEnabled"]')).not.toBeChecked();
+
+    await page.locator('[data-screen="keys"]').click();
+    await page.locator('[data-tab="behaviours"]').click();
+    await publish(page, [], 0, editDomain(demoDocument(), "settings", (settings) => {
+        settings.values[SETTING.BEHAVIORS_ENABLED] = 0;
+    }));
+    await note.click();
+    await expect(page.locator('[data-screen="behaviours"]')).toHaveAttribute("aria-current", "true");
+    await expect(page.locator('.setrow:has([data-macro="behaviorsEnabled"])')).toHaveClass(/revealed/);
+
+    // A custom key's behaviour has no such tab: its card says so.
+    await page.locator('[data-screen="customKeys"]').click();
+    await expect(page.locator(".custom-key-behaviour [data-master-off]")).toBeVisible();
+    expect(errors).toEqual([]);
+});
+
+test("a Lighting stage a global switch keeps from painting says so, reads off, and goes to that switch", async ({page}) => {
+    const errors = [];
+    page.on("pageerror", error => errors.push(error.message));
+    await page.goto("/preview/index.html");
+    const banner = page.locator(".lighting-bench [data-master-off]");
+    const open = async (stage) => {
+        await page.locator('[data-screen="lighting"]').click();
+        await page.locator(`[data-ltab="${stage}"]`).click();
+    };
+    for (const stage of ["auto", "combo", "key", "layers"]) {
+        await open(stage);
+        await expect(banner).toHaveCount(0);
+    }
+    await publish(page, [], 0, editDomain(demoDocument(), "settings", (settings) => {
+        settings.values[SETTING.AUTO_MOUSE_ENABLED] = 0;
+        settings.values[SETTING.COMBOS_ENABLED] = 0;
+        settings.values[SETTING.BEHAVIORS_ENABLED] = 0;
+    }));
+    for (const [stage, words, screen, macro] of [
+        ["auto", "Auto-mouse is off. This stage paints nothing. Turn it on in Pointer settings →", "pointer", "autoMouse"],
+        ["combo", "Combos are off. This stage paints nothing. Turn them on in Combo settings →", "combos", "combosEnabled"],
+        ["key", "Behaviours are off. This stage paints nothing. Turn them on in Behaviour settings →", "behaviours", "behaviorsEnabled"]]) {
+        await open(stage);
+        await expect(banner).toHaveText(words);
+        if (stage === "auto") {
+            // Idle, its controls still post, for when auto-mouse is back on.
+            const mode = page.locator('[data-f="lighting:auto:fade-mode"]');
+            const other = await mode.evaluate((select) => [...select.options].find((option) => !option.selected).value);
+            await page.evaluate(() => {window.__posted.length = 0;});
+            await mode.selectOption(other);
+            await expect.poll(() => page.evaluate(() => window.__posted.length)).toBe(1);
+        }
+        await expect(page.locator(`[data-ltab="${stage}"]`)).toHaveClass(/off/);
+        await banner.click();
+        await expect(page.locator(`[data-screen="${screen}"]`)).toHaveAttribute("aria-current", "true");
+        await expect(page.locator(`.setrow:has([data-macro="${macro}"])`)).toHaveClass(/revealed/);
+    }
+    await open("layers");
+    await expect(banner).toHaveCount(0);
+    expect(errors).toEqual([]);
+});
+
+test("Esc straight after opening a panel closes that panel alone, with focus still on its button", async ({page}) => {
+    await page.goto("/preview/index.html");
+    await page.locator('[data-screen="keys"]').click();
+    const panels = page.locator(".def-pop");
+    const layersButton = page.locator('[data-act="definition-layers"]');
+
+    // In the combo builder, Esc would otherwise cancel the form under it.
+    await page.locator('[data-tab="combos"]').click();
+    await page.getByRole("button", {name: "New combo", exact: true}).click();
+    await page.locator("[data-output]").fill("KC_A");
+    await layersButton.click();
+    await expect(panels).toHaveCount(1);
+    await expect(layersButton).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(panels).toHaveCount(0);
+    await expect(layersButton).toBeFocused();
+    await expect(page.locator("[data-output]")).toHaveValue("KC_A");
+    // With no panel open, Esc cancels the builder as ever.
+    await page.keyboard.press("Escape");
+    await expect(page.locator(".combo-builder [data-output]")).toHaveCount(0);
+
+    // On a behaviour, both of its panels.
+    await page.locator('[data-tab="behaviours"]').click();
+    for (const act of ["definition-layers", "behaviour-timings"]) {
+        const button = page.locator(`[data-act="${act}"]`);
+        await button.click();
+        await expect(panels).toHaveCount(1);
+        await page.keyboard.press("Escape");
+        await expect(panels).toHaveCount(0);
+        await expect(button).toBeFocused();
+    }
+});
+
+test("an open panel takes Esc first wherever focus is, and a sheet over it takes Esc before it", async ({page}) => {
+    await page.goto("/preview/index.html");
+    await page.locator('[data-screen="keys"]').click();
+    await page.locator('[data-tab="combos"]').click();
+    await page.getByRole("button", {name: "New combo", exact: true}).click();
+    const output = page.locator("[data-output]");
+    await output.fill("KC_A");
+    const panels = page.locator(".def-pop");
+    const layersButton = page.locator('[data-act="definition-layers"]');
+
+    // Focus moved on from the panel, into a field of the builder under it:
+    // Esc closes the panel, not the builder holding what was typed.
+    await layersButton.click();
+    await output.focus();
+    await page.keyboard.press("Escape");
+    await expect(panels).toHaveCount(0);
+    await expect(layersButton).toBeFocused();
+    await expect(output).toHaveValue("KC_A");
+
+    // Moving focus does not close the panel; only Esc or a press outside do.
+    await layersButton.click();
+    await output.focus();
+    await expect(panels).toHaveCount(1);
+
+    // The keycode picker opened from the keyboard sits over the panel, so it
+    // closes first, then the panel, then the builder, one Esc each.
+    await page.locator('[data-act="pickout"]').focus();
+    await page.keyboard.press("Enter");
+    const sheet = page.locator(".sheet.picker");
+    await expect(sheet).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(sheet).toHaveCount(0);
+    await expect(panels).toHaveCount(1);
+    await page.keyboard.press("Escape");
+    await expect(panels).toHaveCount(0);
+    await expect(output).toHaveValue("KC_A");
+    await page.keyboard.press("Escape");
+    await expect(output).toHaveCount(0);
+});
+
+test("the keyboard menu and the Layers panel opened over an open panel each take Esc before it", async ({page}) => {
+    await page.goto("/preview/index.html");
+    await page.locator('[data-screen="keys"]').click();
+    await page.locator('[data-tab="combos"]').click();
+    await page.getByRole("button", {name: "New combo", exact: true}).click();
+    const panels = page.locator(".def-pop");
+    await page.locator('[data-act="definition-layers"]').click();
+    await expect(panels).toHaveCount(1);
+
+    await page.locator("#rail-keyboard").focus();
+    await page.keyboard.press("Enter");
+    await expect(page.locator("#rail-menu")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.locator("#rail-menu")).toHaveCount(0);
+    await expect(panels).toHaveCount(1);
+
+    await page.getByRole("button", {name: "Rename & reorder"}).focus();
+    await page.keyboard.press("Enter");
+    await expect(page.locator(".layerpanel")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.locator(".layerpanel")).toHaveCount(0);
+    await expect(panels).toHaveCount(1);
+
+    await page.keyboard.press("Escape");
+    await expect(panels).toHaveCount(0);
+    await expect(page.locator("[data-output]")).toHaveCount(1);
 });
 
 test("a transparent late-layer key explains its source and opens that placement", async ({page}) => {

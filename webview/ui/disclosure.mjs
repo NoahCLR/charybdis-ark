@@ -5,6 +5,7 @@
 // state. Both wear .disclose (styles.css, "disclosure").
 import {DISCLOSURE, esc, watchPressOutside} from "../lib/dom.mjs";
 import {render, state} from "../store.mjs";
+import {hideHover} from "./hover.mjs";
 
 // A fold opened by hand stays open across renders, wherever it appears
 // next, for the session (state.foldsOpen).
@@ -25,7 +26,11 @@ export function disclosureButton(label, {open, className = "", tip = "", attrs =
     return `<button type="button" class="disclose${className ? ` ${esc(className)}` : ""}" aria-expanded="${open}"${tip ? ` data-tip="${esc(tip)}"` : ""}${attrs ? ` ${attrs}` : ""}>${DISCLOSURE}<span>${esc(label)}</span></button>`;
 }
 
-// The outside-press watch of each open panel, by its place: one for the page.
+// What opens over a panel, so answers Esc before it: a sheet, the keyboard menu
+// and the Layers panel.
+const OVER_A_PANEL = '[aria-modal="true"], [role="menu"], [role="dialog"]:not(.def-pop)';
+// The outside-press and Esc watch of each open panel, by its place: one for the
+// page.
 /** @type {Map<string, () => void>} */
 const watching = new Map();
 
@@ -35,14 +40,17 @@ const watching = new Map();
  * `aria-haspopup="dialog"`, and, while the fold is open, the panel
  * (`.def-pop`), both inside `root`. The caller draws the panel when
  * `foldOpen(place)`, so it stays open across the redraws its controls cause.
- * Esc closes it with focus back on its button. A press outside closes it in
- * place rather than by a redraw, and only once the click has landed: the
- * panel reaches below the editor, so taking it out on the press itself can
- * scroll the page under the pointer and lose the click on what it was on. One
- * watch for the page per place: a tab laid out for its height draws a second
- * editor, with a panel of its own, so a press counts as inside by what it
- * lands on (`within`, the control's own selector), and the close takes out
- * every panel of the place. `onClose` runs however it closes, before any
+ * Esc closes it wherever focus is, with focus back on its button, and goes no
+ * further: it lies over the editor around it, which keeps its own Esc for when
+ * no panel is open, and only what opens over it (OVER_A_PANEL) takes Esc first.
+ * So the watch is the page's, and it asks whether a panel is drawn: an editor
+ * can go without closing its panel. A press outside closes it in place rather
+ * than by a redraw, and only once the click has landed: the panel reaches below
+ * the editor, so taking it out on the press itself can scroll the page under the
+ * pointer and lose the click on what it was on. One watch for the page per
+ * place: a tab laid out for its height draws a second editor, with a panel of
+ * its own, so a press counts as inside by what it lands on (`within`, the
+ * control's own selector), and the close takes out every panel of the place. `onClose` runs however it closes, before any
  * redraw: what the panel held unkept goes with it.
  * @param {HTMLElement} root the control: its button and, when open, its panel
  * @param {{place: string, act: string, within: string, onClose?: () => void}} options the fold's
@@ -60,21 +68,25 @@ export function panelDisclosure(root, {place, act, within, onClose}) {
     // every open panel again.
     requestAnimationFrame(() => keepInWindow(pop));
     if (!replacing) { replacing = true; addEventListener("resize", () => document.querySelectorAll(".def-pop").forEach((panel) => keepInWindow(/** @type {HTMLElement} */ (panel)))); }
-    pop.addEventListener("keydown", (event) => {
-        if (event.key !== "Escape") return;
+    /** @param {KeyboardEvent} event */
+    const escape = (event) => {
+        if (event.key !== "Escape" || !document.querySelector(`${within} .def-pop`) || document.querySelector(OVER_A_PANEL)) return;
         event.preventDefault(); event.stopPropagation();
+        hideHover();
         close(); render();
         /** @type {HTMLElement | null} */ (document.querySelector(`[data-act="${act}"]`))?.focus();
-    });
+    };
     watching.get(place)?.();
-    watching.set(place, watchPressOutside([], (event) => {
+    document.addEventListener("keydown", escape, true);
+    const stopPress = watchPressOutside([], (event) => {
         if (/** @type {Element | null} */ (event.target instanceof Element ? event.target : null)?.closest(within)) return;
         close();
         document.addEventListener("click", () => {
             document.querySelectorAll(`${within} .def-pop`).forEach((panel) => panel.remove());
             document.querySelectorAll(`[data-act="${act}"]`).forEach((trigger) => trigger.setAttribute("aria-expanded", "false"));
         }, {capture: true, once: true});
-    }));
+    });
+    watching.set(place, () => { stopPress(); document.removeEventListener("keydown", escape, true); });
 }
 
 // A panel opens at its button's left edge, and is never wider than the window

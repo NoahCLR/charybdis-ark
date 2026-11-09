@@ -16,6 +16,7 @@ import {setReachGroupOpen} from "../../view/reach-groups.mjs";
 import {tabReach} from "../../view/tab-reach.mjs";
 import {actionMarked, comboInputsMarked, layerMarked, tierDot} from "../marks.mjs";
 import {behaviourEditor} from "./behaviour-editor.mjs";
+import {masterOffBanner, underBanner} from "../participation.mjs";
 import {behaviourKey, behaviourRoute, selectBehaviourKey} from "./behaviour-selection.mjs";
 import {sourceLabel} from "./reach.mjs";
 
@@ -111,5 +112,5 @@ export function tabBehaviours(body, right) {
         main.appendChild(behaviourEditor(behaviour));
     }
     else main.appendChild(el(`<p class="note beh-empty">Transparent keys and KC_NO cannot have a behaviour. Pick a mapped key on the board.</p>`));
-    body.replaceChildren(node);
+    body.replaceChildren(underBanner(masterOffBanner("behaviour"), node));
 }

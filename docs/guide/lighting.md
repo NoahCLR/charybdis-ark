@@ -86,7 +86,8 @@ How the pointer layer's light fades when auto-mouse turns it off:
   share.
 
 The board shows where the fade lands, not the animation. With auto-mouse off,
-this stage paints nothing.
+this stage paints nothing: its tab reads off, and an amber banner says so. Its
+controls stay editable. Click the banner to go to the **Auto-mouse** switch.
 
 ### Pointing modes
 
@@ -134,6 +135,10 @@ paints beneath it: the board runs the mode from the combo's keys, and the mode
 covers the combo's colour wherever both paint. Where no combo fires on the
 layer shown, the line under the board says so.
 
+With **Enabled** off on Combo settings no combo fires, so this stage paints
+nothing: its tab reads off, and an amber banner says so. Its controls stay
+editable. Click the banner to go to that switch.
+
 ### Key feedback
 
 The colours a key flashes as a behaviour fires, in two groups, as the
@@ -155,6 +160,10 @@ Under **When and where**:
 
 These are also the colours of the behaviour dots on the board and of the
 behaviour grid's branch numbers.
+
+With **Enabled** off on Behaviour settings no behaviour fires, so this stage
+paints nothing: its tab reads off, and an amber banner says so. Its controls
+stay editable. Click the banner to go to that switch.
 
 ## Accents
 

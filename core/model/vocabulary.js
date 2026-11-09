@@ -724,7 +724,14 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     comboOptions: {useOutputBehavior: "use output behaviour", mustHold: "must be held", mustTap: "tap only", ordered: "keys in order"},
     // What a behaviour and a combo share, as both editors label it and the
     // review names it: whether it runs, and on which layers.
-    definitionFields: {use: {behaviour: "Use this behaviour", combo: "Use this combo"}, allowedLayers: "Layers it runs on"},
+    definitionFields: {use: {behaviour: "Use this behaviour", combo: "Use this combo"}, allowedLayers: "Layers it runs on",
+        offInSettings: {behaviour: `off in ${SETTINGS_SCREENS.behaviours}`, combo: `off in ${SETTINGS_SCREENS.combos}`}, onceOn: {behaviour: "For a key on this layer, this switch takes effect once that is on again; for a combo sending this behaviour, it applies now.",
+            combo: "This switch takes effect once that is on again."}},
+    // A banner while a global switch keeps something off, which goes to that
+    // switch, and what a lighting stage adds when it is the thing kept off.
+    settingOff: {switches: {behaviour: {off: "Behaviours are off.", fix: `Turn them on in ${SETTINGS_SCREENS.behaviours} →`},
+        combo: {off: "Combos are off.", fix: `Turn them on in ${SETTINGS_SCREENS.combos} →`},
+        autoMouse: {off: "Auto-mouse is off.", fix: `Turn it on in ${SETTINGS_SCREENS.pointer} →`}}, stage: "This stage paints nothing."},
     // A behaviour's own switch, as its editor labels it and the review names
     // it, and the fold its timings open from.
     behaviourFields: {anchor: "Keeps the pointer layer on", timings: "Timings"},
