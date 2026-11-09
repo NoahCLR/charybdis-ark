@@ -50,15 +50,28 @@ the Key tab says so. A keycode you set here goes on the top layer and wins.
 picker. It starts with
 a board labelled for your computer's keyboard layout (set in
 [Host settings](macros.md#your-computer)), with Shift above each legend and
-Option or AltGr on the right. Below it are sections by task:
-**Symbols**, **Navigation**, **Numpad**, **Layers**, **Pointing modes**,
-**Macros**, **Mouse**, **Media**, **Lighting**, **Magic** and **Custom keys**,
-then **More keys**, **Other QMK** and **All keycodes**. **Search every
-section** finds keys by name, including your macros by the names you gave
-them.
+Option or AltGr on the right. Below it are sections by task: **Letters and
+digits**, **Symbols**, **Numpad**, **Common keys**, then the things you own,
+**Layers**, **Macros**, **Custom keys** and **Pointing modes**, then **Mouse**,
+**Media**, **More keys**, **Lighting**, **Magic** and **Other QMK**. Keys sit in
+named groups, such as Arrows, Function and Modifiers, and **No key** in Common
+keys holds N/A and Transparent. **All keycodes** lists every key the picker
+offers, section by section, in the same groups.
+
+**Search every section** finds any key, however many match: by its name, the
+words on its tile in any order, its other QMK spellings such as `KC_BSPC`, or
+the start of a group's or a section's name, so `arrows` lists the arrow keys and
+`no key` lists N/A and Transparent. Keyboard and All keycodes hold so many keys
+that they take their first five letters, so `all` still finds a macro called
+Select All. Search takes in your macros and custom keys by the names you gave
+them, and layer keys by their keycode, layer name or form, such as `MO(3)`, or
+`numbers hold` for a layer called Numbers. A shortcut's layers are switches
+rather than keys, so its search doesn't list them.
 
 The picker shows only what this firmware can do: keys for features it wasn't
-built with are left out.
+built with are left out, in All keycodes and in search too. A key with
+modifiers held, such as `LCTL(KC_A)`, or a Tap-hold, such as `LT(1, KC_A)`,
+isn't listed: pick its parts.
 
 **Layers** offers each layer as:
 

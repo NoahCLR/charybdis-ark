@@ -1,7 +1,7 @@
 // @ts-check
 /**
  * @typedef {import("../../contracts/panel.js").PublishedModel | null} Model
- * @typedef {import("../../contracts/panel.js").MacroSlot} MacroSlot
+ * @typedef {import("../state.js").PickerState} Picker
  */
 // Selector assertions describe the authored sheet; click targets can be SVG
 // board keys, whose nearest data-bearing ancestor supplies the same dataset.
@@ -14,11 +14,11 @@ import {getModel, layers, render, state} from "../store.mjs";
 import {actionMarked, keyNameMarked, keyNameText, layerMarked, layerMarkedAt, marked} from "./marks.mjs";
 import {PICKER_BOARD, legendFits, pickerBoardKey} from "../view/picker-board.mjs";
 import {comboOutputProblem, keyProblem} from "../view/keycode-expression.mjs";
-import {dropKey, foldedPick, isLayerKeyPicked, isPicked, offeredEntries, offeredMacros, offeredSections, openingPick, pickAllowed, pickKey, pickModifier, pickProblem, pickValue, pickedExpression, pickerMatches, shownSection} from "../view/picker.mjs";
+import {dropKey, foldedPick, isLayerKeyPicked, isPicked, offeredMacros, offeredSections, openingPick, pickAllowed, pickKey, pickModifier, pickProblem, pickValue, pickedExpression, shownSection} from "../view/picker.mjs";
+import {foundGroups, layerKeys, listedSections, sectionGroups, tileSpan} from "../view/picker-tiles.mjs";
 import {customKeyChoice, offeredName, shortcutLayerKinds, shortcutLayerRows, shortcutOffer, shortcutPick, shortcutPickLabel, shortcutPickMods, shortcutLimitWords} from "../view/custom-key.mjs";
 import {layerSwitchTable, switchedLayers} from "./layer-switches.mjs";
 import {vocabulary, word, layerCalled, slotNamed} from "../view/vocabulary.mjs";
-import {macroShortName} from "../view/macro.mjs";
 import {keyIdentity} from "../view/key-identity.mjs";
 
 /** @param {Model} model */
@@ -56,44 +56,87 @@ const closePicker = () => { state.picker = null; render(); };
 
 const expression = () => pickedExpression(getModel(), state.picker);
 
-// A catalogue key's tile, named as every surface names a key: a pointing mode
-// or a custom key by its mark, as a layer's row and a macro's tile are. Its
-// accessible name keeps the words a mark and tag draw apart.
-/** @param {Model} model @param {Pick<import("../../contracts/panel.js").CatalogEntry, "value" | "label" | "tip">} entry @param {boolean} picked */
-function keyButton(model, entry, picked) {
-    const words = entry.label || entry.value;
-    return `<button class="pk ${picked ? "on" : ""}" data-pick="${esc(entry.value)}" aria-label="${esc(`${words} ${entry.value}`)}"${entry.tip ? ` data-tip="${esc(entry.tip)}"` : ""}>
-        <span class="l">${keyNameMarked(model, words, entry.value)}</span><span class="c">${esc(entry.value)}</span></button>`;
+// A key's tile, named as every surface names a key: a layer key, a pointing
+// mode or a custom key by its mark, as a macro's tile is. Its accessible name
+// keeps the words a mark and tag draw apart. A Tap-hold tile arms its layer,
+// and is lit while armed; any other picks its key.
+/** @param {Model} model @param {Picker} picker @param {import("../view/picker-tiles.mjs").Tile} tile @param {number} span */
+function keyTile(model, picker, tile, span) {
+    const on = tile.tapHold ? picker.layerTap === String(tile.layer)
+        : tile.layer !== undefined ? isLayerKeyPicked(model, picker, tile.value) : isPicked(model, picker, tile.value);
+    return `<button class="pk s${esc(span)} ${on ? "on" : ""}" ${tile.tapHold ? `data-lt="${esc(tile.layer)}"` : `data-pick="${esc(tile.value)}"`} aria-label="${esc(`${tile.words} ${tile.value}`)}" data-tip="${esc(tile.tip)}">
+        <span class="l">${tile.macro ? marked(model, {kind: "macro"}, tile.words)
+            : tile.tapHold ? `${esc(tile.verb)} ${layerMarkedAt(model, tile.layer ?? 0)}`
+            : keyNameMarked(model, tile.words, tile.value)}</span><span class="c">${esc(tile.sub)}</span></button>`;
 }
 
-// A macro slot shows by its name when it has one, with its slot and size
-// underneath, so a named macro is recognisable wherever it is offered. An
-// unnamed slot's face is its slot tag ("M3"), as the Macros list and the
-// macro editor's tag show it: a key-sized tile, where core's longer name
-// ("Macro 3", macroNamed) would need a wide one.
-/** @param {Model} model @param {MacroSlot} slot @param {boolean} picked */
-function macroButton(model, slot, picked) {
-    return `<button class="pk ${slot.name ? "wide" : ""} ${picked ? "on" : ""}" data-pick="${esc(slot.keycode)}" data-tip="${esc(slot.keycode)}">
-        <span class="l">${marked(model, {kind: "macro"}, slot.name || macroShortName(slot))}</span>
-        <span class="c">${slot.name ? `${esc(macroShortName(slot))} · ` : ""}${slot.empty ? "empty" : `${esc(slot.bytes)} B`}</span></button>`;
+// A key's button in a layer's or a pointing slot's row: its form over its
+// keycode. `arms` is the layer a Tap-hold arms, instead of picking a key.
+/** @param {string} value @param {string} label @param {string} tip @param {boolean} on @param {number} [arms] */
+const rowButton = (value, label, tip, on, arms) =>
+    `<button class="pk wide ${on ? "on" : ""}" ${arms === undefined ? `data-pick="${esc(value)}"` : `data-lt="${esc(arms)}"`} data-tip="${esc(tip)}"><span class="l">${esc(label)}</span><span class="c">${esc(value)}</span></button>`;
+
+// One row per layer: its name and a button for each of its keys (layerKeys). A
+// key storing another form of the same act lights its button (isLayerKeyPicked:
+// TG(n) lights Lock).
+/** @param {Model} model @param {Picker} picker */
+function layerRows(model, picker) {
+    return `<div class="pk-layers">${layers().map((layer) => `
+        <div class="pk-layer">
+            <span class="ix">${esc(layer.index)}</span><span class="nm">${layerMarked(model, layer)}</span>
+            ${layerKeys(model, layer.index, picker).map(({value, verb, tip, tapHold}) => tapHold
+                ? rowButton(value, verb, tip, picker.layerTap === String(layer.index), layer.index)
+                : rowButton(value, verb, tip, isLayerKeyPicked(model, picker, value))).join("")}
+        </div>`).join("")}</div>`;
 }
+
+// One row per pointing slot, laid out like the layers: the slot, what it does,
+// then its two keycodes. An empty slot is still offered, since its keycodes are
+// fixed; the row says it does nothing until configured. Past eight slots the
+// rows run down two columns, slot order first.
+/** @param {Model} model @param {Picker} picker */
+function modeRows(model, picker) {
+    const slots = model?.pdModes || [];
+    const many = slots.length > 8;
+    const rows = many ? ` style="grid-template-rows:repeat(${Math.ceil(slots.length / 2)}, auto)"` : "";
+    const kinds = vocabulary(model).pointing.kinds;
+    return `<div class="pk-layers modes ${many ? "many" : ""}"${rows}>${slots.map((slot) => `
+        <div class="pk-layer ${slot.kind ? "" : "empty"}">
+            <span class="ix">${esc(slot.id)}</span>
+            <span class="nm">${marked(model, {kind: "pointing", slot: slot.id}, slotNamed(slot))}<span class="sub">${esc(slot.kind ? word(kinds, slot.kind) : "Empty — does nothing yet")}</span></span>
+            ${rowButton(slot.keys.hold, "Hold", "On while the key is down.", isPicked(model, picker, slot.keys.hold))}
+            ${rowButton(slot.keys.lock, "Lock", "Turns the mode on until pressed again.", isPicked(model, picker, slot.keys.lock))}
+        </div>`).join("")}</div>`;
+}
+
+// Groups of keys on one twelve-column grid, a group's tiles all of one span, so
+// edges line up from group to group.
+/** @param {Model} model @param {Picker} picker @param {import("../view/picker-tiles.mjs").TileGroup[]} groups */
+const keyGroups = (model, picker, groups) => groups.map((group) => `<section class="pk-group">${group.name ? `<div class="label pk-label">${esc(group.name)}</div>` : ""}
+    <div class="pk-grid">${group.tiles.map((tile) => keyTile(model, picker, tile, tileSpan(group.tiles))).join("")}</div></section>`).join("");
+
+// All keycodes: every section under its name, in its groups or its rows.
+/** @param {Model} model @param {Picker} picker @param {import("../view/picker-tiles.mjs").ListedSection[]} sections */
+const allKeycodes = (model, picker, sections) => sections.map((section) => `<section class="pk-section"><h3 class="pk-section-head">${esc(section.name)}</h3>
+    ${section.rows === "layers" ? layerRows(model, picker) : section.rows === "modes" ? modeRows(model, picker)
+        : keyGroups(model, picker, section.groups)}</section>`).join("");
+
+// Said wherever a Tap-hold can be armed.
+/** @param {Model} model @param {Picker} picker */
+const armedWords = (model, picker) => `Tap-hold on <b>${layerMarkedAt(model, Number(picker.layerTap))}</b> is armed — now pick the tap key from any section.`;
 
 /** @param {Model} model */
 function sectionBody(model) {
     const picker = state.picker;
     if (!picker) return "";
-    /** @param {string} value */
-    const picked = (value) => isPicked(model, picker, value);
 
     if (picker.search) {
-        const {macros, keycodes: matches} = pickerMatches(model, picker);
-        if (!matches.length && !macros.length) return `<p class="note pk-empty">Nothing in the keyboard's catalogue or macros matches “${esc(picker.search)}”.</p>`;
-        const count = matches.length + macros.length;
-        return `<div class="pk-body"><p class="note pk-count">${count} match${count === 1 ? "" : "es"}</p>
-            ${macros.length ? `<div class="label pk-label">Macros</div>
-                <div class="pk-rows pk-macros">${macros.map((slot) => macroButton(model, slot, picked(slot.keycode))).join("")}</div>` : ""}
-            ${matches.length ? `${macros.length ? `<div class="label pk-label">Keycodes</div>` : ""}
-                <div class="pk-rows">${matches.map((entry) => keyButton(model, entry, picked(entry.value))).join("")}</div>` : ""}</div>`;
+        const groups = foundGroups(model, picker);
+        const count = groups.reduce((sum, group) => sum + group.tiles.length, 0);
+        if (!count) return `<p class="note pk-empty">No key matches “${esc(picker.search)}”.</p>`;
+        return `<div class="pk-body"><p class="note pk-count">${esc(count)} match${count === 1 ? "" : "es"}</p>
+            ${picker.layerTap ? `<p class="note pk-count">${armedWords(model, picker)}</p>` : ""}
+            ${keyGroups(model, picker, groups)}</div>`;
     }
 
     const section = shownSection(model, picker);
@@ -103,7 +146,7 @@ function sectionBody(model) {
             // The host layout's legends replace the ANSI board's, so a German
             // board reads Z where QMK says KC_Y; the key it stores is unchanged.
             const key = pickerBoardKey(source, model);
-            const on = picked(key.value);
+            const on = isPicked(model, picker, key.value);
             const shifted = key.labels[1] && key.labels[1].length <= 3;
             const extra = key.labels[2] || key.labels[3];
             return `<g class="pkb-key ${on ? "on" : ""}" data-pick="${esc(key.value)}" tabindex="0" role="button" aria-label="${esc(spoken)}">
@@ -135,57 +178,26 @@ function sectionBody(model) {
         <p class="note pk-note">Each layer switched on turns on as the choice above says, as that layer key would. The base and default layers are always on.</p></div>`;
     }
     if (section.kind === "layers") {
-        // A key storing another form of the same act lights its button
-        // (isLayerKeyPicked: TG(n) lights Lock); each button reads as core
-        // words its form (vocabulary.layerKeyVerbs).
-        const verbs = vocabulary(model).layerKeyVerbs;
-        /** @param {string} value @param {string} label @param {string} tip */
-        const button = (value, label, tip, on = isLayerKeyPicked(model, picker, value)) =>
-            `<button class="pk wide ${on ? "on" : ""}" data-pick="${esc(value)}" data-tip="${esc(tip)}"><span class="l">${esc(label)}</span><span class="c">${esc(value)}</span></button>`;
-        return `<div class="pk-body"><div class="pk-layers">${layers().map((layer) => `
-            <div class="pk-layer">
-                <span class="ix">${esc(layer.index)}</span><span class="nm">${layerMarked(model, layer)}</span>
-                ${button(`MO(${layer.index})`, verbs.MO ?? "", "On while the key is down.")}
-                ${button(`LOCK_LAYER(${layer.index})`, verbs.LOCK_LAYER ?? "", "Turns the layer on until pressed again. QMK's TG() is the same lock.")}
-                ${picker.comboOutput ? "" : `<button class="pk wide ${picker.layerTap === String(layer.index) ? "on" : ""}" data-lt="${esc(layer.index)}" data-tip="A tap sends a key, a hold holds the layer. Pick the tap key next."><span class="l">Tap-hold</span><span class="c">LT(${esc(layer.index)}, …)</span></button>`}
-                ${button(`TT(${layer.index})`, verbs.TT ?? "", "Holds the layer like Hold; repeated taps lock it.")}
-                ${button(`OSL(${layer.index})`, verbs.OSL ?? "", "Holds the layer like Hold; a tap turns it on for the next key only.")}
-                ${button(`TO(${layer.index})`, verbs.TO ?? "", "Locks this layer alone and releases every other lock. TO(0) returns to the base layer.")}
-            </div>`).join("")}</div>
+        return `<div class="pk-body">${layerRows(model, picker)}
             <p class="note pk-note">${picker.layerTap
-                ? `Tap-hold on <b>${layerMarkedAt(model, Number(picker.layerTap))}</b> is armed — now pick the tap key from any section.`
+                ? armedWords(model, picker)
                 : `Hold reaches the layer while the key is down. Lock toggles it. ${picker.comboOutput ? "" : "Tap-hold asks for a tap key next. "}Tap-toggle and One-shot hold like Hold; Move to switches to the layer alone.${picker.comboOutput ? " A combo can't send Tap-hold, which needs a key of its own." : ""}`}</p></div>`;
     }
     if (section.kind === "modes") {
-        // One row per slot, laid out like the layers: the slot, what it does,
-        // then its two keycodes. An empty slot is still offered, since its
-        // keycodes are fixed; the row says it does nothing until configured.
-        // Past eight slots the rows run down two columns, slot order first.
-        const slots = model?.pdModes || [];
-        const many = slots.length > 8;
-        const rows = many ? ` style="grid-template-rows:repeat(${Math.ceil(slots.length / 2)}, auto)"` : "";
-        if (!slots.length) return `<p class="note pk-empty">This keyboard has not reported its pointing modes.</p>`;
-        const kinds = vocabulary(model).pointing.kinds;
-        /** @param {string} value @param {string} label @param {string} tip */
-        const button = (value, label, tip) =>
-            `<button class="pk wide ${picked(value) ? "on" : ""}" data-pick="${esc(value)}" data-tip="${esc(tip)}"><span class="l">${esc(label)}</span><span class="c">${esc(value)}</span></button>`;
-        return `<div class="pk-body"><div class="pk-layers modes ${many ? "many" : ""}"${rows}>${slots.map((slot) => `
-            <div class="pk-layer ${slot.kind ? "" : "empty"}">
-                <span class="ix">${esc(slot.id)}</span>
-                <span class="nm">${marked(model, {kind: "pointing", slot: slot.id}, slotNamed(slot))}<span class="sub">${esc(slot.kind ? word(kinds, slot.kind) : "Empty — does nothing yet")}</span></span>
-                ${button(slot.keys.hold, "Hold", "On while the key is down.")}
-                ${button(slot.keys.lock, "Lock", "Turns the mode on until pressed again.")}
-            </div>`).join("")}</div>
+        if (!(model?.pdModes || []).length) return `<p class="note pk-empty">This keyboard has not reported its pointing modes.</p>`;
+        return `<div class="pk-body">${modeRows(model, picker)}
             <p class="note pk-note">Hold runs the mode while the key is down; Lock keeps the mode on until it is pressed again. An empty slot's key does nothing.</p></div>`;
     }
     if (section.kind === "macros") {
-        const slots = offeredMacros(model, picker);
-        if (!slots.length) return `<p class="note pk-empty">This keyboard has not reported its macros.</p>`;
-        return `<div class="pk-body"><div class="pk-rows">${slots.map((slot) => macroButton(model, slot, picked(slot.keycode))).join("")}</div></div>`;
+        if (!offeredMacros(model, picker).length) return `<p class="note pk-empty">This keyboard has not reported its macros.</p>`;
+        return `<div class="pk-body">${keyGroups(model, picker, sectionGroups(model, picker, section))}</div>`;
     }
-    const entries = offeredEntries(model, picker, section);
-    if (!entries.length) return `<p class="note pk-empty">The keyboard's catalogue has nothing in this section.</p>`;
-    return `<div class="pk-body"><div class="pk-rows">${entries.map((entry) => keyButton(model, entry, picked(entry.value))).join("")}</div></div>`;
+    if (section.kind === "all") {
+        return `<div class="pk-body">${picker.layerTap ? `<p class="note pk-count">${armedWords(model, picker)}</p>` : ""}${allKeycodes(model, picker, listedSections(model, picker))}</div>`;
+    }
+    const groups = sectionGroups(model, picker, section);
+    if (!groups.length) return `<p class="note pk-empty">The keyboard's catalogue has nothing in this section.</p>`;
+    return `<div class="pk-body">${keyGroups(model, picker, groups)}</div>`;
 }
 
 // A shortcut's layers, one row per layer in the tab order: the base layer and
@@ -242,7 +254,7 @@ export function pickerOverlay() {
         <div class="sheet-b">
             <div class="picker-side">${offeredSections(model, picker).map((section) =>
                 `<button data-sec="${esc(section.id)}" aria-current="${picker.section === section.id && !picker.search}">${esc(section.label)}</button>`).join("")}</div>
-            <div>${sectionBody(model)}</div>
+            <div class="picker-keys" data-picker-keys="${esc(picker.search ? `search:${picker.search}` : shownSection(model, picker).id)}">${sectionBody(model)}</div>
         </div>
         <div class="sheet-f">
             <span class="label">Selected</span>

@@ -5,8 +5,10 @@
 // navigation. A slot bank (Macros, Custom keys) keeps its own scroll position
 // too, as does a list that scrolls in a pane of its own ([data-scroll-list]:
 // the Lighting layers and pointing modes, each Keys reach table), each under
-// its own key so one list's place never carries into another's. Moving to
-// another screen still starts at its top.
+// its own key so one list's place never carries into another's. The keycode
+// picker keeps its keys' place and its sections' while a pick redraws it, until
+// another section or search shows other keys. Moving to another screen still
+// starts at its top.
 
 // A scroll Ark makes on its own glides, unless the person asked their system
 // for less motion: then it jumps.
@@ -14,7 +16,7 @@
 export const scrollMotion = () => globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
 
 /** @typedef {{top: number, left: number}} ScrollOffset */
-/** @typedef {ScrollOffset & {bank?: ScrollOffset, list?: {key: string, top: number}}} ContentScroll */
+/** @typedef {ScrollOffset & {bank?: ScrollOffset, list?: {key: string, top: number}, picker?: {key: string, keys: number, sections: number}}} ContentScroll */
 
 /** @param {Element} root @param {string | null} previousScreen @param {string} nextScreen */
 export function captureContentScroll(root, previousScreen, nextScreen) {
@@ -23,7 +25,9 @@ export function captureContentScroll(root, previousScreen, nextScreen) {
     if (!content) return null;
     const bank = root.querySelector(".pad.library .macro-grid");
     const list = /** @type {HTMLElement | null} */ (root.querySelector("[data-scroll-list]"));
+    const picker = /** @type {HTMLElement | null} */ (root.querySelector("[data-picker-keys]"));
     return {top: content.scrollTop, left: content.scrollLeft,
+        ...(picker ? {picker: {key: picker.dataset.pickerKeys ?? "", keys: picker.scrollTop, sections: root.querySelector(".picker-side")?.scrollTop ?? 0}} : {}),
         ...(bank ? {bank: {top: bank.scrollTop, left: bank.scrollLeft}} : {}),
         ...(list?.dataset.scrollList ? {list: {key: list.dataset.scrollList, top: list.scrollTop}} : {})};
 }
@@ -42,6 +46,16 @@ export function restoreContentScroll(root, scroll) {
     }
     const list = /** @type {HTMLElement | null} */ (root.querySelector("[data-scroll-list]"));
     if (list && scroll.list && list.dataset.scrollList === scroll.list.key) list.scrollTop = scroll.list.top;
+}
+
+// The picker is drawn over the screen, so its place comes back once it is there.
+/** @param {Element} root @param {ContentScroll | null} scroll */
+export function restorePickerScroll(root, scroll) {
+    const picker = /** @type {HTMLElement | null} */ (root.querySelector("[data-picker-keys]"));
+    if (!picker || !scroll?.picker) return;
+    const side = root.querySelector(".picker-side");
+    if (side) side.scrollTop = scroll.picker.sections;
+    if (picker.dataset.pickerKeys === scroll.picker.key) picker.scrollTop = scroll.picker.keys;
 }
 
 // A list that scrolls beside its editor keeps its picked row in view, below

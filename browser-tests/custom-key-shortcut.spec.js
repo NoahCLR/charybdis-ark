@@ -204,12 +204,12 @@ test("the shortcut picker offers the modifier keys and shifted symbols, as modif
     await page.evaluate(async () => (await import("/webview/ui/keys/key-edits.mjs")).pickKeycodeFor(27));
     open.board = await keysOf(".picker .pkb [data-pick]");
     expect(open.board).toContain("KC_LSFT");
-    for (const section of ["symbols", "more"]) {
+    for (const section of ["symbols", "common"]) {
         await page.locator(`.picker [data-sec="${section}"]`).click();
-        open[section] = await keysOf(".picker .pk-rows [data-pick]");
+        open[section] = await keysOf(".picker .pk-grid [data-pick]");
     }
     expect(open.symbols).toContain("KC_EXLM");
-    expect(open.more).toContain("KC_LEFT_CTRL");
+    expect(open.common).toContain("KC_LEFT_CTRL");
     await page.locator('.picker [data-act="cancel"]').first().click();
 
     await page.locator('[data-screen="customKeys"]').click();
@@ -224,10 +224,11 @@ test("the shortcut picker offers the modifier keys and shifted symbols, as modif
     await expect(page.locator('.picker .pkb [data-pick="KC_LSFT"]')).toHaveClass(/\bon\b/);
     await page.locator('.picker .pkb [data-pick="KC_LSFT"]').click();
     await expect(page.locator('.picker [data-mod="S"]')).not.toHaveClass(/\bon\b/);
-    await page.locator('.picker [data-sec="more"]').click();
-    expect(await keysOf(".picker .pk-rows [data-pick]")).toEqual(open.more);
+    await page.locator('.picker [data-sec="common"]').click();
+    // All but N/A and Transparent, which are no key for a shortcut to hold.
+    expect(await keysOf(".picker .pk-grid [data-pick]")).toEqual(open.common.filter((key) => key !== "KC_NO" && key !== "KC_TRANSPARENT"));
     await page.locator('.picker [data-sec="symbols"]').click();
-    expect(await keysOf(".picker .pk-rows [data-pick]")).toEqual(open.symbols);
+    expect(await keysOf(".picker .pk-grid [data-pick]")).toEqual(open.symbols);
     await page.locator('.picker [data-pick="KC_EXLM"]').click();
     await expect(page.locator('.picker [data-mod="S"]')).toHaveClass(/\bon\b/);
     await expect(page.locator('.picker [data-pick="KC_EXLM"]')).toHaveClass(/\bon\b/);

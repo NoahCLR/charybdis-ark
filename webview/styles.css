@@ -1555,9 +1555,19 @@ table.t tr.quiet > td { color: var(--text-3); }
 .hc-more { padding: var(--sp-2) var(--sp-3); border-radius: var(--r-card); border: 1px dashed var(--line-2); background: var(--surface); color: var(--text-3); font-size: var(--fs-sm); }
 
 /* ── picker ──────────────────────────────────────────────────────────── */
-.sheet.picker { width: min(1180px, 100%); }
-.sheet.picker .sheet-b { padding: 0; display: grid; grid-template-columns: 186px minmax(0, 1fr); align-items: start; }
-.pk-search { max-width: 300px; margin-left: var(--sp-3); }
+/* One height for every section and field, tall enough for every section's name:
+   the sections and the keys each scroll inside it. */
+.sheet.picker { width: min(1180px, 100%); height: min(777px, 100%); }
+.sheet.picker .sheet-b { flex: 1 1 0; min-height: 0; overflow: hidden; padding: 0; display: grid; grid-template-columns: 186px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+.picker-keys { min-height: 0; overflow: auto; }
+/* The search keeps one spot beside Close, however long the words before it. */
+.sheet.picker .sheet-h { align-items: flex-start; }
+.sheet.picker .sheet-h > div:first-child { flex: 1 1 0; min-width: 0; }
+.pk-search { flex: 0 0 300px; width: 300px; margin-left: var(--sp-3); }
+.sheet.picker .sheet-h > .right { flex: none; margin-left: var(--sp-3); }
+@container sheet (max-width: 820px) {
+  .pk-search { flex-basis: 200px; width: 200px; }
+}
 .pk-mods .note { margin-left: auto; }
 .pk-value { margin-left: var(--sp-3); color: var(--text); }
 .pk-problem { padding: 0 var(--sp-5) var(--sp-4); background: var(--surface-2); }
@@ -1565,7 +1575,7 @@ table.t tr.quiet > td { color: var(--text-3); }
 .pk-mod { height: var(--h-compact); padding: 0 var(--sp-3); border-radius: var(--r-control); border: 1px solid var(--line); background: var(--surface); font-size: var(--fs-md); color: var(--text-2); }
 .pk-mod:hover { border-color: var(--line-3); color: var(--text); }
 .pk-mod.on { background: var(--inv-bg); color: var(--inv-text); border-color: transparent; font-weight: var(--fw-strong); }
-.picker-side { border-right: 1px solid var(--line); padding: var(--sp-3) var(--sp-2); display: grid; align-content: start; gap: var(--sp-hair); min-height: 420px; }
+.picker-side { min-height: 0; overflow: auto; border-right: 1px solid var(--line); padding: var(--sp-3) var(--sp-2); display: grid; align-content: start; gap: var(--sp-hair); }
 .picker-side button { text-align: left; padding: var(--sp-2) var(--sp-3); border-radius: var(--r-control); font-size: var(--fs-md); color: var(--text-2); }
 .picker-side button:hover { background: var(--surface-2); color: var(--text); }
 .picker-side button[aria-current="true"] { background: var(--surface-3); color: var(--text); }
@@ -1573,10 +1583,24 @@ table.t tr.quiet > td { color: var(--text-3); }
 .pk-empty { padding: var(--sp-5); }
 .pk-count { margin-bottom: var(--sp-3); }
 .pk-label { margin-bottom: var(--sp-2); }
-.pk-rows.pk-macros { margin-bottom: var(--sp-3); }
+.pk-group + .pk-group { margin-top: var(--sp-4); }
+.pk-section + .pk-section { margin-top: var(--sp-5); }
+.pk-section-head { margin: 0 0 var(--sp-3); padding-bottom: var(--sp-2); border-bottom: 1px solid var(--line); font-size: var(--fs-md); font-weight: var(--fw-strong); color: var(--text); }
 .pk-note { margin-top: var(--sp-3); }
-/* Tiles run on to the sheet's edge and wrap there: a tile's width follows its words and mark. */
-.pk-rows { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+/* One grid for every group, so edges line up from group to group. A tile never
+   pushes past its cell: its words clip, and its tip says them. */
+.pk-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: var(--sp-2); }
+.pk-grid .pk { min-width: 0; width: 100%; grid-template-columns: minmax(0, 1fr); justify-items: center; }
+.pk-grid .pk .l, .pk-grid .pk .c { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
+.pk-grid .pk .l .mk { display: inline-flex; max-width: 100%; }
+.pk.s1 { grid-column: span 1; }
+.pk.s2 { grid-column: span 2; }
+.pk.s3 { grid-column: span 3; }
+.pk.s4 { grid-column: span 4; }
+@container sheet (max-width: 820px) {
+  .pk-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .pk.s4 { grid-column: span 6; }
+}
 .pk {
   min-width: 78px; height: 42px; padding: 0 var(--sp-2); border-radius: var(--r-control); border: 1px solid var(--line);
   background: var(--surface-2); display: grid; place-items: center; gap: var(--sp-hair);

@@ -8,7 +8,7 @@
 import {createPanelMessages} from "./messages.mjs";
 import * as controls from "./view/controls.mjs";
 import {el, esc} from "./lib/dom.mjs";
-import {captureBenchHeight, captureContentScroll, revealSelectedContentRow, revealSelectedListRow, restoreBenchHeight, restoreContentScroll} from "./lib/scroll.mjs";
+import {captureBenchHeight, captureContentScroll, revealSelectedContentRow, revealSelectedListRow, restoreBenchHeight, restorePickerScroll, restoreContentScroll} from "./lib/scroll.mjs";
 import {activateOnKey, focusDialog, redrawKeepingFocus, trapTab} from "./lib/focus.mjs";
 import {mountNumberEntry} from "./lib/number-entry.mjs";
 import {announce, mountAnnouncer} from "./lib/announce.mjs";
@@ -100,6 +100,7 @@ function drawApp(keptScreen, scroll, benchHeight) {
 
     const picker = pickerOverlay();
     if (picker) root.appendChild(picker);
+    restorePickerScroll(root, scroll);
     const review = reviewOverlay();
     if (review) root.appendChild(review);
     const history = historyOverlay();
