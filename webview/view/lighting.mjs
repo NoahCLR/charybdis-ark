@@ -8,6 +8,7 @@
 import {GEO, inLocality, trackballInLocality} from "./geometry.mjs";
 import {keyIdentity} from "./key-identity.mjs";
 import {keyMeaning} from "./keyface.mjs";
+import {masterOff} from "./participation.mjs";
 import {vocabulary} from "./vocabulary.mjs";
 import {OFF, inheritsStageColour, layerPaints, ledColour} from "../../rules/led-light.mjs";
 
@@ -39,15 +40,36 @@ export function stageEnabled(model, id) {
 
 // A stage switched on can still paint nothing. The auto-mouse fade runs only
 // while auto-mouse raises its layer: with auto-mouse off, a pointer layer
-// turned on by hand shows its own lighting. This answers why, or null; the
-// stored switch is left as it is, so turning auto-mouse back on restores it.
-// Without settings readback nothing is claimed.
-/** @param {Model} model @param {string} id */
-export function stageIdle(model, id) {
-    if (id !== "auto" || !stageEnabled(model, id)) return null;
+// turned on by hand shows its own lighting. Combo feedback lights a combo being
+// held, and key feedback a behaviour firing, so neither paints while the master
+// switch of what it lights is off. The stored switch is left as it is, so
+// turning that setting back on restores it. Without settings readback nothing
+// is claimed.
+/** @param {Model} model */
+function autoMouseOff(model) {
     const field = (model?.configDefaults || []).find((section) => section.id === "autoMouse")
         ?.fields.find((entry) => entry.macro === "autoMouse");
-    return field && !field.enabled ? "Auto-mouse is off, so this stage paints nothing." : null;
+    return Boolean(field && !field.enabled);
+}
+/** @type {Readonly<Record<string, {needs: import("../../contracts/model.js").SettingOffSwitch, off: (model: Model) => boolean}>>} */
+const STAGE_NEEDS = Object.freeze({
+    auto: {needs: "autoMouse", off: autoMouseOff},
+    combo: {needs: "combo", off: (model) => masterOff(model, "combo")},
+    key: {needs: "behaviour", off: (model) => masterOff(model, "behavior")},
+});
+// The global switch keeping this stage from painting; null when none is.
+/** @param {Model} model @param {string} id */
+export function stageHeldOffBy(model, id) {
+    const stage = Object.hasOwn(STAGE_NEEDS, id) ? STAGE_NEEDS[id] : null;
+    return stage && stageEnabled(model, id) && stage.off(model) ? stage.needs : null;
+}
+// Why this stage paints nothing, in the words of its banner; null when it paints.
+/** @param {Model} model @param {string} id */
+export function stageIdle(model, id) {
+    const needs = stageHeldOffBy(model, id);
+    if (!needs) return null;
+    const words = vocabulary(model).settingOff;
+    return `${words.switches[needs].off} ${words.stage}`;
 }
 
 /** @param {Model} model @param {string} id */

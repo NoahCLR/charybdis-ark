@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {createRequire} from "node:module";
 import {isOff} from "../../webview/lib/colour.mjs";
-import {baseColour, feedbackColours, inheritsStageColour, keyLed, layerPaints, keyLight, mappedKeyCount, offWording, ownLight, pdColourRow, stageEnabled, stageIdle, stageInEffect, trackballLed, trackballLight} from "../../webview/view/lighting.mjs";
+import {baseColour, feedbackColours, inheritsStageColour, keyLed, layerPaints, keyLight, mappedKeyCount, offWording, ownLight, pdColourRow, stageEnabled, stageHeldOffBy, stageIdle, stageInEffect, trackballLed, trackballLight} from "../../webview/view/lighting.mjs";
 
 const colour = (h, s, v) => ({h: String(h), s: String(s), v: String(v)});
 const position = (layoutIndex, keycode) => ({layoutIndex, keycode});
@@ -62,6 +62,30 @@ test("stages report what the device said, and the base effect is its own read", 
     assert.equal(baseColour(unread), null, "an unread base effect has no colour to draw");
     const animated = model({rgb: {baseEffect: {state: "read", enabled: true, effectId: 3}}});
     assert.equal(baseColour(animated), null, "an animated effect has no single colour");
+});
+
+test("combo and key feedback are in effect only while what they light can run", () => {
+    const switched = (/** @type {{behaviors?: string[], combos?: string[]}} */ reasons) => {
+        const m = model();
+        m.rgb.stages = m.rgb.stages.map((row) => ({...row, enabled: true}));
+        return {...m, participation: {layers: [{behaviors: [], combos: [], bypass: [], exclude: [], ...reasons}]}};
+    };
+    const combosOff = switched({combos: ["master"]});
+    assert.match(stageIdle(combosOff, "combo"), /combos are off/i);
+    assert.equal(stageInEffect(combosOff, "combo"), false);
+    assert.equal(stageEnabled(combosOff, "combo"), true, "the stored switch is left as it is");
+    assert.equal(stageInEffect(combosOff, "key"), true, "key feedback does not depend on combos");
+    const behavioursOff = switched({behaviors: ["master"]});
+    assert.match(stageIdle(behavioursOff, "key"), /behaviours are off/i);
+    assert.equal(stageInEffect(behavioursOff, "combo"), true, "combo feedback does not depend on behaviours");
+    assert.equal(stageIdle(switched({combos: ["layer"], behaviors: ["layer"]}), "combo"), null, "one layer's switch leaves the stage for the others");
+    assert.equal(stageIdle(model(), "combo"), null, "without settings readback nothing is claimed");
+    const stageOff = switched({combos: ["master"]});
+    stageOff.rgb.stages = stageOff.rgb.stages.map((row) => row.id === "combo" ? {...row, enabled: false} : row);
+    assert.equal(stageIdle(stageOff, "combo"), null, "a stage switched off is off, not idle");
+    assert.equal(stageHeldOffBy(combosOff, "combo"), "combo");
+    assert.equal(stageHeldOffBy(behavioursOff, "key"), "behaviour");
+    assert.equal(stageHeldOffBy(combosOff, "layers"), null, "no global switch stops this stage");
 });
 
 // The fade runs only while auto-mouse moves the layer, so with auto-mouse off

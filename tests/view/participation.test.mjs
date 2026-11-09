@@ -2,7 +2,7 @@ import test from "node:test";
 import {said} from "../../webview/view/vocabulary.mjs";
 import assert from "node:assert/strict";
 import {createRequire} from "node:module";
-import {behaviourRuns, comboJoins, participationAt, thisKeyOnThisLayer} from "../../webview/view/participation.mjs";
+import {behaviourRuns, comboJoins, layerOff, masterOff, participationAt, thisKeyOnThisLayer} from "../../webview/view/participation.mjs";
 // A decision with its reasons read as plain words.
 /** @template {{reasons: import("../../webview/view/vocabulary.mjs").Phrase[]}} U @param {U} use */
 const plainly = (use) => ({...use, reasons: use.reasons.map((reason) => said(reason))});
@@ -90,4 +90,29 @@ test("a key joins a combo only where every switch lets it", () => {
     assert.deepEqual(plainly(comboJoins(unreported, 0, at, {...combo, enabled: false})), {joins: false, reasons: ["Use this combo is off"]});
     assert.deepEqual(plainly(comboJoins({...unreported, layers}, 1, at, {...combo, allowedLayers: 1})), {joins: false, reasons: ["Layers it runs on leaves out this layer (Layer 1)"]},
         "without reported participation the combo's own layers still decide");
+});
+
+test("a layer's own switch is that layer's, for that kind only, and the master switch is no layer's", () => {
+    const off = (/** @type {any} */ from, /** @type {number} */ layer, /** @type {"behavior" | "combo"} */ kind) => {
+        const phrase = layerOff(from, layer, kind);
+        return phrase && said(phrase);
+    };
+    assert.equal(off(model, 2, "behavior"), "Behaviour settings has behaviours off on this layer (Symbol)");
+    assert.equal(off(model, 2, "combo"), "Combo settings has combos off on this layer (Symbol)");
+    assert.equal(off(model, 1, "behavior"), null);
+    const combosOnly = modelWith({behaviorLayers: ALL_LAYERS});
+    assert.equal(off(combosOnly, 2, "behavior"), null);
+    assert.ok(off(combosOnly, 2, "combo"));
+    assert.equal(off(modelWith({behaviorsEnabled: false, behaviorLayers: ALL_LAYERS}), 2, "behavior"), null);
+});
+
+test("the master switch says so of its kind alone, a layer's own switch still stands under it, and no settings read say neither", () => {
+    assert.equal(masterOff(model, "behavior"), false);
+    const off = modelWith({behaviorsEnabled: false});
+    assert.equal(masterOff(off, "behavior"), true);
+    assert.equal(masterOff(off, "combo"), false);
+    assert.equal(masterOff(modelWith({combosEnabled: false}), "combo"), true);
+    assert.ok(layerOff(off, 2, "behavior"));
+    assert.equal(masterOff(unreported, "behavior"), false);
+    assert.equal(layerOff(unreported, 2, "behavior"), null);
 });

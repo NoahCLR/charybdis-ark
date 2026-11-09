@@ -933,9 +933,6 @@ button.tier:hover { background: var(--surface-3); }
 .tab-grid.three { grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr) minmax(0, 1fr); }
 .tab-grid.two { grid-template-columns: minmax(320px, 0.9fr) minmax(0, 1.1fr); }
 .tab-grid .span { grid-column: 1 / -1; }
-/* A stage switched on that paints nothing (auto-mouse off): its controls stay
-   visible and kept, but read as not in play. */
-.tab-grid.idle > section { color: var(--text-2); }
 .tab-grid section { min-width: 0; }
 .tab-split { display: grid; grid-template-columns: 236px minmax(0, 1fr); gap: var(--sp-5); align-items: start; }
 .tab-split.builder { grid-template-columns: 330px minmax(0, 1fr); }
@@ -2049,6 +2046,8 @@ select.input.pd-add { height: var(--h-chip); width: 124px; min-width: 0; padding
 .layer-grid .sw { min-width: 0; }
 .layer-grid .sw[hidden] { display: none; }
 .layer-grid .sw .txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* A row's reason stands apart at its right, whole; its name gives way first. */
+.layer-grid .sw .layer-why { flex: none; margin-left: auto; padding-left: var(--sp-4); white-space: nowrap; }
 /* Switches per layer in columns (layer-switches.mjs): a row per layer, its
    name then a column per switch; an unusable row is dimmed, its reason in it. */
 .layer-table { display: grid; }
@@ -2058,11 +2057,11 @@ select.input.pd-add { height: var(--h-chip); width: 124px; min-width: 0; padding
 /* The reason wraps under the name rather than squeezing it. */
 .layer-table-name { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 var(--sp-3); min-width: 0; }
 .layer-table-name .txt { font-size: var(--fs-md); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.layer-table-why { font-size: var(--fs-sm); color: var(--text-3); min-width: 0; }
+.layer-why { font-size: var(--fs-sm); color: var(--text-3); min-width: 0; }
 .layer-table-row .sw { min-width: 0; }
 .layer-table-row .sw .txt { font-size: var(--fs-sm); line-height: 1.3; }
-.layer-table-row.unusable .layer-table-name .txt { color: var(--text-disabled); }
-.layer-table-row.unusable .layer-table-name .mk > :first-child { opacity: .45; }
+.layer-table-row.unusable .layer-table-name .txt, .layer-grid .sw.vetoed .txt { color: var(--text-disabled); }
+.layer-table-row.unusable .layer-table-name .mk > :first-child, .layer-grid .sw.vetoed .mk > :first-child { opacity: .45; }
 @container content (max-width: 788px) { .layer-table-row { grid-auto-columns: minmax(0, 190px); } }
 @container content (max-width: 528px) { .layer-table-row { grid-auto-columns: minmax(0, 132px); } }
 .btn .settings-help-mark { width: 14px; height: 14px; flex: none; fill: currentColor; stroke: none; }
@@ -2113,6 +2112,13 @@ select.input.pd-add { height: var(--h-chip); width: 124px; min-width: 0; padding
 .note.warn { color: var(--warning); }
 .callout { border: 1px solid var(--line); border-left: 2px solid var(--line-3); border-radius: 0 var(--r-control) var(--r-control) 0; padding: var(--sp-3) var(--sp-3); background: var(--surface-2); font-size: var(--fs-md); color: var(--text-2); }
 .callout.warn { border-left-color: var(--draft); }
+/* A global switch off: what this tab holds does not run, and pressing it goes to
+   that switch (ui/participation.mjs). */
+.callout.master-off { display: block; width: 100%; margin-bottom: var(--sp-3); text-align: left; color: var(--text); border-color: color-mix(in srgb, var(--warning) 55%, var(--line)); border-left-color: var(--warning); background: color-mix(in srgb, var(--warning) 14%, var(--surface)); }
+.banner-over { display: grid; grid-template: auto 1fr / minmax(0, 1fr); }
+.banner-over > .tab-grid { align-self: start; }
+.custom-key-behaviour .callout.master-off { margin-bottom: 0; }
+.callout.master-off:hover { background: color-mix(in srgb, var(--warning) 22%, var(--surface)); }
 /* A share of a duration as a slider whose track is the duration: solid up to
    the share, fading after it. --share is set by the control as it moves. */
 .share-field > span { display: flex; justify-content: space-between; }

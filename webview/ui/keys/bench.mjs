@@ -7,6 +7,7 @@ import {tabReach} from "../../view/tab-reach.mjs";
 import {currentLayer, currentView, getModel, render, selectedPosition, state} from "../../store.mjs";
 import {draftDot, draftMarks} from "../../view/review.mjs";
 import {keepInView} from "../layerbar.mjs";
+import {masterOffBanner, underBanner} from "../participation.mjs";
 import {rovingTabs} from "../../lib/tabs.mjs";
 import {benchHeightWith} from "../../lib/scroll.mjs";
 import {behaviourEditorRow} from "../../view/behavior-editor.mjs";
@@ -78,5 +79,5 @@ export function matchBehavioursHeight(root) {
     // the list stacks over the editor, the pane's own height.
     const sizer = el(`<div class="tab-split reach-split"><div class="bench-pane"></div><div></div></div>`);
     /** @type {HTMLElement} */ (sizer.lastElementChild).appendChild(behaviourEditor(behaviour));
-    bench.style.minHeight = `${benchHeightWith(bench, sizer)}px`;
+    bench.style.minHeight = `${benchHeightWith(bench, underBanner(masterOffBanner("behaviour"), sizer))}px`;
 }

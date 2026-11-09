@@ -1,6 +1,9 @@
 // @ts-check
 import {el} from "../../lib/dom.mjs";
 import {getModel, state} from "../../store.mjs";
+import {stageHeldOffBy} from "../../view/lighting.mjs";
+import {vocabulary} from "../../view/vocabulary.mjs";
+import {settingOffBanner, underBanner} from "../participation.mjs";
 import {benchHeightWith} from "../../lib/scroll.mjs";
 import {stageBase} from "./base.mjs";
 import {stageLayers} from "./layers.mjs";
@@ -13,6 +16,14 @@ import {accentsOverview} from "./accents.mjs";
 // The bench chooses one surface; each stage owns its controls and listeners.
 /** @type {Readonly<Record<string, (model: import("../../../contracts/panel.js").PublishedModel) => HTMLElement>>} */
 const STAGES = Object.freeze({base: stageBase, layers: stageLayers, auto: stageAuto, pd: stagePointing, combo: stageCombo, key: stageKey, accents: accentsOverview});
+
+// A stage a global switch keeps from painting leads with that switch's banner,
+// and its height counts the banner too.
+/** @param {import("../../../contracts/panel.js").PublishedModel} model @param {string} id */
+function stageSurface(model, id) {
+    const heldBy = stageHeldOffBy(model, id);
+    return underBanner(heldBy ? settingOffBanner(heldBy, vocabulary(model).settingOff.stage) : null, STAGES[id](model));
+}
 
 // The tallest stage with a list beside its editor sets Lighting's workbench
 // height for every tab, so switching stages never changes how tall the list
@@ -38,7 +49,7 @@ export function matchTallestStageHeight(root) {
     let tallest = bench.getBoundingClientRect().height;
     for (const stage of LISTED) {
         if (stage === state.stage) continue;
-        const height = measured.heights.get(stage) ?? benchHeightWith(bench, holding(STAGES[stage](model)));
+        const height = measured.heights.get(stage) ?? benchHeightWith(bench, holding(stageSurface(model, stage)));
         measured.heights.set(stage, height);
         tallest = Math.max(tallest, height);
     }
@@ -49,6 +60,5 @@ export function matchTallestStageHeight(root) {
 export function stageBody(body) {
     const model = getModel();
     if (!model) return;
-    const surface = Object.hasOwn(STAGES, state.stage) ? STAGES[state.stage] : undefined;
-    body.replaceChildren(surface?.(model) ?? el(`<div></div>`));
+    body.replaceChildren(Object.hasOwn(STAGES, state.stage) ? stageSurface(model, state.stage) : el(`<div></div>`));
 }

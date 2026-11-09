@@ -43,7 +43,11 @@ Each combo also has:
 - **Tap only**: fires only if its keys are let go before the combo hold
   threshold. Held longer, the keys type themselves.
 - **Keys in order**: fires only if its keys are pressed in the order listed.
-- **Use this combo** and **Layers it runs on**, like a behaviour's.
+- **Use this combo** and **Layers it runs on**, like a behaviour's. A layer
+  that **Combo settings** keeps combos off says *off in Combo settings* in its
+  row, and while **Enabled** there is off, an amber banner at the top of the
+  Combos tab says so. Everything stays editable. Click the banner to go to that
+  switch.
 - **Use output behaviour**: if what the combo sends has a behaviour, run it.
   Off, the combo sends its plain output.
 

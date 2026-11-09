@@ -145,10 +145,18 @@ says so, headed **Timing notice** or **Timing warning**.
 - **Use this behaviour**: turn it off to keep everything it does but stop it
   running, until you turn it on again.
 - **Layers it runs on**: opens a panel of the layers a key can come from for
-  this behaviour to run. Click outside it, or press Esc, to close it.
+  this behaviour to run. A layer that **Behaviour settings** keeps behaviours
+  off says *off in Behaviour settings* in its row. Its switch still works: for a
+  key on that layer it takes effect once Settings allows it, and for a combo
+  sending this behaviour it applies now, since a combo's output doesn't follow
+  that setting. Click outside the panel, or press Esc, to close it.
 - **Keeps the pointer layer on**: pressing this key counts as using the
   trackball, so auto-mouse keeps the pointer layer on instead of turning it
   off.
+
+While **Enabled** on Behaviour settings is off, an amber banner at the top of
+the Behaviours tab says so, and at the top of a custom key's **What it does**.
+Everything stays editable. Click the banner to go to that switch.
 
 These, and the timings, wait until the behaviour does something. On a plain
 key such as Tab, a timing does nothing until the behaviour has a branch.

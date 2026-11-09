@@ -1,4 +1,6 @@
 import type {AccentTable, Scalar, Tier, TimingTerm} from './edits.js';
+// A global switch a banner names (vocabulary.settingOff).
+export type SettingOffSwitch = 'behaviour' | 'combo' | 'autoMouse';
 export type {AccentTable};
 
 /** The setting a behaviour timing's default comes from: the dual-role tapping term or a behaviour default. */
@@ -204,7 +206,8 @@ export interface Vocabulary {
     modifiers: WordList<number>;
     comboOptions: Readonly<Record<string, string>>;
     /** What a behaviour and a combo share: whether it runs, and on which layers. */
-    definitionFields: {use: Readonly<Record<'behaviour' | 'combo', string>>; allowedLayers: string};
+    definitionFields: {use: Readonly<Record<'behaviour' | 'combo', string>>; allowedLayers: string; offInSettings: Readonly<Record<'behaviour' | 'combo', string>>; onceOn: Readonly<Record<'behaviour' | 'combo', string>>};
+    settingOff: {switches: Readonly<Record<SettingOffSwitch, {off: string; fix: string}>>; stage: string};
     behaviourFields: Readonly<Record<'anchor' | 'timings', string>>;
     comboFields: Readonly<Record<'inputs' | 'sends' | 'window' | 'conditions', string>>;
 }

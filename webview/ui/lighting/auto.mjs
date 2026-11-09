@@ -15,8 +15,8 @@ import {aboutStage, colourControl, section, stack, stageSwitch} from "./common.m
 // timeout. The keyboard stores milliseconds and keeps them with its global
 // policy, so this is a settings section, saved whole; a share cannot outlast
 // the timeout, and a new timeout on Pointer settings carries it along.
-/** @param {import("../../../contracts/panel.js").PublishedModel} model @param {string | null} idle */
-function fadeTiming(model, idle) {
+/** @param {import("../../../contracts/panel.js").PublishedModel} model */
+function fadeTiming(model) {
     const section = sectionsIn(model, "Lighting").find((entry) => entry.stage === "auto");
     const gate = editGate(model, "settings");
     const node = el(`<section><div class="sect-h"><h4>Timing${section && draftMarks(model?.draft?.changes).settings.has(section.id) ? draftDot(model?.draft) : ""}</h4></div></section>`);
@@ -28,7 +28,7 @@ function fadeTiming(model, idle) {
         return node;
     }
     const field = section.fields[0];
-    const editable = gate.editable && !field.readOnly && !idle;
+    const editable = gate.editable && !field.readOnly;
     const whole = Number(field.whole);
     // The slider's track is the timeout: solid while the colour holds, fading
     // after. Dragging previews here and commits once on release, since every
@@ -52,8 +52,8 @@ function fadeTiming(model, idle) {
     range.addEventListener("change", () => post(edits.settingsSection(section, () => range.value, model.settingsEditing?.identity)));
     const box = el(`<div class="stack gap-12"></div>`);
     box.append(control, note);
-    if (!idle) box.append(open);
-    if (!editable && !idle && !gate.quiet) box.append(el(`<div class="unavailable">${esc(gate.why || "The fade timing cannot be edited right now.")}</div>`));
+    box.append(open);
+    if (!editable && !gate.quiet) box.append(el(`<div class="unavailable">${esc(gate.why || "The fade timing cannot be edited right now.")}</div>`));
     node.append(box);
     return node;
 }
@@ -66,20 +66,11 @@ export function stageAuto(model) {
     /** @type {Partial<import("../../../contracts/panel.js").RgbView["automouseFade"]>} */
     const fade = model.rgb.automouseFade || {};
     node.className = "tab-grid three";
-    // With auto-mouse off the fade never runs, so its controls are shown
-    // disabled rather than pretending to matter. Nothing is cleared: the
-    // stage switch and these values come back with auto-mouse.
-    const idle = stageIdle(model, "auto");
-    const editFade = canEdit && !idle;
-    if (idle) {
-        node.classList.add("idle");
-        const notice = el(`<div class="unavailable span"><span>${esc(idle)} A pointer layer turned on by hand shows its own layer lighting. The fade settings below are kept for when auto-mouse is back on.</span>
-            <button class="btn tiny link self-start">Open ${esc(sectionPath(model, "autoMouse"))}</button></div>`);
-        /** @type {HTMLButtonElement} */ (notice.querySelector("button")).addEventListener("click", () => { state.screen = "pointer"; state.reveal = '.settings-group[data-section="autoMouse"]'; render(); });
-        node.append(notice);
-    }
+    // With auto-mouse off the fade never runs (the stage's banner says so,
+    // stage-body.mjs). Its controls stay editable, for when it is back on.
+    if (stageIdle(model, "auto")) node.append(el(`<p class="note span">A pointer layer turned on by hand shows its own layer lighting. The fade settings below take effect once auto-mouse is back on.</p>`));
     const policy = section("Fade");
-    const select = el(`<label class="field"><span>${esc(vocabulary(model).lightingFields.fadeMode)}</span><select data-f="lighting:auto:fade-mode" class="input" ${editFade ? "" : "disabled"}>
+    const select = el(`<label class="field"><span>${esc(vocabulary(model).lightingFields.fadeMode)}</span><select data-f="lighting:auto:fade-mode" class="input" ${canEdit ? "" : "disabled"}>
         ${vocabulary(model).fadeModes.map(([id, text]) => `<option value="${esc(id)}" ${fade.mode === id ? "selected" : ""}>${esc(text)}</option>`).join("")}</select></label>`);
     /** @type {HTMLSelectElement} */ (select.querySelector("select")).addEventListener("change", (event) =>
         { if (fade.end_color) post(edits.automouseFade(/** @type {HTMLSelectElement} */ (event.target).value, fade.end_color)); });
@@ -89,10 +80,10 @@ export function stageAuto(model) {
     endColour.append(unused
         ? el(`<div class="row colour-head unused"><span class="swatch-lg ${isOff(fade.end_color) ? "swatch-off" : ""}" style="${isOff(fade.end_color) ? "" : `background:${css(fade.end_color)}`}"></span>
             <div><div class="colour-title">Unused in this mode</div><div class="note mono">${esc(hsvLabel(fade.end_color))}</div></div></div>`)
-        : colourControl(model, {colour: fade.end_color, canEdit: editFade, title: "Fade destination", ...offWording(model, "auto"),
+        : colourControl(model, {colour: fade.end_color, canEdit, title: "Fade destination", ...offWording(model, "auto"),
             onChange: (next) => { if (fade.mode !== undefined) post(edits.automouseFade(fade.mode, next)); }}));
     if (unused) endColour.append(el(`<p class="note">This mode lands on what the board would show without the pointer layer, so it uses no end colour.</p>`));
-    node.append(policy, endColour, fadeTiming(model, idle),
+    node.append(policy, endColour, fadeTiming(model),
         aboutStage("While auto-mouse keeps the pointer layer on, its light holds, then fades toward where it lands over the rest of the auto-mouse timeout, in place of the layer colours. The board shows where the fade lands, not the animation."));
     return node;
 }

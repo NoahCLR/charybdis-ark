@@ -28,6 +28,7 @@ import {SHORTCUT_MEANS, customKeyInUse, hasShortcut, customKeyShortcutLine, same
 import {openPicker} from "./picker.mjs";
 import {behaviourEditorRow} from "../view/behavior-editor.mjs";
 import {behaviourActions, behaviourEditor} from "./keys/behaviour-editor.mjs";
+import {masterOffBanner} from "./participation.mjs";
 import {pickBehaviourKey} from "./keys/retarget.mjs";
 import {placedOnMarkup, showPlacements} from "./keys/reach.mjs";
 import {mark} from "./marks.mjs";
@@ -182,6 +183,8 @@ function behaviourCard(model, key) {
         <div class="card-b stack"></div></div>`);
     const body = /** @type {HTMLElement} */ (card.querySelector(".card-b"));
     if (behaviour) {
+        const masterBanner = masterOffBanner("behaviour");
+        if (masterBanner) body.appendChild(masterBanner);
         body.appendChild(behaviourEditor(behaviour, {head: false}));
         /** @type {HTMLButtonElement | null} */ (card.querySelector('.card-h [data-act="rekey"]'))?.addEventListener("click", () => pickBehaviourKey(behaviour));
         /** @type {HTMLButtonElement | null} */ (card.querySelector('.card-h [data-act="remove"]'))?.addEventListener("click", () =>

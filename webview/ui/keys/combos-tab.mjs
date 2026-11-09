@@ -14,6 +14,7 @@ import {vocabulary} from "../../view/vocabulary.mjs";
 import {keyMeaning, keyName} from "../../view/keyface.mjs";
 import {tabReach} from "../../view/tab-reach.mjs";
 import {comboBuilder} from "./combo-builder.mjs";
+import {masterOffBanner, underBanner} from "../participation.mjs";
 import {keysReach} from "./reach.mjs";
 
 /** @param {HTMLElement} body @param {HTMLElement} right */
@@ -107,5 +108,5 @@ export function tabCombos(body, right) {
     });
     side.append(add, state.combo.open ? comboBuilder(canEdit, () => edits.comboHoldTermValue(model, undefined)) : el(`<div class="empty-card">
         <p class="note">Pick <b>New combo</b> to build one: choose what it sends, then click its input keys straight on the board. Pick a combo in the list to edit it.</p></div>`));
-    body.replaceChildren(node);
+    body.replaceChildren(underBanner(masterOffBanner("combo"), node));
 }

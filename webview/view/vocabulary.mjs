@@ -19,7 +19,7 @@ const NONE = {phases: /** @type {Vocabulary["phases"]} */ ({}), readSteps: /** @
     pointing: {kinds: [], directions: [], diagonals: [], axes: [], invert: [], pointerLayer: [], linkLabels: {startsOther: "", linkedLayers: "", linkTurnsOn: "", linkEnds: "", startedBy: "", endsWhen: "", keyTurnsOnShort: "", ignored: "", started: ""}, linkEnds: [], linkInert: {default: "", pointer: ""},
         emptyDirection: [], directionOutput: [], directionStep: [], scrollAxes: [], modifierPolicy: [], kindsDo: [], movementLabel: "", scrollFields: [], heldModifiers: "", tips: {}, pointerLayerLabel: "",
         fieldLabels: {name: "", dpi: "", axis: "", emptyDirection: "", directionOutput: "", scrollAxes: "", invert: "", horizontal: "", vertical: ""}},
-    modifiers: [], comboOptions: {}, definitionFields: {use: {behaviour: "", combo: ""}, allowedLayers: ""}, behaviourFields: {anchor: "", timings: ""},
+    modifiers: [], comboOptions: {}, definitionFields: {use: {behaviour: "", combo: ""}, allowedLayers: "", offInSettings: {behaviour: "", combo: ""}, onceOn: {behaviour: "", combo: ""}}, settingOff: {switches: {behaviour: {off: "", fix: ""}, combo: {off: "", fix: ""}, autoMouse: {off: "", fix: ""}}, stage: ""}, behaviourFields: {anchor: "", timings: ""},
     comboFields: {inputs: "", sends: "", window: "", conditions: ""}};
 
 /** @param {VocabularyModel | null | undefined} model */
