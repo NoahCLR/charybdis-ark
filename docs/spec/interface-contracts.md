@@ -533,6 +533,11 @@ macro and a custom key, which have none:
   shortcut written as its chord ("Navigation+Extra", as its label is), and
   the layer stack's folded run, which spans its layers under one grey icon
   (`browser-tests/marks.spec.js`).
+- The keycode picker marks what it offers as it marks a layer's row: a pointing
+  slot's row and a macro's tile by the thing's mark, and a catalogue tile
+  through `keyNameMarked`, in its section and in a search alike. A mark widens
+  a tile, so tiles run on to the sheet's edge and wrap there
+  (`browser-tests/marks.spec.js`).
 - A key or action is named through `actionMarked` or `keyNameMarked`; only
   attributes and plain-text messages carry the words alone
   (`tests/view/key-names-marked.test.mjs`). One that acts on a layer or runs a

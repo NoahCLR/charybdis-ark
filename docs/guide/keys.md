@@ -74,6 +74,11 @@ built with are left out.
 **Pointing modes** offers each mode as **Hold** (on while the key is down) or
 **Lock** (on until pressed again).
 
+Layers, pointing modes, macros and custom keys show their icons here as
+everywhere else in Ark, in the sections and in search results alike: a layer
+or a pointing mode in its colour, a macro and a custom key in the colour of the
+words. See [what the icons mean](board-and-layers.md).
+
 ### Modifiers
 
 A modifier picked in the row above the board is held down with the key you

@@ -1575,15 +1575,15 @@ table.t tr.quiet > td { color: var(--text-3); }
 .pk-label { margin-bottom: var(--sp-2); }
 .pk-rows.pk-macros { margin-bottom: var(--sp-3); }
 .pk-note { margin-top: var(--sp-3); }
-.pk-rows { display: grid; gap: var(--sp-2); }
-.pk-row { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
+/* Tiles run on to the sheet's edge and wrap there: a tile's width follows its words and mark. */
+.pk-rows { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
 .pk {
   min-width: 78px; height: 42px; padding: 0 var(--sp-2); border-radius: var(--r-control); border: 1px solid var(--line);
   background: var(--surface-2); display: grid; place-items: center; gap: var(--sp-hair);
 }
 .pk:hover { border-color: var(--line-3); background: var(--surface-3); }
 .pk.on { background: var(--inv-bg); border-color: transparent; }
-.pk.on .l, .pk.on .c { color: var(--inv-text); }
+.pk.on .l, .pk.on .c, .pk.on .sends-tag { color: var(--inv-text); }
 .pk[disabled] { pointer-events: none; background: none; border-style: dashed; }
 .pk[disabled] .l, .pk[disabled] .c { color: var(--text-disabled); }
 .pk .l { font-size: var(--fs-md); }
@@ -1599,6 +1599,12 @@ table.t tr.quiet > td { color: var(--text-3); }
 .pk-layers.modes .nm { display: grid; gap: var(--sp-hair); min-width: 0; }
 .pk-layers.modes .nm > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pk-layers.modes .nm .sub { font-size: var(--fs-sm); color: var(--text-3); }
+/* A long name shortens beside its mark; lit or off, the mark is one width, so every row's
+   name starts at one edge, and the mode's kind sits under its name. */
+.pk-layers.modes .nm .mk { display: flex; }
+.pk-layers.modes .nm .mk > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.pk-layers.modes .nm .kind-icon svg { width: 14px; height: 14px; }
+.pk-layers.modes .nm .sub { padding-left: calc(14px + var(--sp-1)); }
 .pk-layer.empty .nm > span:first-child { color: var(--text-2); }
 .pk-layers.modes.many { grid-auto-flow: column; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: var(--sp-7); row-gap: var(--sp-1); }
 .pk-layers.modes.many .pk-layer { grid-template-columns: 20px minmax(0, 1fr) repeat(2, minmax(0, 120px)); }

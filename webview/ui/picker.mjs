@@ -11,7 +11,7 @@
 
 import {el, esc} from "../lib/dom.mjs";
 import {getModel, layers, render, state} from "../store.mjs";
-import {actionMarked, keyNameText, layerMarked, layerMarkedAt} from "./marks.mjs";
+import {actionMarked, keyNameMarked, keyNameText, layerMarked, layerMarkedAt, marked} from "./marks.mjs";
 import {PICKER_BOARD, legendFits, pickerBoardKey} from "../view/picker-board.mjs";
 import {comboOutputProblem, keyProblem} from "../view/keycode-expression.mjs";
 import {dropKey, foldedPick, isLayerKeyPicked, isPicked, offeredEntries, offeredMacros, offeredSections, openingPick, pickAllowed, pickKey, pickModifier, pickProblem, pickValue, pickedExpression, pickerMatches, shownSection} from "../view/picker.mjs";
@@ -56,14 +56,14 @@ const closePicker = () => { state.picker = null; render(); };
 
 const expression = () => pickedExpression(getModel(), state.picker);
 
-/** @template T @param {T[]} values @param {number} size */
-const chunk = (values, size) => values.reduce((rows, value, index) =>
-    (index % size ? rows[rows.length - 1].push(value) : rows.push([value]), rows), /** @type {T[][]} */ ([]));
-
-/** @param {Pick<import("../../contracts/panel.js").CatalogEntry, "value" | "label" | "tip">} entry @param {boolean} picked */
-function keyButton(entry, picked) {
-    return `<button class="pk ${picked ? "on" : ""}" data-pick="${esc(entry.value)}"${entry.tip ? ` data-tip="${esc(entry.tip)}"` : ""}>
-        <span class="l">${esc(entry.label || entry.value)}</span><span class="c">${esc(entry.value)}</span></button>`;
+// A catalogue key's tile, named as every surface names a key: a pointing mode
+// or a custom key by its mark, as a layer's row and a macro's tile are. Its
+// accessible name keeps the words a mark and tag draw apart.
+/** @param {Model} model @param {Pick<import("../../contracts/panel.js").CatalogEntry, "value" | "label" | "tip">} entry @param {boolean} picked */
+function keyButton(model, entry, picked) {
+    const words = entry.label || entry.value;
+    return `<button class="pk ${picked ? "on" : ""}" data-pick="${esc(entry.value)}" aria-label="${esc(`${words} ${entry.value}`)}"${entry.tip ? ` data-tip="${esc(entry.tip)}"` : ""}>
+        <span class="l">${keyNameMarked(model, words, entry.value)}</span><span class="c">${esc(entry.value)}</span></button>`;
 }
 
 // A macro slot shows by its name when it has one, with its slot and size
@@ -71,10 +71,10 @@ function keyButton(entry, picked) {
 // unnamed slot's face is its slot tag ("M3"), as the Macros list and the
 // macro editor's tag show it: a key-sized tile, where core's longer name
 // ("Macro 3", macroNamed) would need a wide one.
-/** @param {MacroSlot} slot @param {boolean} picked */
-function macroButton(slot, picked) {
+/** @param {Model} model @param {MacroSlot} slot @param {boolean} picked */
+function macroButton(model, slot, picked) {
     return `<button class="pk ${slot.name ? "wide" : ""} ${picked ? "on" : ""}" data-pick="${esc(slot.keycode)}" data-tip="${esc(slot.keycode)}">
-        <span class="l">${esc(slot.name || macroShortName(slot))}</span>
+        <span class="l">${marked(model, {kind: "macro"}, slot.name || macroShortName(slot))}</span>
         <span class="c">${slot.name ? `${esc(macroShortName(slot))} · ` : ""}${slot.empty ? "empty" : `${esc(slot.bytes)} B`}</span></button>`;
 }
 
@@ -91,9 +91,9 @@ function sectionBody(model) {
         const count = matches.length + macros.length;
         return `<div class="pk-body"><p class="note pk-count">${count} match${count === 1 ? "" : "es"}</p>
             ${macros.length ? `<div class="label pk-label">Macros</div>
-                <div class="pk-rows pk-macros">${chunk(macros, 8).map((row) => `<div class="pk-row">${row.map((slot) => macroButton(slot, picked(slot.keycode))).join("")}</div>`).join("")}</div>` : ""}
+                <div class="pk-rows pk-macros">${macros.map((slot) => macroButton(model, slot, picked(slot.keycode))).join("")}</div>` : ""}
             ${matches.length ? `${macros.length ? `<div class="label pk-label">Keycodes</div>` : ""}
-                <div class="pk-rows">${chunk(matches, 8).map((row) => `<div class="pk-row">${row.map((entry) => keyButton(entry, picked(entry.value))).join("")}</div>`).join("")}</div>` : ""}</div>`;
+                <div class="pk-rows">${matches.map((entry) => keyButton(model, entry, picked(entry.value))).join("")}</div>` : ""}</div>`;
     }
 
     const section = shownSection(model, picker);
@@ -172,7 +172,7 @@ function sectionBody(model) {
         return `<div class="pk-body"><div class="pk-layers modes ${many ? "many" : ""}"${rows}>${slots.map((slot) => `
             <div class="pk-layer ${slot.kind ? "" : "empty"}">
                 <span class="ix">${esc(slot.id)}</span>
-                <span class="nm"><span>${esc(slotNamed(slot))}</span><span class="sub">${esc(slot.kind ? word(kinds, slot.kind) : "Empty — does nothing yet")}</span></span>
+                <span class="nm">${marked(model, {kind: "pointing", slot: slot.id}, slotNamed(slot))}<span class="sub">${esc(slot.kind ? word(kinds, slot.kind) : "Empty — does nothing yet")}</span></span>
                 ${button(slot.keys.hold, "Hold", "On while the key is down.")}
                 ${button(slot.keys.lock, "Lock", "Turns the mode on until pressed again.")}
             </div>`).join("")}</div>
@@ -181,13 +181,11 @@ function sectionBody(model) {
     if (section.kind === "macros") {
         const slots = offeredMacros(model, picker);
         if (!slots.length) return `<p class="note pk-empty">This keyboard has not reported its macros.</p>`;
-        return `<div class="pk-body"><div class="pk-rows">${chunk(slots, 8).map((row) => `<div class="pk-row">${row.map((slot) =>
-            macroButton(slot, picked(slot.keycode))).join("")}</div>`).join("")}</div></div>`;
+        return `<div class="pk-body"><div class="pk-rows">${slots.map((slot) => macroButton(model, slot, picked(slot.keycode))).join("")}</div></div>`;
     }
     const entries = offeredEntries(model, picker, section);
     if (!entries.length) return `<p class="note pk-empty">The keyboard's catalogue has nothing in this section.</p>`;
-    return `<div class="pk-body"><div class="pk-rows">${chunk(entries, 8).map((row) =>
-        `<div class="pk-row">${row.map((entry) => keyButton(entry, picked(entry.value))).join("")}</div>`).join("")}</div></div>`;
+    return `<div class="pk-body"><div class="pk-rows">${entries.map((entry) => keyButton(model, entry, picked(entry.value))).join("")}</div></div>`;
 }
 
 // A shortcut's layers, one row per layer in the tab order: the base layer and
