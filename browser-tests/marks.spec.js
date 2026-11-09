@@ -240,6 +240,73 @@ test("the keycode picker names the layer its Tap-hold is armed on by its icon", 
     expect(await note.evaluate(layerIcons)).toBe(1);
 });
 
+test("the keycode picker marks a pointing mode, a macro and a custom key as it marks a layer", async ({page}) => {
+    await openControls(page, "keys");
+    await page.locator('.tab-grid [data-act="pick"]').first().click();
+    const picker = page.locator(".picker");
+
+    // Each pointing slot's row, by its icon in its own light; the words stay.
+    await picker.locator('[data-sec="modes"]').click();
+    const rows = picker.locator(".pk-layers.modes .pk-layer");
+    const count = await rows.count();
+    expect(count).toBeGreaterThan(0);
+    await expect(rows.locator(".nm .mk .kind-icon.pointing")).toHaveCount(count);
+    await expect(rows.first().locator(".nm .mk")).toHaveText("Dragscroll");
+    await expect(rows.first().locator('[data-pick="PD_MODE_0"] .kind-icon')).toHaveCount(0);
+    // Lit or off, every row's name starts at one edge, its kind under it.
+    const edges = await rows.evaluateAll((all) => all.map((row) => {
+        const left = (selector) => {
+            const words = document.createRange();
+            words.selectNodeContents(row.querySelector(selector));
+            return words.getBoundingClientRect().left - row.getBoundingClientRect().left;
+        };
+        return [left(".mk > span:last-child"), left(".sub")];
+    }));
+    expect(new Set(edges.flat()).size, "one left edge for every name and kind").toBe(1);
+
+    // Every macro tile, named or not.
+    await picker.locator('[data-sec="macros"]').click();
+    const macros = picker.locator(".pk-rows .pk");
+    const macroCount = await macros.count();
+    expect(macroCount).toBeGreaterThan(0);
+    await expect(macros.locator('.l .mk .kind-icon[data-kind="macro"]')).toHaveCount(macroCount);
+    await expect(picker.locator('[data-pick="MACRO_0"] .l')).toHaveText("M0");
+
+    // Custom keys share a section with keys that are none: No key and Transparent.
+    await picker.locator('[data-sec="custom"]').click();
+    await expect(picker.locator('[data-pick="CUSTOM_KEY_0"] .l .kind-icon[data-kind="customKey"]')).toHaveCount(1);
+    await expect(picker.locator('[data-pick="CUSTOM_KEY_0"] .l')).toHaveText("Custom key 0");
+    await expect(picker.locator('[data-pick="KC_TRANSPARENT"] .kind-icon')).toHaveCount(0);
+    // Marks widen a tile: tiles wrap at the sheet's edge, none alone on a line.
+    const perLine = await picker.locator(".pk-rows .pk").evaluateAll((tiles) => {
+        const lines = new Map();
+        for (const tile of tiles) lines.set(tile.offsetTop, (lines.get(tile.offsetTop) || 0) + 1);
+        return [...lines.values()];
+    });
+    expect(perLine.slice(0, -1).every((count) => count > 1), `tiles per line: ${perLine}`).toBe(true);
+
+    // A search draws them the same way, a pointing mode's key by its slot's light.
+    const search = picker.locator("#pickerSearch");
+    await search.fill("dragscroll");
+    const hold = picker.locator('[data-pick="PD_MODE_0"]');
+    await expect(hold.locator(".l .kind-icon.pointing")).toHaveCount(1);
+    await expect(hold.locator(".sends-name")).toHaveText("Dragscroll");
+    await expect(hold.locator(".sends-tag")).toHaveText("hold");
+    await expect(hold).toHaveAccessibleName("Dragscroll · hold PD_MODE_0");
+    // An empty slot's key too, whose name is its slot's.
+    await search.fill("PD_MODE_8_LOCK");
+    await expect(picker.locator('[data-pick="PD_MODE_8_LOCK"] .l .kind-icon.pointing')).toHaveCount(1);
+    await search.fill("CUSTOM_KEY_0");
+    await expect(picker.locator('[data-pick="CUSTOM_KEY_0"] .l .kind-icon[data-kind="customKey"]')).toHaveCount(1);
+    await search.fill("M0");
+    await expect(picker.locator('.pk-macros [data-pick="MACRO_0"] .l .kind-icon[data-kind="macro"]')).toHaveCount(1);
+
+    // A key that reaches none of them keeps its bare name.
+    await search.fill("KC_ENTER");
+    await expect(picker.locator('[data-pick="KC_ENTER"]')).toBeVisible();
+    await expect(picker.locator('[data-pick="KC_ENTER"] .kind-icon')).toHaveCount(0);
+});
+
 test("Lighting names the layer whose colour and accents it edits by its icon", async ({page}) => {
     await openControls(page, "lighting", {stage: "layers", layer: 1});
     expect(await page.locator("h4", {hasText: / colour$/}).first().evaluate(layerIcons)).toBe(1);
