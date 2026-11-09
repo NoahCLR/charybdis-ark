@@ -53,10 +53,10 @@ a board labelled for your computer's keyboard layout (set in
 Option or AltGr on the right. Below it are sections by task: **Letters and
 digits**, **Symbols**, **Numpad**, **Common keys**, then the things you own,
 **Layers**, **Macros**, **Custom keys** and **Pointing modes**, then **Mouse**,
-**Media**, **More keys**, **Lighting**, **Magic** and **Other QMK**. Keys sit in
-named groups, such as Arrows, Function and Modifiers, and **No key** in Common
-keys holds N/A and Transparent. **All keycodes** lists every key the picker
-offers, section by section, in the same groups.
+**Media**, **More keys**, **Lighting** and **Other QMK**, which holds Magic.
+Keys sit in named groups, such as Arrows, Function and Modifiers, and **No key**
+in Common keys holds N/A and Transparent. **All keycodes** lists every key the
+picker offers, section by section, in the same groups.
 
 **Search every section** finds any key, however many match: by its name, the
 words on its tile in any order, its other QMK spellings such as `KC_BSPC`, or
