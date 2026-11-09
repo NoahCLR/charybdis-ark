@@ -22,7 +22,7 @@ async function usePosts(page, keycode) {
 
 test("every key section's tiles line up on one grid, with no words cut off", async ({page}) => {
     const picker = await openPicker(page);
-    for (const section of ["letters", "symbols", "numpad", "common", "macros", "custom", "mouse", "media", "lighting", "magic", "more", "other", "all"]) {
+    for (const section of ["letters", "symbols", "numpad", "common", "macros", "custom", "mouse", "media", "lighting", "more", "other", "all"]) {
         await picker.locator(`[data-sec="${section}"]`).click();
         const off = await picker.locator(".pk-grid").first().evaluate((first) => {
             const box = first.getBoundingClientRect(), step = (box.width + 8) / 12;

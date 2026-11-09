@@ -102,12 +102,11 @@ export function pickerSections() {
         {id: "lighting", label: "Lighting", kind: "catalogue", filter: inGroups("backlight", "led_matrix", "underglow", "rgb", "rgb_matrix"), groups: [
             group("Switch", named(/_(?:ON|OFF|TOGGLE)$/)), group("Effect", named(/MODE|FLAG/)), group("Colour", rest),
         ]},
-        {id: "magic", label: "Magic", kind: "catalogue", filter: inGroups("magic", "swap_hands"), groups: [
-            group("Swaps", named(/SWAP|TOGGLE_(?:CONTROL|BACKSLASH|ALT_GUI|CTL_GUI|ESCAPE)/)), group("Switches", rest),
-        ]},
         {id: "other", label: "Other QMK", kind: "catalogue", filter: inGroups(
-            "connection", "joystick", "midi", "programmable_button", "quantum", "sequencer", "steno", "system",
+            "connection", "joystick", "magic", "midi", "programmable_button", "quantum", "sequencer", "steno", "swap_hands", "system",
         ), groups: [
+            group("Magic swaps", (entry) => entry.group === "magic" && /SWAP|TOGGLE_(?:CONTROL|BACKSLASH|ALT_GUI|CTL_GUI|ESCAPE)/.test(valueOf(entry))),
+            group("Magic switches", from("magic")),
             group("System", from("system")), group("Firmware", named(/BOOTLOADER|REBOOT|DEBUG|EEPROM|MAKE/)), group("Space Cadet", named(/SPACE_CADET/)), group("Features", rest),
         ]},
         {id: "all", label: "All keycodes", kind: "all"},

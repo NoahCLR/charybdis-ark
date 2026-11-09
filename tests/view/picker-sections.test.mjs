@@ -20,7 +20,7 @@ const catalogue = ["KC_A", "KC_SLASH", "KC_EXLM", "KC_HOME", "KC_KP_1", "KC_F12"
 test("the picker uses task-shaped sections instead of raw QMK group names", () => {
     assert.deepEqual(pickerSections().map(({label}) => label), [
         "Keyboard", "Letters and digits", "Symbols", "Numpad", "Common keys", "Layers", "Macros", "Custom keys", "Pointing modes",
-        "Mouse", "Media", "More keys", "Lighting", "Magic", "Other QMK", "All keycodes",
+        "Mouse", "Media", "More keys", "Lighting", "Other QMK", "All keycodes",
     ]);
 });
 
@@ -104,6 +104,7 @@ test("a section's groups tell its keys apart by keycode, and a custom key by whe
     assert.deepEqual(["KC_UNDO", "KC_INTERNATIONAL_1", "KC_LANGUAGE_1", "KC_KB_MUTE"].map((value) => groupOf("more", value)), ["Editing", "International", "Language", "System"]);
     assert.deepEqual(["KC_NUM_LOCK", "KC_KP_SLASH", "KC_KP_1"].map((value) => groupOf("numpad", value)), ["Signs and lock", "Signs and lock", "Digits"]);
     assert.equal(groupOf("other", "QK_GRAVE_ESCAPE"), "Features");
+    assert.deepEqual(["QK_MAGIC_SWAP_CONTROL_CAPS_LOCK", "QK_MAGIC_TOGGLE_NKRO", "QK_BOOTLOADER"].map((value) => groupOf("other", value)), ["Magic swaps", "Magic switches", "Firmware"]);
     if (named) assert.equal(groupOf("custom", named.keycode), "Named");
     assert.equal(groupOf("custom", unnamed.keycode), "Unnamed");
     const renamed = {...published, customKeys: published.customKeys.map((key) => key.keycode === unnamed.keycode ? {...key, name: "Thumb"} : key)};
