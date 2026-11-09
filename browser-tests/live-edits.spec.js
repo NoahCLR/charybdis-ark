@@ -117,7 +117,8 @@ test("an edit that would add a trap asks first; Go back and Send anyway post the
 });
 
 test("Escape on a live edit's question is its Go back, even with the board's Shortcuts list open under it", async ({page}) => {
-    await openLive(page, "keys", {boardShortcuts: true});
+    await openLive(page, "keys");
+    await page.getByRole("button", {name: "Shortcuts"}).hover();
     await expect(page.locator("#board-shortcuts")).toBeVisible();
     await withModel(page, model => {model.liveProposal = {id: 8, label: "Set Base · Q to TG(2)", checks: [{kind: "trap", level: "trap", status: "new", key: "trap:2", layers: [2], title: "Layer 2 has no way back", detail: "", fix: ""}]};});
     await expect(page.locator(".sheet.live-ask")).toBeVisible();

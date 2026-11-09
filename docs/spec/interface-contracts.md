@@ -125,13 +125,15 @@ The same kind of control looks and sits the same on every screen.
   all it must (no test).
 - The board's legend says what its marks mean, on one line where it fits, in
   sentence case like the captions over it. What the board takes from the
-  mouse and the keys is in the list its **Shortcuts** button opens: a button
-  with `aria-expanded`, whose list Escape or a press outside closes, the focus
-  back on the button. It names ⌘-clicking (Ctrl-clicking) a layer to preview
+  mouse and the keys is in the list behind the info mark on the board's
+  top-right corner: a button named Shortcuts and described by the list,
+  which shows while the pointer is on the mark or the list, or the
+  keyboard's focus is on the mark, and which Escape hides until both leave.
+  It names ⌘-clicking (Ctrl-clicking) a layer to preview
   layers together, which reads the board, whether or not the board takes an
   edit; while it takes none, the rest of the list says only what still
   works, selecting a key and copying it, all in this computer's shortcut
-  words (`legend`, `webview/ui/keys/board-card.mjs`;
+  words (`boardShortcuts`, `webview/ui/keys/board-card.mjs`;
   `browser-tests/shortcut-glyphs.spec.js`).
 - A number field's unit rides inside the input (`.affix.unit`), so its label
   names only the value, and a whole number is a text field with

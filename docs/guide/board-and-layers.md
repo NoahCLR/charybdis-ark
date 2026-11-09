@@ -43,10 +43,11 @@ On a key face:
   modes the change already runs on the keyboard, so the dot marks an
   **unsaved change**; in Live edit it goes once the keyboard saves.
 
-The legend under the board explains each mark. Its **Shortcuts** button
-lists what the board takes from the mouse and the keys (below), ⌘-clicking a
-layer tab to [preview layers together](#previewing-layers-together) included;
-Escape or a click elsewhere closes the list.
+The legend under the board explains each mark. Rest the pointer on the
+**ⓘ** in the board's top-right corner to see what the board takes from the
+mouse and the keys (below), ⌘-clicking a layer tab to
+[preview layers together](#previewing-layers-together) included; the list
+also shows while the ⓘ has the keyboard's focus, and Escape hides it.
 
 ## The hover card
 

@@ -89,7 +89,6 @@ export const STATE_FIELDS = {
     keyClipboard: kept(null),  // {keycode, label}: the key ⌘C copied, for ⌘V onto the selected key
     stage: kept("layers"),
     railMenu: kept(false),    // the keyboard menu under the rail's mark
-    boardShortcuts: kept(false), // the Shortcuts list in the board's legend
     layersOpen: kept(false),  // the layer-stack panel on the layer row
     layersAsked: kept(false), // its stack is requested once per opening
     pointingSlot: kept(0),
