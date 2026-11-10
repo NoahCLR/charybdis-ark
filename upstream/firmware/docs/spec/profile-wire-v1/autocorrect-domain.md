@@ -2,7 +2,7 @@
 
 Domain `0x80`, version 1, holds the profile's autocorrect list: what the
 keyboard replaces as it is typed, and with what (D-F68,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/e28ffca6f293c122d3be25c219caa222905073a3/docs/adr/0068-the-autocorrect-list-is-a-readable-profile-domain.md)).
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/2814bd0d42e5be22408c0530948f52427b461f81/docs/adr/0068-the-autocorrect-list-is-a-readable-profile-domain.md)).
 It holds the entries as they are written, not a compiled tree. An **entry** is
 one **replacement**, stored once, with every **typed form** that produces it;
 each typed form says **where it matches** a word. A replacement is text the
@@ -103,17 +103,20 @@ The table is generated from `tests/fixtures/host_layouts_v1.json` by
 `tests/fixtures/autocorrect_domain_v1.json` as `wordCharacters`, each
 `[character, folded]`: 491 characters today. It is part of this domain
 version. A host layout that types a new letter extends it, which admits typos
-the firmware before it refuses, so that change raises the schema minor.
+the firmware before it refuses, so that change raises the schema minor. The
+firmware's file also holds the table read the other way, each small letter
+with the one character that folds to it, which the case rule looks up for
+every character of a replacement.
 
 A typed form is never equal, byte for byte, to the text replacement it names.
 One that differs from it only by case is allowed (`iphone` for `iPhone`).
 
-Held by: `tests/host/run_profile_autocorrect_v1_tests.sh` (`build.py --check`; `profile_autocorrect_v1_test.c`, `test_fold` and the `invalid` vectors).
+Held by: `tests/host/run_profile_autocorrect_v1_tests.sh` (`build.py --check`; `profile_autocorrect_v1_test.c`, `test_fold`, `test_capital` and the `invalid` vectors).
 
 ## Ceilings
 
 Counted, and all held at once (D-F14,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/e28ffca6f293c122d3be25c219caa222905073a3/docs/adr/0014-bigger-profiles.md)):
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/2814bd0d42e5be22408c0530948f52427b461f81/docs/adr/0014-bigger-profiles.md)):
 
 | Ceiling | Value |
 | --- | ---: |
@@ -188,7 +191,7 @@ Held by: `tests/host/run_profile_autocorrect_v1_tests.sh` (`profile_autocorrect_
 
 The keyboard reads the list where it lies, in the active profile: a saved
 slot in flash or the working copy in RAM (D-F54,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/e28ffca6f293c122d3be25c219caa222905073a3/docs/adr/0054-profile-flash-and-validation-leave-the-raw-hid-callback.md)).
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/2814bd0d42e5be22408c0530948f52427b461f81/docs/adr/0054-profile-flash-and-validation-leave-the-raw-hid-callback.md)).
 It keeps the list's range and its four counts, and no index or copy of the
 list in RAM. A newly active profile, a live edit included, replaces the range.
 
@@ -212,7 +215,7 @@ compiled defaults do. The authored list is the keymap folder's
 `autocorrect.txt`, one typo a line in QMK's form (`typo -> correction`, a
 colon before the typo for the start of a word, after it for the end, both for
 the whole word, neither for anywhere; `:typo: => N` plays macro slot `N`;
-[authoring](https://github.com/NoahCLR/charybdis-4x6/blob/e28ffca6f293c122d3be25c219caa222905073a3/docs/guide/authoring.md#the-autocorrect-list)).
+[authoring](https://github.com/NoahCLR/charybdis-4x6/blob/2814bd0d42e5be22408c0530948f52427b461f81/docs/guide/authoring.md#the-autocorrect-list)).
 `tools/autocorrect/build.py --write-authored` encodes it into
 `authored_autocorrect_list.h`, which the compiled defaults copy;
 real-profile validation refuses a header the list no longer encodes to. An

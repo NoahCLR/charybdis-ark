@@ -3,7 +3,7 @@
 The keyboard replaces what is on the profile's
 [autocorrect list](profile-wire-v1/autocorrect-domain.md) as it is typed, on
 any computer, with nothing installed there (D-F69,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/e28ffca6f293c122d3be25c219caa222905073a3/docs/adr/0069-autocorrect-is-the-firmwares-own-and-corrects-at-the-word-end.md)):
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/2814bd0d42e5be22408c0530948f52427b461f81/docs/adr/0069-autocorrect-is-the-firmwares-own-and-corrects-at-the-word-end.md)):
 a typo with the right word, an abbreviation with a phone number or a
 sign-off, a typed form with a macro. People know the feature as **text
 replacement**; the code, the domain and the keys call it autocorrect. A list
@@ -16,7 +16,7 @@ replaces, the undo, when it forgets the word, how a replacement is typed or
 played and what happens to keys pressed meanwhile. The list's bytes are the
 [autocorrect domain](profile-wire-v1/autocorrect-domain.md)'s; the layouts
 are [host layouts](host-layouts-v1.md)'s; how it sits in the report path is
-[macro playback](https://github.com/NoahCLR/charybdis-4x6/blob/e28ffca6f293c122d3be25c219caa222905073a3/docs/architecture/macro-playback.md#corrections)'s.
+[macro playback](https://github.com/NoahCLR/charybdis-4x6/blob/2814bd0d42e5be22408c0530948f52427b461f81/docs/architecture/macro-playback.md#corrections)'s.
 
 `tests/fixtures/autocorrect_v1.json` holds a case for every rule here: a
 list, a host layout, the computer's Caps Lock, the keys typed and the text the
@@ -78,10 +78,19 @@ is matched as `teh`.
 The word **ends** at the next character that is not a word character (a
 space, punctuation, a hyphen) or at Enter or Tab.
 
+A word whose ending character was composed through a dead key is passed
+over: it is not looked up, and the next word starts fresh. On
+US-International the quote is such a character, a dead key and then Space.
+The dead key reached the computer before the keyboard could know the word
+had ended, so the computer is in the middle of composing, and what a
+replacement erased and typed would land inside that. A text matcher cannot
+tell how a character was typed, so this is one place where the keyboard
+replaces less than a client's preview shows.
+
 Backspace inside a word removes its last character. The keyboard follows 32
 characters of a word; a longer word is left alone.
 
-Held by: `tests/host/run_autocorrect_tests.sh` (rule 2 cases: `apostrophe-after`, `apostrophes-around`, `apostrophe-inside`, `digits-are-word-characters`, `word-end-punctuation`; `backspace-inside-a-word`).
+Held by: `tests/host/run_autocorrect_tests.sh` (rule 2 cases: `apostrophe-after`, `apostrophes-around`, `apostrophe-inside`, `digits-are-word-characters`, `word-end-punctuation`, `word-ended-through-a-dead-key`; `backspace-inside-a-word`).
 
 ## Which typed form
 
@@ -102,7 +111,7 @@ A typed form whose replacement this host cannot type, or whose macro cannot
 play, is passed over as if it were not on the list. A word found nowhere, or
 still being typed, is never touched.
 
-Held by: `tests/host/run_autocorrect_tests.sh` (rule 3 cases: `two-typos-one-correction`, `anywhere-in-a-word`, `end-of-a-word`, `start-of-a-word`, `longest-typo-wins`, `whole-word-beats-part`, `first-in-the-list-wins-a-tie`; `inside-a-longer-word`, `unfinished-word`).
+Held by: `tests/host/run_autocorrect_tests.sh` (rule 3 cases: `two-typos-one-correction`, `anywhere-in-a-word`, `end-of-a-word`, `start-of-a-word`, `longest-typo-wins`, `whole-word-beats-part`, `first-in-the-list-wins-a-tie`, `more-part-of-word-typos-than-one-step`; `inside-a-longer-word`, `unfinished-word`).
 
 ## Case
 
@@ -159,8 +168,10 @@ line or more than 128 bytes, or anything else a
 typed forms ends:
 
 1. the keyboard erases the typed form, as it erases before typing text;
-2. the macro plays through the macro engine, as it plays from a key, with
-   its own protection and pace;
+2. the macro plays through the macro engine at its own pace, with its
+   output isolated as a text replacement's is, whatever protection the macro
+   is stored with: modifiers the person holds never reach it, and keys
+   pressed meanwhile are held back, never ignored;
 3. the key that ended the word goes to the computer, and the keys pressed
    meanwhile after it, in order.
 
@@ -177,7 +188,7 @@ A replacement whose macro slot is empty, or whose macro cannot play on this
 host (its text needs Unicode entry the host has not set up, say), is passed
 over, and nothing is erased. The check is made before the erase.
 
-Held by: `tests/host/run_autocorrect_tests.sh` (rule 10 cases: `macro-replacement`, `macro-replacement-has-no-case`, `macro-replacement-has-no-undo`, `macro-replacement-ended-by-enter`, `keys-during-a-macro-replacement`, `macro-replacement-empty-slot`, `macro-replacement-apostrophes`, `macro-replacement-whole-word-only`; `test_a_full_queue_stops_a_macro_correction`), `tests/host/run_macro_slot_provider_tests.sh` (`test_can_start_checks_without_playing`), `tests/host/run_profile_autocorrect_v1_tests.sh` (the `macros` vector and the macro refusals).
+Held by: `tests/host/run_autocorrect_tests.sh` (rule 10 cases: `macro-replacement`, `macro-replacement-has-no-case`, `macro-replacement-has-no-undo`, `macro-replacement-ended-by-enter`, `macro-replacement-ended-by-a-shifted-key`, `macro-replacement-ended-by-shift-enter`, `keys-during-a-macro-replacement`, `macro-replacement-empty-slot`, `macro-replacement-apostrophes`, `macro-replacement-whole-word-only`; `held-shift-stays-out-of-a-macro-replacement`; `test_typing_through_a_protected_macro_correction`, `test_a_full_queue_stops_a_macro_correction`), `tests/host/run_macro_payload_engine_tests.sh` (`test_a_corrections_macro_is_isolated_whatever_its_protection`), `tests/host/run_pointing_mode_key_runtime_integration_tests.sh` (`test_a_correction_drops_no_press`), `tests/host/run_macro_slot_provider_tests.sh` (`test_can_start_checks_without_playing`), `tests/host/run_profile_autocorrect_v1_tests.sh` (the `macros` vector and the macro refusals).
 
 ## Undo
 
@@ -189,11 +200,15 @@ The word is then left alone: ending it again replaces nothing.
 
 After Enter or Tab there is no undo, since the text may be sent or the focus
 moved: Backspace is Backspace. After a macro there is none either. Any other
-key press between the replacement and Backspace ends the chance, and so does holding the ending key until it
-repeats. When the layout can no longer type the word back (Caps Lock went on
-on macOS), Backspace is Backspace.
+key press between the replacement and Backspace ends the chance, and so does
+holding the ending key until it repeats. So does anything that makes the
+keyboard [forget the word](#forgetting-the-word) from the moment the
+replacement starts, a mouse click or a switch key while it is still being
+typed included: the cursor may be elsewhere by then. When the layout can no
+longer type the word back (Caps Lock went on on macOS), Backspace is
+Backspace.
 
-Held by: `tests/host/run_autocorrect_tests.sh` (rule 5 cases, `undo-a-long-replacement` among them).
+Held by: `tests/host/run_autocorrect_tests.sh` (rule 5 cases, `undo-a-long-replacement` and `no-undo-after-a-click-meanwhile` among them; `test_a_switch_key_during_a_replacement_ends_the_undo`).
 
 ## Forgetting the word
 
@@ -205,21 +220,22 @@ normally. After:
 - a shortcut;
 - a key that moves the cursor or deletes forward;
 - a mouse button going down;
-- a macro, whatever it types.
+- a macro, whatever it types;
+- the override being switched by key anywhere but in the middle of a word.
 
 **Suspended**: nothing is replaced until the next word end, because the
 keyboard no longer knows where the word on screen starts. After:
 
 - Backspace with no character of the word left;
 - a key held 200 ms, which is taken to repeat on the computer (after a word
-  end this only ends the chance to undo);
+  end this only ends the chance to undo, and changes nothing else);
 - a dead key the layout composes nothing from;
 - a keypad character;
 - a word past 32 characters;
 - autocorrect coming on after reports went out unread, or its override being
   switched while a word is being typed.
 
-Held by: `tests/host/run_autocorrect_tests.sh` (rule 6 cases; `test_switching_off_forgets_the_word`).
+Held by: `tests/host/run_autocorrect_tests.sh` (rule 6 cases, `dead-key-right-after-a-replacement` among them; `test_switching_off_forgets_the_word`, `test_a_held_ending_key_keeps_a_suspension`).
 
 ## Typing a replacement and holding keys back
 
@@ -269,17 +285,27 @@ The queue is never allowed to cost a key:
   macro a key started, which is never stopped (D-F17). Only then can a key
   pressed and released again before there is room go unseen.
 
-One press is not seen whatever the queue holds: a key tapped entirely within
-the 5 ms for which a replacement, or a macro, holds that same key down. The
-computer already has the key down, and the keyboard cannot show it a second
-press. A key held longer than that, as typing holds one, is shown when the
-replacement lets go of it.
+A key pressed while a replacement, or a macro, holds that same key down
+changes no report: the computer already has the key down. The keyboard reads
+that press and its release where its own ledger of held keys records them,
+and queues them like any other, so even a tap that begins and ends inside
+those 5 ms comes out after the replacement. A behaviour's tap, a combo's
+output and a custom key's tap are all that short: pressed and released in
+one step.
+
+A modifier is not read that way. While a replacement, or a macro, holds a
+modifier (Shift for a capital, 5 ms), the person's own press or release of
+that modifier is read when the replacement lets go of it. A key they press
+in between is read without the change, and a modifier pressed and released
+again inside that hold is not seen.
 
 The lookup runs from the scan too: the whole word at once, then 32
 part-of-word typed forms a scan. The ending key waits for it, at most 33
 scans for a full list and one for a list without part-of-word typed forms.
+A list published while a lookup is spread over scans (an Apply or a live
+edit) starts that lookup over on the new list.
 
-Held by: `tests/host/run_autocorrect_tests.sh` (rule 7 cases, `typing-over-the-longest-replacement` and `full-queue` among them; `test_no_correction_starts_behind_a_long_queue`, `test_a_full_queue_loses_no_key`, `test_typing_through_the_longest_correction`, `test_a_full_queue_stops_a_macro_correction`, `test_a_correction_keeps_its_pace`, `test_a_one_shot_modifier_is_spent_once`), `tests/host/run_macro_payload_engine_tests.sh` (`test_erase_taps_backspace_at_the_text_pace`, `test_a_correction_is_isolated_without_ignoring_presses`).
+Held by: `tests/host/run_autocorrect_tests.sh` (rule 7 cases, `typing-over-the-longest-replacement` and `full-queue` among them; `test_no_correction_starts_behind_a_long_queue`, `test_a_full_queue_loses_no_key`, `test_typing_through_the_longest_correction`, `test_a_full_queue_stops_a_macro_correction`, `test_a_correction_keeps_its_pace`, `test_a_one_shot_modifier_is_spent_once`, `test_a_tap_of_a_key_the_correction_holds`, `test_a_list_published_during_a_lookup`; rule 3's `more-part-of-word-typos-than-one-step`), `tests/host/run_profile_owner_tests.sh` (the list's publication count), `tests/host/run_macro_payload_engine_tests.sh` (`test_erase_taps_backspace_at_the_text_pace`, `test_a_correction_is_isolated_without_ignoring_presses`).
 
 ## On and off
 
@@ -297,10 +323,15 @@ on finds the next word; switched in the middle of a word, that word is left
 alone. A replacement already being typed finishes. With the stored switch
 off or the list empty, keyboard reports are not read at all.
 
+When reports start being read with keys held (the switch or a list has just
+been applied), the computer sees nothing change: those keys stay down for
+it and are not pressed again. They are read as typing from there, so a held
+key that ends a word still ends the [suspension](#forgetting-the-word).
+
 The keyboard cannot see a password field or a terminal: `AC_OFF` or
 `AC_TOGG` is how to keep it out of one.
 
-Held by: `tests/host/run_autocorrect_tests.sh` (`switched-off`; `test_the_stage_is_idle_without_a_list`, `test_the_override_and_the_stored_switch_both_allow`), `tests/host/run_key_runtime_layer_lock_integration_tests.sh` (`test_plain_autocorrect_keys_switch_the_override`).
+Held by: `tests/host/run_autocorrect_tests.sh` (`switched-off`; `test_the_stage_is_idle_without_a_list`, `test_the_override_and_the_stored_switch_both_allow`, `test_the_stage_starts_with_a_key_held`), `tests/host/run_key_runtime_layer_lock_integration_tests.sh` (`test_plain_autocorrect_keys_switch_the_override`).
 
 ## The fixture
 
