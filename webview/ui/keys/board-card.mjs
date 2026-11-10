@@ -19,6 +19,7 @@ import {actionMarked, comboBadge, keyNameMarked, layerMarked, phraseMarked} from
 import {comboInputLabel} from "./combo-builder.mjs";
 import {modifierKey, shortcut} from "../../view/shortcuts.mjs";
 import {REACH_ICONS} from "../../view/screens.mjs";
+import {attachInfoMarks, infoMark} from "../info-mark.mjs";
 
 // The caption while layers are previewed on together: which ones, in the
 // order they win, in the words Lighting's preview uses (layersOnTop).
@@ -60,54 +61,34 @@ export function legend(model) {
     </div>`);
 }
 
-const INFO_ICON = `<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M8 7.2v4.3"/><circle class="dot" cx="8" cy="4.9" r=".55"/></svg>`;
-
 // An info mark on the board's top-right corner, which the drawing leaves
-// empty, whose list says what the board takes from the mouse and the keys.
-// Hovering the mark, or reaching it by the keyboard, shows the list, a
-// screen reader hearing it as the mark's description; the list stays open
-// while the pointer is on it, and Escape hides it until the pointer or the
-// focus leaves. Read only (Live edit's held states, a keyboard not read
-// yet), the list says only what still works there: selecting a key and
-// copying it.
+// empty, whose list says what the board takes from the mouse and the keys:
+// the one info mark (ui/info-mark.mjs), in its corner form. Read only (Live
+// edit's held states, a keyboard not read yet), the list says only what still
+// works there: selecting a key and copying it.
 /** @param {Model} model */
 export function boardShortcuts(model) {
-    const node = el(`<div class="board-info">
-        <button type="button" class="board-info-button" aria-label="Shortcuts" aria-describedby="board-shortcuts">${INFO_ICON}</button>
-        ${shortcutList(editGate(model, "keys").editable)}</div>`);
-    const open = () => delete node.dataset.shut;
-    node.addEventListener("mouseleave", open);
-    node.addEventListener("focusout", open);
+    const node = el(infoMark({id: "board-shortcuts", label: "Shortcuts", heading: "Shortcuts", named: "Board shortcuts", corner: true, rows: shortcutRows(editGate(model, "keys").editable)}));
+    attachInfoMarks(node);
     return node;
 }
 
-/** @param {boolean} editable */
-function shortcutList(editable) {
-    /** @param {string} keys @param {string} does */
-    const row = (keys, does) => `<dt>${esc(keys)}</dt><dd>${esc(does)}</dd>`;
+/** @param {boolean} editable @returns {import("../info-mark.mjs").InfoRow[]} */
+function shortcutRows(editable) {
+    /** @param {string} term @param {string} says */
+    const row = (term, says) => ({term, says});
     // Previewing layers together reads the board, so it is listed whether or
     // not the board can be edited (ui/layerbar.mjs, view/layer-set.mjs).
     const layers = row(`${modifierKey()}-click a layer`, "Preview it on with the others");
-    return `<div class="shortcuts-pop" id="board-shortcuts" role="group" aria-label="Board shortcuts"><div class="shortcuts-h">Shortcuts</div><dl>${editable
-        ? row("Double-click", "Pick a keycode")
-            + row("Drag onto a key", "Swap the two keys")
-            + row(`${shortcut("C")}, ${shortcut("V")}`, "Copy a key, paste it onto the selected one")
-            + row("Delete", "Make the selected key transparent")
-            + row(`${shortcut("Z")}, ${shortcut("Z", {shift: true})}`, "Undo, redo")
-            + row("Enter", "Open the picker for the selected key")
-            + layers
-        : row("Click", "Select a key to read it")
-            + row(shortcut("C"), "Copy the selected key")
-            + layers}</dl></div>`;
-}
-
-// Esc hides the shortcuts list while it shows, until the pointer or the
-// focus leaves the mark.
-export function escapeBoardShortcuts() {
-    const info = /** @type {HTMLElement | null} */ (document.querySelector(".board-info:hover, .board-info:has(:focus-visible)"));
-    if (!info || info.dataset.shut !== undefined) return false;
-    info.dataset.shut = "";
-    return true;
+    return editable
+        ? [row("Double-click", "Pick a keycode"),
+            row("Drag onto a key", "Swap the two keys"),
+            row(`${shortcut("C")}, ${shortcut("V")}`, "Copy a key, paste it onto the selected one"),
+            row("Delete", "Make the selected key transparent"),
+            row(`${shortcut("Z")}, ${shortcut("Z", {shift: true})}`, "Undo, redo"),
+            row("Enter", "Open the picker for the selected key"),
+            layers]
+        : [row("Click", "Select a key to read it"), row(shortcut("C"), "Copy the selected key"), layers];
 }
 
 export function pickBar() {
