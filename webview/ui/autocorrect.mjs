@@ -357,7 +357,7 @@ function replacementControls(model, f, value, canEdit, most) {
     return `<div class="ac-replacement">${choiceField({label: "Replacement is", f: `${f}:kind`, hideLabel: true, disabled: !canEdit, choices: [["text", "Text"], ["macro", "Macro"]], current: value.kind,
         tip: "Text is one line the keyboard types. A macro is for anything longer, or of more than one line."})}
         ${value.kind === "macro" ? `<div class="input-row ac-macro">
-                <input class="input" data-ac-macro="${esc(value.macro ?? "")}" aria-label="Macro" value="${esc(name ? `${PLAYS} ${name}` : "")}" placeholder="No macro yet" readonly ${off}
+                <input class="input" data-f="${esc(f)}:macro" data-ac-macro="${esc(value.macro ?? "")}" aria-label="Macro" value="${esc(name ? `${PLAYS} ${name}` : "")}" placeholder="No macro yet" readonly ${off}
                     data-tip="${esc(name ? `Plays the macro “${name}”.` : "Pick the macro this replacement plays.")}">
                 <button type="button" class="btn" data-act="ac-pick" ${canEdit && (value.macro !== null || macros.some((macro) => !macro.empty)) ? "" : "disabled"}>Pick…</button></div>
             ${value.macro === null && !macros.some((macro) => !macro.empty) ? `<p class="note ac-macro-none">No macro has steps yet. <button type="button" class="btn tiny link" data-act="ac-macros">Make one in Macros →</button></p>` : ""}`
