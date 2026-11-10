@@ -16,6 +16,14 @@ test("every stored enum value has a word", () => {
     // letters may go, one way for each stored value.
     assert.deepEqual(Object.values(require("../../core/schema/autocorrect-domain-v1").AUTOCORRECT_MATCH).map(match => require("../../core/model/autocorrect-list").inputForm({typo: "x", match})),
         ["x", "x*", "*x", "*x*"], "where a text replacement's input matches");
+    // What a replacement is, text or a macro, has a word for each stored kind.
+    assert.deepEqual(VOCABULARY.replacementKinds.map(([id]) => id.toUpperCase()).sort(), Object.keys(require("../../core/schema/autocorrect-domain-v1").AUTOCORRECT_KIND).sort(), "replacement kinds");
+    // A list's file formats: the runtime list, the contract's union and the words agree.
+    const {contractUnion} = require("../fixtures/contract-unions");
+    const formats = [...require("../../core/model/autocorrect-import").AUTOCORRECT_FILE_FORMATS];
+    assert.deepEqual(VOCABULARY.listFileFormats.map(([id]) => id), formats, "list file formats, in the order Export offers them");
+    assert.deepEqual(contractUnion("messages.d.ts", "AutocorrectFileFormat"), formats);
+    assert.ok(VOCABULARY.listFileFormats.every(([, words]) => words && !/autocorrect/i.test(words)));
     covers(VOCABULARY.holdStyles.hold, KEY_BEHAVIOR_HOLD_STYLES, "hold styles under Hold");
     covers(VOCABULARY.holdStyles.long, KEY_BEHAVIOR_HOLD_STYLES, "hold styles under Long hold");
     covers(VOCABULARY.holdWithoutLongHold, KEY_BEHAVIOR_HOLD_STYLES, "holds without a long hold");

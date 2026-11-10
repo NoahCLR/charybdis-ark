@@ -68,9 +68,9 @@ const DRAFT_EDIT_TYPES = Object.freeze(/** @satisfies {{[K in DraftEditType]: En
     updateMacro: {editor: "macro", label: "Edited a macro"},
     addAutocorrectTypos: {editor: "autocorrect", label: (message, document) => require("./autocorrect-editor").addLabel(message, document)},
     updateAutocorrectCorrection: {editor: "autocorrect", label: "Changed a replacement"},
-    updateAutocorrectTypo: {editor: "autocorrect", label: message => message.correction !== undefined || message.macro !== undefined ? "Moved an input to another replacement" : "Edited an input"},
+    updateAutocorrectTypo: {editor: "autocorrect", label: "Edited an input"},
     deleteAutocorrectTypo: {editor: "autocorrect", label: "Removed an input"},
-    deleteAutocorrectEntry: {editor: "autocorrect", label: "Removed a replacement"},
+    deleteAutocorrectEntry: {editor: "autocorrect", label: "Deleted a replacement"},
     importAutocorrect: {editor: "autocorrect", label: message => message.mode === "replace" ? "Replaced the text replacement list" : "Added to the text replacement list"},
     updateCustomKey: {editor: "customKey", label: "Renamed a custom key"},
     updateCustomKeyShortcut: {editor: "customKey", label: message => message.then || message.name !== undefined ? "Made a custom key for a shortcut"

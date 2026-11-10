@@ -177,7 +177,9 @@ export function placeState(place, layers = []) {
         // asked for by id and the tab picks it where it finds it.
         case "combo": return {screen: "keys", tab: "combos", pickCombo: place.index, reveal: '[data-reach][data-picked="true"]'};
         case "macro": return {screen: "macros", macroSlot: place.keycode};
-        case "autocorrect": return {screen: "autocorrect", autocorrectEdit: null, autocorrectAdding: null, autocorrectSearch: "", reveal: `[data-ac-entry="${place.entry.replace(/["\\]/g, "\\$&")}"]`};
+        // The entry is the one open in its editor, as a macro's Show opens the
+        // macro: whatever was open or being made gives way to it.
+        case "autocorrect": return {screen: "autocorrect", autocorrectEntry: place.entry, autocorrectNew: null, autocorrectEdit: null, autocorrectSearch: "", reveal: `[data-ac-entry="${place.entry.replace(/["\\]/g, "\\$&")}"]`};
         case "customKey": return {screen: "customKeys", customKey: place.keycode};
         case "pointing": return {screen: "pointing", pointingSlot: place.slot, pdKind: null, pdTaps: null};
         case "lighting": return place.stage ? {screen: "lighting", stage: place.stage} : {screen: "lighting"};

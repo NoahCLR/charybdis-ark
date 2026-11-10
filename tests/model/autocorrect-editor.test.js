@@ -5,10 +5,11 @@ const {compiled, settings, CURRENT_CAPABILITIES} = require("../fixtures/portable
 const {editDomain} = require("../fixtures/profile-document");
 const {draftEdit} = require("../fixtures/draft-edit");
 const {fingerprint, validateSnapshot} = require("../../core/model/portable-profile");
-const {autocorrectEditorView, newWarnings, tryText, TRY_TEXT_MAX} = require("../../core/model/autocorrect-editor");
+const {autocorrectEditorView, editNames, newWarnings, tryText, TRY_TEXT_MAX} = require("../../core/model/autocorrect-editor");
 const {AUTOCORRECT_DOMAIN_V1, AUTOCORRECT_MATCH: MATCH, autocorrectDomainSize, entryKey} = require("../../core/schema/autocorrect-domain-v1");
 const {encodeMacroPayload} = require("../../core/schema/macro-payload");
 const {hostLayouts} = require("../../core/data/host-layouts");
+const {AUTOCORRECT_STARTER} = require("../../core/data/autocorrect-starter");
 const {draftEditLabel} = require("../../core/model/draft-edits");
 const {buildDeviceModel} = require("../../core/session/device-model");
 
@@ -38,14 +39,18 @@ test("the view lists each replacement once with its inputs, as it is written, in
     const view = autocorrectEditorView(current, CURRENT_CAPABILITIES);
     assert.equal(view.identity, current.fingerprint);
     assert.deepEqual(view.entries, [
-        {id: "because", correction: "because", warnings: [], typos: [{typo: "becuase", input: "becuase", match: 0, warnings: []}]},
-        {id: "ment", correction: "ment", warnings: [], typos: [{typo: "mnet", input: "*mnet", match: 2, warnings: []}]},
-        {id: "receive", correction: "receive", warnings: [], typos: [{typo: "recieve", input: "recieve*", match: 1, warnings: []}]},
-        {id: "the", correction: "the", warnings: [], typos: [{typo: "hte", input: "hte", match: 0, warnings: []}, {typo: "teh", input: "teh", match: 0, warnings: []}]},
-        {id: "thing", correction: "thing", warnings: [], typos: [{typo: "tihng", input: "*tihng*", match: 3, warnings: []}]},
-        {id: entryKey({macro: 5}), correction: "", macro: 5, warnings: [], typos: [{typo: "sig", input: "sig", match: 0, warnings: []}]}]);
+        {id: "because", label: "because", correction: "because", warnings: [], typos: [{typo: "becuase", input: "becuase", warnings: []}]},
+        {id: "ment", label: "ment", correction: "ment", warnings: [], typos: [{typo: "mnet", input: "*mnet", warnings: []}]},
+        {id: "receive", label: "receive", correction: "receive", warnings: [], typos: [{typo: "recieve", input: "recieve*", warnings: []}]},
+        {id: "the", label: "the", correction: "the", warnings: [], typos: [{typo: "hte", input: "hte", warnings: []}, {typo: "teh", input: "teh", warnings: []}]},
+        {id: "thing", label: "thing", correction: "thing", warnings: [], typos: [{typo: "tihng", input: "*tihng*", warnings: []}]},
+        {id: entryKey({macro: 5}), label: "▶ Macro 5 named", correction: "", macro: 5, warnings: [], typos: [{typo: "sig", input: "sig", warnings: []}]}],
+        "each named once, by core: its text, or its macro's name after the mark");
     const bytes = autocorrectDomainSize(validateSnapshot(current.document).autocorrect);
-    assert.deepEqual(view.usage, {corrections: 6, maxCorrections: 1024, typos: 7, maxTypos: 1024, textBytes: 58, maxTextBytes: 20480, bytes, capacity: 34824, free: 34824 - bytes, textMax: 32, correctionMax: 128});
+    // The share both memory meters draw is the list's bytes of its own limit;
+    // what is free is bound by the text's ceiling and the profile's room too.
+    assert.deepEqual(view.usage, {corrections: 6, typos: 7, maxTypos: 1024, textBytes: 58, maxTextBytes: 20480, bytes, capacity: 34824, share: bytes / 34824, free: 20480 - 58, textMax: 32, correctionMax: 128, shortInput: 4});
+    assert.deepEqual(view.starter, {replacements: AUTOCORRECT_STARTER.replacements.length, inputs: AUTOCORRECT_STARTER.replacements.reduce((total, entry) => total + entry.inputs.length, 0)});
     assert.deepEqual([view.notices, view.layoutName], [[], "US"]);
     assert.equal(autocorrectEditorView(null), null);
     assert.equal(autocorrectEditorView({incomplete: true, document: current.document}), null);
@@ -55,7 +60,11 @@ test("the keyboard's own ceilings and the profile's free room bound the list's",
     const current = fixture([["the", "teh"]]);
     const stored = validateSnapshot(current.document);
     const view = autocorrectEditorView(current, {...CURRENT_CAPABILITIES, maxAutocorrectCorrections: 10, maxAutocorrectTypos: 20, autocorrectTextBytes: 300, autocorrectBytes: 500, maxProfilePayload: stored.candidate.length + 40});
-    assert.deepEqual([view.usage.maxCorrections, view.usage.maxTypos, view.usage.maxTextBytes, view.usage.capacity, view.usage.free], [10, 20, 300, 500, 40]);
+    assert.deepEqual([view.usage.maxTypos, view.usage.maxTextBytes, view.usage.capacity, view.usage.free], [20, 300, 500, 40]);
+    assert.equal(view.usage.share, view.usage.bytes / 500);
+    // Whichever is tightest: the list's own bytes, its text's ceiling or the profile's room.
+    const tight = capabilities => autocorrectEditorView(current, {...CURRENT_CAPABILITIES, maxProfilePayload: stored.candidate.length + 40, ...capabilities}).usage.free;
+    assert.deepEqual([tight({autocorrectBytes: view.usage.bytes + 7}), tight({autocorrectTextBytes: 6 + 9}), tight({autocorrectBytes: view.usage.bytes - 1})], [7, 9, 0]);
     const lengths = autocorrectEditorView(current, {...CURRENT_CAPABILITIES, autocorrectTextMax: 30, autocorrectCorrectionMax: 100}).usage;
     assert.deepEqual([lengths.textMax, lengths.correctionMax], [30, 100]);
 });
@@ -66,15 +75,18 @@ test("warnings are published on the entry or input they are about, and the layou
     assert.deepEqual(german.notices, []);
     assert.equal(german.layoutName, "German (Windows)");
     const us = autocorrectEditorView(fixture(entries), CURRENT_CAPABILITIES);
-    assert.deepEqual(us.notices, ["2 replacements will not fire on US."]);
+    assert.deepEqual(us.notices, ["US cannot type 2 replacements, so the keyboard skips them. Change Host settings → Your computer back, or edit the replacements marked."],
+        "said once, whole, with what to do about it");
     assert.equal(us.entries.reduce((total, entry) => total + entry.warnings.length + entry.typos.reduce((sum, typo) => sum + typo.warnings.length, 0), 0), 4);
     assert.match(us.entries.find(entry => entry.correction === "über").warnings[0], /US cannot type “ü”/);
     const on = us.entries.find(entry => entry.correction === "no").typos[0];
     assert.equal(on.warnings.length, 2);
-    assert.equal(on.warnings[0], "“*on” is a short input with *, so it fires inside many words.");
+    assert.equal(on.warnings[0], "“*on” is a short input with *, so it catches many words.");
     assert.match(on.warnings[1], /inside the replacement “button”/);
-    assert.deepEqual(autocorrectEditorView(fixture([["uber", "über"], ["a", "ä"]], 0), CURRENT_CAPABILITIES).notices, ["2 inputs will not fire on US."]);
-    assert.deepEqual(autocorrectEditorView(fixture([["über", "ueber"], ["a", "ä"]], 0), CURRENT_CAPABILITIES).notices, ["1 replacement and 1 input will not fire on US."]);
+    const noticed = entries => autocorrectEditorView(fixture(entries, 0), CURRENT_CAPABILITIES).notices.map(notice => notice.split(". ")[0]);
+    assert.deepEqual(noticed([["uber", "über"], ["a", "ä"]]), ["US cannot type 2 inputs, so the keyboard skips them"]);
+    assert.deepEqual(noticed([["über", "ueber"], ["a", "ä"]]), ["US cannot type 1 replacement and 1 input, so the keyboard skips them"]);
+    assert.deepEqual(noticed([["uber", "über"]]), ["US cannot type 1 input, so the keyboard skips it"]);
     // A replacement that plays a macro with no steps says so, by the macro's
     // name; one whose macro has steps says nothing.
     const played = autocorrectEditorView(fixture([[5, "sig"], [6, "addr"]], 0, {5: "Kind regards"}), CURRENT_CAPABILITIES);
@@ -89,20 +101,25 @@ test("each edit the screen posts changes the list and nothing else", () => {
     assert.deepEqual(listOf(current), [["because", "becasue", "becuase"], ["the", "hte", "teh"]]);
     current = edit(current, {type: "updateAutocorrectTypo", typo: "hte", to: "hte*"});
     current = edit(current, {type: "updateAutocorrectTypo", typo: "teh", to: "tthe"});
-    current = edit(current, {type: "updateAutocorrectTypo", typo: "becasue", correction: "cause"});
-    assert.deepEqual(listOf(current), [["because", "becuase"], ["cause", "becasue"], ["the", ["hte", MATCH.START], "tthe"]]);
+    // A field's text is read into its inputs by core, split at spaces.
+    current = edit(current, {type: "addAutocorrectTypos", correction: "cause", inputs: "  cuase   Casue "});
+    assert.deepEqual(listOf(current), [["because", "becasue", "becuase"], ["cause", "casue", "cuase"], ["the", ["hte", MATCH.START], "tthe"]]);
+    says(() => edit(current, {type: "addAutocorrectTypos", correction: "cause", inputs: "cuas,csue"}), /“,” is neither/, "AUTOCORRECT_EDIT_REFUSED");
+    says(() => edit(current, {type: "addAutocorrectTypos", correction: "cause", inputs: "   "}), /A replacement needs at least one input/, "AUTOCORRECT_EDIT_REFUSED");
+    says(() => edit(current, {type: "addAutocorrectTypos", correction: "cause"}), /A replacement needs at least one input/, "AUTOCORRECT_EDIT_REFUSED");
     current = edit(current, {type: "updateAutocorrectCorrection", correction: "cause", to: "because"});
     current = edit(current, {type: "deleteAutocorrectTypo", typo: "tthe"});
+    current = edit(current, {type: "deleteAutocorrectTypo", typo: "casue"});
+    current = edit(current, {type: "deleteAutocorrectTypo", typo: "cuase"});
     assert.deepEqual(listOf(current), [["because", "becasue", "becuase"], ["the", ["hte", MATCH.START]]]);
     // A replacement that plays a macro: added, added to, made from text and
-    // made text again, moved to and deleted, each named by its slot.
+    // made text again, and deleted, each named by its slot.
     current = edit(current, {type: "addAutocorrectTypos", macro: 5, typos: [{typo: "sig"}]});
     current = edit(current, {type: "addAutocorrectTypos", macro: 5, typos: [{typo: "sgi"}]});
     current = edit(current, {type: "updateAutocorrectCorrection", correction: "because", toMacro: 9});
     assert.deepEqual(listOf(current), [["the", ["hte", MATCH.START]], [5, "sgi", "sig"], [9, "becasue", "becuase"]]);
     current = edit(current, {type: "updateAutocorrectCorrection", macro: 9, to: "because"});
-    current = edit(current, {type: "updateAutocorrectTypo", typo: "becasue", macro: 5});
-    assert.deepEqual(listOf(current), [["because", "becuase"], ["the", ["hte", MATCH.START]], [5, "becasue", "sgi", "sig"]]);
+    assert.deepEqual(listOf(current), [["because", "becasue", "becuase"], ["the", ["hte", MATCH.START]], [5, "sgi", "sig"]]);
     current = edit(current, {type: "deleteAutocorrectEntry", macro: 5});
     current = edit(current, {type: "deleteAutocorrectEntry", correction: "because"});
     current = edit(current, {type: "deleteAutocorrectTypo", typo: "hte"});
@@ -147,10 +164,36 @@ test("an edit's new warnings are the ones the list did not already have", () => 
     const current = fixture([["the", ["th", MATCH.START]]]);
     const added = draftEdit(current, {type: "addAutocorrectTypos", correction: "no", typos: [{typo: "*on"}]}, CURRENT_CAPABILITIES);
     const warnings = newWarnings(current, added);
-    assert.deepEqual(warnings, ["“*on” is a short input with *, so it fires inside many words."]);
+    assert.deepEqual(warnings, ["“*on” is a short input with *, so it catches many words."]);
     // A replacement that plays a macro without steps is warned of as it is added.
     assert.match(newWarnings(current, draftEdit(current, {type: "addAutocorrectTypos", macro: 5, typos: [{typo: "sig"}]}, CURRENT_CAPABILITIES))[0], /“Macro 5” has no steps/);
     assert.deepEqual(newWarnings(current, draftEdit(current, {type: "addAutocorrectTypos", correction: "because", typos: [{typo: "becuase"}]}, CURRENT_CAPABILITIES)), []);
+});
+
+test("an edit is asked which entry it names: the one the list has for its replacement, or the one it would make", () => {
+    const current = fixture([["the", "teh"], ["then", "tehn"], [5, "sig"]], 0, {5: "Kind regards"});
+    const macro = entryKey({macro: 5});
+    // An add: the entry it adds to, or the one it makes. A replacement is the
+    // same one whatever spaces are typed around it, and no other in other capitals.
+    assert.deepEqual(editNames(current, {type: "addAutocorrectTypos", correction: " the ", inputs: "hte"}), {entry: "the", label: "the", listed: true, unfinished: false, listedSaid: "“the” is already on your list. Add inputs to it there."});
+    assert.deepEqual(editNames(current, {type: "addAutocorrectTypos", correction: "The", inputs: "hte"}), {entry: "The", label: "The", listed: false, unfinished: false});
+    assert.deepEqual(editNames(current, {type: "addAutocorrectTypos", macro: 5, typos: [{typo: "sgi"}]}), {entry: macro, label: "▶ Macro 5 named", listed: true, unfinished: false, listedSaid: "The macro “Macro 5 named” is already on your list. Add inputs to it there."});
+    assert.deepEqual(editNames(current, {type: "addAutocorrectTypos", macro: 6, inputs: "addr"}), {entry: entryKey({macro: 6}), label: "▶ Macro 6", listed: false, unfinished: false});
+    // One that names no input yet is only asked what it would be.
+    assert.equal(editNames(current, {type: "addAutocorrectTypos", correction: "the", inputs: "  "}).unfinished, true);
+    assert.deepEqual(editNames(current, {type: "addAutocorrectTypos", correction: "new"}), {entry: "new", label: "new", listed: false, unfinished: true});
+    says(() => editNames(current, {type: "addAutocorrectTypos", correction: "  ", inputs: "x"}), /Type the replacement/, "AUTOCORRECT_EDIT_REFUSED");
+    // A change: the entry it becomes, and in words when that joins another.
+    assert.deepEqual(editNames(current, {type: "updateAutocorrectCorrection", correction: "the", to: "them"}), {entry: "them", label: "them", listed: false});
+    assert.deepEqual(editNames(current, {type: "updateAutocorrectCorrection", correction: "the", to: "the"}), {entry: "the", label: "the", listed: false}, "itself is no other entry");
+    assert.deepEqual(editNames(current, {type: "updateAutocorrectCorrection", correction: "the", to: " then "}),
+        {entry: "then", label: "then", listed: true, joins: "“then” is already on your list: this one's inputs will join it."});
+    assert.deepEqual(editNames(current, {type: "updateAutocorrectCorrection", correction: "the", toMacro: 5}),
+        {entry: macro, label: "▶ Macro 5 named", listed: true, joins: "The macro “Macro 5 named” is already on your list: this one's inputs will join it."});
+    assert.deepEqual(editNames(current, {type: "updateAutocorrectCorrection", macro: 5, toMacro: 5}), {entry: macro, label: "▶ Macro 5 named", listed: false});
+    // An edit that names no replacement to go to names nothing.
+    assert.deepEqual(editNames(current, {type: "updateAutocorrectTypo", typo: "teh", to: "teh*"}), {});
+    assert.deepEqual(editNames(current, {type: "deleteAutocorrectEntry", correction: "the"}), {});
 });
 
 test("each edit is recorded in its own words", () => {
@@ -158,12 +201,12 @@ test("each edit is recorded in its own words", () => {
     assert.equal(draftEditLabel({type: "addAutocorrectTypos", correction: "then", typos: [{typo: "tehn"}]}, document), "Added a replacement");
     assert.equal(draftEditLabel({type: "addAutocorrectTypos", macro: 5, typos: [{typo: "sig"}]}, document), "Added a replacement");
     assert.equal(draftEditLabel({type: "addAutocorrectTypos", correction: " the ", typos: [{typo: "hte"}]}, document), "Added an input to a replacement");
-    assert.equal(draftEditLabel({type: "updateAutocorrectTypo", typo: "teh", correction: "then"}, document), "Moved an input to another replacement");
-    assert.equal(draftEditLabel({type: "updateAutocorrectTypo", typo: "teh", macro: 5}, document), "Moved an input to another replacement");
+    assert.equal(draftEditLabel({type: "addAutocorrectTypos", correction: "the", inputs: "hte"}, document), "Added an input to a replacement");
+    assert.equal(draftEditLabel({type: "addAutocorrectTypos", correction: "", inputs: "hte"}, document), "Added a replacement", "named before it is judged");
     assert.equal(draftEditLabel({type: "updateAutocorrectTypo", typo: "teh", to: "teh*"}, document), "Edited an input");
     assert.equal(draftEditLabel({type: "updateAutocorrectCorrection", correction: "the", to: "The"}, document), "Changed a replacement");
     assert.equal(draftEditLabel({type: "deleteAutocorrectTypo", typo: "teh"}, document), "Removed an input");
-    assert.equal(draftEditLabel({type: "deleteAutocorrectEntry", correction: "the"}, document), "Removed a replacement");
+    assert.equal(draftEditLabel({type: "deleteAutocorrectEntry", correction: "the"}, document), "Deleted a replacement", "a replacement is deleted, an input removed");
 });
 
 test("the list reaches the published model only with a complete read, and is writable with it", () => {
@@ -191,10 +234,10 @@ test("Review lists each changed entry once: added, removed, respelled or made a 
     assert.deepEqual(brief, [
         ["because", "changed", UNIT.autocorrect("because"), [["Input", "removed", "becasue · moved to “cause”", null], ["Input", "added", null, "beacuse"]]],
         ["gone", "removed", UNIT.autocorrect("gone"), [["Replacement", "removed", "gone", null], ["Input", "removed", "goen", null]]],
-        ["Macro “Macro 5 named”", "changed", UNIT.autocorrect("signed", macro(5)), [["Replacement", "changed", "signed", "Macro “Macro 5 named”"]]],
+        ["▶ Macro 5 named", "changed", UNIT.autocorrect("signed", macro(5)), [["Replacement", "changed", "signed", "▶ Macro 5 named"]]],
         ["The", "changed", UNIT.autocorrect("the", "The"), [["Replacement", "changed", "the", "The"]]],
         ["thing", "changed", UNIT.autocorrect("thing"), [["Input", "changed", "*tihng*", "*tihng"]]],
-        ["Macro “Macro 6”", "changed", UNIT.autocorrect(macro(6)), [["Input", "added", null, "adres"]]],
+        ["▶ Macro 6", "changed", UNIT.autocorrect(macro(6)), [["Input", "added", null, "adres"]]],
         ["cause", "added", UNIT.autocorrect("cause"), [["Replacement", "added", null, "cause"], ["Input", "added", null, "becasue · moved from “because”"]]],
         ["new", "added", UNIT.autocorrect("new"), [["Replacement", "added", null, "new"], ["Input", "added", null, "nwe"]]],
     ]);
@@ -242,6 +285,21 @@ test("an import adds to the list or replaces it in one step, leaving out what th
     assert.deepEqual([starter.add.refused, starter.add.unfit], [[], 0]);
     assert.equal(validateSnapshot(edit(fixture([]), {type: "importAutocorrect", mode: "add", entries: starter.entries}).document).autocorrect.entries.length, starter.add.replacements);
 
+    // Within every count, an import is still bound by the room the profile
+    // has left: the sheet says what does not fit and why, and the choice it
+    // offers is taken, never refused whole as profile full.
+    const room = validateSnapshot(current.document).candidate.length + 40, tight = {...CURRENT_CAPABILITIES, maxProfilePayload: room};
+    const cramped = importPreview(current, starterFile(), tight);
+    assert.ok(cramped.add.unfit > 0 && cramped.add.inputs > 2, "some of it fits, and the rest is counted");
+    assert.equal(cramped.add.unfitWhy, "the keyboard's profile is full");
+    const taken = edit(current, {type: "importAutocorrect", mode: "add", entries: cramped.entries}, tight);
+    const kept = validateSnapshot(taken.document);
+    assert.deepEqual([kept.autocorrect.entries.length, kept.autocorrect.entries.reduce((total, entry) => total + entry.typos.length, 0)], [cramped.add.replacements, cramped.add.inputs], "what is kept is what the sheet said");
+    assert.ok(kept.candidate.length <= room);
+    // The list's own memory bounds it the same way.
+    const small = importPreview(current, starterFile(), {...CURRENT_CAPABILITIES, autocorrectBytes: autocorrectDomainSize(validateSnapshot(current.document).autocorrect) + 60});
+    assert.equal(small.add.unfitWhy, "text replacement memory is full");
+
     // The list as a file, named by the day and the format.
     const day = new Date("2026-11-10T08:00:00Z");
     assert.deepEqual(exportedList(current, "txt", day), {fileName: "charybdis-text-replacements-2026-11-10.txt", text: ":teh: -> the\n:tehn: -> then\n", mime: "text/plain"});
@@ -256,10 +314,14 @@ test("Review warns once of the replacements the host layout cannot type, and of 
     const [finding, ...more] = untypable([["über", "ueber"], ["straße", "strasse"], ["the", "teh"], ["a", "ä"]]);
     assert.deepEqual(more, []);
     assert.deepEqual({level: finding.level, count: finding.count, title: finding.title, place: finding.place},
-        {level: "warning", count: 3, title: "3 text replacements will not fire on US", place: {kind: "autocorrect", entry: "a"}});
+        {level: "warning", count: 3, title: "US cannot type 3 text replacements", place: {kind: "autocorrect", entry: "a"}});
     assert.match(finding.detail, /US cannot type a character in “a”, “straße”, “über”\. The keyboard stores them and skips them\./);
     assert.deepEqual(profileFindings(validateSnapshot(fixture([["über", "ueber"]], GERMAN).document)).filter(row => row.kind === "untypableAutocorrect"), []);
-    assert.equal(untypable([["über", "ueber"]])[0].title, "1 text replacement will not fire on US");
+    assert.equal(finding.fix, "Change Host settings → Your computer back, or edit the replacements marked on the Text replacement screen.");
+    assert.equal(untypable([["über", "ueber"]])[0].title, "US cannot type 1 text replacement");
+    // A replacement that plays a macro is named in the sentence as one.
+    const named = profileFindings(validateSnapshot(fixture([[5, "sig"], ["a", "ä"]], 0, {5: "Kind regards"}).document)).find(row => row.kind === "untypableAutocorrect");
+    assert.match(named.detail, /cannot type a character in “a”\./);
     // A replacement whose macro has no steps is a finding of its own, as a
     // pointing mode that runs an empty macro is; one with steps is none.
     const inert = profileFindings(validateSnapshot(fixture([[5, "sig"], [6, "addr"], ["the", "teh"]], 0, {5: "Kind regards"}).document)).filter(finding => finding.kind === "inertAutocorrectMacro");

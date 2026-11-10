@@ -84,7 +84,9 @@ test("Show goes to where each kind of item is edited", () => {
     assert.equal(placeState(null), null, "the profile fallback has nowhere to go");
     // Text replacement's switch is a Host setting; its list is its own screen's, an entry shown by its id.
     assert.deepEqual(placeState({kind: "settings", section: "autocorrect", area: "Settings"}), {screen: "host", reveal: '.settings-group[data-section="autocorrect"]'});
-    assert.deepEqual(placeState({kind: "autocorrect", entry: "the"}), {screen: "autocorrect", autocorrectEdit: null, autocorrectAdding: null, autocorrectSearch: "", reveal: '[data-ac-entry="the"]'});
+    // Show opens the entry in its editor, as a macro's opens the macro: what
+    // was open, being made or searched for gives way to it.
+    assert.deepEqual(placeState({kind: "autocorrect", entry: "the"}), {screen: "autocorrect", autocorrectEntry: "the", autocorrectNew: null, autocorrectEdit: null, autocorrectSearch: "", reveal: '[data-ac-entry="the"]'});
     assert.equal(placeState({kind: "autocorrect", entry: 'say "hi"'}).reveal, '[data-ac-entry="say \\"hi\\""]', "a replacement's own quotes do not end the selector");
     assert.ok(draftMarks([{place: {kind: "autocorrect", entry: "the"}, status: "changed"}]).autocorrect.has("the"));
     assert.deepEqual(categorySummary(words, [{place: {kind: "settings", section: "autocorrect"}, status: "changed"}, {place: {kind: "autocorrect", entry: "the"}, status: "added"}, {place: {kind: "macro", index: 0, keycode: "MACRO_0"}, status: "changed"}])

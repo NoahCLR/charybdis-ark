@@ -26,7 +26,7 @@ const {reorderShortcutRefusal} = require("./shortcut-layers");
 const {readStoredMacro} = require("./macro-input");
 const {MACRO_LIMITS} = require("../../rules/macro-payload.mjs");
 const {MACRO_DOMAIN_V1} = require("../schema/macro-domain-v1");
-const {AUTOCORRECT_DOMAIN_V1} = require("../schema/autocorrect-domain-v1");
+const {AUTOCORRECT_DOMAIN_V1, autocorrectCounts} = require("../schema/autocorrect-domain-v1");
 const {hostSettings} = require("../schema/host-settings");
 const {answered} = require("../schema/bytes");
 const {profileDepthOptions} = require("../schema/profile-depth");
@@ -269,12 +269,10 @@ function autocorrectCeilings(capabilities) {
 // What a list past the keyboard's ceilings is told, or nothing.
 /** @param {import("../schema/autocorrect-domain-v1.js").AutocorrectList} list @param {DomainsContext["capabilities"]} capabilities */
 function autocorrectRefusal(list, capabilities) {
-    const ceilings = autocorrectCeilings(capabilities);
-    const typos = list.entries.reduce((total, entry) => total + entry.typos.length, 0);
-    const text = list.entries.reduce((total, entry) => total + Buffer.byteLength(entry.correction) + entry.typos.reduce((sum, typo) => sum + Buffer.byteLength(typo.typo), 0), 0);
-    if (list.entries.length > ceilings.maxCorrections) return PROFILE_FULL_WORDS.counts.autocorrectCorrections(ceilings.maxCorrections);
-    if (typos > ceilings.maxTypos) return PROFILE_FULL_WORDS.counts.autocorrectTypos(ceilings.maxTypos);
-    if (text > ceilings.maxTextBytes) return PROFILE_FULL_WORDS.counts.autocorrectText(ceilings.maxTextBytes);
+    const ceilings = autocorrectCeilings(capabilities), counts = autocorrectCounts(list);
+    if (counts.corrections > ceilings.maxCorrections) return PROFILE_FULL_WORDS.counts.autocorrectCorrections(ceilings.maxCorrections);
+    if (counts.typos > ceilings.maxTypos) return PROFILE_FULL_WORDS.counts.autocorrectTypos(ceilings.maxTypos);
+    if (counts.textBytes > ceilings.maxTextBytes) return PROFILE_FULL_WORDS.counts.autocorrectText(ceilings.maxTextBytes);
     return undefined;
 }
 // The codec options a document's domains are read and written with: the tap

@@ -9,15 +9,16 @@
 // a typo.
 
 const {decodedOf, editProfileDomains, autocorrectCeilings} = require("./portable-profile");
-const {AUTOCORRECT_DOMAIN_V1, entryKey, isMacroSlot} = require("../schema/autocorrect-domain-v1");
+const {AUTOCORRECT_DOMAIN_V1, entryKey} = require("../schema/autocorrect-domain-v1");
 const {parsePayload} = require("../schema/macro-payload");
 const {inspectMacroPlayback, readStoredMacro} = require("./macro-input");
 const {PROFILE_BLOB_V1} = require("../schema/profile-blob-v1");
 const {MACOS, hostSettings} = require("../schema/host-settings");
 const {hostLayout} = require("../data/host-layouts");
 const {typedText} = require("./autocorrect-matcher");
-const {WARNING, addTypos, changeReplacement, changeTypo, findEntry, listUsage, listWarnings, removeEntry, removeTypo, inputForm} = require("./autocorrect-list");
+const {SHORT_INPUT_LETTERS, WARNING, addTypos, changeReplacement, changeTypo, findEntry, listUsage, listWarnings, removeEntry, removeTypo, replacementCalled, replacementSaid, splitInputs, targetOf, inputForm, untypableFix} = require("./autocorrect-list");
 const {exportAutocorrect, planImport, previewImport, rowsOf} = require("./autocorrect-import");
+const {AUTOCORRECT_STARTER} = require("../data/autocorrect-starter");
 const {VOCABULARY, word} = require("./vocabulary");
 
 /**
@@ -82,8 +83,8 @@ function warningsOf(decoded, hostOs) {
     return held.warnings ??= listWarnings(decoded.autocorrect, held.host);
 }
 
-// How many replacements and inputs the chosen layout leaves unable to
-// fire, said once for the whole list; nothing when it types them all.
+// How many replacements and inputs the chosen layout cannot type, said once
+// for the whole list with what to do about it; nothing when it types them all.
 /** @param {import("./autocorrect-list.js").Warning[]} warnings @param {string} layoutName */
 function untypableNotice(warnings, layoutName) {
     const untypable = warnings.filter(warning => warning.kind === WARNING.UNTYPABLE);
@@ -91,8 +92,19 @@ function untypableNotice(warnings, layoutName) {
     /** @param {number} count @param {string} one @param {string} many */
     const counted = (count, one, many) => `${count} ${count === 1 ? one : many}`;
     const parts = [...(entries ? [counted(entries, "replacement", "replacements")] : []), ...(typos ? [counted(typos, "input", "inputs")] : [])];
-    return parts.length ? `${parts.join(" and ")} will not fire on ${layoutName}.` : "";
+    return parts.length ? `${layoutName} cannot type ${parts.join(" and ")}, so the keyboard skips ${untypable.length === 1 ? "it" : "them"}. ${untypableFix()}` : "";
 }
+
+// What the keyboard holds of a list, for this profile: its ceilings as the
+// keyboard reports them, the bytes of its domain, and the bytes the profile
+// may still grow by, which the list shares with everything else in it.
+/** @param {import("./types.js").DecodedProfile} decoded @param {import("./types.js").ProfileDestination} [capabilities] */
+function roomOf(decoded, capabilities) {
+    return {...autocorrectCeilings(capabilities), capacity: capabilities?.autocorrectBytes ?? AUTOCORRECT_DOMAIN_V1.MAX_SIZE,
+        sharedFree: Math.max(0, (capabilities?.maxProfilePayload ?? PROFILE_BLOB_V1.MAX_SIZE) - decoded.candidate.length)};
+}
+// The starter list's size, for the button that offers it.
+const STARTER = Object.freeze({replacements: AUTOCORRECT_STARTER.replacements.length, inputs: AUTOCORRECT_STARTER.replacements.reduce((total, entry) => total + entry.inputs.length, 0)});
 
 /** @param {import("./types.js").ProfileSnapshot | null | undefined} snapshot @param {import("./types.js").ProfileDestination} [capabilities] */
 function autocorrectEditorView(snapshot, capabilities) {
@@ -102,40 +114,55 @@ function autocorrectEditorView(snapshot, capabilities) {
     const warnings = warningsOf(decoded, snapshot.hostOs);
     /** @param {string} entry @param {string} [typo] */
     const said = (entry, typo) => warnings.filter(warning => warning.entry === entry && warning.typo === typo).map(warning => warning.text);
-    const used = listUsage(list), ceilings = autocorrectCeilings(capabilities);
-    const capacity = capabilities?.autocorrectBytes ?? AUTOCORRECT_DOMAIN_V1.MAX_SIZE;
-    const sharedFree = (capabilities?.maxProfilePayload ?? PROFILE_BLOB_V1.MAX_SIZE) - decoded.candidate.length;
+    const used = listUsage(list), room = roomOf(decoded, capabilities);
     const notice = untypableNotice(warnings, host.layoutName);
     return {identity: snapshot.fingerprint,
-        entries: list.entries.map(entry => ({id: entryKey(entry), correction: entry.correction, ...(entry.macro === undefined ? {} : {macro: entry.macro}), warnings: said(entryKey(entry)),
-            typos: entry.typos.map(typo => ({typo: typo.typo, input: inputForm(typo), match: typo.match, warnings: said(entryKey(entry), typo.typo)}))})),
-        usage: {corrections: used.corrections, maxCorrections: ceilings.maxCorrections, typos: used.typos, maxTypos: ceilings.maxTypos,
-            textBytes: used.textBytes, maxTextBytes: ceilings.maxTextBytes, bytes: used.bytes, capacity,
-            free: Math.max(0, Math.min(capacity - used.bytes, sharedFree)), textMax: capabilities?.autocorrectTextMax ?? AUTOCORRECT_DOMAIN_V1.TEXT_MAX,
-            correctionMax: capabilities?.autocorrectCorrectionMax ?? AUTOCORRECT_DOMAIN_V1.CORRECTION_MAX},
+        entries: list.entries.map(entry => ({id: entryKey(entry), label: replacementCalled(entry, host.macroNames), correction: entry.correction, ...(entry.macro === undefined ? {} : {macro: entry.macro}), warnings: said(entryKey(entry)),
+            typos: entry.typos.map(typo => ({typo: typo.typo, input: inputForm(typo), warnings: said(entryKey(entry), typo.typo)}))})),
+        // `share` is the list's bytes of its own limit, the one figure both
+        // memory meters draw; `free` is what it can still grow by, which its
+        // text's ceiling and the profile's shared room may bound sooner.
+        usage: {corrections: used.corrections, typos: used.typos, maxTypos: room.maxTypos,
+            textBytes: used.textBytes, maxTextBytes: room.maxTextBytes, bytes: used.bytes, capacity: room.capacity, share: room.capacity > 0 ? Math.min(1, used.bytes / room.capacity) : 0,
+            free: Math.max(0, Math.min(room.capacity - used.bytes, room.maxTextBytes - used.textBytes, room.sharedFree)), textMax: capabilities?.autocorrectTextMax ?? AUTOCORRECT_DOMAIN_V1.TEXT_MAX,
+            correctionMax: capabilities?.autocorrectCorrectionMax ?? AUTOCORRECT_DOMAIN_V1.CORRECTION_MAX, shortInput: SHORT_INPUT_LETTERS},
+        starter: STARTER,
         notices: notice ? [notice] : [],
         layoutName: host.layoutName};
 }
 
 // Each edit's change to the list, by the type the screen posts.
-/** @type {{[K in AutocorrectEditType]: (list: AutocorrectList, message: import("../../contracts/edits.js").EditOf<K>, host: Host, ceilings: Required<import("../schema/autocorrect-domain-v1.js").Ceilings>) => void}} */
+// The inputs an add names: a field's text, split as core splits it, or the
+// inputs one by one.
+/** @param {import("../../contracts/edits.js").EditOf<"addAutocorrectTypos">} message */
+const addedTypos = message => typeof message.inputs === "string" ? splitInputs(message.inputs).map(typo => ({typo})) : message.typos || [];
+/** @type {{[K in AutocorrectEditType]: (list: AutocorrectList, message: import("../../contracts/edits.js").EditOf<K>, host: Host, room: ReturnType<typeof roomOf>) => void}} */
 const CHANGES = {
-    addAutocorrectTypos: (list, message, host) => addTypos(list, message, message.typos, host),
+    addAutocorrectTypos: (list, message, host) => addTypos(list, message, addedTypos(message), host),
     updateAutocorrectCorrection: (list, message, host) => changeReplacement(list, message, message.toMacro === undefined ? {correction: message.to} : {macro: message.toMacro}, host),
-    updateAutocorrectTypo: (list, message, host) => changeTypo(list, message.typo, {to: message.to, correction: message.correction, macro: message.macro}, host),
+    updateAutocorrectTypo: (list, message, host) => changeTypo(list, message.typo, message.to, host),
     deleteAutocorrectTypo: (list, message) => removeTypo(list, message.typo),
     deleteAutocorrectEntry: (list, message, host) => removeEntry(list, message, host),
     // What the list cannot take of an import is left out, as its preview
     // said (autocorrect-import.js planImport); the rest becomes the list.
-    importAutocorrect: (list, message, host, ceilings) => {
+    importAutocorrect: (list, message, host, room) => {
         if (message.mode !== "add" && message.mode !== "replace") throw refuse("Choose whether to add to the list or replace it.");
         const entries = Array.isArray(message.entries) ? message.entries : [];
         if (entries.some(entry => !entry || (entry.macro === undefined ? typeof entry.correction !== "string" : !Number.isInteger(entry.macro)) || !Array.isArray(entry.typos) || entry.typos.some(typo => !typo || typeof typo.typo !== "string"))) throw refuse("This is not a text replacement list.");
-        list.entries = planImport(list, rowsOf(entries), message.mode, host, ceilings).list.entries;
+        list.entries = planImport(list, rowsOf(entries), message.mode, host, room).list.entries;
     },
 };
 /** @param {string} message */
 const refuse = message => Object.assign(new Error(message), {code: "AUTOCORRECT_EDIT_REFUSED"});
+
+// One edit's change to a list, in place, by the list's own rules: what the
+// draft's handler below makes of the profile's list, and what the offline
+// preview's stand-in runs to answer a check (scripts/preview-macro-shell.mjs).
+/** @param {AutocorrectList} list @param {import("../../contracts/edits.js").AutocorrectEdit} message @param {Host} host @param {ReturnType<typeof roomOf>} room */
+function changeList(list, message, host, room) {
+    const change = /** @type {(list: AutocorrectList, message: unknown, host: Host, room: unknown) => void} */ (CHANGES[message.type]);
+    change(list, message, host, room);
+}
 
 // One edit to the list. The list is opened, changed in place and encoded
 // again in its canonical order; a list past what the keyboard holds is
@@ -143,9 +170,7 @@ const refuse = message => Object.assign(new Error(message), {code: "AUTOCORRECT_
 /** @param {import("./types.js").PortableDocument} document @param {import("../../contracts/edits.js").AutocorrectEdit} message @param {import("./types.js").Draft} draft */
 function editAutocorrect(document, message, draft) {
     return editProfileDomains(document, draft, (open, read) => {
-        const host = hostOf(read(), draft.hostOs);
-        const change = /** @type {(list: AutocorrectList, message: unknown, host: Host, ceilings: unknown) => void} */ (CHANGES[message.type]);
-        change(open("autocorrect"), message, host, autocorrectCeilings(draft.capabilities));
+        changeList(open("autocorrect"), message, hostOf(read(), draft.hostOs), roomOf(read(), draft.capabilities));
     });
 }
 
@@ -158,6 +183,35 @@ function newWarnings(before, after) {
     return warningsOf(next, before.hostOs).filter(warning => !had.has(warning.text)).map(warning => warning.text);
 }
 
+// What an edit names, asked before it is made: the entry its replacement is
+// once the edit is kept (`entry`, the id the list has or will have for it),
+// what that replacement is called (`label`), whether the list already has it
+// (`listed`: an add then adds to it, which `listedSaid` says where a new
+// replacement is being made, and a change joins it, which `joins` warns of),
+// and whether it is an add that names no input yet (`unfinished`), which is
+// only asked what it would be. Nothing for an edit that names no replacement
+// to go to. A replacement that cannot be one is refused as the edit would
+// refuse it.
+/** @param {AutocorrectList} list @param {import("./autocorrect-list.js").MacroNames} macroNames @param {import("../../contracts/edits.js").AutocorrectEdit} edit @returns {{entry?: string, label?: string, listed?: boolean, listedSaid?: string, joins?: string, unfinished?: boolean}} */
+function listEditNames(list, macroNames, edit) {
+    /** @param {import("./autocorrect-list.js").Target} target */
+    const said = target => { const words = replacementSaid(target, macroNames); return `${words[0].toUpperCase()}${words.slice(1)} is already on your list`; };
+    if (edit.type === "addAutocorrectTypos") {
+        const target = targetOf(edit), listed = Boolean(findEntry(list, target));
+        return {entry: entryKey(target), label: replacementCalled(target, macroNames), listed, unfinished: !addedTypos(edit).length, ...(listed ? {listedSaid: `${said(target)}. Add inputs to it there.`} : {})};
+    }
+    if (edit.type !== "updateAutocorrectCorrection") return {};
+    const target = targetOf(edit.toMacro === undefined ? {correction: edit.to} : {macro: edit.toMacro});
+    const from = edit.macro !== undefined ? entryKey({macro: edit.macro}) : String(edit.correction ?? "");
+    const listed = entryKey(target) !== from && Boolean(findEntry(list, target));
+    return {entry: entryKey(target), label: replacementCalled(target, macroNames), listed, ...(listed ? {joins: `${said(target)}: this one's inputs will join it.`} : {})};
+}
+/** @param {{document: import("./types.js").PortableDocument, decoded?: import("./types.js").DecodedProfile}} snapshot @param {import("../../contracts/edits.js").AutocorrectEdit} edit */
+function editNames(snapshot, edit) {
+    const decoded = decodedOf(snapshot);
+    return listEditNames(decoded.autocorrect, decoded.settings.macroNames || [], edit);
+}
+
 // What a list file, or the starter list, would do to a snapshot's list,
 // added to it and replacing it, on its host layout and within what the
 // keyboard holds.
@@ -165,7 +219,7 @@ function newWarnings(before, after) {
 function importPreview(snapshot, file, capabilities) {
     const decoded = decodedOf(snapshot);
     // A row's match is one of the four the keyboard stores: every reader of a file maps a word to one.
-    return /** @type {import("../../contracts/messages.js").AutocorrectImportPreview} */ (previewImport(decoded.autocorrect, file, hostOf(decoded, snapshot.hostOs), autocorrectCeilings(capabilities)));
+    return /** @type {import("../../contracts/messages.js").AutocorrectImportPreview} */ (previewImport(decoded.autocorrect, file, hostOf(decoded, snapshot.hostOs), roomOf(decoded, capabilities)));
 }
 
 // The most text a try runs: what was there and what was typed, each.
@@ -198,8 +252,9 @@ function exportedList(snapshot, format, now = new Date()) {
 // replacement, or one more input for one the list had.
 /** @param {import("../../contracts/edits.js").EditOf<"addAutocorrectTypos">} message @param {import("./types.js").PortableDocument} document */
 function addLabel(message, document) {
-    const named = isMacroSlot(message.macro) ? {macro: message.macro} : {correction: typeof message.correction === "string" ? message.correction.trim() : ""};
-    return findEntry(decodedOf({document}).autocorrect, named) ? "Added an input to a replacement" : "Added a replacement";
+    // A step is named before its edit is judged: one that names no
+    // replacement the list could have reads as the new one it would be.
+    try { return editNames({document}, message).listed ? "Added an input to a replacement" : "Added a replacement"; } catch { return "Added a replacement"; }
 }
 
-module.exports = {TRY_TEXT_MAX, addLabel, autocorrectEditorView, editAutocorrect, exportedList, importPreview, newWarnings, tryText};
+module.exports = {TRY_TEXT_MAX, addLabel, autocorrectEditorView, changeList, editAutocorrect, editNames, exportedList, importPreview, listEditNames, newWarnings, tryText};

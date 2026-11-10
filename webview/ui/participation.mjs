@@ -30,10 +30,17 @@ const kindOf = (noun) => noun === "combo" ? "combo" : "behavior";
 /** @type {Readonly<Record<SettingOffSwitch, {section: string, macro: string}>>} */
 const SWITCHES = {behaviour: {section: "behaviorSettings", macro: "behaviorsEnabled"}, combo: {section: "comboSettings", macro: "combosEnabled"},
     autoMouse: {section: "autoMouse", macro: "autoMouse"}, autocorrect: {section: "autocorrect", macro: "autocorrect"}};
+// Whether a global switch is off in the profile, as its Settings section
+// publishes it: the one answer for a switch that has no participation of its
+// own to read.
+/** @param {{configDefaults?: readonly {id: string, fields: readonly {macro: string, enabled?: boolean}[]}[]} | null | undefined} model @param {SettingOffSwitch} name */
+export const settingSwitchedOff = (model, name) => (model?.configDefaults || []).some((section) => section.id === SWITCHES[name].section
+    && section.fields.some((field) => field.macro === SWITCHES[name].macro && field.enabled === false));
 // A banner that says a global switch is off, and goes to it, marking its row.
-// `detail` is what that means where the banner is.
+// `detail` is what that means where the banner is: the vocabulary's own for
+// the switch, unless the place has its own to say.
 /** @param {SettingOffSwitch} name @param {string} [detail] @returns {HTMLElement} */
-export function settingOffBanner(name, detail = "") {
+export function settingOffBanner(name, detail = vocabulary(getModel()).settingOff.switches[name].detail || "") {
     const words = vocabulary(getModel()).settingOff.switches[name];
     const {section, macro} = SWITCHES[name];
     const banner = el(`<button type="button" class="callout master-off" data-master-off><strong>${esc(words.off)}</strong> ${detail ? `${esc(detail)} ` : ""}${esc(words.fix)}</button>`);

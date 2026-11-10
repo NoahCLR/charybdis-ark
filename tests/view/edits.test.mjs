@@ -550,31 +550,29 @@ test("each text replacement edit is posted as written and staged as the keyboard
     const list = () => decoded(draft).autocorrect.entries.map((entry) => [entry.macro ?? entry.correction, ...entry.typos.map((typo) => `${typo.typo}:${typo.match}`)]);
     const of = (replacement) => list().find(([name]) => name === replacement);
     const identity = () => draft.current.fingerprint;
-    const added = edits.addAutocorrectInputs({correction: " then "}, ["Tehn", "thne"], identity());
-    assert.deepEqual(added, {type: "addAutocorrectTypos", correction: " then ", typos: [{typo: "Tehn"}, {typo: "thne"}], expectedFingerprint: identity()});
+    // The field's text goes as it was typed: core reads its inputs.
+    const added = edits.addAutocorrectInputs({correction: " then "}, " Tehn  thne ", identity());
+    assert.deepEqual(added, {type: "addAutocorrectTypos", correction: " then ", inputs: " Tehn  thne ", expectedFingerprint: identity()});
     stage(draft, added);
     assert.deepEqual(of("then"), ["then", "tehn:0", "thne:0"]);
     assert.ok(reviewAreas(draft).includes("Text replacement"));
-    stage(draft, edits.addAutocorrectInputs({correction: "then"}, ["thn*"], identity()));
+    stage(draft, edits.addAutocorrectInputs({correction: "then"}, "thn*", identity()));
     assert.deepEqual(of("then"), ["then", "tehn:0", "thn:1", "thne:0"], "added to again, the replacement gains the input, its * read as where it matches");
     assert.deepEqual(edits.changeAutocorrectReplacement({correction: "then"}, {correction: "Then"}, "f"), {type: "updateAutocorrectCorrection", correction: "then", to: "Then", expectedFingerprint: "f"});
     assert.deepEqual(edits.changeAutocorrectReplacement({correction: "then"}, {macro: 4}, "f"), {type: "updateAutocorrectCorrection", correction: "then", toMacro: 4, expectedFingerprint: "f"});
     assert.deepEqual(edits.changeAutocorrectReplacement({macro: 4}, {correction: "then"}, "f"), {type: "updateAutocorrectCorrection", macro: 4, to: "then", expectedFingerprint: "f"});
     stage(draft, edits.changeAutocorrectReplacement({correction: "then"}, {correction: "Then"}, identity()));
-    assert.deepEqual(edits.changeAutocorrectInput("thn", {to: "*thn*"}, "f"), {type: "updateAutocorrectTypo", typo: "thn", to: "*thn*", expectedFingerprint: "f"});
-    assert.deepEqual(edits.changeAutocorrectInput("thn", {replacement: {correction: "the"}}, "f"), {type: "updateAutocorrectTypo", typo: "thn", correction: "the", expectedFingerprint: "f"});
-    assert.deepEqual(edits.changeAutocorrectInput("thn", {replacement: {macro: 4}}, "f"), {type: "updateAutocorrectTypo", typo: "thn", macro: 4, expectedFingerprint: "f"});
-    stage(draft, edits.changeAutocorrectInput("thn", {to: "*thn*"}, identity()));
-    stage(draft, edits.changeAutocorrectInput("thn", {to: "*thnn*"}, identity()));
-    stage(draft, edits.changeAutocorrectInput("thne", {replacement: {correction: "the"}}, identity()));
+    assert.deepEqual(edits.changeAutocorrectInput("thn", "*thn*", "f"), {type: "updateAutocorrectTypo", typo: "thn", to: "*thn*", expectedFingerprint: "f"});
+    stage(draft, edits.changeAutocorrectInput("thn", "*thn*", identity()));
+    stage(draft, edits.changeAutocorrectInput("thn", "*thnn*", identity()));
+    stage(draft, edits.deleteAutocorrectTypo("thne", identity()));
     assert.deepEqual(of("Then"), ["Then", "tehn:0", "thnn:3"]);
-    assert.ok(of("the").includes("thne:0"), "the input moved to the other replacement");
     stage(draft, edits.deleteAutocorrectTypo("thnn", identity()));
     assert.deepEqual(of("Then"), ["Then", "tehn:0"]);
-    // A replacement that plays a macro, by its slot: added, moved to, made
-    // text and deleted.
-    stage(draft, edits.addAutocorrectInputs({macro: 4}, ["sig"], identity()));
-    stage(draft, edits.changeAutocorrectInput("tehn", {replacement: {macro: 4}}, identity()));
+    // A replacement that plays a macro, by its slot: added, joined by
+    // another, made text and deleted.
+    stage(draft, edits.addAutocorrectInputs({macro: 4}, "sig", identity()));
+    stage(draft, edits.changeAutocorrectReplacement({correction: "Then"}, {macro: 4}, identity()));
     assert.deepEqual([of(4), of("Then")], [[4, "sig:0", "tehn:0"], undefined]);
     stage(draft, edits.changeAutocorrectReplacement({macro: 4}, {correction: "Then"}, identity()));
     assert.deepEqual(of("Then"), ["Then", "sig:0", "tehn:0"]);
@@ -582,8 +580,8 @@ test("each text replacement edit is posted as written and staged as the keyboard
     assert.deepEqual(edits.deleteAutocorrectEntry({macro: 4}, "f"), {type: "deleteAutocorrectEntry", macro: 4, expectedFingerprint: "f"});
     stage(draft, edits.deleteAutocorrectEntry({correction: "Then"}, identity()));
     assert.equal(of("Then"), undefined);
-    assert.throws(() => stage(draft, edits.addAutocorrectInputs({correction: "ten"}, ["teh"], identity())), /is already an input for/);
-    assert.throws(() => stage(draft, edits.addAutocorrectInputs({macro: 4}, ["sig*"], identity())), /A macro plays for a whole word only/);
+    assert.throws(() => stage(draft, edits.addAutocorrectInputs({correction: "ten"}, "teh", identity())), /is already an input for/);
+    assert.throws(() => stage(draft, edits.addAutocorrectInputs({macro: 4}, "sig*", identity())), /A macro plays for a whole word only/);
     assert.deepEqual(edits.autocorrectValidationMessage(added, 7), {type: "validateAutocorrect", edit: added, requestId: 7});
 });
 

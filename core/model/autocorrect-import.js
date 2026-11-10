@@ -19,8 +19,8 @@
 // Only a file that is not a list at all (too large, not JSON, another
 // version) is refused whole.
 
-const {AUTOCORRECT_MATCH, entryKey, isMacroSlot, playsMacro} = require("../schema/autocorrect-domain-v1");
-const {addTypos, findEntry, findTypo, macroCalled, targetOf, inputForm, inputOf, typoOf} = require("./autocorrect-list");
+const {AUTOCORRECT_DOMAIN_V1, AUTOCORRECT_MATCH, autocorrectCounts, sizeOfCounts, entryKey, isMacroSlot, playsMacro} = require("../schema/autocorrect-domain-v1");
+const {addTypos, findEntry, findTypo, replacementCalled, splitInputs, targetOf, inputForm, typoOf} = require("./autocorrect-list");
 const {AUTOCORRECT_STARTER} = require("../data/autocorrect-starter");
 
 /**
@@ -30,7 +30,7 @@ const {AUTOCORRECT_STARTER} = require("../data/autocorrect-starter");
  * @typedef {"txt" | "csv" | "json"} Format
  * @typedef {{line: number, correction?: string, macro?: number, typo: string, match?: number}} Row one input as a file gives it, written with its `*` or with an older file's match beside it, the text or macro slot it produces, and the line or row it is on
  * @typedef {{line: number | null, text: string, reason: string}} Refused a line a file or the list refused, and why
- * @typedef {Required<import("../schema/autocorrect-domain-v1.js").Ceilings>} Ceilings
+ * @typedef {Required<import("../schema/autocorrect-domain-v1.js").Ceilings> & {capacity?: number, sharedFree?: number}} Ceilings what the keyboard holds of a list: its counts and text, the bytes of its domain (`capacity`), and the bytes the profile it is part of may still grow by (`sharedFree`)
  */
 
 // A list of 1,024 inputs is a few tens of kilobytes in any format; this
@@ -43,7 +43,11 @@ const JSON_VERSION = 1;
 // Where an input matches, as an older file's `match` says it in words.
 /** @type {Readonly<Record<string, number>>} */
 const MATCH_BY_WORD = Object.freeze({"whole word": 0, "whole": 0, "start": 1, "start of word": 1, "end": 2, "end of word": 2, "anywhere": 3, "anywhere in a word": 3});
-const NO_SUCH_MATCH = "is not where an input can match: use whole word, start, end or anywhere, or write it with *.";
+// What a `match` Ark cannot read is told. The four an older file may say are
+// read; a message never names them, since an input is written with `*`.
+const NO_SUCH_MATCH = "does not say where an input goes in a word. Leave it empty, and write the input with * where other letters may go.";
+// A byte order mark, which a spreadsheet may write first and Ark writes for one.
+const BOM = "\ufeff";
 // The columns of a spreadsheet, by the names its header may give them: Ark's
 // own first, then the older ones.
 const CSV_COLUMNS = /** @type {const} */ ({replacement: ["replacement", "correction"], inputs: ["inputs", "input", "typed", "typos", "typo"], match: ["match"], macro: ["macro"]});
@@ -62,9 +66,12 @@ function formatOf(text, name = "") {
     if (/^\s*[{[]/.test(text)) return "json";
     // QMK's text has an arrow on every line that is not a comment; a
     // spreadsheet may only hold one inside a replacement.
-    const lines = text.replace(/^\ufeff/, "").split(/\r\n|\r|\n/).map(line => line.trim()).filter(line => line && !line.startsWith("#"));
+    const lines = withoutBom(text).split(/\r\n|\r|\n/).map(line => line.trim()).filter(line => line && !line.startsWith("#"));
     return lines.length > 0 && lines.every(line => line.includes("->") || line.includes("=>")) ? "txt" : "csv";
 }
+
+/** @param {string} text */
+const withoutBom = text => text.startsWith(BOM) ? text.slice(BOM.length) : text;
 
 // QMK's autocorrect dictionary: `typo -> correction` a line, `#` comments
 // and blank lines skipped. A colon before the typo is the start of a word,
@@ -133,10 +140,11 @@ function csvRecords(text, separator) {
 // a byte order mark allowed. The inputs cell may hold several inputs
 // with spaces between them, each with its own `*`. An older file's header
 // says `typed`, or `correction`, `typos` and `match`, and one without a header row is
-// read as that file's columns were: typos, correction, match.
+// read as that file's columns were: typos, correction, match. A spreadsheet
+// may pad its rows with empty cells at the end: they are no columns.
 /** @param {string} text @returns {{rows: Row[], refused: Refused[]}} */
 function parseCsv(text) {
-    const body = text.replace(/^﻿/, "");
+    const body = withoutBom(text);
     const first = body.split(/\r\n|\r|\n/).find(line => line.trim()) || "";
     const outside = first.replace(/"(?:[^"]|"")*"/g, "");
     const separator = (outside.match(/;/g) || []).length > (outside.match(/,/g) || []).length ? ";" : ",";
@@ -147,6 +155,7 @@ function parseCsv(text) {
     const refused = [];
     let columns = {inputs: 0, replacement: 1, match: 2, macro: -1};
     const names = (records[0]?.fields || []).map(name => name.trim().toLowerCase());
+    while (names.length && names[names.length - 1] === "") names.pop();
     /** @param {keyof typeof CSV_COLUMNS} column */
     const columnOf = column => names.findIndex(name => /** @type {readonly string[]} */ (CSV_COLUMNS[column]).includes(name));
     const known = Object.values(CSV_COLUMNS).flat();
@@ -158,13 +167,15 @@ function parseCsv(text) {
     const width = named ? names.length : undefined;
     /** @param {string[]} fields @param {number} column */
     const cell = (fields, column) => (column < 0 ? "" : fields[column] ?? "").trim();
-    for (const {line, fields} of named ? records.slice(1) : records) {
+    for (const record of named ? records.slice(1) : records) {
+        const {line} = record, fields = record.fields.slice();
+        while (fields.length > (width ?? 3) && fields[fields.length - 1] === "") fields.pop();
         const shown = fields.join(separator === ";" ? "; " : ", ");
         if (fields.length < 2 || fields.length > (width ?? 3)) {
             refused.push({line, text: shown, reason: `It has ${fields.length} column${fields.length === 1 ? "" : "s"}; a row is a replacement and its inputs.`});
             continue;
         }
-        const correction = cell(fields, columns.replacement), typos = cell(fields, columns.inputs).split(/\s+/).filter(Boolean), macro = cell(fields, columns.macro);
+        const correction = cell(fields, columns.replacement), typos = splitInputs(cell(fields, columns.inputs)), macro = cell(fields, columns.macro);
         const word = cell(fields, columns.match).toLowerCase();
         const match = word === "" ? undefined : MATCH_BY_WORD[word];
         if (word !== "" && match === undefined) { refused.push({line, text: shown, reason: `${quoted(word)} ${NO_SUCH_MATCH}`}); continue; }
@@ -185,7 +196,7 @@ function parseCsv(text) {
 function parseJson(text) {
     /** @type {unknown} */
     let value;
-    try { value = JSON.parse(text.replace(/^﻿/, "")); } catch { throw invalid("This file is not a valid text replacement list."); }
+    try { value = JSON.parse(withoutBom(text)); } catch { throw invalid("This file is not a valid text replacement list."); }
     const file = /** @type {{version?: unknown, replacements?: unknown, entries?: unknown} | null} */ (value);
     const listed = file && typeof file === "object" && !Array.isArray(file) ? file.replacements ?? file.entries : undefined;
     if (!Array.isArray(listed)) throw invalid("This file is not a text replacement list: it has no replacements.");
@@ -226,9 +237,10 @@ function parseAutocorrectFile(text, name) {
 
 /** @param {Row} row */
 const namedBy = row => row.macro === undefined ? {correction: row.correction} : {macro: row.macro};
-// A row as a sentence shows it: the input, an arrow, the replacement.
+// A row as a refused line shows it: the input, an arrow, the replacement as
+// it is named everywhere, or the number a file gave for a macro there is none of.
 /** @param {Row} row @param {Host} host */
-const shownRow = (row, host) => `${row.typo} → ${row.macro === undefined ? row.correction : isMacroSlot(row.macro) ? `macro ${quoted(macroCalled(row.macro, host))}` : `macro ${row.macro}`}`;
+const shownRow = (row, host) => `${row.typo} → ${row.macro !== undefined && !isMacroSlot(row.macro) ? `macro ${row.macro}` : replacementCalled(row, host.macroNames)}`;
 
 // Rows as entries, each replacement once with its inputs in the order
 // given, as an import posts them back: written with their `*`, with an older
@@ -238,7 +250,7 @@ function entriesOf(rows) {
     /** @type {Map<string, import("../../contracts/edits.js").AutocorrectEntryEdit>} */
     const entries = new Map();
     for (const row of rows) {
-        const key = row.macro === undefined ? `t${row.correction}` : `m${row.macro}`;
+        const key = entryKey(row);
         const entry = entries.get(key) ?? {...(row.macro === undefined ? {correction: String(row.correction)} : {macro: row.macro}), typos: []};
         entries.set(key, entry);
         entry.typos.push({typo: row.typo, ...(row.match === undefined ? {} : {match: /** @type {import("../../contracts/edits.js").AutocorrectMatch} */ (row.match)})});
@@ -252,8 +264,10 @@ const rowsOf = entries => entries.flatMap((entry, index) => entry.typos.map(typo
 // editor's own rules: `list` after it, the replacements it makes with the
 // inputs of each, the inputs it adds to replacements the list has, how
 // many it skips as already there, the rows it refuses with the reason, and
-// how many do not fit what the keyboard holds. The list given is left as it
-// is.
+// how many do not fit what the keyboard holds, with what stopped the first
+// of them. Fitting is judged by everything an edit is refused for: the counts,
+// the text, the domain's own bytes and the room left in the profile. The list
+// given is left as it is.
 /** @param {AutocorrectList} current @param {readonly Row[]} rows @param {"add" | "replace"} mode @param {Host} host @param {Ceilings} ceilings */
 function planImport(current, rows, mode, host, ceilings) {
     /** @param {AutocorrectList} list @returns {AutocorrectList} */
@@ -265,30 +279,40 @@ function planImport(current, rows, mode, host, ceilings) {
     const made = new Map(), added = new Map();
     /** @type {Refused[]} */
     const refused = [];
-    let duplicates = 0, unfit = 0, typos = list.entries.reduce((total, entry) => total + entry.typos.length, 0);
-    let textBytes = list.entries.reduce((total, entry) => total + Buffer.byteLength(entry.correction) + entry.typos.reduce((sum, typo) => sum + Buffer.byteLength(typo.typo), 0), 0);
+    let duplicates = 0, unfit = 0, unfitWhy = "";
+    const counts = autocorrectCounts(list), {ROW_SIZE, PART_ROW_SIZE} = AUTOCORRECT_DOMAIN_V1;
+    // The profile grows by what the list grows past the one it holds now.
+    const capacity = ceilings.capacity ?? AUTOCORRECT_DOMAIN_V1.MAX_SIZE, mostBytes = Math.min(capacity, sizeOfCounts(autocorrectCounts(current)) + (ceilings.sharedFree ?? Infinity));
+    let size = sizeOfCounts(counts);
     for (const row of rows) {
         try {
             const target = targetOf(namedBy(row)), typo = typoOf(row);
             const key = entryKey(target);
             const held = findTypo(list, typo.typo), entry = findEntry(list, target);
             if (held && entryKey(held.entry) === key) { duplicates++; continue; }
-            // What it would take of what the keyboard holds.
-            const bytes = Buffer.byteLength(typo.typo) + (entry || target.macro !== undefined ? 0 : Buffer.byteLength(target.correction));
-            const fits = typos + 1 <= ceilings.maxTypos && (entry || list.entries.length + 1 <= ceilings.maxCorrections) && textBytes + bytes <= ceilings.maxTextBytes;
+            // What it would take of what the keyboard holds, and the first
+            // ceiling it would pass, in the words an edit past it is told.
+            const text = Buffer.byteLength(typo.typo) + (entry || target.macro !== undefined ? 0 : Buffer.byteLength(target.correction));
+            const bytes = text + ROW_SIZE * (entry ? 1 : 2) + (typo.match === AUTOCORRECT_MATCH.WHOLE_WORD ? 0 : PART_ROW_SIZE);
+            const full = counts.typos + 1 > ceilings.maxTypos ? `the keyboard holds ${ceilings.maxTypos.toLocaleString("en-US")} inputs`
+                : !entry && counts.corrections + 1 > ceilings.maxCorrections ? `the keyboard holds ${ceilings.maxCorrections.toLocaleString("en-US")} replacements`
+                : counts.textBytes + text > ceilings.maxTextBytes ? `the list holds ${ceilings.maxTextBytes.toLocaleString("en-US")} bytes of text`
+                : size + bytes > capacity ? "text replacement memory is full"
+                : size + bytes > mostBytes ? "the keyboard's profile is full" : "";
             // Checked all the same when it lacks room, so a row that would be refused anyway is not counted as one that only lacks room.
-            addTypos(fits ? list : copied(list), target, [typo], host);
-            if (!fits) { unfit++; continue; }
-            typos++; textBytes += bytes;
+            addTypos(full ? copied(list) : list, target, [typo], host);
+            if (full) { unfit++; unfitWhy ||= full; continue; }
+            counts.typos++; counts.textBytes += text; size += bytes;
+            if (!entry) counts.corrections++;
             const group = had.has(key) ? added : made;
-            const listed = group.get(key) ?? {label: target.macro === undefined ? target.correction : `Macro ${quoted(macroCalled(target.macro, host))}`, inputs: []};
+            const listed = group.get(key) ?? {label: replacementCalled(target, host.macroNames), inputs: []};
             group.set(key, listed);
             listed.inputs.push(inputForm(typo));
         } catch (error) {
             refused.push({line: row.line, text: shownRow(row, host), reason: error instanceof Error ? error.message : String(error)});
         }
     }
-    return {list, newReplacements: [...made.values()], addedInputs: [...added.values()], duplicates, refused, unfit,
+    return {list, newReplacements: [...made.values()], addedInputs: [...added.values()], duplicates, refused, unfit, unfitWhy,
         // What replacing would take away: the entries the list has now.
         removed: mode === "replace" ? current.entries.length : 0};
 }
@@ -301,7 +325,9 @@ function previewImport(current, file, host, ceilings) {
     /** @param {"add" | "replace"} mode */
     const outcome = mode => {
         const {list, refused, ...plan} = planImport(current, file.rows, mode, host, ceilings);
-        return {...plan, refused: [...file.refused, ...refused], replacements: list.entries.length, inputs: list.entries.reduce((total, entry) => total + entry.typos.length, 0)};
+        // The file's refusals and the list's, in the file's order.
+        const lines = [...file.refused, ...refused].map((row, at) => ({row, at})).sort((a, b) => (a.row.line ?? Infinity) - (b.row.line ?? Infinity) || a.at - b.at).map(({row}) => row);
+        return {...plan, refused: lines, replacements: list.entries.length, inputs: autocorrectCounts(list).typos};
     };
     return {format: file.format, entries: entriesOf(file.rows), add: outcome("add"), replace: outcome("replace")};
 }
@@ -333,13 +359,16 @@ function exportText(list) {
 const csvField = field => /[",;\r\n]|^\s|\s$/.test(field) ? `"${field.replaceAll('"', '""')}"` : field;
 // A row a replacement, with its inputs, spaces between, so it
 // opens in a spreadsheet one replacement a row. A list with a replacement
-// that plays a macro has a third column for the macro's number.
+// that plays a macro has a third column for the macro's number. It starts
+// with a byte order mark: without one Excel on Windows reads the file in the
+// system's own code page and mangles every accent; Numbers, Google Sheets and
+// Ark's own reader take it either way.
 /** @param {AutocorrectList} list */
 function exportCsv(list) {
     const macros = list.entries.some(playsMacro);
     const lines = [[...CSV_HEADER, ...(macros ? ["macro"] : [])].join(",")];
     for (const entry of list.entries) lines.push([entry.correction, entry.typos.map(inputForm).join(" "), ...(macros ? [playsMacro(entry) ? String(entry.macro) : ""] : [])].map(csvField).join(","));
-    return `${lines.join("\r\n")}\r\n`;
+    return `${BOM}${lines.join("\r\n")}\r\n`;
 }
 
 // A list as a file in one of the three formats.

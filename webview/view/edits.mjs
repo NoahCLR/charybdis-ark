@@ -239,19 +239,17 @@ export const macroValidationMessage = (keycode, payload, requestId) => ({type: "
 // refusal comes back in words.
 /** @typedef {import("../../contracts/edits.js").AutocorrectReplacement} AutocorrectReplacement */
 // Inputs for a replacement: the entry is made when the list has none of
-// that text or macro, else they are added to it.
-/** @param {AutocorrectReplacement} replacement @param {readonly string[]} typed @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'addAutocorrectTypos'>} */
-export const addAutocorrectInputs = (replacement, typed, identity) => ({type: "addAutocorrectTypos", ...replacement,
-    typos: typed.map((typo) => ({typo})), expectedFingerprint: identity});
+// that text or macro, else they are added to it. `typed` is the field's text
+// as it stands: core reads it into its inputs.
+/** @param {AutocorrectReplacement} replacement @param {string} typed @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'addAutocorrectTypos'>} */
+export const addAutocorrectInputs = (replacement, typed, identity) => ({type: "addAutocorrectTypos", ...replacement, inputs: typed, expectedFingerprint: identity});
 // A replacement changed where it stands: to other text, or to a macro.
 /** @param {AutocorrectReplacement} replacement @param {AutocorrectReplacement} to @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'updateAutocorrectCorrection'>} */
 export const changeAutocorrectReplacement = (replacement, to, identity) => ({type: "updateAutocorrectCorrection", ...replacement,
     ...(to.macro === undefined ? {to: to.correction} : {toMacro: to.macro}), expectedFingerprint: identity});
-// One input, named by its stored letters: written anew, or moved to
-// another replacement, made when the list has none such.
-/** @param {string} typo @param {{to?: string, replacement?: AutocorrectReplacement}} change @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'updateAutocorrectTypo'>} */
-export const changeAutocorrectInput = (typo, change, identity) => ({type: "updateAutocorrectTypo", typo,
-    ...(change.to === undefined ? {} : {to: change.to}), ...(change.replacement ?? {}), expectedFingerprint: identity});
+// One input, named by its stored letters, written anew.
+/** @param {string} typo @param {string} to @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'updateAutocorrectTypo'>} */
+export const changeAutocorrectInput = (typo, to, identity) => ({type: "updateAutocorrectTypo", typo, to, expectedFingerprint: identity});
 /** @param {string} typo @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'deleteAutocorrectTypo'>} */
 export const deleteAutocorrectTypo = (typo, identity) => ({type: "deleteAutocorrectTypo", typo, expectedFingerprint: identity});
 /** @param {AutocorrectReplacement} replacement @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'deleteAutocorrectEntry'>} */

@@ -40,7 +40,7 @@ export const screenCombos = () => settingsScreen("combos", "Combos",
 export const screenPointer = () => settingsScreen("pointer", "Pointer",
     "Pointer speed, sniping and the pointer layer.");
 export const screenHost = () => settingsScreen("host", "Host",
-    "The computer you type on, and key swaps for every layer.");
+    "The computer you type on, text replacement's switch, and key swaps for every layer.");
 
 // One Settings screen: its sections as cards, all open, each saved whole.
 /** @param {string} screen @param {string} title @param {string} subtitle */
@@ -159,7 +159,7 @@ function comboTimingRow(model, entry) {
  * @param {Model | null} model @param {Section} section @param {boolean} canEdit
  * @param {{extra?: {after: string, nodes: HTMLElement[]}}} [options]
  */
-export function sectionCard(model, section, canEdit, {extra} = {}) {
+function sectionCard(model, section, canEdit, {extra} = {}) {
     const node = el(`<section class="card settings-group" data-section="${esc(section.id)}">
         <div class="card-h"><h3>${esc(section.label)}${draftMarks(model?.draft?.changes).settings.has(section.id) ? draftDot(model?.draft) : ""}</h3></div>
         ${section.description ? `<div class="card-b settings-intro"><p class="note">${esc(section.description)}</p></div>` : ""}

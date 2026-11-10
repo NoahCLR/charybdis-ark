@@ -336,6 +336,10 @@ window.acquirePanelApi = () => ({
         console.log("posted", JSON.stringify(message));
         if (message.type === "validateMacro") Promise.all([import("./${macroShell.macroShell}"), import("../webview/store.mjs")])
             .then(([shell, store]) => window.dispatchEvent(new MessageEvent("message", {data: shell.inspect(message, store.getModel())})));
+        // A text replacement edit is checked by the list's own rules too: the
+        // screen posts an edit only once its check has passed.
+        if (message.type === "validateAutocorrect") Promise.all([import("./${macroShell.macroShell}"), import("../webview/store.mjs")])
+            .then(([shell, store]) => window.dispatchEvent(new MessageEvent("message", {data: shell.inspectAutocorrect(message, store.getModel())})));
         if (message.type === "ready" || message.type === "refresh") { wanted = true; publish(); }
         if (message.type === "setTheme" && model?.shell) { model.shell.theme = message.theme; publish(); }
         if (message.type === "openDemo") fetch("./model-demo.json").then((response) => response.json()).then((loaded) => { model = loaded; publish(); });

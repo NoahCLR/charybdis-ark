@@ -17,7 +17,7 @@ const {inertLinkLayers, inertLinkReason, linkNamed} = require("./pointing-links"
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {actionName} = require("../schema/actions");
 const {REVIEW_AREAS, VOCABULARY, macroDefaultName, settingsPath, slotName, word} = require("./vocabulary");
-const {WARNING, entryOfKey, listWarnings} = require("./autocorrect-list");
+const {WARNING, entryOfKey, listWarnings, replacementSaid, untypableFix} = require("./autocorrect-list");
 const {macroName} = require("../../rules/qmk-keycodes.mjs");
 
 // A behaviour step that sends a custom key sends only its shortcut (firmware
@@ -98,19 +98,15 @@ function profileFindings(decoded, destination = {}) {
     const layoutName = word(VOCABULARY.hostLayouts, host.layout);
     const macroNames = decoded.settings.macroNames || [];
     const listed = listWarnings(decoded.autocorrect || {entries: []}, {layout: host.layout, layoutName, macroNames, emptyMacros});
-    // An entry as a sentence names it: its text, or its macro.
     /** @param {string} key */
-    const calledEntry = key => {
-        const named = entryOfKey(key);
-        return "macro" in named ? `macro “${macroNames[named.macro] || macroDefaultName(named.macro)}”` : `“${named.correction}”`;
-    };
+    const calledEntry = key => replacementSaid(entryOfKey(key), macroNames);
     const silent = listed.filter(warning => warning.kind === WARNING.UNTYPABLE);
     if (silent.length) {
         const named = [...new Set(silent.map(warning => warning.entry))];
         findings.push({kind: "untypableAutocorrect", level: "warning", layers: [], identity: silent.map(warning => `${warning.entry}:${warning.typo ?? ""}`).join("|"), count: named.length,
-            title: `${named.length} text replacement${named.length === 1 ? "" : "s"} will not fire on ${layoutName}`,
+            title: `${layoutName} cannot type ${named.length} text replacement${named.length === 1 ? "" : "s"}`,
             detail: `${layoutName} cannot type a character in ${named.slice(0, 8).map(calledEntry).join(", ")}${named.length > 8 ? ` and ${named.length - 8} more` : ""}. The keyboard stores them and skips them.`,
-            fix: `Change ${settingsPath("host", "host")} back, or edit the replacements marked on the Text replacement screen.`, place: {kind: "autocorrect", entry: named[0]}});
+            fix: untypableFix(" on the Text replacement screen"), place: {kind: "autocorrect", entry: named[0]}});
     }
     // A replacement that plays an empty macro, as a pointing mode that runs
     // one is said: the keyboard accepts it and does nothing.

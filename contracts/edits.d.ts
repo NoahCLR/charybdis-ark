@@ -115,12 +115,12 @@ export interface EditPayloads {
         | {protection: 'auto' | 'on' | 'off'; payload?: string; name?: string}
     );
     validateMacro: {keycode: string; payload: string; requestId: number};
-    /** Inputs for a replacement: the entry is made when the list has none of that exact text or macro, otherwise they are added to it. */
-    addAutocorrectTypos: AutocorrectReplacement & {typos: AutocorrectTypoEdit[]; expectedFingerprint?: string};
+    /** Inputs for a replacement: the entry is made when the list has none of that exact text or macro, otherwise they are added to it. `inputs` is a field's text as it was typed, which core reads into inputs, split at spaces; `typos` gives them one by one. One of the two. */
+    addAutocorrectTypos: AutocorrectReplacement & {typos?: AutocorrectTypoEdit[]; inputs?: string; expectedFingerprint?: string};
     /** A replacement changed where it stands: its text respelled (`to`), or made to play a macro (`toMacro`). Changed to one the list already has, its inputs joins that one. */
     updateAutocorrectCorrection: AutocorrectReplacement & ({to: string; toMacro?: undefined} | {toMacro: number; to?: undefined}) & {expectedFingerprint?: string};
-    /** One input, named by its stored letters, written anew (`to`, with its `*`), or moved to another replacement (`correction` or `macro`), made when the list has none such. */
-    updateAutocorrectTypo: {typo: string; to?: string; correction?: string; macro?: number; expectedFingerprint?: string};
+    /** One input, named by its stored letters, written anew (`to`, with its `*`). */
+    updateAutocorrectTypo: {typo: string; to: string; expectedFingerprint?: string};
     /** An input removed; a replacement's last one takes its entry with it. */
     deleteAutocorrectTypo: {typo: string; expectedFingerprint?: string};
     deleteAutocorrectEntry: AutocorrectReplacement & {expectedFingerprint?: string};

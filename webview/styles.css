@@ -2184,8 +2184,11 @@ select.input.pd-add { height: var(--h-chip); width: 124px; min-width: 0; padding
 .callout { border: 1px solid var(--line); border-left: 2px solid var(--line-3); border-radius: 0 var(--r-control) var(--r-control) 0; padding: var(--sp-3) var(--sp-3); background: var(--surface-2); font-size: var(--fs-md); color: var(--text-2); }
 .callout.warn { border-left-color: var(--draft); }
 /* A global switch off: what this tab holds does not run, and pressing it goes to
-   that switch (ui/participation.mjs). */
-.callout.master-off { display: block; width: 100%; margin-bottom: var(--sp-3); text-align: left; color: var(--text); border-color: color-mix(in srgb, var(--warning) 55%, var(--line)); border-left-color: var(--warning); background: color-mix(in srgb, var(--warning) 14%, var(--surface)); }
+   that switch (ui/participation.mjs). A caution is the same callout with no
+   press of its own: something on the screen will not work as it stands. */
+.callout:is(.master-off, .caution) { display: block; width: 100%; margin-bottom: var(--sp-3); text-align: left; color: var(--text); border-color: color-mix(in srgb, var(--warning) 55%, var(--line)); border-left-color: var(--warning); background: color-mix(in srgb, var(--warning) 14%, var(--surface)); }
+/* What heads a library screen is spaced by the head itself. */
+.library-head > .callout { margin-bottom: 0; }
 .banner-over { display: grid; grid-template: auto 1fr / minmax(0, 1fr); }
 .banner-over > .tab-grid { align-self: start; }
 .custom-key-behaviour .callout.master-off { margin-bottom: 0; }
@@ -2329,7 +2332,6 @@ details > summary { list-style: none; }
 .ac-files { gap: var(--sp-2); margin-top: var(--sp-3); }
 .ac-export { position: relative; }
 .ac-menu.rail-menu { left: 0; right: auto; min-width: 150px; }
-.ac-notice { color: var(--warning); }
 .ac-editor .macro-sequence-heading { justify-content: flex-start; gap: var(--sp-1); }
 .ac-replacement { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--sp-2) var(--sp-3); }
 .ac-replacement > .field.segmented { flex: none; }

@@ -76,7 +76,7 @@ const {watchLive} = require("./live-watch");
 const {readFlashFigures} = require("./flash-pauses");
 const {demoControl, demoExport, demoUnsaved, leaveDemo, panelState} = require("./demo-session");
 const {macroInputStatus} = require("../model/macro-editor");
-const {importPreview, newWarnings, tryText} = require("../model/autocorrect-editor");
+const {editNames, importPreview, newWarnings, tryText} = require("../model/autocorrect-editor");
 const {parseAutocorrectFile, starterFile} = require("../model/autocorrect-import");
 const {applyDraftEdit} = require("../model/draft-editor");
 const {draftEditEntry} = require("../model/draft-edits");
@@ -228,13 +228,17 @@ function overlayOf(value, base) {
 /** @param {unknown} value @returns {value is Record<string, unknown>} */
 const isRecord = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
 
-// What an autocorrect edit would newly warn about, its refusal thrown: the
-// edit is made of the draft as it stands and the result thrown away, so the
-// check and the edit cannot disagree.
-/** @param {import("../model/types.js").CompleteSnapshot} snapshot @param {import("../../contracts/edits.js").AutocorrectEdit} edit @param {import("../model/types.js").ProfileDestination} [capabilities] */
+// What an autocorrect edit would newly warn about, and the entry it names,
+// its refusal thrown: the edit is made of the draft as it stands and the
+// result thrown away, so the check and the edit cannot disagree. An add that
+// names no input yet is not made: it is only asked which entry it would be.
+/** @param {import("../model/types.js").CompleteSnapshot} snapshot @param {import("../../contracts/edits.js").AutocorrectEdit} edit @param {import("../model/types.js").ProfileDestination} [capabilities] @returns {Pick<import("../../contracts/messages.js").AutocorrectValidation, "warnings" | "entry" | "label" | "listed" | "listedSaid">} */
 function autocorrectEditStatus(snapshot, edit, capabilities) {
     if (draftEditEntry(edit?.type)?.editor !== "autocorrect") throw Object.assign(new Error("Unsupported draft edit."), {code: "PROFILE_DRAFT_CONFLICT"});
-    return newWarnings(snapshot, applyDraftEdit(snapshot, edit, {capabilities}));
+    const {entry, label, listed, listedSaid, joins, unfinished} = editNames(snapshot, edit);
+    const named = entry === undefined ? {} : {entry, label, listed: Boolean(listed), ...(listedSaid ? {listedSaid} : {})};
+    if (unfinished) return {warnings: [], ...named};
+    return {warnings: [...(joins ? [joins] : []), ...newWarnings(snapshot, applyDraftEdit(snapshot, edit, {capabilities}))], ...named};
 }
 
 // Edit/control paths publish, including the ones that decline or fail:
@@ -265,8 +269,8 @@ async function handleMessage(session, message, shell) {
         /** @type {Extract<import("../../contracts/messages.js").PanelResponse, {type: "autocorrectValidation"}>} */
         const reply = {type: "autocorrectValidation", requestId: inspection.requestId, draftId: message.draftId, draftRevision: message.draftRevision, validation: {error: "", code: "", warnings: []}};
         try {
-            const draft = boundDraft(session, panelState(session), message, "Read the keyboard and wait for its current operation before editing the autocorrect list.");
-            reply.validation.warnings = autocorrectEditStatus(draft.current, inspection.edit, draft.capabilities);
+            const draft = boundDraft(session, panelState(session), message, "Read the keyboard and wait for its current operation before editing your text replacements.");
+            reply.validation = {...reply.validation, ...autocorrectEditStatus(draft.current, inspection.edit, draft.capabilities)};
         } catch (error) {
             reply.validation = {error: failureSentence(error), code: /** @type {import("./types.js").OperationFailure} */ (error).code || "AUTOCORRECT_EDIT_REFUSED", warnings: []};
         }
@@ -279,7 +283,7 @@ async function handleMessage(session, message, shell) {
         /** @type {Extract<import("../../contracts/messages.js").PanelResponse, {type: "autocorrectTry"}>} */
         const reply = {type: "autocorrectTry", requestId: tried.requestId, draftId: message.draftId, draftRevision: message.draftRevision};
         try {
-            reply.result = tryText(boundDraft(session, panelState(session), message, "Read the keyboard and wait for its current operation before trying the autocorrect list.").current, tried);
+            reply.result = tryText(boundDraft(session, panelState(session), message, "Read the keyboard and wait for its current operation before trying your text replacements.").current, tried);
         } catch (error) {
             reply.error = failureSentence(error);
         }
@@ -297,7 +301,7 @@ async function handleMessage(session, message, shell) {
             // answers with no preview.
             const chosen = message.type === "chooseAutocorrectFile" ? await shell.chooseProfile?.() : message.type === "previewAutocorrectImport" && !message.starter ? message : null;
             if (chosen !== undefined) {
-                const draft = boundDraft(session, panelState(session), message, "Read the keyboard and wait for its current operation before importing an autocorrect list.");
+                const draft = boundDraft(session, panelState(session), message, "Read the keyboard and wait for its current operation before importing a text replacement list.");
                 reply.name = chosen === null || typeof chosen === "string" ? "" : chosen.name || "";
                 const file = chosen === null ? starterFile() : parseAutocorrectFile(typeof chosen === "string" ? chosen : chosen.text, reply.name);
                 reply.preview = importPreview(draft.current, file, draft.capabilities);

@@ -91,10 +91,11 @@ test("the webview refuses a profile file over core's limit in core's words", () 
     assert.deepEqual([PROFILE_FILE_MAX_BYTES, PROFILE_FILE_TOO_LARGE], [FILE_MAX_BYTES, FILE_TOO_LARGE]);
 });
 
-test("the webview refuses an autocorrect list file over core's limit in core's words, and names core's formats", async () => {
-    const {LIST_FILE_FORMATS, LIST_FILE_MAX_BYTES, LIST_FILE_TOO_LARGE} = await import("../../webview/view/autocorrect.mjs");
-    const {AUTOCORRECT_FILE_FORMATS, IMPORT_MAX_BYTES, IMPORT_TOO_LARGE} = require("../../core/model/autocorrect-import");
-    assert.deepEqual([[...LIST_FILE_FORMATS], LIST_FILE_MAX_BYTES, LIST_FILE_TOO_LARGE], [[...AUTOCORRECT_FILE_FORMATS], IMPORT_MAX_BYTES, IMPORT_TOO_LARGE]);
+test("the webview refuses an autocorrect list file over core's limit in core's words", async () => {
+    // The formats and their names are the vocabulary's (tests/model/vocabulary.test.js): the webview keeps no copy.
+    const {LIST_FILE_MAX_BYTES, LIST_FILE_TOO_LARGE} = await import("../../webview/view/autocorrect.mjs");
+    const {IMPORT_MAX_BYTES, IMPORT_TOO_LARGE} = require("../../core/model/autocorrect-import");
+    assert.deepEqual([LIST_FILE_MAX_BYTES, LIST_FILE_TOO_LARGE], [IMPORT_MAX_BYTES, IMPORT_TOO_LARGE]);
 });
 
 test("the webview's layer-lock block is the keyboard's", () => {

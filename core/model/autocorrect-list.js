@@ -19,18 +19,19 @@
 // entry changes again, a short input with `*`, a macro that is empty) is
 // a warning: found on the list, never a refusal.
 
-const {AUTOCORRECT_DOMAIN_V1, AUTOCORRECT_MATCH, autocorrectDomainSize, correctionProblem, entryKey, entryOfKey, foldTypo, isMacroSlot, playsMacro, typoProblem} = require("../schema/autocorrect-domain-v1");
+const {AUTOCORRECT_DOMAIN_V1, AUTOCORRECT_MATCH, autocorrectCounts, sizeOfCounts, correctionProblem, entryKey, entryOfKey, foldTypo, isMacroSlot, playsMacro, typoProblem} = require("../schema/autocorrect-domain-v1");
 const {AUTOCORRECT_APOSTROPHE, foldWordCharacter} = require("../data/autocorrect-words");
 const {typoFinder, wordsOf} = require("./autocorrect-matcher");
 const {layoutTypes} = require("../data/host-layouts");
-const {macroDefaultName} = require("./vocabulary");
+const {macroDefaultName, settingsPath} = require("./vocabulary");
 
 /**
  * @typedef {import("../schema/autocorrect-domain-v1.js").AutocorrectList} AutocorrectList
  * @typedef {import("../schema/autocorrect-domain-v1.js").Entry} Entry
  * @typedef {Entry["typos"][number]} Typo
  * @typedef {{correction: string, macro?: undefined} | {macro: number, correction?: undefined}} Target what names an entry: its text, or the macro slot it plays
- * @typedef {{layout: number, layoutName?: string, macroNames?: readonly (string | undefined)[], emptyMacros?: ReadonlySet<number>}} Host the host layout the keyboard types through and its name; the macros' names, and the slots that hold none
+ * @typedef {readonly (string | undefined)[]} MacroNames the macros' names, by slot
+ * @typedef {{layout: number, layoutName?: string, macroNames?: MacroNames, emptyMacros?: ReadonlySet<number>}} Host the host layout the keyboard types through and its name; the macros' names, and the slots that hold none
  * @typedef {{kind: typeof WARNING[keyof typeof WARNING], entry: string, typo?: string, text: string}} Warning what misbehaves, on the entry of that key and, when it is one input's, that typo
  */
 
@@ -40,7 +41,7 @@ const refuse = message => Object.assign(new Error(message), {code: "AUTOCORRECT_
 const quoted = text => `“${text}”`;
 const BYTES = "accented letters take two or more each";
 // An input with `*` and fewer letters than this is warned about.
-const SHORT_PART_LETTERS = 4;
+const SHORT_INPUT_LETTERS = 4;
 // Where other letters may go, in an input as it is written.
 const STAR = "*";
 const STAR_HINT = `Put ${STAR} only at the start or the end, where other letters may go.`;
@@ -57,11 +58,22 @@ function requireTypable(text, host, what) {
 }
 
 // A macro as the screens call it: its name, or "Macro 5".
-/** @param {number} slot @param {Host} [host] */
-const macroCalled = (slot, host) => host?.macroNames?.[slot] || macroDefaultName(slot);
-// An entry as a sentence names it: its text in quotes, or its macro.
+/** @param {number} slot @param {MacroNames} [macroNames] */
+const macroCalled = (slot, macroNames) => macroNames?.[slot] || macroDefaultName(slot);
+// The mark before the name of a macro a replacement plays.
+const PLAYS = "▶";
+// A replacement as it is named wherever one is listed, the one way to name
+// it: its text, or the macro it plays by that macro's name after the mark
+// ("▶ Sign-off"). The bank, the editor's title, Review, an import's summary
+// and a file's refused line all read this; the panel publishes it as each
+// entry's `label`.
+/** @param {{correction?: string, macro?: number}} target @param {MacroNames} [macroNames] */
+const replacementCalled = (target, macroNames) => target.macro === undefined ? String(target.correction) : `${PLAYS} ${macroCalled(target.macro, macroNames)}`;
+// The same inside a sentence: its text in quotes, or "the macro “Sign-off”".
+/** @param {{correction?: string, macro?: number}} target @param {MacroNames} [macroNames] */
+const replacementSaid = (target, macroNames) => target.macro === undefined ? quoted(String(target.correction)) : `the macro ${quoted(macroCalled(target.macro, macroNames))}`;
 /** @param {Target} target @param {Host} [host] */
-const called = (target, host) => target.macro === undefined ? quoted(target.correction) : `the macro ${quoted(macroCalled(target.macro, host))}`;
+const called = (target, host) => replacementSaid(target, host?.macroNames);
 
 // A replacement's text as it is stored: what was typed, without the spaces
 // around it.
@@ -93,19 +105,24 @@ function targetOf(named) {
 /** @param {unknown} text @returns {Typo} */
 function inputOf(text) {
     const written = typeof text === "string" ? text.trim() : "";
-    if (!written) throw refuse("Type what you would type for it.");
+    if (!written) throw refuse("Type an input.");
     const start = written.endsWith(STAR), end = written.startsWith(STAR);
     const letters = written.slice(end ? 1 : 0, start && written.length > 1 ? -1 : undefined);
     if (!letters) throw refuse(`${quoted(written)} has no letters. ${STAR_HINT}`);
     if (letters.includes(STAR)) throw refuse(`${quoted(written)} has ${STAR} where it cannot go. ${STAR_HINT}`);
     const other = [...letters].find(character => character !== AUTOCORRECT_APOSTROPHE && foldWordCharacter(character) === undefined);
-    if (other !== undefined) throw refuse(`What you type is one word: letters and digits, with an apostrophe only between them; ${other === " " ? "a space" : quoted(other)} is neither.`);
+    if (other !== undefined) throw refuse(`An input is one word: letters and digits, with an apostrophe only between them; ${other === " " ? "a space" : quoted(other)} is neither.`);
     const typo = /** @type {string} */ (foldTypo(letters));
     const problem = typoProblem(typo);
-    if (problem?.code === "INVALID_TEXT_LENGTH") throw refuse(`What you type is at most ${AUTOCORRECT_DOMAIN_V1.TEXT_MAX} bytes; ${BYTES}.`);
-    if (problem) throw refuse("What you type may hold an apostrophe only between two letters or digits.");
+    if (problem?.code === "INVALID_TEXT_LENGTH") throw refuse(`An input is at most ${AUTOCORRECT_DOMAIN_V1.TEXT_MAX} bytes; ${BYTES}.`);
+    if (problem) throw refuse("An input may hold an apostrophe only between two letters or digits.");
     return {typo, match: start && end ? AUTOCORRECT_MATCH.ANYWHERE : start ? AUTOCORRECT_MATCH.START : end ? AUTOCORRECT_MATCH.END : AUTOCORRECT_MATCH.WHOLE_WORD};
 }
+// A field's text as the inputs it holds: split at spaces, since an input
+// never holds one. The field that adds inputs and a spreadsheet's inputs cell
+// are both read by it.
+/** @param {unknown} text @returns {string[]} */
+const splitInputs = text => String(text ?? "").split(/\s+/).filter(Boolean);
 // A stored input as it is written, with its `*`.
 /** @param {{typo: string, match: number}} typo */
 const inputForm = typo => `${typo.match === AUTOCORRECT_MATCH.END || typo.match === AUTOCORRECT_MATCH.ANYWHERE ? STAR : ""}${typo.typo}${typo.match === AUTOCORRECT_MATCH.START || typo.match === AUTOCORRECT_MATCH.ANYWHERE ? STAR : ""}`;
@@ -116,7 +133,7 @@ const inputForm = typo => `${typo.match === AUTOCORRECT_MATCH.END || typo.match 
 function typoOf(row) {
     const typed = inputOf(row?.typo);
     if (row?.match === undefined || typed.match !== AUTOCORRECT_MATCH.WHOLE_WORD) return typed;
-    if (!Number.isInteger(row.match) || /** @type {number} */ (row.match) < AUTOCORRECT_MATCH.WHOLE_WORD || /** @type {number} */ (row.match) > AUTOCORRECT_MATCH.ANYWHERE) throw refuse(`${quoted(typed.typo)} has no such match. ${STAR_HINT}`);
+    if (!Number.isInteger(row.match) || /** @type {number} */ (row.match) < AUTOCORRECT_MATCH.WHOLE_WORD || /** @type {number} */ (row.match) > AUTOCORRECT_MATCH.ANYWHERE) throw refuse(`Ark cannot tell where ${quoted(typed.typo)} goes in a word. Write it with ${STAR} where other letters may go.`);
     return {typo: typed.typo, match: /** @type {number} */ (row.match)};
 }
 
@@ -173,7 +190,7 @@ function dropIfEmpty(list, entry) {
 /** @param {AutocorrectList} list @param {{correction?: unknown, macro?: unknown}} named @param {readonly {typo: unknown, match?: unknown}[]} typos @param {Host} host */
 function addTypos(list, named, typos, host) {
     const target = targetOf(named);
-    if (!Array.isArray(typos) || !typos.length) throw refuse("A replacement needs at least one thing you type for it.");
+    if (!Array.isArray(typos) || !typos.length) throw refuse("A replacement needs at least one input.");
     const existing = findEntry(list, target);
     if (!existing && target.macro === undefined) requireTypable(target.correction, host, "type this replacement");
     /** @type {Typo[]} */
@@ -213,26 +230,15 @@ function changeReplacement(list, from, to, host) {
     list.entries.splice(list.entries.indexOf(entry), 1);
 }
 
-// Changes one input: how it is written (its letters and its `*`), or the
-// replacement it belongs to (made when the list has none such). A
-// replacement left with no input goes.
-/** @param {AutocorrectList} list @param {string} typoText @param {{to?: unknown, correction?: unknown, macro?: unknown}} change @param {Host} host */
-function changeTypo(list, typoText, change, host) {
+// Writes one input anew where it is: its letters and its `*`.
+/** @param {AutocorrectList} list @param {string} typoText @param {unknown} to @param {Host} host */
+function changeTypo(list, typoText, to, host) {
     const {entry, typo} = storedTypo(list, typoText);
-    const moves = change.correction !== undefined || change.macro !== undefined;
-    const target = moves ? targetOf(change) : targetOfEntry(entry);
-    const next = change.to === undefined ? {...typo} : inputOf(change.to);
-    const held = findEntry(list, target);
+    const next = inputOf(to);
     if (next.typo !== typo.typo) requireTypable(next.typo, host, "see this input");
-    if (!held && target.macro === undefined) requireTypable(target.correction, host, "type this replacement");
-    requireFree(list, next, target, host, typo);
+    requireFree(list, next, targetOfEntry(entry), host, typo);
     typo.typo = next.typo;
     typo.match = next.match;
-    if (held === entry) return;
-    entry.typos.splice(entry.typos.indexOf(typo), 1);
-    if (held) held.typos.push(typo);
-    else list.entries.push({...newEntry(target), typos: [typo]});
-    dropIfEmpty(list, entry);
 }
 
 /** @param {AutocorrectList} list @param {string} typoText */
@@ -252,10 +258,14 @@ function removeEntry(list, named, host) {
 // domain's bytes.
 /** @param {AutocorrectList} list */
 function listUsage(list) {
-    const typos = list.entries.reduce((total, entry) => total + entry.typos.length, 0);
-    const textBytes = list.entries.reduce((total, entry) => total + Buffer.byteLength(entry.correction) + entry.typos.reduce((sum, typo) => sum + Buffer.byteLength(typo.typo), 0), 0);
-    return {corrections: list.entries.length, typos, textBytes, bytes: autocorrectDomainSize(list)};
+    const counts = autocorrectCounts(list);
+    return {corrections: counts.corrections, typos: counts.typos, textBytes: counts.textBytes, bytes: sizeOfCounts(counts)};
 }
+
+// What to do about entries a layout change left untypable, said the same
+// wherever it is said: under the screen's notice and in Review's check.
+/** @param {string} [where] */
+const untypableFix = (where = "") => `Change ${settingsPath("host", "host")} back, or edit the replacements marked${where}.`;
 
 // What will misbehave in this list on this host layout, entry by entry in
 // the list's order. None of it stops a save.
@@ -286,7 +296,7 @@ function listWarnings(list, host) {
         const key = entryKey(entry);
         const missing = playsMacro(entry) ? [] : untypable(entry.correction, host);
         if (missing.length) warnings.push({kind: WARNING.UNTYPABLE, entry: key, text: `${layout} cannot type ${missing.map(quoted).join(", ")}, so this replacement will not be typed.`});
-        if (entry.macro !== undefined && host.emptyMacros?.has(entry.macro)) warnings.push({kind: WARNING.EMPTY_MACRO, entry: key, text: `${quoted(macroCalled(entry.macro, host))} has no steps, so this replacement does nothing yet. Add steps in Macros, or choose another replacement.`});
+        if (entry.macro !== undefined && host.emptyMacros?.has(entry.macro)) warnings.push({kind: WARNING.EMPTY_MACRO, entry: key, text: `${quoted(macroCalled(entry.macro, host.macroNames))} has no steps, so this replacement does nothing yet. Add steps in Macros, or choose another replacement.`});
         const next = corrected.get(entry);
         if (next && corrected.get(next) === entry) warnings.push({kind: WARNING.LOOP, entry: key, text: `${named(next)} and ${named(entry)} replace each other.`});
         else if (next) warnings.push({kind: WARNING.CHAIN, entry: key, text: `${named(entry)} is itself an input for ${named(next)}: typing it gives ${named(next)}.`});
@@ -294,7 +304,7 @@ function listWarnings(list, host) {
             const unseen = missing.length ? [] : untypable(typo.typo, host);
             if (unseen.length) warnings.push({kind: WARNING.UNTYPABLE, entry: key, typo: typo.typo, text: `${layout} cannot type ${unseen.map(quoted).join(", ")}, so this input will never be seen.`});
             if (typo.match === AUTOCORRECT_MATCH.WHOLE_WORD) continue;
-            if ([...typo.typo].length < SHORT_PART_LETTERS) warnings.push({kind: WARNING.SHORT_PART, entry: key, typo: typo.typo, text: `${quoted(inputForm(typo))} is a short input with ${STAR}, so it fires inside many words.`});
+            if ([...typo.typo].length < SHORT_INPUT_LETTERS) warnings.push({kind: WARNING.SHORT_PART, entry: key, typo: typo.typo, text: `${quoted(inputForm(typo))} is a short input with ${STAR}, so it catches many words.`});
             const within = inside.get(typo);
             if (within !== undefined) warnings.push({kind: WARNING.INSIDE_CORRECTION, entry: key, typo: typo.typo, text: `${quoted(inputForm(typo))} also matches inside the replacement ${quoted(within)}, so typing that changes it.`});
         }
@@ -346,4 +356,4 @@ function restoreEntry(mine, theirs, key, respelled) {
     }
 }
 
-module.exports = {WARNING, addTypos, changeReplacement, changeTypo, correctionOf, entryOfKey, findEntry, findTypo, listUsage, listWarnings, macroCalled, pairEntries, removeEntry, removeTypo, restoreEntry, targetOf, inputForm, inputOf, typoOf};
+module.exports = {SHORT_INPUT_LETTERS, WARNING, addTypos, changeReplacement, changeTypo, correctionOf, entryOfKey, findEntry, findTypo, listUsage, listWarnings, pairEntries, removeEntry, removeTypo, replacementCalled, replacementSaid, restoreEntry, splitInputs, targetOf, inputForm, inputOf, typoOf, untypableFix};

@@ -1,10 +1,15 @@
 // @ts-check
 // What the Text replacement screen draws of the list core publishes
 // (`model.autocorrect`): which entries a search shows, in what order, and
-// which of their inputs it found, how a replacement is named, which entry is
-// open, and the list's size in words. The list's rules are core's; nothing here judges an
-// entry. The code keeps the keyboard's names for the two parts of an entry:
-// a replacement is a `correction` and an input a `typo` (GLOSSARY.md).
+// which of their inputs it found, which entry is open, and the list's size in
+// words. The list's rules are core's, and so is what a replacement is called
+// (each entry's `label`): nothing here judges an entry, names one, or reads
+// what is typed into inputs. The code keeps the keyboard's names for the two
+// parts of an entry: a replacement is a `correction` and an input a `typo`
+// (GLOSSARY.md).
+
+import {nameCount} from "./names.mjs";
+import {macroNamed} from "./vocabulary.mjs";
 
 /**
  * @typedef {import("../../contracts/panel.js").AutocorrectEntry} Entry
@@ -16,48 +21,38 @@
 
 const collator = new Intl.Collator("en", {sensitivity: "base"});
 
-// A macro as the screens call it: its name, or what it is called without one.
-/** @param {Macros} macros @param {number} slot */
-export const macroLabel = (macros, slot) => macros?.[slot]?.name || macros?.[slot]?.defaultName || `Macro ${slot}`;
-
-// A replacement as its row shows it: its text, or the macro it plays.
-/** @param {Pick<Entry, "correction" | "macro">} entry @param {Macros} macros */
-export const replacementLabel = (entry, macros) => entry.macro === undefined ? entry.correction : macroLabel(macros, entry.macro);
-
 // What an edit names an entry by: its text, or its macro slot.
 /** @param {Pick<Entry, "correction" | "macro">} entry @returns {Replacement} */
 export const replacementOf = (entry) => entry.macro === undefined ? {correction: entry.correction} : {macro: entry.macro};
 
-// The entries a search shows, as a dictionary lists words. A search matches a
-// replacement's text or its macro's name, or one of its inputs, whatever its
-// case; `found` names the inputs it matched in an entry whose replacement it
-// did not, which the screen marks.
+// The entries a search shows, as a dictionary lists words: a text by itself,
+// a macro's by the macro's name. A search is a plain one over what core
+// publishes, whatever its case: a replacement's label, or an input as it is
+// written, with its `*`. `found` names the inputs it matched in an entry
+// whose replacement it did not, which the screen marks.
 /** @param {View | null | undefined} view @param {{query?: string, macros?: Macros}} [options] @returns {Row[]} */
 export function autocorrectRows(view, {query = "", macros} = {}) {
-    const needle = query.trim().toLowerCase().replace(/^\*|\*$/g, "");
+    const needle = query.trim().toLowerCase();
     /** @type {Row[]} */
     const rows = [];
     for (const entry of view?.entries || []) {
-        if (!needle || replacementLabel(entry, macros).toLowerCase().includes(needle)) rows.push({entry, found: []});
+        if (!needle || entry.label.toLowerCase().includes(needle)) rows.push({entry, found: []});
         else {
-            const found = entry.typos.filter((typo) => typo.typo.includes(needle)).map((typo) => typo.typo);
+            const found = entry.typos.filter((typo) => typo.input.toLowerCase().includes(needle)).map((typo) => typo.typo);
             if (found.length) rows.push({entry, found});
         }
     }
     /** @param {Entry} entry */
-    const name = (entry) => replacementLabel(entry, macros);
+    const name = (entry) => entry.macro === undefined ? entry.correction : macroNamed(macros?.[entry.macro]) || entry.label;
     return rows.sort((a, b) => collator.compare(name(a.entry), name(b.entry)) || (a.entry.id < b.entry.id ? -1 : 1));
 }
 
 // The entry the editor shows: the one picked, while the list still has it,
-// else the first of the rows shown, as every bank opens on its first item.
-/** @param {View | null | undefined} view @param {readonly Row[]} rows @param {string | null} picked */
-export const openEntry = (view, rows, picked) => (view?.entries || []).find((entry) => entry.id === picked) || rows[0]?.entry || null;
-
-// Whether text replacement is switched off in the profile: its switch is a
-// Host setting (core/model/settings-editor.js), published with the others.
-/** @param {{configDefaults?: readonly {id: string, fields: readonly {macro: string, enabled?: boolean}[]}[]} | null | undefined} model */
-export const switchedOff = (model) => (model?.configDefaults || []).some((section) => section.id === "autocorrect" && section.fields.some((field) => field.macro === "autocorrect" && field.enabled === false));
+// else the first of the rows shown, as every bank opens on its first item,
+// else, when a search shows none, the first of the list: a list that has
+// replacements always has one open.
+/** @param {View | null | undefined} view @param {readonly Row[]} rows @param {string | null} picked @param {Macros} [macros] */
+export const openEntry = (view, rows, picked, macros) => (view?.entries || []).find((entry) => entry.id === picked) || rows[0]?.entry || autocorrectRows(view, {macros})[0]?.entry || null;
 
 /** @param {number} count */
 const n = (count) => count.toLocaleString("en-US");
@@ -65,7 +60,7 @@ const n = (count) => count.toLocaleString("en-US");
 const counted = (count, one, many) => `${n(count)} ${count === 1 ? one : many}`;
 
 // The list's size in words: "3 replacements · 7 inputs".
-/** @param {View["usage"]} usage */
+/** @param {Pick<View["usage"], "corrections" | "typos">} usage */
 export const countWords = (usage) => `${counted(usage.corrections, "replacement", "replacements")} · ${counted(usage.typos, "input", "inputs")}`;
 
 // What the list uses of the count the keyboard caps first, as a bank says how
@@ -74,34 +69,18 @@ export const countWords = (usage) => `${counted(usage.corrections, "replacement"
 /** @param {View["usage"]} usage */
 export const usageWords = (usage) => `${n(usage.typos)} of ${n(usage.maxTypos)} inputs`;
 
-// The list's bytes of the memory it has, as Macro memory says its own.
+// The list's bytes of the memory it has, and what it can still grow by, as
+// Macro memory says its own. How full its meter is drawn is core's too
+// (`usage.share`), the same figure the Keyboard screen's Memory panel draws.
 /** @param {View["usage"]} usage */
 export const bytesWords = (usage) => `${n(usage.bytes)} / ${n(usage.capacity)} bytes`;
-
-// A replacement's text against the bytes one may hold, as a name's counter
-// says where a name stands (view/names.mjs).
-const encoder = new TextEncoder();
-/** @param {string} text @param {number} max */
-export function textCount(text, max) {
-    const used = encoder.encode(text.trim()).length;
-    return {used, max, over: used > max, label: `${n(used)} / ${n(max)} bytes`};
-}
-
-// How full the list's memory is, as its one meter shows it: the largest
-// share any of its ceilings is used to.
 /** @param {View["usage"]} usage */
-export const usageShare = (usage) => Math.min(100, 100 * Math.max(usage.typos / usage.maxTypos, usage.textBytes / usage.maxTextBytes, usage.bytes / usage.capacity));
+export const freeWords = (usage) => `${n(usage.free)} ${usage.free === 1 ? "byte" : "bytes"} free`;
 
-// What is typed into the field that adds inputs, as the inputs it holds: split
-// at spaces and commas.
-/** @param {string} text @returns {string[]} */
-export const inputTokens = (text) => String(text ?? "").split(/[\s,]+/).filter(Boolean);
-
-// The entry the list already has for a replacement being made: the same text
-// exactly, or the same macro. The screen offers to open it instead.
-/** @param {View | null | undefined} view @param {{kind: "text" | "macro", text: string, macro: number | null}} adding */
-export const joinedEntry = (view, adding) => (view?.entries || []).find((entry) => adding.kind === "macro"
-    ? adding.macro !== null && entry.macro === adding.macro : entry.macro === undefined && entry.correction === adding.text.trim()) || null;
+// A replacement's text against the bytes one may hold, as it is stored,
+// without the spaces around it: a name's counter (view/names.mjs).
+/** @param {string} text @param {number} max */
+export const textCount = (text, max) => nameCount(text.trim(), max);
 
 // The replacement a new one names so far, or null while it names none.
 /** @param {{kind: "text" | "macro", text: string, macro: number | null}} adding @returns {Replacement | null} */
@@ -111,24 +90,23 @@ export const addedReplacement = (adding) => adding.kind === "macro" ? (adding.ma
 // (IMPORT_MAX_BYTES and IMPORT_TOO_LARGE in core/model/autocorrect-import.js).
 export const LIST_FILE_MAX_BYTES = 262144;
 export const LIST_FILE_TOO_LARGE = "This file is too large for a text replacement list.";
-// The formats a list is saved in, by the extension core names each with.
-export const LIST_FILE_FORMATS = /** @type {const} */ (["txt", "csv", "json"]);
 
 // What importing a file one way would do, as the lines its preview shows:
 // each a sentence, with the names it is about where it has some.
-/** @param {import("../../contracts/messages.js").AutocorrectImportOutcome} outcome @param {{maxTypos: number}} holds @returns {{kind: "new" | "added" | "duplicates" | "refused" | "unfit" | "removed" | "nothing", text: string, names?: string[]}[]} */
-export function importLines(outcome, holds) {
+/** @param {import("../../contracts/messages.js").AutocorrectImportOutcome} outcome @returns {{kind: "new" | "added" | "duplicates" | "refused" | "unfit" | "removed" | "nothing", text: string, names?: string[]}[]} */
+export function importLines(outcome) {
     /** @param {{inputs: string[]}[]} groups */
     const inputs = (groups) => groups.reduce((total, group) => total + group.inputs.length, 0);
     /** @type {ReturnType<typeof importLines>} */
     const lines = [];
-    if (outcome.removed) lines.push({kind: "removed", text: `${counted(outcome.removed, "replacement", "replacements")} in your list now ${outcome.removed === 1 ? "is" : "are"} removed.`});
+    if (outcome.removed) lines.push({kind: "removed", text: `${counted(outcome.removed, "replacement", "replacements")} in your list now ${outcome.removed === 1 ? "is" : "are"} deleted.`});
     if (outcome.newReplacements.length) lines.push({kind: "new", text: `${counted(outcome.newReplacements.length, "new replacement", "new replacements")}, with ${counted(inputs(outcome.newReplacements), "input", "inputs")}.`,
         names: outcome.newReplacements.map((entry) => entry.label)});
     if (outcome.addedInputs.length) lines.push({kind: "added", text: `${counted(inputs(outcome.addedInputs), "more input", "more inputs")} for ${counted(outcome.addedInputs.length, "replacement", "replacements")} you already have.`,
         names: outcome.addedInputs.map((entry) => `${entry.inputs.join(" ")} → ${entry.label}`)});
     if (outcome.duplicates) lines.push({kind: "duplicates", text: `${n(outcome.duplicates)} ${outcome.duplicates === 1 ? "is" : "are"} already in the list, and skipped.`});
-    if (outcome.unfit) lines.push({kind: "unfit", text: `${n(outcome.unfit)} ${outcome.unfit === 1 ? "does" : "do"} not fit: the keyboard holds ${n(holds.maxTypos)} inputs.`});
+    // What stopped the first of them is core's to say (`unfitWhy`).
+    if (outcome.unfit) lines.push({kind: "unfit", text: `${n(outcome.unfit)} ${outcome.unfit === 1 ? "does" : "do"} not fit: ${outcome.unfitWhy}.`});
     if (outcome.refused.length) lines.push({kind: "refused", text: `${counted(outcome.refused.length, "line is", "lines are")} refused:`,
         names: outcome.refused.map((row) => `${row.line === null ? "" : `${row.line}: `}${row.text} — ${row.reason}`)});
     if (!outcome.newReplacements.length && !outcome.addedInputs.length && !outcome.removed) lines.unshift({kind: "nothing", text: "Nothing in it would change your list."});
@@ -160,5 +138,5 @@ export function triedWords(tried, macros) {
     if (tried.undone) return "Backspace put the word back as you typed it. Ending it again leaves it alone.";
     const last = tried.fired.at(-1);
     if (!last) return "";
-    return last.macro === undefined ? `“${last.typo}” was replaced with “${last.correction}”.` : `“${last.typo}” plays macro “${macroLabel(macros, last.macro)}”.`;
+    return last.macro === undefined ? `“${last.typo}” was replaced with “${last.correction}”.` : `“${last.typo}” plays the macro “${macroNamed(macros?.[last.macro])}”.`;
 }

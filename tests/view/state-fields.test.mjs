@@ -130,3 +130,18 @@ test("a take being recorded keeps the text it is building on, and nothing else o
     resetDraftForms();
     assert.deepEqual(state.macroForms, {}, "a take whose slot has no form leaves none behind");
 });
+
+// Review's Show is a patch of the state (view/review.mjs placeState): a key
+// it sets that the state does not have opens nothing, and passes unseen.
+test("where Review shows an item is said in fields the state has", async () => {
+    const {placeState} = await import("../../webview/view/review.mjs");
+    const places = [{kind: "key", layer: 0, layoutIndex: 3}, {kind: "behaviour", keycode: "KC_A"}, {kind: "combo", index: 2}, {kind: "macro", index: 1, keycode: "MACRO_1"},
+        {kind: "autocorrect", entry: "the"}, {kind: "customKey", keycode: "CK_0"}, {kind: "pointing", slot: 2}, {kind: "lighting", stage: "base"},
+        {kind: "settings", section: "host", area: "Settings"}, {kind: "settings", stage: "base"}, {kind: "layers"}, {kind: "slots", bank: "macros", keycodes: ["MACRO_1"], slots: [1]}];
+    for (const place of places) {
+        const patch = placeState(place);
+        assert.ok(patch, place.kind);
+        assert.deepEqual(Object.keys(patch).filter((field) => !(field in STATE_FIELDS)), [], `${place.kind}: every field is the state's`);
+    }
+    assert.equal(placeState({kind: "autocorrect", entry: "the"}).autocorrectEntry, "the", "a replacement's Show opens it in its editor");
+});

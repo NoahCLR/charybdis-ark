@@ -456,16 +456,29 @@ test("an autocorrect edit is checked against the draft without staging it: its r
     const draft = loop.session.draft, before = structuredClone(draft.document), revision = draft.revision;
     const ask = (edit, extra = {}) => loop.handleMessage({type: "validateAutocorrect", edit, requestId: 41, draftId: draft.id, draftRevision: revision, ...extra});
     await ask({type: "addAutocorrectTypos", correction: "then", typos: [{typo: "tehn"}]});
-    assert.deepEqual(last(shell), {type: "autocorrectValidation", requestId: 41, draftId: draft.id, draftRevision: revision, validation: {error: "", code: "", warnings: []}});
+    assert.deepEqual(last(shell), {type: "autocorrectValidation", requestId: 41, draftId: draft.id, draftRevision: revision, validation: {error: "", code: "", warnings: [], entry: "then", label: "then", listed: false}},
+        "with the entry its replacement would be");
     await ask({type: "addAutocorrectTypos", correction: "no", typos: [{typo: "*on"}]});
     assert.equal(last(shell).validation.error, "");
-    assert.deepEqual(last(shell).validation.warnings, ["“*on” is a short input with *, so it fires inside many words."]);
+    assert.deepEqual(last(shell).validation.warnings, ["“*on” is a short input with *, so it catches many words."]);
     await ask({type: "addAutocorrectTypos", correction: "ten", typos: [{typo: "teh"}]});
     assert.deepEqual(last(shell).validation, {error: "“teh” is already an input for “the”.", code: "AUTOCORRECT_EDIT_REFUSED", warnings: []});
     await ask({type: "addAutocorrectTypos", correction: "then", typos: [{typo: "te*hn"}]});
     assert.match(last(shell).validation.error, /has \* where it cannot go/);
     await ask({type: "addAutocorrectTypos", macro: 5, typos: [{typo: "sig"}]});
     assert.equal(last(shell).validation.error, "", "a replacement may play a macro");
+    // A field's text is read by core, and the entry the list has for the
+    // replacement is named: the screen offers to open it, and follows it.
+    await ask({type: "addAutocorrectTypos", correction: " the ", inputs: "tthe thhe"});
+    assert.deepEqual(last(shell).validation, {error: "", code: "", warnings: [], entry: "the", label: "the", listed: true, listedSaid: "“the” is already on your list. Add inputs to it there."});
+    // An add that names no input yet is only asked which entry it would be.
+    await ask({type: "addAutocorrectTypos", correction: "the", inputs: ""});
+    assert.deepEqual(last(shell).validation, {error: "", code: "", warnings: [], entry: "the", label: "the", listed: true, listedSaid: "“the” is already on your list. Add inputs to it there."});
+    await ask({type: "addAutocorrectTypos", correction: "the", inputs: "teh"});
+    assert.deepEqual(last(shell).validation, {error: "“teh” is already an input for “the”.", code: "AUTOCORRECT_EDIT_REFUSED", warnings: []});
+    // Changing a replacement to one the list has joins the two, and says so first.
+    await ask({type: "updateAutocorrectCorrection", correction: "thing", to: "the"});
+    assert.deepEqual(last(shell).validation, {error: "", code: "", warnings: ["“the” is already on your list: this one's inputs will join it."], entry: "the", label: "the", listed: true});
     await ask({type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "KC_A"}]});
     assert.ok(last(shell).validation.error, "only an autocorrect edit is checked here");
     for (const stale of [{draftId: "old"}, {draftRevision: revision - 1}]) {
@@ -509,7 +522,7 @@ test("an autocorrect list file is read and judged against the draft without stag
         {type: "autocorrectImportPreview", requestId: 5, name: "mine.txt", ...bound, error: undefined});
     assert.equal(reply.preview.format, "txt");
     assert.deepEqual(reply.preview.add.newReplacements, [{label: "then", inputs: ["tehn"]}]);
-    assert.deepEqual(reply.preview.add.refused.map(row => row.reason), ["It has no “->” between the input and its replacement.", "“teh” is already an input for “the”."]);
+    assert.deepEqual(reply.preview.add.refused.map(row => row.reason), ["“teh” is already an input for “the”.", "It has no “->” between the input and its replacement."], "in the file's order");
     assert.equal(reply.preview.replace.replacements, 2);
     // The chooser's file, as the shell hands it over; none chosen answers with no preview.
     chosen = {text: "replacement,inputs\nthen,tehn then*\n", name: "sheet.csv"};

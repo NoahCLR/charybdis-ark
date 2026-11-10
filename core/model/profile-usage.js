@@ -20,6 +20,7 @@ const {profileMacroBudget} = require("./macro-editor");
 const {PROFILE_ACTION_KINDS: ACTION, decodeProfileBlob} = require("../schema/profile-blob-v1");
 const {PROFILE_DOMAIN_IDS} = require("../schema/profile-domains");
 const {shortcutPresent} = require("../schema/settings-domain-v1");
+const {autocorrectCounts} = require("../schema/autocorrect-domain-v1");
 
 /** @param {number | undefined} value @returns {value is number} */
 const positive = value => typeof value === "number" && Number.isInteger(value) && value > 0;
@@ -78,7 +79,7 @@ function profileUsage(snapshot, capabilities) {
         ["macros", macroSlots.length - macros.empty, macroSlots.length, macros.outOfRoom.size],
         // Text replacement, the screen after Macros: what is typed is the
         // count the keyboard caps first, each replacement having at least one.
-        ["autocorrectInputs", (decoded.autocorrect?.entries || []).reduce((total, entry) => total + entry.typos.length, 0), capabilities.maxAutocorrectTypos],
+        ["autocorrectInputs", autocorrectCounts(decoded.autocorrect || {entries: []}).typos, capabilities.maxAutocorrectTypos],
         ["customKeys", customKeys, settings.customKeyNames.length],
         ["pointingModes", pdModes.filter(slot => slot.kind).length, pdModes.length],
         ["lightingGroups", lighting[4], capabilities.maxReusableRgbGroups],

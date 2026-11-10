@@ -144,16 +144,23 @@ const entryKey = entry => entry.macro === undefined ? String(entry.correction) :
 /** @param {string} key @returns {{correction: string} | {macro: number}} */
 const entryOfKey = key => key.startsWith("\u0001macro:") ? {macro: Number(key.slice(7))} : {correction: key};
 
-// The canonical domain's size for this list.
+// What a list counts against the keyboard's ceilings, and its canonical
+// domain's size: its corrections, its typos, those that match part of a word,
+// and the bytes of all its text. The one count every ceiling is judged by.
 /** @param {AutocorrectList} list */
-function autocorrectDomainSize(list) {
-    let typos = 0, parts = 0, text = 0;
+function autocorrectCounts(list) {
+    let typos = 0, parts = 0, textBytes = 0;
     for (const entry of list.entries) {
-        text += Buffer.byteLength(entry.correction, "utf8");
-        for (const typo of entry.typos) {typos += 1; parts += typo.match === AUTOCORRECT_MATCH.WHOLE_WORD ? 0 : 1; text += Buffer.byteLength(typo.typo, "utf8");}
+        textBytes += Buffer.byteLength(entry.correction, "utf8");
+        for (const typo of entry.typos) {typos += 1; parts += typo.match === AUTOCORRECT_MATCH.WHOLE_WORD ? 0 : 1; textBytes += Buffer.byteLength(typo.typo, "utf8");}
     }
-    return AUTOCORRECT_DOMAIN_V1.HEADER_SIZE + AUTOCORRECT_DOMAIN_V1.ROW_SIZE * (list.entries.length + typos) + AUTOCORRECT_DOMAIN_V1.PART_ROW_SIZE * parts + text;
+    return {corrections: list.entries.length, typos, parts, textBytes};
 }
+// The canonical domain's size for those counts, and for a list.
+/** @param {ReturnType<typeof autocorrectCounts>} counts */
+const sizeOfCounts = ({corrections, typos, parts, textBytes}) => AUTOCORRECT_DOMAIN_V1.HEADER_SIZE + AUTOCORRECT_DOMAIN_V1.ROW_SIZE * (corrections + typos) + AUTOCORRECT_DOMAIN_V1.PART_ROW_SIZE * parts + textBytes;
+/** @param {AutocorrectList} list */
+const autocorrectDomainSize = list => sizeOfCounts(autocorrectCounts(list));
 
 /** @param {AutocorrectList} list @param {Ceilings} [ceilings] @returns {Buffer} */
 function encodeAutocorrectDomain(list, {maxCorrections = AUTOCORRECT_DOMAIN_V1.MAX_CORRECTIONS, maxTypos = AUTOCORRECT_DOMAIN_V1.MAX_TYPOS, maxTextBytes = AUTOCORRECT_DOMAIN_V1.MAX_TEXT_BYTES} = {}) {
@@ -291,4 +298,4 @@ function decodeAutocorrectDomain(value) {
     return {entries: entries.map(entry => entry.text ? {correction: entry.text.toString("utf8"), typos: entry.typos} : {correction: "", macro: entry.macro, typos: entry.typos})};
 }
 
-module.exports = {AUTOCORRECT_DOMAIN_V1, AUTOCORRECT_KIND, AUTOCORRECT_MATCH, entryKey, entryOfKey, isMacroSlot, playsMacro, AutocorrectDomainError, autocorrectDomainSize, correctionProblem, decodeAutocorrectDomain, encodeAutocorrectDomain, foldTypo, typoProblem};
+module.exports = {AUTOCORRECT_DOMAIN_V1, AUTOCORRECT_KIND, AUTOCORRECT_MATCH, autocorrectCounts, sizeOfCounts, entryKey, entryOfKey, isMacroSlot, playsMacro, AutocorrectDomainError, autocorrectDomainSize, correctionProblem, decodeAutocorrectDomain, encodeAutocorrectDomain, foldTypo, typoProblem};

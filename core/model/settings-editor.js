@@ -300,8 +300,8 @@ function settingsSections(snapshot, settings) {
             : "The keyboard could not tell. Choose the one your computer runs.", {max: 3, unit: undefined}), bitMask: 3, kind: "number",
             choices: VOCABULARY.hostOs.map(([value, word]) => ({value, label: value === 0 && host.detected ? `${word} (${label(host.detected)} detected)` : word}))},
         {...byte("hostLayout", SETTING.UNICODE_HOST_MODE, LAYOUT_SHIFT, "Keyboard layout"), kind: "number",
-            hint: macos ? "The layout active on your Mac; macros type through it. Unicode Hex Input types emoji too."
-                : "The layout active on your computer; macros type through it.",
+            hint: macos ? "The layout active on your Mac; macros and text replacements type through it. Unicode Hex Input types emoji too."
+                : "The layout active on your computer; macros and text replacements type through it.",
             choices: offered.map(layout => ({value: layout.id, label: layoutWord(layout.id)}))},
         ...(macos || host.macosIso ? [{...toggle("macosIso", SETTING.UNICODE_HOST_MODE, "ISO keyboard on macOS", "On if macOS set this keyboard up as ISO; macros then swap the keys left of 1 and Z."), bitMask: MACOS_ISO}] : []),
         // On macOS, Unicode entry is the Unicode Hex Input layout, not a switch.

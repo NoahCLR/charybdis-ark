@@ -118,6 +118,10 @@ export interface Vocabulary {
     /** The setting macroProtection chooses, by its name, and Automatic as it says whether it plays uninterruptibly now ("Automatic · on"). */
     macroUninterruptible: Readonly<{label: string; automatic: Readonly<{on: string; off: string}>}>;
     macroSteps: WordList<MacroStepKind>;
+    /** What a text replacement is, text or a macro, as its editor's choice and its tag say it. */
+    replacementKinds: WordList<'text' | 'macro'>;
+    /** The formats a text replacement list is saved in, by extension, in the order Export offers them. */
+    listFileFormats: WordList<import('./messages.js').AutocorrectFileFormat>;
     /** A step's short name under its tile and in the legend: a key or chord step says which it is. */
     macroStepTiles: Readonly<Record<Exclude<MacroStepKind, 'tap'> | 'key' | 'chord', string>>;
     /** Why a macro does not read in the step editor, by the macro grammar's reason code (rules/macro-payload.mjs). */
@@ -210,7 +214,7 @@ export interface Vocabulary {
     comboOptions: Readonly<Record<string, string>>;
     /** What a behaviour and a combo share: whether it runs, and on which layers. */
     definitionFields: {use: Readonly<Record<'behaviour' | 'combo', string>>; allowedLayers: string; offInSettings: Readonly<Record<'behaviour' | 'combo', string>>; onceOn: Readonly<Record<'behaviour' | 'combo', string>>};
-    settingOff: {switches: Readonly<Record<SettingOffSwitch, {off: string; fix: string}>>; stage: string};
+    settingOff: {switches: Readonly<Record<SettingOffSwitch, {off: string; fix: string; /** What off means where the banner is, when it says so. */ detail?: string}>>; stage: string};
     behaviourFields: Readonly<Record<'anchor' | 'timings', string>>;
     comboFields: Readonly<Record<'inputs' | 'sends' | 'window' | 'conditions', string>>;
 }

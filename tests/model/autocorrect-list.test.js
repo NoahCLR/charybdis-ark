@@ -1,7 +1,7 @@
 "use strict";
 const {test} = require("node:test");
 const assert = require("node:assert/strict");
-const {addTypos, changeReplacement, changeTypo, findEntry, findTypo, listUsage, listWarnings, removeEntry, removeTypo, inputForm, inputOf, WARNING} = require("../../core/model/autocorrect-list");
+const {addTypos, changeReplacement, changeTypo, findEntry, findTypo, listUsage, listWarnings, removeEntry, removeTypo, replacementCalled, replacementSaid, splitInputs, inputForm, inputOf, WARNING} = require("../../core/model/autocorrect-list");
 const {AUTOCORRECT_MATCH: MATCH, encodeAutocorrectDomain, autocorrectDomainSize, entryKey} = require("../../core/schema/autocorrect-domain-v1");
 const {hostLayouts, US_HOST_LAYOUT} = require("../../core/data/host-layouts");
 
@@ -52,14 +52,14 @@ test("an input is a whole word unless it is written with * where other letters m
     says(() => inputOf("te h*"), /one word.*a space is neither/);
     const value = list(["the", "teh"]);
     addTypos(value, text("receive"), [{typo: "recieve*"}], US);
-    changeTypo(value, "recieve", {to: "*recieve"}, US);
+    changeTypo(value, "recieve", "*recieve", US);
     assert.deepEqual(shape(value)[1], ["receive", ["recieve", MATCH.END]], "its * is changed where it stands");
-    changeTypo(value, "recieve", {to: "recieve"}, US);
+    changeTypo(value, "recieve", "recieve", US);
     assert.deepEqual(shape(value)[1], ["receive", "recieve"]);
     // An older file's match stands for a form written without *.
     addTypos(value, text("thing"), [{typo: "tihng", match: MATCH.ANYWHERE}], US);
     assert.deepEqual(shape(value)[2], ["thing", ["tihng", MATCH.ANYWHERE]]);
-    says(() => addTypos(value, text("thing"), [{typo: "thnig", match: 7}], US), /no such match/);
+    says(() => addTypos(value, text("thing"), [{typo: "thnig", match: 7}], US), /Ark cannot tell where “thnig” goes in a word\. Write it with \* where other letters may go/);
 });
 
 test("a replacement may play a macro: named by its slot, for whole words only, beside text or in its place", () => {
@@ -84,35 +84,45 @@ test("a replacement may play a macro: named by its slot, for whole words only, b
     addTypos(value, {macro: 8}, [{typo: "addr"}], US);
     changeReplacement(value, {macro: 8}, {macro: 7}, US);
     assert.deepEqual(shape(value), [["the", "teh"], [7, "sig", "sgi", "addr"]]);
-    changeTypo(value, "teh", {to: "teh*"}, US);
+    changeTypo(value, "teh", "teh*", US);
     says(() => changeReplacement(value, text("the"), {macro: 3}, US), /take the \* out of “teh\*” first/);
-    says(() => changeTypo(value, "teh", {macro: 7}, US), /A macro plays for a whole word only/);
-    says(() => changeTypo(value, "sig", {to: "*sig"}, US), /A macro plays for a whole word only/);
-    changeTypo(value, "sgi", {correction: "the"}, US);
-    changeTypo(value, "sig", {macro: 2}, US);
-    assert.deepEqual(shape(value), [["the", ["teh", MATCH.START], "sgi"], [7, "addr"], [2, "sig"]]);
+    says(() => changeTypo(value, "sig", "*sig", US), /A macro plays for a whole word only/);
     removeEntry(value, {macro: 7}, US);
     says(() => removeEntry(value, {macro: 7}, US), /the macro “Macro 7” is no longer in the list/);
-    assert.deepEqual(shape(value), [["the", ["teh", MATCH.START], "sgi"], [2, "sig"]]);
+    assert.deepEqual(shape(value), [["the", ["teh", MATCH.START]]]);
+});
+
+test("a replacement has one name wherever it is listed, and one inside a sentence; a field's text is its inputs, split at spaces", () => {
+    const names = Object.assign([], {5: "Sign-off"});
+    assert.equal(replacementCalled({correction: "because"}, names), "because");
+    assert.equal(replacementCalled({correction: "", macro: 5}, names), "▶ Sign-off");
+    assert.equal(replacementCalled({macro: 6}, names), "▶ Macro 6", "a macro with no name by what Macros calls it");
+    assert.equal(replacementCalled({macro: 6}), "▶ Macro 6");
+    assert.equal(replacementSaid({correction: "because"}, names), "“because”");
+    assert.equal(replacementSaid({macro: 5}, names), "the macro “Sign-off”");
+    assert.deepEqual(splitInputs("  teh   hte\trecieve* "), ["teh", "hte", "recieve*"]);
+    assert.deepEqual(splitInputs("teh,hte"), ["teh,hte"], "a comma is no space: the input it leaves is refused for it");
+    assert.deepEqual([splitInputs(""), splitInputs(undefined)], [[], []]);
 });
 
 test("each refusal says what is wrong in plain words", () => {
     const value = list(["the", "teh"]);
     says(() => addTypos(value, text(""), [{typo: "x"}], US), /Type the replacement/);
-    says(() => addTypos(value, text("then"), [], US), /at least one thing you type for it/);
-    says(() => addTypos(value, text("then"), [{typo: " "}], US), /Type what you would type for it/);
-    says(() => addTypos(value, text("then"), [{typo: "the-n"}], US), /letters and digits.*“-”/);
-    says(() => addTypos(value, text("then"), [{typo: "'then"}], US), /apostrophe/);
+    says(() => addTypos(value, text("then"), [], US), /A replacement needs at least one input/);
+    says(() => addTypos(value, text("then"), [{typo: " "}], US), /Type an input/);
+    says(() => addTypos(value, text("then"), [{typo: "the-n"}], US), /An input is one word: letters and digits.*“-”/);
+    says(() => addTypos(value, text("then"), [{typo: "the,n"}], US), /“,” is neither/);
+    says(() => addTypos(value, text("then"), [{typo: "'then"}], US), /An input may hold an apostrophe only between/);
     says(() => addTypos(value, text("then"), [{typo: "then"}], US), /“then” is the replacement itself/);
     says(() => addTypos(value, text("ten"), [{typo: "teh"}], US), /“teh” is already an input for “the”/);
     says(() => addTypos(value, text("the"), [{typo: "TEH"}], US), /“teh” is already an input for “the”/);
     says(() => addTypos(value, text("then"), [{typo: "tehn"}, {typo: "Tehn"}], US), /“tehn” is there twice/);
     says(() => addTypos(value, text("a".repeat(129)), [{typo: "x"}], US), /at most 128 bytes of text.*Use a macro for something longer/);
-    says(() => addTypos(value, text("then"), [{typo: "a".repeat(33)}], US), /at most 32 bytes/);
+    says(() => addTypos(value, text("then"), [{typo: "a".repeat(33)}], US), /An input is at most 32 bytes/);
     says(() => addTypos(value, text("then"), [{typo: "é".repeat(17)}], {layout: hostLayouts().find(layout => layout.slug === "windows-german").id}), /at most 32 bytes/);
     says(() => addTypos(value, text("a\tb"), [{typo: "ab"}], US), /one line of text.*Use a macro for more than one line/);
     says(() => addTypos(value, text("two\nlines"), [{typo: "ab"}], US), /one line of text/);
-    says(() => addTypos(value, text("then"), [{typo: "tehn", match: 7}], US), /no such match/);
+    says(() => addTypos(value, text("then"), [{typo: "tehn", match: 7}], US), /Ark cannot tell where “tehn” goes/);
     assert.deepEqual(shape(value), [["the", "teh"]], "a refused edit changes nothing");
 });
 
@@ -124,10 +134,10 @@ test("an entry the chosen layout cannot type is refused when it is added or edit
     addTypos(value, text("über"), [{typo: "ueber"}], german);
     assert.deepEqual(shape(value), [["über", "ueber"]]);
     says(() => changeReplacement(value, text("über"), text("übér"), {...US, layoutName: "US"}), /US cannot type/);
-    says(() => changeTypo(value, "ueber", {to: "üeber"}, {...US, layoutName: "US"}), /US cannot type “ü”/);
+    says(() => changeTypo(value, "ueber", "üeber", {...US, layoutName: "US"}), /US cannot type “ü”/);
     // What was already in the list is only warned about.
-    assert.doesNotThrow(() => changeTypo(value, "ueber", {to: "ueber*"}, {...US, layoutName: "US"}));
-    changeTypo(value, "ueber", {to: "ueber"}, {...US, layoutName: "US"});
+    assert.doesNotThrow(() => changeTypo(value, "ueber", "ueber*", {...US, layoutName: "US"}));
+    changeTypo(value, "ueber", "ueber", {...US, layoutName: "US"});
     // A macro is not typed through the layout.
     assert.doesNotThrow(() => changeReplacement(value, text("über"), {macro: 1}, {...US, layoutName: "US"}));
 });
@@ -142,19 +152,16 @@ test("a replacement is respelled where it stands, and respelling it to one that 
     assert.deepEqual(shape(value), [["the", "hte", "tehn"]]);
 });
 
-test("an input is written anew, with or without *, or moved to another replacement, new or not", () => {
+test("an input is written anew where it is, with or without *", () => {
     const value = list(["the", "teh", "hte"], ["then", "tehn"]);
-    changeTypo(value, "teh", {to: "Tthe"}, US);
-    changeTypo(value, "tthe", {to: "tthe*"}, US);
+    changeTypo(value, "teh", "Tthe", US);
+    changeTypo(value, "tthe", "tthe*", US);
     assert.deepEqual(shape(value)[0], ["the", ["tthe", MATCH.START], "hte"]);
-    says(() => changeTypo(value, "hte", {to: "tehn"}, US), /“tehn” is already an input for “then”/);
-    says(() => changeTypo(value, "hte", {to: "the"}, US), /is the replacement itself/);
-    says(() => changeTypo(value, "gone", {to: "*gone"}, US), /no longer in the list/);
-    changeTypo(value, "hte", {correction: "then"}, US);
-    assert.deepEqual(shape(value), [["the", ["tthe", MATCH.START]], ["then", "tehn", "hte"]]);
-    changeTypo(value, "tthe", {correction: "three"}, US);
-    assert.deepEqual(shape(value), [["then", "tehn", "hte"], ["three", ["tthe", MATCH.START]]], "its last input gone, the entry goes; a new replacement is made");
-    says(() => changeTypo(value, "hte", {correction: "hte"}, US), /is the replacement itself/);
+    says(() => changeTypo(value, "hte", "tehn", US), /“tehn” is already an input for “then”/);
+    says(() => changeTypo(value, "hte", "the", US), /is the replacement itself/);
+    says(() => changeTypo(value, "gone", "*gone", US), /no longer in the list/);
+    says(() => changeTypo(value, "hte", " ", US), /Type an input/);
+    assert.deepEqual(shape(value), [["the", ["tthe", MATCH.START], "hte"], ["then", "tehn"]], "it stays with its replacement");
 });
 
 test("removing a replacement's last input removes the entry; removing an entry removes its inputs", () => {
@@ -197,7 +204,7 @@ test("warnings are found on the list and never refuse it", () => {
 
     const parts = listWarnings(list(["the", ["teh", MATCH.ANYWHERE]], ["their", "thier"], ["no", ["on", MATCH.END]], ["button", "buton"]), US);
     assert.deepEqual(parts.map(({kind, typo}) => [kind, typo]), [[WARNING.SHORT_PART, "teh"], [WARNING.SHORT_PART, "on"], [WARNING.INSIDE_CORRECTION, "on"]]);
-    assert.equal(parts[0].text, "“*teh*” is a short input with *, so it fires inside many words.");
+    assert.equal(parts[0].text, "“*teh*” is a short input with *, so it catches many words.");
     assert.match(parts[2].text, /“\*on” also matches inside the replacement “button”/);
     assert.deepEqual(listWarnings(list(["something", ["tihng", MATCH.ANYWHERE]]), US), [], "a long input with * that matches no replacement is fine");
     assert.deepEqual(listWarnings(list(["iPhone", "iphone"]), US), [], "an input that is its replacement in other capitals changes nothing typed right");

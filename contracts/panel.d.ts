@@ -57,14 +57,15 @@ export interface ComboView extends Combo {inputPositions?: number[]; /** The lay
     /** The layers its output holds while it is held, ascending: such a combo shows no combo light, its layers' own light showing the hold (core/model/layer-effects.js comboHeldShows). */ holdsLayers?: number[];
     /** The pointing slot its output runs, held or locked, which paints over its combo feedback; null when it runs none. */ runsPointing?: number | null; id: number; badge: string; inputDisplays: string[]; outputDisplay: string}
 export interface CatalogEntry {value: string; key: string; label: string; group: string; aliases: string[]; keycode: number; searchTerms: string[]; search: string; searchCompact: string; name?: string; tip?: string; /** False for an entry the keycode picker never offers (core/data/offered-keycodes.js). */ offered?: boolean}
-/** One input of a text replacement entry (a typo, in the firmware's and these contracts' names): its letters as stored (folded), which name it in an edit; as it is written, with `*` where other letters may go; where it matches (the stored number); and what will misbehave about it, in words. */
-export interface AutocorrectTypo {typo: string; input: string; match: number; warnings: string[]}
-/** One text replacement entry: what names it among the entries (`id`), its replacement (a correction, in the firmware's names) as text, or '' with the macro slot it plays, all its inputs, and what will misbehave about the entry, in words. */
-export interface AutocorrectEntry {id: string; correction: string; macro?: number; typos: AutocorrectTypo[]; warnings: string[]}
-/** The text replacement list as its screen draws it (core/model/autocorrect-editor.js): entries in stored order, what the list uses against what the keyboard holds (`textMax` the bytes in one input, `correctionMax` in one replacement's text), what the chosen host layout leaves unable to fire, said once, and that layout's name. */
+/** One input of a text replacement entry (a typo, in the firmware's and these contracts' names): its letters as stored (folded), which name it in an edit; as it is written, with `*` where other letters may go; and what will misbehave about it, in words. */
+export interface AutocorrectTypo {typo: string; input: string; warnings: string[]}
+/** One text replacement entry: what names it among the entries (`id`), what it is called wherever a replacement is listed (`label`: its text, or its macro's name after the mark of one that plays), its replacement (a correction, in the firmware's names) as text, or '' with the macro slot it plays, all its inputs, and what will misbehave about the entry, in words. */
+export interface AutocorrectEntry {id: string; label: string; correction: string; macro?: number; typos: AutocorrectTypo[]; warnings: string[]}
+/** The text replacement list as its screen draws it (core/model/autocorrect-editor.js): entries in stored order; what the list uses against what the keyboard holds (`share`, 0 to 1, its bytes of its own limit, which both memory meters draw; `free`, the bytes it can still grow by, bounded by its text's ceiling and the profile's shared room too; `textMax` the bytes in one input, `correctionMax` in one replacement's text; `shortInput`, the letters under which an input with `*` is warned about); the starter list's size; what the chosen host layout cannot type, said once with what to do; and that layout's name. */
 export interface AutocorrectView {
     entries: AutocorrectEntry[];
-    usage: {corrections: number; maxCorrections: number; typos: number; maxTypos: number; textBytes: number; maxTextBytes: number; bytes: number; capacity: number; free: number; textMax: number; correctionMax: number};
+    usage: {corrections: number; typos: number; maxTypos: number; textBytes: number; maxTextBytes: number; bytes: number; capacity: number; share: number; free: number; textMax: number; correctionMax: number; shortInput: number};
+    starter: {replacements: number; inputs: number};
     notices: string[];
     /** The host layout entries are checked against, by name. */
     layoutName: string;

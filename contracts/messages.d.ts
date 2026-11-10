@@ -105,19 +105,19 @@ export type PanelRequest = PanelCommand & Partial<DraftIdentity>;
 export type ReadStep = 'layout' | 'profile' | 'combos' | 'baseRgb';
 export type ReadProgress = ({source: 'layout' | 'profile'; progress: CountedProgress} | {source: 'portable'; progress: string}) & {operationId: number; phase: PhaseId; selectedDeviceId: string; connectionToken: number | string | null};
 export type MacroValidation = MacroInspection | {error: string; code: string};
-/** What an autocorrect edit would be refused for (`error`, '' when it would be taken) and what it would newly warn about. */
-export interface AutocorrectValidation {error: string; code: string; warnings: string[]}
+/** What an autocorrect edit would be refused for (`error`, '' when it would be taken) and what it would newly warn about. For an edit that names a replacement to add to or to change to: the id that replacement's entry has in the list once the edit is kept (`entry`), what it is called there (`label`, as an entry's is), and whether the list already has it (`listed`): an add then adds to that entry, which `listedSaid` says in a sentence for a replacement being made, and a change joins it, which a warning says. */
+export interface AutocorrectValidation {error: string; code: string; warnings: string[]; entry?: string; label?: string; listed?: boolean; listedSaid?: string}
 /** What the keyboard would leave on screen for a try: the text, the replacements that fired and still stand, in order (each its entry's id, its text or '' with the macro slot it played, and the input's stored letters), where each of those stands in the text (`marks`, by its offsets; a part deleted since is no longer marked), and whether the last key undid one. */
 export interface AutocorrectTryResult {text: string; fired: {entry: string; correction: string; typo: string; macro?: number}[]; marks: {entry: string; correction: string; typo: string; macro?: number; start: number; end: number}[]; undone: boolean}
 export type AutocorrectFileFormat = 'txt' | 'csv' | 'json';
 /** A line a list file or the list refused, and why; `line` is the file's line, row or entry number. */
 export interface AutocorrectImportRefused {line: number | null; text: string; reason: string}
-/** What importing a file one way would do: the list's size after it, the replacements it makes and the inputs it adds to replacements the list has (each by its label, its text or its macro's name, with its inputs as written), how many inputs it skips as already there, what it refuses, how many inputs do not fit what the keyboard holds, and how many entries replacing takes away. */
+/** What importing a file one way would do: the list's size after it, the replacements it makes and the inputs it adds to replacements the list has (each by its label, as an entry's is, with its inputs as written), how many inputs it skips as already there, what it refuses, in the file's order, how many inputs do not fit what the keyboard holds and what stopped the first of them (`unfitWhy`, the end of a sentence), and how many entries replacing takes away. */
 export interface AutocorrectImportOutcome {
     replacements: number; inputs: number;
     newReplacements: {label: string; inputs: string[]}[];
     addedInputs: {label: string; inputs: string[]}[];
-    duplicates: number; refused: AutocorrectImportRefused[]; unfit: number; removed: number;
+    duplicates: number; refused: AutocorrectImportRefused[]; unfit: number; unfitWhy: string; removed: number;
 }
 /** A list file read and judged both ways (core/model/autocorrect-import.js): what it holds, and what Add and Replace would each do. */
 export interface AutocorrectImportPreview {

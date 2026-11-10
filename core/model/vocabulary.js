@@ -183,9 +183,9 @@ const PROFILE_FULL_WORDS = Object.freeze({
         lightingTableGroupRows: (most) => `The keyboard holds at most ${most} accents on any one of layers, pointing modes, combo feedback and key feedback. Remove one there before adding another.`,
         behaviours: (most) => `The keyboard holds at most ${most} behaviours. Remove one before adding another.`,
         behaviourSteps: (most) => `The keyboard holds at most ${most} behaviour tap counts, added up across all behaviours. Remove a tap count or a behaviour first.`,
-        autocorrectCorrections: (most) => `The keyboard holds at most ${most.toLocaleString("en-US")} text replacements. Remove one before adding another.`,
+        autocorrectCorrections: (most) => `The keyboard holds at most ${most.toLocaleString("en-US")} text replacements. Delete one before adding another.`,
         autocorrectTypos: (most) => `The keyboard holds at most ${most.toLocaleString("en-US")} inputs across all text replacements. Remove one before adding another.`,
-        autocorrectText: (most) => `The text replacement list holds at most ${most.toLocaleString("en-US")} bytes of text across its replacements and their inputs. Remove a replacement first.`,
+        autocorrectText: (most) => `The text replacement list holds at most ${most.toLocaleString("en-US")} bytes of text across its replacements and their inputs. Delete a replacement first.`,
     }),
     profile: "This change does not fit: the keyboard's profile is full. Remove an accent, a behaviour, a combo or a macro first.",
     name: "The keyboard's profile is full, so this name does not fit. Shorten another name, or remove a behaviour or combo.",
@@ -398,6 +398,12 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     // Each kind of macro step by its one name (glossary "Macro step"): the
     // add buttons, the step editor and the picker it opens all say it so.
     macroSteps: [["text", "Text"], ["tap", "Key or chord"], ["delay", "Delay"], ["press", "Press"], ["release", "Release"]],
+    // What a text replacement is (schema/autocorrect-domain-v1.js
+    // AUTOCORRECT_KIND), as its editor's choice and its tag say it.
+    replacementKinds: [["text", "Text"], ["macro", "Macro"]],
+    // The formats a text replacement list is saved in (autocorrect-import.js
+    // AUTOCORRECT_FILE_FORMATS), as Export's menu names each.
+    listFileFormats: [["txt", "Text (QMK)"], ["csv", "CSV"], ["json", "JSON"]],
     // The same names, short, as the word under a step's tile, the editor's
     // legend beside its mark and a screen reader before a chip say them; a
     // key or chord step says which of the two it is.
@@ -751,7 +757,7 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     settingOff: {switches: {behaviour: {off: "Behaviours are off.", fix: `Turn them on in ${SETTINGS_SCREENS.behaviours} →`},
         combo: {off: "Combos are off.", fix: `Turn them on in ${SETTINGS_SCREENS.combos} →`},
         autoMouse: {off: "Auto-mouse is off.", fix: `Turn it on in ${SETTINGS_SCREENS.pointer} →`},
-        autocorrect: {off: "Text replacement is off.", fix: `Turn it on in ${SETTINGS_SCREENS.host} →`}}, stage: "This stage paints nothing."},
+        autocorrect: {off: "Text replacement is off.", detail: "The keyboard keeps this list and replaces nothing.", fix: `Turn it on in ${SETTINGS_SCREENS.host} →`}}, stage: "This stage paints nothing."},
     // A behaviour's own switch, as its editor labels it and the review names
     // it, and the fold its timings open from.
     behaviourFields: {anchor: "Keeps the pointer layer on", timings: "Timings"},
