@@ -10,13 +10,14 @@ export const INFO_ICON = `<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx
 
 /** @typedef {{term: string, mono?: boolean, says: string}} InfoRow */
 
-// An info mark beside a heading. `rows` are its list, each a term and what it
-// says, both plain text; a mono term is written as it is typed.
-/** @param {{id: string, label: string, heading: string, rows: InfoRow[]}} info */
-export function infoMark({id, label, heading, rows}) {
+// An info mark beside a heading. `lead` is an optional sentence or two before
+// the list; `rows` are its list, each a term and what it says, all plain
+// text; a mono term is written as it is typed.
+/** @param {{id: string, label: string, heading: string, lead?: string, rows: InfoRow[]}} info */
+export function infoMark({id, label, heading, lead = "", rows}) {
     return `<span class="info-mark" data-info-mark>
         <button type="button" class="info-button" aria-label="${esc(label)}" aria-describedby="${esc(id)}">${INFO_ICON}</button>
-        <span class="shortcuts-pop info-pop" id="${esc(id)}" role="group" aria-label="${esc(heading)}"><span class="shortcuts-h">${esc(heading)}</span><dl>${rows
+        <span class="shortcuts-pop info-pop" id="${esc(id)}" role="group" aria-label="${esc(heading)}"><span class="shortcuts-h">${esc(heading)}</span>${lead ? `<span class="info-lead">${esc(lead)}</span>` : ""}<dl>${rows
             .map((row) => `<dt${row.mono ? ` class="mono"` : ""}>${esc(row.term)}</dt><dd>${esc(row.says)}</dd>`).join("")}</dl></span></span>`;
 }
 

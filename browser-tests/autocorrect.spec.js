@@ -283,12 +283,13 @@ test("inputs are chips: + Input adds one or several and stays for the next, and 
     // How an input is written is behind the Inputs heading's info mark: hovering it, or reaching it by the keyboard, shows it; Escape shuts it.
     const info = editor(page).locator("[data-info-mark]:has(#ac-info-inputs)");
     const list = info.locator("#ac-info-inputs");
-    await expect(info.locator(".info-button")).toHaveAttribute("aria-label", "How inputs are written");
+    await expect(info.locator(".info-button")).toHaveAttribute("aria-label", "How inputs are written, and the * wildcard");
     await expect(list).toBeHidden();
     await info.locator(".info-button").hover();
     await expect(list).toBeVisible();
-    await expect(list.locator("dt")).toHaveText(["teh", "recieve*", "*mnet", "*tihng*", "Capitals", "Characters", "Overlaps", "Macros"]);
-    await expect(list).toContainText("The start of a word: also recieved, recieving.");
+    await expect(list.locator(".info-lead")).toHaveText("An input matches a whole word. Add *, the wildcard, where other letters may go: one input then catches every form of a word, and only the part you wrote is replaced.");
+    await expect(list.locator("dt")).toHaveText(["teh", "recieve*", "*mnet", "*tihng*", "Where * goes", "Short inputs", "Capitals", "Characters", "Overlaps", "Macros"]);
+    await expect(list).toContainText("For receive, it also fixes recieved and recieving.");
     await page.keyboard.press("Escape");
     await expect(list).toBeHidden();
     await page.mouse.move(0, 0);
@@ -454,7 +455,7 @@ test("every control of the screen has a name, and the keyboard reaches them in r
         if (order.at(-1) !== at) order.push(at);
     }
     expect(order.map((name) => name.replace(/^autocorrect:entry:because:/, ""))).toEqual(["item", "ac-add", "ac-import", "ac-export-menu", "ac-delete", "ⓘ How a replacement works", "kind:text", "replacement",
-        "ⓘ How inputs are written", "ac-chip", "input:becasue", "ac-remove-input", "ac-chip", "ac-more", "ⓘ About the preview", "ac-try-clear", "autocorrect:try:text", "autocorrect:try:caps"]);
+        "ⓘ How inputs are written, and the * wildcard", "ac-chip", "input:becasue", "ac-remove-input", "ac-chip", "ac-more", "ⓘ About the preview", "ac-try-clear", "autocorrect:try:text", "autocorrect:try:caps"]);
 });
 
 // ── the switch is a Host setting (D-L87) ───────────────────────────────

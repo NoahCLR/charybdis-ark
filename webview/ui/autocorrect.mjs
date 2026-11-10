@@ -72,14 +72,18 @@ const REPLACEMENT_INFO = infoMark({id: "ac-info-replacement", label: "How a repl
     {term: "Macro", says: "For anything longer or on several lines. It plays for whole-word inputs only, keeps no capitals rule, and Backspace does not take it back."},
     {term: "Starting over", says: "A click, a shortcut or an arrow key starts a new word. The keyboard cannot see a password field or a terminal: turn text replacement off there."},
     {term: "On and off", says: "Settings → Host, or a key set to Text replacement on, off or toggle."}]});
-const INPUTS_INFO = infoMark({id: "ac-info-inputs", label: "How inputs are written", heading: "How inputs are written", rows: [
-    {term: "teh", mono: true, says: "The whole word only."},
-    {term: "recieve*", mono: true, says: "The start of a word: also recieved, recieving."},
-    {term: "*mnet", mono: true, says: "The end of a word: also developmnet, managemnet."},
-    {term: "*tihng*", mono: true, says: "Anywhere in a word: also anytihng, tihngs."},
+const INPUTS_INFO = infoMark({id: "ac-info-inputs", label: "How inputs are written, and the * wildcard", heading: "How inputs are written",
+    lead: "An input matches a whole word. Add *, the wildcard, where other letters may go: one input then catches every form of a word, and only the part you wrote is replaced.",
+    rows: [
+    {term: "teh", mono: true, says: "No *: only the word teh itself."},
+    {term: "recieve*", mono: true, says: "* at the end: words that start with recieve. For receive, it also fixes recieved and recieving."},
+    {term: "*mnet", mono: true, says: "* at the start: words that end in mnet. For ment, it fixes developmnet and managemnet."},
+    {term: "*tihng*", mono: true, says: "* at both ends: tihng anywhere in a word. For thing, it fixes anytihng and tihngs."},
+    {term: "Where * goes", says: "Only at the start, the end or both. Not in the middle: re*ve is refused."},
+    {term: "Short inputs", says: "With *, an input under four letters can catch real words, so Ark warns about it."},
     {term: "Capitals", says: "Do not matter: teh also catches Teh and TEH."},
     {term: "Characters", says: "Letters, digits and apostrophes, up to 32 bytes."},
-    {term: "Overlaps", says: "The longest input wins, and a whole word beats one with *."},
+    {term: "Overlaps", says: "The longest input wins, and a whole word beats a wildcard."},
     {term: "Macros", says: "A replacement that plays a macro takes whole words only, without *."}]});
 // A macro's mark before its name, where a replacement is named in one line.
 const PLAYS = "▶";
@@ -434,7 +438,7 @@ function entryEditor(model, list, entry, canEdit) {
                         aria-label="The input ${esc(typo.input)}: edit or remove it" data-tip="${esc(typo.warnings.length ? typo.warnings.join(" ") : "Click to write it anew, or to remove it.")}">${esc(typo.input)}</button>`).join("")}
                 ${editing?.part === "more"
                     ? `<input class="input mono ac-chip-input" data-f="autocorrect:entry:${esc(entry.id)}:more" data-ac-more data-ac-open aria-label="Another input for ${esc(label)}"
-                        autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="type it, then Enter" value="" ${off}>`
+                        autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${entry.macro === undefined ? "teh or recieve*" : "sig"}, then Enter" value="" ${off}>`
                     : `<button type="button" class="chip ac-more" data-act="ac-more" ${off} data-tip="Something else you type for this replacement.">+ Input</button>`}
             </div>
             ${entry.typos.map((typo) => typo.warnings.map((warning) => `<p class="note warn" data-ac-warning="${esc(typo.typo)}"><span class="mono">${esc(typo.input)}</span> ${esc(warning)}</p>`).join("")).join("")}
@@ -552,7 +556,7 @@ function newEditor(model, list, fresh, canEdit) {
             <div class="macro-sequence-heading"><h4>Inputs</h4>${INPUTS_INFO}</div>
             <div class="pd-chips ac-inputs">
                 <input class="input mono ac-chip-input" data-f="autocorrect:new:input" data-ac-first aria-label="What you type for it" autocomplete="off" autocapitalize="off" spellcheck="false"
-                    placeholder="${fresh.kind === "macro" ? "sig, then Enter" : "becuase becasue, then Enter"}" value="" ${canEdit && named ? "" : "disabled"}>
+                    placeholder="${fresh.kind === "macro" ? "sig, then Enter" : "becuase or recieve*, then Enter"}" value="" ${canEdit && named ? "" : "disabled"}>
             </div>
             <p class="note">It joins your list with its first input.</p>
             <div data-ac-feedback="input" hidden></div>`}

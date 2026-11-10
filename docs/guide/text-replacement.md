@@ -159,7 +159,8 @@ the text or pick the macro.
 
 The ⓘ beside **Replacement**, **Inputs** and **Try it** sums up how each
 works: when the keyboard replaces, capitals, Backspace and macros; how an
-input is written with `*`; and what the preview can and cannot show. Hover
+input is written with `*`, the wildcard, with examples and where it may go;
+and what the preview can and cannot show. Hover
 it, or reach it with Tab; Escape closes it.
 
 ### Inputs
