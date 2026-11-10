@@ -54,7 +54,7 @@ Option or AltGr on the right. Below it are sections by task: **Letters and
 digits**, **Symbols**, **Numpad**, **Common keys**, then the things you own,
 **Layers**, **Macros**, **Custom keys** and **Pointing modes**, then **Mouse**,
 **Media**, **More keys**, **Lighting** and **Other QMK**, which holds Magic
-and the [switch keys](behaviours.md#switch-keys) for combos, autocorrect,
+and the [switch keys](behaviours.md#switch-keys) for combos, text replacement,
 behaviours and auto-mouse, in **Switch keys**.
 Keys sit in named groups, such as Arrows, Function and Modifiers, and **No key**
 in Common keys holds N/A and Transparent. **All keycodes** lists every key the
@@ -233,8 +233,10 @@ keyboard-wide options that apply on every layer:
   Caps Lock.
 - **Typing**: one-shot modifiers and layers, and more than six keys at once.
 
-Autocorrect's switch is on the
-[Autocorrect](autocorrect.md#turning-it-on-and-off) screen, with its list.
+**Text replacement**, the card above these on Host, has the switch for
+[text replacement](text-replacement.md#turning-it-on-and-off): **Enabled**,
+with **Edit replacements →** to its list. It sits under **Your computer**
+because replacements are typed through the layout chosen there.
 
 An option this firmware was built without says **Not in this firmware** and
 does nothing. These options are marked **↺ keyboard keys change this too**:

@@ -88,15 +88,23 @@ test("a switch key for auto-mouse is picked after those for behaviours and posts
 });
 
 // QMK's switch keys for autocorrect (firmware D-F66, D-F69) are offered with
-// the others, after those for combos, and post by QMK's name.
-test("a switch key for autocorrect is picked beside those for combos and posts by name", async ({page}) => {
+// the others, after those for combos, worded as text replacement, found by
+// either name, and post by QMK's name.
+test("a switch key for text replacement is picked beside those for combos, found as autocorrect too, and posts by name", async ({page}) => {
     await openControls(page, "keys", {tab: "key", selected: 0});
     await page.locator('[data-act="pick"]').click();
     const picker = page.getByRole("dialog", {name: "Pick a keycode"});
     await picker.locator('[data-sec="other"]').click();
-    await expect(picker.locator('[data-pick="QK_AUTOCORRECT_ON"]')).toContainText("Autocorrect On");
-    await expect(picker.locator('[data-pick="QK_AUTOCORRECT_OFF"]')).toContainText("Autocorrect Off");
-    await expect(picker.locator('[data-pick="QK_AUTOCORRECT_TOGGLE"]')).toContainText("Toggle Autocorrect");
+    await expect(picker.locator('[data-pick="QK_AUTOCORRECT_ON"]')).toContainText("Text replacement On");
+    await expect(picker.locator('[data-pick="QK_AUTOCORRECT_OFF"]')).toContainText("Text replacement Off");
+    await expect(picker.locator('[data-pick="QK_AUTOCORRECT_TOGGLE"]')).toContainText("Toggle Text replacement");
+    // Searching for the keys' own name, or the feature's, finds all three.
+    for (const query of ["autocorrect", "text replacement", "AC_TOGG"]) {
+        await picker.locator("#pickerSearch").fill(query);
+        await expect(picker.locator('[data-pick="QK_AUTOCORRECT_TOGGLE"]')).toBeVisible();
+    }
+    await picker.locator("#pickerSearch").fill("");
+    await picker.locator('[data-sec="other"]').click();
     await clearPosts(page);
     await picker.locator('[data-pick="QK_AUTOCORRECT_TOGGLE"]').click();
     await picker.locator('[data-act="use"]').click();

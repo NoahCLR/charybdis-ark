@@ -25,12 +25,15 @@ function emptied(value) {
 }
 
 test("the bar is the bytes Apply writes, and each count is what its screen sets up", () => {
-    const value = pdDocument(), usage = profileUsage(snapshot(value), schema2);
+    const value = pdDocument(), usage = profileUsage(snapshot(value), {...schema2, maxAutocorrectTypos: 1024});
     assert.equal(usage.used, validateSnapshot(value).candidate.length);
     assert.equal(usage.capacity, 130048, "the size is the one the firmware advertises");
     assert.deepEqual(usage.counts.map(entry => entry.id),
-        ["behaviours", "behaviourSteps", "combos", "macros", "customKeys", "pointingModes", "lightingGroups", "lightingGroupRows"],
-        "in the order of Keymap's workbench tabs, then Lighting");
+        ["behaviours", "behaviourSteps", "combos", "macros", "autocorrectTyped", "customKeys", "pointingModes", "lightingGroups", "lightingGroupRows"],
+        "in the order of the rail's Configure screens, Keymap's tabs first, then Lighting's two");
+    assert.deepEqual(count(usage, "autocorrectTyped"), {id: "autocorrectTyped", used: validateSnapshot(value).autocorrect.entries.reduce((total, entry) => total + entry.typos.length, 0), limit: 1024},
+        "everything typed for a text replacement, against what the keyboard holds");
+    assert.ok(count(usage, "autocorrectTyped").used > 0, "the fixture's list is counted");
     const {behaviors, combos, pdModes, settings} = validateSnapshot(value);
     assert.deepEqual(count(usage, "behaviours"), {id: "behaviours", used: behaviors.rows.length, limit: 64});
     assert.deepEqual(count(usage, "behaviourSteps"), {id: "behaviourSteps", used: behaviors.populatedStepCount, limit: 128});

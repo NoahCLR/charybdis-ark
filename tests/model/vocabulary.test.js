@@ -12,7 +12,10 @@ const coversNumbers = (list, values, label) => assert.deepEqual(list.map(([id]) 
 
 test("every stored enum value has a word", () => {
     coversNumbers(VOCABULARY.macroProtection, require("../../core/schema/macro-payload").MACRO_PROTECTION, "macro protection");
-    coversNumbers(VOCABULARY.autocorrectMatches, require("../../core/schema/autocorrect-domain-v1").AUTOCORRECT_MATCH, "where an autocorrect typo matches");
+    // Where a typed form matches is written, not worded: with * where other
+    // letters may go, one way for each stored value.
+    assert.deepEqual(Object.values(require("../../core/schema/autocorrect-domain-v1").AUTOCORRECT_MATCH).map(match => require("../../core/model/autocorrect-list").typedForm({typo: "x", match})),
+        ["x", "x*", "*x", "*x*"], "where a text replacement's typed form matches");
     covers(VOCABULARY.holdStyles.hold, KEY_BEHAVIOR_HOLD_STYLES, "hold styles under Hold");
     covers(VOCABULARY.holdStyles.long, KEY_BEHAVIOR_HOLD_STYLES, "hold styles under Long hold");
     covers(VOCABULARY.holdWithoutLongHold, KEY_BEHAVIOR_HOLD_STYLES, "holds without a long hold");

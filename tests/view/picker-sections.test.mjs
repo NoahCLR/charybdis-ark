@@ -100,12 +100,17 @@ test("the switch keys for behaviours and auto-mouse are offered beside those for
     const switches = groups.find((group) => group.name === "Switch keys");
     assert.deepEqual(switches?.entries.map((entry) => [entry.value, entry.label]), [
         ["QK_COMBO_ON", "Combo On"], ["QK_COMBO_OFF", "Combo Off"], ["QK_COMBO_TOGGLE", "Toggle Combo"],
-        ["QK_AUTOCORRECT_ON", "Autocorrect On"], ["QK_AUTOCORRECT_OFF", "Autocorrect Off"], ["QK_AUTOCORRECT_TOGGLE", "Toggle Autocorrect"],
+        ["QK_AUTOCORRECT_ON", "Text replacement On"], ["QK_AUTOCORRECT_OFF", "Text replacement Off"], ["QK_AUTOCORRECT_TOGGLE", "Toggle Text replacement"],
         ["BH_ON", "Behaviours On"], ["BH_OFF", "Behaviours Off"], ["BH_TOGG", "Toggle Behaviours"],
         ["AM_ON", "Auto-mouse On"], ["AM_OFF", "Auto-mouse Off"], ["AM_TOGG", "Toggle Auto-mouse"],
     ]);
     assert.deepEqual(switches.entries.slice(6).map((entry) => entry.keycode), [0x7ee0, 0x7ee1, 0x7ee2, 0x7ef0, 0x7ef1, 0x7ef2]);
     assert.ok(switches.entries.every(pickable));
+    // QMK's keys for autocorrect are worded as the feature is here, and a
+    // search for either name finds them: their own name is in their help.
+    const replacement = switches.entries.slice(3, 6);
+    assert.ok(replacement.every((entry) => /text replacement \(autocorrect\)/.test(entry.tip) && entry.search.includes("autocorrect") && entry.search.includes("text replacement") && entry.aliases.some((alias) => alias.startsWith("AC_"))));
+    assert.deepEqual(switches.entries.slice(0, 3).map((entry) => entry.tip), [undefined, undefined, undefined], "the combo keys keep QMK's words");
 });
 
 test("a section's groups tell its keys apart by keycode, and a custom key by whether it has a name", () => {

@@ -8,8 +8,8 @@ const probe = process.argv[2], dir = process.argv[3], firmware = process.argv[4]
 const fixture = JSON.parse(fs.readFileSync(path.join(firmware, "tests/fixtures/autocorrect_domain_v1.json"), "utf8"));
 
 // The validator's reason numbers, as its field ids (autocorrect-domain.md).
-const REASONS = ["OK", "INVALID_ARGUMENT", "READ_ERROR", "INVALID_LENGTH", "CAPACITY_EXCEEDED", "INVALID_OFFSET", "INVALID_TEXT_LENGTH", "RESERVED", "INVALID_TEXT",
-    "ORDER", "INVALID_MATCH", "INVALID_REFERENCE", "FIRST_TYPO", "NOT_A_WORD", "NOT_FOLDED", "TYPO_IS_CORRECTION", "PART_INDEX"];
+const REASONS = ["OK", "INVALID_ARGUMENT", "READ_ERROR", "INVALID_LENGTH", "CAPACITY_EXCEEDED", "INVALID_OFFSET", "INVALID_TEXT_LENGTH", "INVALID_KIND", "INVALID_TEXT",
+    "ORDER", "INVALID_MATCH", "INVALID_REFERENCE", "FIRST_TYPO", "NOT_A_WORD", "NOT_FOLDED", "TYPO_IS_CORRECTION", "PART_INDEX", "INVALID_MACRO"];
 
 let runs = 0;
 // What the firmware makes of these bytes: its refusal, or the list as its
@@ -26,8 +26,9 @@ function firmwareReads(bytes) {
     }
     const parts = /** @type {string} */ (lines.at(-1)).split(" ").slice(1).map(Number);
     return {parts, typos: lines.slice(1, -1).map(line => {
+        // A macro correction is `m` and its slot; a text one its bytes.
         const [typo, match, correction] = line.split(" ");
-        return {typo: Buffer.from(typo, "hex").toString("utf8"), match: Number(match), correction: Buffer.from(correction, "hex").toString("utf8")};
+        return {typo: Buffer.from(typo, "hex").toString("utf8"), match: Number(match), ...(correction.startsWith("m") ? {macro: Number(correction.slice(1))} : {correction: Buffer.from(correction, "hex").toString("utf8")})};
     })};
 }
 // The same of Ark's decoder.
@@ -38,7 +39,7 @@ function arkReads(bytes) {
         const refusal = /** @type {{code: string, table?: number, row?: number}} */ (error);
         return {error: {code: refusal.code, table: refusal.table ?? null, row: refusal.row ?? null}};
     }
-    const typos = list.entries.flatMap(entry => entry.typos.map(typo => ({...typo, correction: entry.correction})))
+    const typos = list.entries.flatMap(entry => entry.typos.map(typo => ({...typo, ...(entry.macro === undefined ? {correction: entry.correction} : {macro: entry.macro})})))
         .sort((a, b) => Buffer.compare(Buffer.from(a.typo), Buffer.from(b.typo)));
     return {typos, parts: typos.flatMap((typo, row) => typo.match === AUTOCORRECT_MATCH.WHOLE_WORD ? [] : [row])};
 }
@@ -52,8 +53,8 @@ function agree(bytes, label) {
 }
 
 const match = /** @param {string} word */ word => fixture.matches.indexOf(word);
-/** @param {{correction: string, typos: {typo: string, match: string}[]}[]} entries */
-const listOf = entries => ({entries: entries.map(entry => ({correction: entry.correction, typos: entry.typos.map(typo => ({typo: typo.typo, match: match(typo.match)}))}))});
+/** @param {{correction?: string, macro?: number, typos: {typo: string, match: string}[]}[]} entries */
+const listOf = entries => ({entries: entries.map(entry => ({correction: entry.correction ?? "", ...(entry.macro === undefined ? {} : {macro: entry.macro}), typos: entry.typos.map(typo => ({typo: typo.typo, match: match(typo.match)}))}))});
 
 // The firmware's vectors: Ark encodes each valid one to its bytes, and both
 // sides judge every one alike, refusals by reason, table and row.
@@ -65,15 +66,34 @@ for (const vector of fixture.valid) {
 for (const vector of fixture.invalid) assert.deepEqual(agree(Buffer.from(vector.hex, "hex"), vector.name).error, vector.error, vector.name);
 
 // Lists Ark writes: every match, text outside ASCII, a typo folded by Ark,
-// and a list at every ceiling at once.
+// a correction of 128 bytes, macro corrections at both ends of the slots, and
+// a list at every ceiling at once.
 const folded = /** @type {string} */ (foldTypo("ÉCOLE"));
 const mixed = encodeAutocorrectDomain({entries: [
     {correction: "École", typos: [{typo: folded, match: 0}, {typo: "ecole", match: 1}]},
     {correction: "a lot", typos: [{typo: "alot", match: 0}]},
     {correction: "don't", typos: [{typo: "dont", match: 2}, {typo: "do'nt", match: 3}]},
     {correction: "Z", typos: [{typo: "zz", match: 0}]},
+    {correction: `+31 6 1234 5678 | ${"é".repeat(54)}!!`, typos: [{typo: "pnumber", match: 0}]},
+    {correction: "", macro: 127, typos: [{typo: "sig", match: 0}]},
+    {correction: "", macro: 0, typos: [{typo: "addr", match: 0}, {typo: "adres", match: 0}]},
 ]});
-assert.deepEqual(agree(mixed, "mixed").typos?.map(typo => typo.typo), ["alot", "do'nt", "dont", "ecole", "zz", "école"], "in byte order, as stored");
+const read = agree(mixed, "mixed");
+assert.deepEqual(read.typos?.map(typo => typo.typo), ["addr", "adres", "alot", "do'nt", "dont", "ecole", "pnumber", "sig", "zz", "école"], "in byte order, as stored");
+assert.deepEqual(read.typos?.filter(typo => "macro" in typo).map(typo => [typo.typo, typo.macro]), [["addr", 0], ["adres", 0], ["sig", 127]], "the firmware reads each macro correction's slot");
+assert.equal(Buffer.byteLength(/** @type {{correction: string}} */ (read.typos?.find(typo => typo.typo === "pnumber")).correction), AUTOCORRECT_DOMAIN_V1.CORRECTION_MAX, "and a correction at its full length");
+// What Ark's encoder refuses of a macro correction, the firmware refuses of the same bytes.
+/** @param {(bytes: Buffer) => void} change @param {string} code @param {string} label */
+const macroRefused = (change, code, label) => {
+    const bytes = encodeAutocorrectDomain({entries: [{correction: "the", typos: [{typo: "teh", match: 0}]}, {correction: "", macro: 5, typos: [{typo: "sig", match: 0}]}]});
+    change(bytes);
+    assert.equal(agree(bytes, label).error?.code, code, label);
+};
+// Rows: the header's 8 bytes, the text correction's row at 8, the macro's at 14, then the typos' at 20 and 26.
+macroRefused(bytes => bytes.writeUInt16LE(AUTOCORRECT_DOMAIN_V1.MACRO_SLOTS, 14), "INVALID_MACRO", "a macro slot past the slots");
+macroRefused(bytes => {bytes[17] = 2;}, "INVALID_KIND", "a kind that is neither");
+macroRefused(bytes => {bytes[16] = 1;}, "INVALID_TEXT_LENGTH", "a macro with a text length");
+macroRefused(bytes => {bytes[23] = 1;}, "INVALID_MATCH", "a macro's typo matched at the start of a word");
 const {MAX_CORRECTIONS, MAX_TYPOS, MAX_TEXT_BYTES, MAX_SIZE} = AUTOCORRECT_DOMAIN_V1;
 const text = MAX_TEXT_BYTES / (MAX_CORRECTIONS + MAX_TYPOS);
 /** @param {string} lead @param {number} index */

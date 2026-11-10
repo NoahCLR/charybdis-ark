@@ -210,16 +210,18 @@ switch is keeping it off, with no branches or timing, since none of them run.
 
 A **switch key** on the keyboard turns behaviours, combos,
 [auto-mouse](pointing.md#pointer-settings) or
-[autocorrect](autocorrect.md#turning-it-on-and-off) on or off for the whole
+[text replacement](text-replacement.md#turning-it-on-and-off) on or off for the whole
 keyboard until it restarts: **Behaviours On**, **Behaviours Off** and **Toggle
 Behaviours** (`BH_ON`, `BH_OFF`, `BH_TOGG`), QMK's **Combo On**, **Combo Off**
 and **Toggle Combo** (`CM_ON`, `CM_OFF`, `CM_TOGG`), **Auto-mouse On**,
 **Auto-mouse Off** and **Toggle Auto-mouse** (`AM_ON`, `AM_OFF`, `AM_TOGG`),
-and QMK's **Autocorrect On**, **Autocorrect Off** and **Toggle Autocorrect**
-(`AC_ON`, `AC_OFF`, `AC_TOGG`).
+and **Text replacement On**, **Text replacement Off** and **Toggle Text
+replacement**, which are QMK's autocorrect keys (`AC_ON`, `AC_OFF`,
+`AC_TOGG`).
 Nothing is saved, and the switches in Ark stay as they are. That is why each
 switch, the **Enabled** of Behaviour settings and Combo settings, Pointer
-settings' **Auto-mouse** and Autocorrect's **Correct typos as I type**, says
+settings' **Auto-mouse** and the **Enabled** of Host settings' **Text
+replacement**, says
 **↺ keyboard keys change this too**. When a
 switch key has turned one off while Ark has it on, its settings mark it
 **turned off by key**. Nothing else says so: the board, the Key tab, the hover

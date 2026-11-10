@@ -150,11 +150,13 @@ const optionLabels = [
     ["swapRightControlGui", "Swap right Control and GUI", "Exchange the right Control and GUI modifier actions across all layers.", "Modifiers"],
     ["oneshot", "One-shot modifiers and layers", "Allow one-shot modifier and layer keys to affect the next key after they are released.", "Typing"],
     ["swapEscapeCaps", "Swap Escape and Caps Lock", "Exchange the Escape and Caps Lock key actions across all layers.", "Keys"],
-    ["autocorrect", "Correct typos as I type", "The keyboard fixes the typos on the list below when a word ends. Off, it types every word as you typed it and keeps the list.", "Typing"],
+    ["autocorrect", "Enabled", "The keyboard fixes typos and types your replacements when you finish a word. Off, it types every word as you typed it and keeps your list.", "Typing"],
 ];
-// Autocorrect's switch is a key option the keyboard stores with the others
-// (option 12, firmware settings-domain.md). It is drawn on the Autocorrect
-// screen, as a section of its own, beside the list it turns on.
+// Text replacement's switch (autocorrect, in the keyboard's names) is a key
+// option the keyboard stores with the others (option 12, firmware
+// settings-domain.md). It has a section of its own on the Host screen, since
+// replacements are typed through the host layout chosen there; the list it
+// turns on is the Text replacement screen's.
 const AUTOCORRECT_SWITCH = "autocorrect";
 // Which bits of its settings word a field owns: one flag, a shifted byte or
 // nibble, or the whole word. Reading, writing and putting a field back to the
@@ -268,7 +270,7 @@ function settingsSections(snapshot, settings) {
         keyOptions.filter(field => field.macro !== AUTOCORRECT_SWITCH)});
     // Its switch keys override it until the keyboard restarts (switchedByKeys),
     // so it is no longer a "Typing" option among the swaps.
-    result.push({id: "autocorrect", area: AREA.autocorrect, label: SECTION.autocorrect, fields:
+    result.push({id: "autocorrect", area: AREA.settings, label: SECTION.autocorrect, screenLink: {label: "Edit replacements", screen: "autocorrect"}, fields:
         keyOptions.filter(field => field.macro === AUTOCORRECT_SWITCH).map(({part, tooltip, ...field}) => switchedByKeys({...field, hint: field.hint || tooltip}, "autocorrect"))});
     /** @param {number} id */
     const label = id => VOCABULARY.hostOs.find(([value]) => value === id)?.[1] || "Unknown";

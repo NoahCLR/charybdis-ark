@@ -54,9 +54,10 @@ const UNIT = Object.freeze({
     comboTiming: "comboTiming",
     /** @param {number} index */
     macro: index => `macro:${index}`,
-    // An autocorrect entry by its correction as the keyboard spells it (or
-    // as the draft does, for one the keyboard lacks), and with it the
-    // draft's spelling when the entry was respelled.
+    // A text replacement entry by its key (its replacement's text, or a
+    // macro replacement's key; core/schema/autocorrect-domain-v1.js entryKey)
+    // as the keyboard has it, or as the draft does for one the keyboard
+    // lacks, and with it the draft's key when its replacement changed.
     /** @param {string} correction @param {string} [respelled] */
     autocorrect: (correction, respelled) => `autocorrect:${JSON.stringify(respelled === undefined ? [correction] : [correction, respelled])}`,
     /** @param {number} index */

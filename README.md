@@ -3,7 +3,7 @@
 Ark is the web editor for
 [Noah's Charybdis 4x6 firmware](https://github.com/NoahCLR/charybdis-4x6),
 and works only with that firmware. Once a keyboard is connected, Ark reads
-its profile: keymap, behaviours, combos, macros, autocorrect, trackball and
+its profile: keymap, behaviours, combos, macros, text replacement, trackball and
 lighting. In the default edit mode, a change runs on the keyboard from the
 next keypress and can be tried in real typing before it is saved.
 
@@ -143,18 +143,21 @@ character it can't type says which one and isn't kept.
   <sub>Command+Space added as a chord, then <code>notes</code> and Enter recorded, and the macro named Open Notes.</sub>
 </p>
 
-### Autocorrect
+### Text replacement
 
-List the typos you make and the keyboard fixes them as you finish a word, on
-any computer. An entry is one correction with every way you mistype it, so
-"because" is written once for `becuase`, `becasue` and `beacuse`. A typo
-matches the whole word unless it is set to match the start, the end or any
-part of one. Ark checks each entry as it is typed, refuses one the computer's
-layout can't type, and marks the ones that would misfire. A starter list of
-common English typos is one click away, and a list comes in from, and goes
-out to, QMK's text format, a spreadsheet's CSV or JSON. **Try it** shows what
-the keyboard would do with a sentence before anything is saved, and a key on
-the keyboard switches autocorrect off for a password or a terminal.
+The keyboard replaces what you type as you finish a word, on any computer:
+it fixes a typo, types longer text for you, or plays a macro. A replacement
+is written once with everything you type for it, so "because" stands for
+`becuase`, `becasue` and `beacuse`, and `pnumber` types your phone number.
+What you type is a whole word unless you add `*` where other letters may go:
+`recieve*` also fixes "recieved". A replacement is a line of text up to 128
+bytes, or one of your macros for anything longer. Ark checks each entry as
+it is typed, refuses one the computer's layout can't type, and marks the
+ones that would misfire. Fixes for common English typos are one click away,
+and a list comes in from, and goes out to, QMK's autocorrect format, a
+spreadsheet's CSV or JSON. **Try it** shows what the keyboard would do with a
+sentence before anything is saved, and a key on the keyboard switches it off
+for a password or a terminal.
 
 ### Pointing modes
 
@@ -297,7 +300,7 @@ The [Ark guide](docs/guide/README.md) has a page per screen:
 - [Behaviours](docs/guide/behaviours.md)
 - [Combos](docs/guide/combos.md)
 - [Macros](docs/guide/macros.md)
-- [Autocorrect](docs/guide/autocorrect.md)
+- [Text replacement](docs/guide/text-replacement.md)
 - [Pointing](docs/guide/pointing.md)
 - [Lighting](docs/guide/lighting.md)
 - [Edit modes and Review](docs/guide/review-and-save.md)

@@ -3,7 +3,7 @@ const {test} = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const {AUTOCORRECT_DOMAIN_V1, AUTOCORRECT_MATCH, encodeAutocorrectDomain, decodeAutocorrectDomain, autocorrectDomainSize, foldTypo, typoProblem, correctionProblem} = require("../../core/schema/autocorrect-domain-v1");
+const {AUTOCORRECT_DOMAIN_V1, AUTOCORRECT_KIND, AUTOCORRECT_MATCH, entryKey, entryOfKey, encodeAutocorrectDomain, decodeAutocorrectDomain, autocorrectDomainSize, foldTypo, typoProblem, correctionProblem} = require("../../core/schema/autocorrect-domain-v1");
 const {decodeProfileBlob} = require("../../core/schema/profile-blob-v1");
 const fixture = require("../../upstream/firmware/tests/fixtures/autocorrect_domain_v1.json");
 
@@ -13,15 +13,17 @@ const fixtureDomain = name => {
     return decodeProfileBlob(Buffer.from(/** @type {RegExpMatchArray} */ (text.match(/^profile\.hex=(.+)$/m))[1], "hex")).domains.find(domain => domain.id === 0x80);
 };
 const reject = (fn, code) => assert.throws(fn, error => error.code === code, code);
-// The fixture's entries, their matches as the stored numbers.
-const listOf = entries => ({entries: entries.map(entry => ({correction: entry.correction, typos: entry.typos.map(({typo, match}) => ({typo, match: fixture.matches.indexOf(match)}))}))});
+// The fixture's entries, their matches as the stored numbers; a macro entry
+// names its slot and has no text.
+const listOf = entries => ({entries: entries.map(entry => ({correction: entry.correction ?? "", ...(entry.macro === undefined ? {} : {macro: entry.macro}),
+    typos: entry.typos.map(({typo, match}) => ({typo, match: fixture.matches.indexOf(match)}))}))});
 // Entries compared whatever order they are written in.
 const sorted = list => list.entries.map(entry => ({...entry, typos: entry.typos.slice().sort((a, b) => Buffer.compare(Buffer.from(a.typo), Buffer.from(b.typo)))}))
-    .sort((a, b) => Buffer.compare(Buffer.from(a.correction), Buffer.from(b.correction)));
+    .sort((a, b) => Buffer.compare(Buffer.from(entryKey(a)), Buffer.from(entryKey(b))));
 
 test("the ceilings and the match numbers are the firmware's", () => {
-    assert.deepEqual({corrections: AUTOCORRECT_DOMAIN_V1.MAX_CORRECTIONS, typos: AUTOCORRECT_DOMAIN_V1.MAX_TYPOS, bytesPerText: AUTOCORRECT_DOMAIN_V1.TEXT_MAX,
-        textBytes: AUTOCORRECT_DOMAIN_V1.MAX_TEXT_BYTES, domainBytes: AUTOCORRECT_DOMAIN_V1.MAX_SIZE}, fixture.ceilings);
+    assert.deepEqual({corrections: AUTOCORRECT_DOMAIN_V1.MAX_CORRECTIONS, typos: AUTOCORRECT_DOMAIN_V1.MAX_TYPOS, bytesPerTypo: AUTOCORRECT_DOMAIN_V1.TEXT_MAX,
+        bytesPerCorrection: AUTOCORRECT_DOMAIN_V1.CORRECTION_MAX, macroSlots: AUTOCORRECT_DOMAIN_V1.MACRO_SLOTS, textBytes: AUTOCORRECT_DOMAIN_V1.MAX_TEXT_BYTES, domainBytes: AUTOCORRECT_DOMAIN_V1.MAX_SIZE}, fixture.ceilings);
     assert.deepEqual([AUTOCORRECT_MATCH.WHOLE_WORD, AUTOCORRECT_MATCH.START, AUTOCORRECT_MATCH.END, AUTOCORRECT_MATCH.ANYWHERE],
         ["whole word", "start of word", "end of word", "anywhere"].map(word => fixture.matches.indexOf(word)));
 });
@@ -43,6 +45,21 @@ test("a decoded list is in the stored order: corrections by their bytes, each wi
     assert.deepEqual(list.entries.map(entry => entry.correction), ["a lot", "because", "café", "doesn't", "iPhone", "ment", "the", "thing", "un", "über"]);
     assert.deepEqual(list.entries[1].typos, [{typo: "beacuse", match: 0}, {typo: "becasue", match: 0}, {typo: "becuase", match: 0}]);
     assert.deepEqual(list.entries[7].typos, [{typo: "tihng", match: 3}]);
+});
+
+test("a replacement of 128 bytes and macro replacements decode as written: text first, then macros by slot", () => {
+    const long = decodeAutocorrectDomain(Buffer.from(fixture.valid.find(vector => vector.name === "long").hex, "hex"));
+    assert.equal(Buffer.byteLength(long.entries.find(entry => entry.typos[0].typo === "sigoff").correction), AUTOCORRECT_DOMAIN_V1.CORRECTION_MAX);
+    const macros = decodeAutocorrectDomain(Buffer.from(fixture.valid.find(vector => vector.name === "macros").hex, "hex"));
+    assert.deepEqual(macros.entries, [
+        {correction: "sam@example.com", typos: [{typo: "myemail", match: 0}]},
+        {correction: "the", typos: [{typo: "teh", match: 0}]},
+        {correction: "", macro: 3, typos: [{typo: "addr", match: 0}, {typo: "adres", match: 0}]},
+        {correction: "", macro: 127, typos: [{typo: "sigfull", match: 0}]},
+    ]);
+    assert.deepEqual([AUTOCORRECT_KIND.TEXT, AUTOCORRECT_KIND.MACRO], [0, 1]);
+    // An entry's key tells a macro from any text, and reads back.
+    assert.deepEqual(macros.entries.map(entry => entryOfKey(entryKey(entry))), [{correction: "sam@example.com"}, {correction: "the"}, {macro: 3}, {macro: 127}]);
 });
 
 test("every invalid vector is refused with the firmware's reason, table and row", () => {
@@ -74,7 +91,16 @@ test("the encoder refuses what the keyboard would, by the keyboard's reason", ()
     reject(() => encodeAutocorrectDomain({entries: [{correction: "the", typos: []}]}), "FIRST_TYPO");
     reject(() => encodeAutocorrectDomain(one("", "teh")), "INVALID_TEXT_LENGTH");
     reject(() => encodeAutocorrectDomain(one("the", "")), "INVALID_TEXT_LENGTH");
-    reject(() => encodeAutocorrectDomain(one("a".repeat(33), "teh")), "INVALID_TEXT_LENGTH");
+    reject(() => encodeAutocorrectDomain(one("a".repeat(129), "teh")), "INVALID_TEXT_LENGTH");
+    assert.doesNotThrow(() => encodeAutocorrectDomain(one("a".repeat(128), "teh")));
+    reject(() => encodeAutocorrectDomain(one("the", "a".repeat(33))), "INVALID_TEXT_LENGTH");
+    const plays = (macro, typo, match = 0, correction = "") => ({entries: [{correction, macro, typos: [{typo, match}]}]});
+    reject(() => encodeAutocorrectDomain(plays(128, "sig")), "INVALID_MACRO");
+    reject(() => encodeAutocorrectDomain(plays(-1, "sig")), "INVALID_MACRO");
+    reject(() => encodeAutocorrectDomain(plays(3, "sig", 1)), "INVALID_MATCH");
+    reject(() => encodeAutocorrectDomain(plays(3, "sig", 0, "both")), "INVALID_TEXT_LENGTH");
+    reject(() => encodeAutocorrectDomain({entries: [...plays(3, "sig").entries, ...plays(3, "sgi").entries]}), "ORDER");
+    assert.doesNotThrow(() => encodeAutocorrectDomain(plays(0, "sig")));
     reject(() => encodeAutocorrectDomain(one("the", "é".repeat(17))), "INVALID_TEXT_LENGTH");
     reject(() => encodeAutocorrectDomain(one("the\u0007", "teh")), "INVALID_TEXT");
     reject(() => encodeAutocorrectDomain(one("the", "Teh")), "NOT_FOLDED");
@@ -113,5 +139,9 @@ test("a typo is folded with the firmware's table, and what cannot be one says wh
     assert.equal(correctionProblem("a lot"), null);
     assert.equal(correctionProblem("")?.code, "INVALID_TEXT_LENGTH");
     assert.equal(correctionProblem("a\tb")?.code, "INVALID_TEXT");
+    assert.equal(correctionProblem("+31 6 1234 5678, sam@example.com!"), null);
+    assert.equal(correctionProblem("é".repeat(64)), null);
+    assert.equal(correctionProblem("é".repeat(65))?.code, "INVALID_TEXT_LENGTH");
+    assert.equal(correctionProblem("two\nlines")?.code, "INVALID_TEXT");
     assert.equal(correctionProblem("\ud800")?.code, "INVALID_TEXT");
 });

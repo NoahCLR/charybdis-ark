@@ -36,9 +36,9 @@ The fixed linked prefix runs from the bank's start to `__heap_base__`: all of
 `.data` and `.bss`. The largest static claims in it are the working copy,
 `runtime_working_bytes`, one slot payload (130,048 bytes,
 `NOAH_PROFILE_PAYLOAD_MAX`) of `.bss` (D-F32,
-[`0032`](https://github.com/NoahCLR/charybdis-4x6/blob/3d13219524187e2c879ba09b7108716279d42a5b/docs/adr/0032-live-edits-working-copy-and-save.md)); QMK's RAM mirror
+[`0032`](https://github.com/NoahCLR/charybdis-4x6/blob/e28ffca6f293c122d3be25c219caa222905073a3/docs/adr/0032-live-edits-working-copy-and-save.md)); QMK's RAM mirror
 of the 4 KiB logical EEPROM (D-F31,
-[`0031`](https://github.com/NoahCLR/charybdis-4x6/blob/3d13219524187e2c879ba09b7108716279d42a5b/docs/adr/0031-via-is-not-supported.md)); and the split slave thread's
+[`0031`](https://github.com/NoahCLR/charybdis-4x6/blob/e28ffca6f293c122d3be25c219caa222905073a3/docs/adr/0031-via-is-not-supported.md)); and the split slave thread's
 1,200-byte working area. The working copy is static, never allocated, so the
 core-memory span says exactly what is left. No RAM copy of a profile slot
 exists: slots are read in place through XIP.
@@ -117,14 +117,15 @@ engineering regression policies, not SRAM limits:
 | Split reconciler | 1,024 | `NOAH_PROFILE_SPLIT_RECONCILER_STATE_BUDGET_32BIT` |
 | Active-profile provider | 784 | `NOAH_ACTIVE_PROFILE_PROVIDER_STATE_BUDGET_32BIT` |
 | Active-profile key-behaviour runtime | 768 | `NOAH_ACTIVE_PROFILE_KEY_BEHAVIOR_RUNTIME_STATE_BUDGET_32BIT` |
-| Whole-profile validator | 400 | `NOAH_PROFILE_VALIDATOR_V1_EMBEDDED_STATE_BUDGET` |
+| Whole-profile validator | 416 | `NOAH_PROFILE_VALIDATOR_V1_EMBEDDED_STATE_BUDGET` |
 | Profile store | 384 | `NOAH_PROFILE_STORE_STATE_BUDGET_32BIT` |
 | Other-half store | 256 | `NOAH_PROFILE_OTHER_HALF_STORE_STATE_BUDGET_32BIT` |
 | Active-profile lighting runtime / frame | 192 / 80 | `NOAH_ACTIVE_PROFILE_RGB_RUNTIME_STATE_BUDGET_32BIT`, `NOAH_ACTIVE_PROFILE_RGB_FRAME_BUDGET_32BIT` |
 | Split authority | 128 | `NOAH_PROFILE_SPLIT_AUTHORITY_STATE_BUDGET_32BIT` |
 | Key-behaviour domain handle / its validation | 128 / 128 | `key_behavior_domain_v1.c`, `NOAH_KEY_BEHAVIOR_DOMAIN_V1_EMBEDDED_VALIDATION_BUDGET` |
-| Autocorrect list handle / its validation (D-F68) | 24 / 64 | `NOAH_PROFILE_AUTOCORRECT_V1_EMBEDDED_LIST_BUDGET`, `NOAH_PROFILE_AUTOCORRECT_V1_EMBEDDED_VALIDATION_BUDGET` |
-| Autocorrect: the word, the keys shown and live, and the queue of 64 changes (D-F69) | 304 | `NOAH_AUTOCORRECT_EMBEDDED_STATE_BUDGET` |
+| Autocorrect list handle / its validation, which holds one 128-byte correction (D-F68) | 24 / 160 | `NOAH_PROFILE_AUTOCORRECT_V1_EMBEDDED_LIST_BUDGET`, `NOAH_PROFILE_AUTOCORRECT_V1_EMBEDDED_VALIDATION_BUDGET` |
+| Autocorrect: the word, the keys shown and live, and the queue of 240 changes (D-F69) | 656 | `NOAH_AUTOCORRECT_EMBEDDED_STATE_BUDGET` |
+| Autocorrect: the scan's workspace for one correction of 128 bytes (D-F69) | 704 | `NOAH_AUTOCORRECT_EMBEDDED_WORK_BUDGET` |
 | Lighting domain view / its validation | 40 / 72 | `NOAH_PROFILE_RGB_V1_EMBEDDED_VIEW_BUDGET`, `NOAH_PROFILE_RGB_V1_EMBEDDED_VALIDATION_BUDGET` |
 | Lighting row selectors, one byte per group row (D-F63) | 656 | `rgb_active_profile_config.c` |
 | Lighting render snapshot | 96 | `rgb_runtime.c` |
@@ -158,7 +159,8 @@ The keyboard-report filters end the deepest of these paths, so they keep
 nothing large on the stack: their working copies of a report's usages are
 static, and the typing stage only queues what changed there. Autocorrect's
 lookup and its starts each keep their workspace in a frame of their own
-below the matrix scan (D-F69).
+below the matrix scan, and the correction being worked on, which may be 128
+bytes, in static workspace (D-F69).
 
 A PASS covers the named paths only. It is not a global or interrupt-stack
 maximum and not a measured high-water: the sums start at `main` and leave out
@@ -186,7 +188,7 @@ the budgets against the real ELF only in a resource build.
 `tests/host/run_firmware_stack_budget_checks.sh` and
 `tests/host/run_live_profile_owner_stack_budget_checks.sh` check a plain
 `qmk compile` image, which leaves out the live-profile owner (D-F35,
-[`0035`](https://github.com/NoahCLR/charybdis-4x6/blob/3d13219524187e2c879ba09b7108716279d42a5b/docs/adr/0035-live-profile-owner-on-by-default.md)) and is not the
+[`0035`](https://github.com/NoahCLR/charybdis-4x6/blob/e28ffca6f293c122d3be25c219caa222905073a3/docs/adr/0035-live-profile-owner-on-by-default.md)) and is not the
 firmware anyone flashes.
 
 ## Flash
@@ -196,7 +198,7 @@ The firmware image must end below 1 MiB: the link fails if it reaches
 (`users/noah/lib/compat/qmk_profile_flash.ld`). The two 128 KiB slots, QMK's
 8 KiB wear-leveling backing at the top of the assumed 2 MiB, the slot record,
 the flash pauses and every profile ceiling (D-F14,
-[`0014`](https://github.com/NoahCLR/charybdis-4x6/blob/3d13219524187e2c879ba09b7108716279d42a5b/docs/adr/0014-bigger-profiles.md)) are in
+[`0014`](https://github.com/NoahCLR/charybdis-4x6/blob/e28ffca6f293c122d3be25c219caa222905073a3/docs/adr/0014-bigger-profiles.md)) are in
 [the device-resident profile](device-resident-profile.md#where-the-profile-is-stored).
 
 Held by: `tests/host/run_profile_storage_layout_tests.sh` (the linker guard

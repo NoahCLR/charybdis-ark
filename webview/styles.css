@@ -2293,47 +2293,112 @@ details > summary { list-style: none; }
 .flash-pauses { table-layout: fixed; }
 .flash-pauses th:first-child { width: 40%; }
 
-/* Autocorrect: one column, the Add form over the list. An entry is a row,
-   its correction then its typos as chips; the open one is edited in place. */
-.pad.autocorrect { max-width: 980px; }
-.ac-add-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto auto; gap: var(--sp-3); align-items: end; }
-.ac-list .card-h .search { width: 180px; min-width: 0; }
-.ac-rows { display: grid; gap: var(--sp-0); }
-.ac-row { display: grid; grid-template-columns: minmax(120px, 220px) auto minmax(0, 1fr); gap: var(--sp-3); align-items: center; width: 100%; text-align: left;
-  padding: var(--sp-2) var(--sp-3); border: 1px solid transparent; border-radius: var(--r-control); background: none; color: var(--text); font: inherit; cursor: pointer; }
-.ac-row:hover { background: var(--surface-2); }
-.ac-row.warn .ac-correction, .ac-chip.warn { color: var(--warning); }
+/* Text replacement: the list is the screen, with Try it beside it where
+   there is room and folded under it where there is not. An entry is a row,
+   its replacement then what is typed for it as chips; a row is edited in
+   place, a typed form in a panel under its chip. */
+.pad.autocorrect { position: relative; max-width: 1280px; }
+.ac-layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: var(--sp-4); align-items: start; }
+.ac-list { min-width: 0; }
+.ac-toolbar { flex-wrap: wrap; row-gap: var(--sp-2); }
+.ac-toolbar .right { flex-wrap: wrap; row-gap: var(--sp-2); }
+.ac-toolbar .search { width: 170px; min-width: 0; }
+.ac-export { position: relative; }
+.ac-menu { position: absolute; z-index: var(--z-popover); top: calc(100% + var(--sp-1)); right: 0; min-width: 140px; display: grid; padding: var(--sp-1);
+  border: 1px solid var(--line-2); border-radius: var(--r-control); background: var(--surface-3); box-shadow: var(--shadow); }
+.ac-menu-item { padding: var(--sp-2); border-radius: var(--r-control); text-align: left; font-size: var(--fs-md); }
+.ac-menu-item:hover, .ac-menu-item:focus-visible { background: var(--surface-2); }
+.ac-file-status { padding: var(--sp-2) var(--sp-4) 0; color: var(--warning); }
+/* Two columns, the same in the heads, the rows and the row being added. */
+.ac-heads, .ac-row { display: grid; grid-template-columns: minmax(140px, 2fr) minmax(0, 3fr) var(--h-chip); column-gap: var(--sp-4); }
+.ac-heads { padding: var(--sp-3) var(--sp-4) var(--sp-1); font-size: var(--fs-xs); font-weight: var(--fw-label); letter-spacing: .1em; text-transform: uppercase; color: var(--text-3); }
+.ac-rows { display: grid; padding: 0 var(--sp-2) var(--sp-2); }
+.ac-row { align-items: start; row-gap: var(--sp-2); padding: var(--sp-2); border: 1px solid transparent; border-radius: var(--r-control); }
+.ac-row + .ac-row { border-top-color: var(--line); border-top-left-radius: 0; border-top-right-radius: 0; }
+.ac-row:hover, .ac-row:focus-within { background: var(--surface-2); }
+.ac-rep { min-width: 0; display: grid; gap: var(--sp-1); justify-items: start; }
+.ac-rep-text { max-width: 100%; min-height: var(--h-chip); display: inline-flex; align-items: center; gap: var(--sp-2); padding: 0 var(--sp-1); margin-left: calc(-1 * var(--sp-1));
+  border-radius: var(--r-chip); text-align: left; font-weight: var(--fw-strong); color: var(--text); cursor: text; }
+.ac-rep-text:hover:where(:not([disabled])), .ac-rep-text:focus-visible { background: var(--surface-3); }
+.ac-rep-text:disabled { cursor: default; }
+.ac-rep-words { overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.ac-row.warn .ac-rep-words, .ac-chip.warn { color: var(--warning); }
+.ac-rep-edit, .ac-row.adding .ac-rep { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); width: 100%; }
+.ac-rep-field { flex: 1 1 160px; min-width: 0; }
+.ac-rep-edit > .note, .ac-rep-edit > [data-ac-feedback] { flex-basis: 100%; }
+.ac-typed { position: relative; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1); }
+button.chip { cursor: pointer; }
+.ac-chip:hover:where(button), .ac-chip[aria-expanded="true"] { border-color: var(--line-3); background: var(--surface-3); color: var(--text); }
 .ac-chip.warn { border-color: color-mix(in srgb, var(--warning) 55%, var(--line)); }
-.ac-chip.found, .ac-typo.found .input.mono { border-color: var(--line-3); background: var(--surface-3); color: var(--text); }
-.ac-correction { font-weight: var(--fw-strong); overflow-wrap: anywhere; }
-.ac-arrow { color: var(--text-3); }
-.ac-typos { display: flex; flex-wrap: wrap; gap: var(--sp-1); min-width: 0; }
-.ac-where { color: var(--text-3); font-size: var(--fs-xs); }
-.ac-row.open { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sp-3); cursor: default; border-color: var(--line-2); background: var(--surface-2); padding: var(--sp-3); }
-.ac-open-h { display: flex; align-items: end; gap: var(--sp-3); }
-.ac-open-h > .field { flex: 1 1 auto; max-width: 320px; }
-.ac-open-h > .right { margin-left: auto; display: flex; gap: var(--sp-2); }
-.ac-typo-rows { display: grid; gap: var(--sp-2); }
-.ac-typo { display: grid; grid-template-columns: minmax(0, 170px) auto minmax(0, 150px) auto; gap: var(--sp-2); align-items: center; }
-.ac-typo > .note { grid-column: 1 / -1; }
+.ac-chip.found { border-color: var(--line-3); background: var(--surface-3); color: var(--text); }
+.ac-more { border-style: dashed; background: none; color: var(--text-3); opacity: 0; }
+.ac-row:hover .ac-more, .ac-row:focus-within .ac-more, .ac-more:focus-visible { opacity: 1; }
+.ac-more:hover:where(:not([disabled])) { color: var(--text); border-color: var(--line-3); }
+.ac-more-input.input { width: 190px; height: var(--h-chip); }
+.ac-more-hint, .ac-typed > [data-ac-feedback] { flex-basis: 100%; }
+.ac-delete { opacity: 0; }
+.ac-row:hover .ac-delete, .ac-row:focus-within .ac-delete, .ac-delete:focus-visible { opacity: 1; }
 .ac-warning { color: var(--warning); }
-.ac-try .card-h .right { display: flex; align-items: center; gap: var(--sp-3); }
-.ac-try-box.input { height: auto; min-height: 76px; padding: var(--sp-3); resize: vertical; white-space: pre-wrap; overflow-wrap: anywhere; }
-.ac-row.fired { border-color: var(--line-3); background: var(--surface-2); }
-.ac-chip.fired, .ac-typo.fired .input.mono { border-color: var(--text); color: var(--text); }
 .ac-notice { color: var(--warning); }
-@media (max-width: 760px) {
-  .ac-add-row, .ac-typo { grid-template-columns: minmax(0, 1fr); }
-  .ac-row { grid-template-columns: minmax(0, 1fr); }
-  .ac-arrow { display: none; }
-}
-.ac-files-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); }
-.ac-export { margin-left: auto; display: inline-flex; align-items: center; gap: var(--sp-2); }
-.ac-file-status { flex-basis: 100%; }
-.pad.autocorrect.drag-over .ac-files { border-color: var(--text); background: var(--surface-2); }
+.ac-none { padding: var(--sp-4) var(--sp-2); }
+/* A typed form's panel, under its row's chips. */
+.ac-pop { position: absolute; z-index: var(--z-popover); top: calc(100% + var(--sp-1)); left: 0; width: min(340px, calc(100vw - 2 * var(--window-room))); display: grid; gap: var(--sp-3);
+  padding: var(--sp-3); border: 1px solid var(--line-2); border-radius: var(--r-card); background: var(--surface-3); box-shadow: var(--shadow-panel); }
+.ac-pop-foot { display: flex; justify-content: space-between; gap: var(--sp-2); }
+/* The row a replacement is added in: its own border, a field of chips. */
+.ac-row.adding { margin-top: var(--sp-2); border-color: var(--line-3); background: var(--surface-2); padding: var(--sp-3); grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.ac-row.adding + .ac-row { border-top-color: transparent; }
+.ac-tokens { flex: 1 1 auto; min-height: var(--h-control); display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1); padding: var(--sp-1);
+  border: 1px solid var(--line-2); border-radius: var(--r-control); background: var(--surface-2); cursor: text; }
+.ac-tokens:focus-within { border-color: var(--line-3); background: var(--surface-3); }
+.ac-token-input.input { flex: 1 1 150px; min-width: 0; height: var(--h-chip); padding: 0 var(--sp-1); border: 0; background: none; }
+.ac-token-input.input:focus-visible { outline: none; }
+.ac-tokens:has(.ac-token-input:focus-visible) { outline: 2px solid var(--focus); outline-offset: 2px; }
+.ac-chip.token { background: var(--surface-3); color: var(--text); padding-right: var(--sp-1); }
+.ac-token-x { width: var(--h-tiny); height: var(--h-tiny); border-radius: var(--r-chip); color: var(--text-3); line-height: 1; }
+.ac-token-x:hover:where(:not([disabled])), .ac-token-x:focus-visible { background: var(--surface-2); color: var(--text); }
+.ac-add-foot { grid-column: 1 / -1; display: grid; gap: var(--sp-2); }
+.ac-add-actions { display: flex; gap: var(--sp-2); }
+.ac-empty { margin: var(--sp-4) var(--sp-2) var(--sp-2); display: grid; gap: var(--sp-2); justify-items: start; }
+.ac-empty h4 { font-size: var(--fs-base); }
+.ac-empty .note { max-width: 62ch; }
+.ac-empty-actions { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-top: var(--sp-2); }
+.ac-memory { padding: var(--sp-3) var(--sp-4) var(--sp-4); border-top: 1px solid var(--line); }
+.ac-memory .meter-note { font-variant-numeric: tabular-nums; }
+/* Try it: beside the list, staying in view as the list scrolls. */
+.ac-try { position: sticky; top: var(--sp-5); }
+.ac-try-fold { display: none; }
+.ac-try-box.input { height: auto; min-height: 76px; padding: var(--sp-3); resize: vertical; white-space: pre-wrap; overflow-wrap: anywhere; }
+.ac-try-tools { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); }
+.ac-row.fired { border-color: var(--line-3); background: var(--surface-2); }
+.ac-chip.fired { border-color: var(--text); color: var(--text); }
+/* A file dragged over the screen: the whole of it says where it will go. */
+.ac-drop { display: none; position: absolute; inset: var(--sp-3); z-index: var(--z-sticky); align-items: center; justify-content: center; pointer-events: none;
+  border: 2px dashed var(--line-3); border-radius: var(--r-card); background: color-mix(in srgb, var(--bg) 82%, transparent); font-size: var(--fs-lg); color: var(--text); }
+.pad.autocorrect.drag-over .ac-drop { display: flex; }
 .ac-import { border-color: var(--line-3); }
 .ac-import-ways { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-5); align-items: start; }
 .ac-import-ways section { display: grid; gap: var(--sp-2); justify-items: start; }
 .ac-import-lines { margin: 0; padding-left: var(--sp-4); display: grid; gap: var(--sp-1); font-size: var(--fs-md); }
 .ac-names { display: flex; flex-wrap: wrap; gap: var(--sp-0) var(--sp-2); color: var(--text-2); font-size: var(--fs-sm); }
-@media (max-width: 760px) { .ac-import-ways { grid-template-columns: minmax(0, 1fr); } }
+.settings-link { padding-top: 0; }
+@media (max-width: 1100px) {
+  .ac-layout { grid-template-columns: minmax(0, 1fr); }
+  .ac-try { position: static; }
+  .ac-try .ac-try-title { display: none; }
+  .ac-try-fold { display: flex; align-items: center; gap: var(--sp-2); width: 100%; text-align: left; }
+  .ac-try-fold::before { content: "›"; color: var(--text-3); }
+  .ac-try-fold[aria-expanded="true"]::before { content: "⌄"; }
+  .ac-try:has(.ac-try-body.folded) .card-h { border-bottom: 0; }
+  .ac-try-body.folded { display: none; }
+}
+@media (max-width: 760px) {
+  .ac-import-ways { grid-template-columns: minmax(0, 1fr); }
+  .ac-heads { display: none; }
+  .ac-row { grid-template-columns: minmax(0, 1fr) var(--h-chip); }
+  .ac-row > .ac-rep { grid-column: 1; }
+  .ac-row > .ac-typed { grid-column: 1; grid-row: 2; }
+  .ac-row > .ac-delete { grid-column: 2; grid-row: 1; }
+  .ac-more, .ac-delete { opacity: 1; }
+  .ac-toolbar .search { width: 100%; flex: 1 1 100%; }
+}

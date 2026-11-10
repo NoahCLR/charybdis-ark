@@ -11,15 +11,16 @@ import {vocabulary} from "./vocabulary.mjs";
 // The Settings group of the rail, a screen per subject, each drawing its
 // sections open in the order a person reads them: where behaviours run and
 // what a key press feels like; combos and the layers they match on; how
-// the trackball moves the pointer; the computer the keyboard is plugged into
-// and the keyboard-wide swaps. Combos also holds the combo timing, saved
+// the trackball moves the pointer; the computer the keyboard is plugged into,
+// text replacement, which types through that computer's layout, and the
+// keyboard-wide swaps. Combos also holds the combo timing, saved
 // with the combos. Default layers is on none: moving the base layer covers
 // it, and the keyboard's stored value is kept as it is.
 export const SETTINGS_SCREENS = Object.freeze({
     behaviours: Object.freeze(["behaviorSettings", "keyTiming"]),
     combos: Object.freeze(["comboSettings", "comboReferences"]),
     pointer: Object.freeze(["normalPointerSpeed", "sniping", "autoMouse"]),
-    host: Object.freeze(["host", "keyboardOptions"]),
+    host: Object.freeze(["host", "autocorrect", "keyboardOptions"]),
 });
 /** @typedef {keyof typeof SETTINGS_SCREENS} SettingsScreen */
 
@@ -69,15 +70,6 @@ export function sectionPath(model, id) {
     const screen = screenOfSection(id), words = vocabulary(model);
     return [screen && words.settingsScreens[screen], words.settingsSections[id]].filter(Boolean).join(" → ");
 }
-
-// Autocorrect's switch is a settings section no Settings screen draws: it
-// heads the Autocorrect screen, above the list it turns on.
-export const AUTOCORRECT_SECTION = "autocorrect";
-
-// The screen a section is edited on: a Settings screen, or Autocorrect for
-// its switch; null for one with no editor of its own.
-/** @param {string | null | undefined} id @returns {SettingsScreen | "autocorrect" | null} */
-export const editorScreenOf = (id) => id === AUTOCORRECT_SECTION ? "autocorrect" : screenOfSection(id);
 
 // A section's one-per-layer switches are one setting to a person, drawn as
 // one row of layers.

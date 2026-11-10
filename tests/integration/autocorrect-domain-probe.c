@@ -7,8 +7,9 @@
 // "valid", or "invalid CODE TABLE ROW" in the validator's numbers (TABLE 255
 // and ROW 65535 for none). For a valid list it then prints every typo as the
 // runtime reads it, a line each in row order: the typo's bytes in hex, its
-// match, and its correction's bytes in hex; then the part-of-word typos'
-// rows, as the part index lists them.
+// match, and its correction, a text correction's bytes in hex or `m` and the
+// slot of a macro one; then the part-of-word typos' rows, as the part index
+// lists them.
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -48,14 +49,21 @@ int main(int argc, char **argv) {
     assert(noah_profile_autocorrect_v1_open(&list, &reader, offset, length));
     for (uint16_t row = 0; row < list.typos; row++) {
         noah_profile_autocorrect_v1_typo_t typo, found;
-        uint8_t text[NOAH_PROFILE_AUTOCORRECT_V1_TEXT_MAX], correction[NOAH_PROFILE_AUTOCORRECT_V1_TEXT_MAX], correction_length;
+        noah_profile_autocorrect_v1_correction_t correction;
+        uint8_t text[NOAH_PROFILE_AUTOCORRECT_V1_TEXT_MAX], replacement[NOAH_PROFILE_AUTOCORRECT_V1_CORRECTION_MAX];
         assert(noah_profile_autocorrect_v1_typo_at(&list, row, &typo, text));
-        assert(noah_profile_autocorrect_v1_correction(&list, typo.correction, correction, &correction_length));
+        assert(noah_profile_autocorrect_v1_correction(&list, typo.correction, &correction, replacement));
         // The binary search the engine uses finds every typo by its bytes.
         assert(noah_profile_autocorrect_v1_find(&list, text, typo.length, &found) && found.index == row);
         hex(text, typo.length);
         printf(" %u ", (unsigned)typo.match);
-        hex(correction, correction_length);
+        if (correction.kind == NOAH_PROFILE_AUTOCORRECT_V1_KIND_MACRO) {
+            // A macro plays for the whole word only, and has no text.
+            assert(typo.match == NOAH_PROFILE_AUTOCORRECT_V1_MATCH_WHOLE_WORD && correction.length == 0u);
+            printf("m%u", (unsigned)correction.macro);
+        } else {
+            hex(replacement, correction.length);
+        }
         putchar('\n');
     }
     printf("parts");

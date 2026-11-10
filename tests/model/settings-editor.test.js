@@ -79,8 +79,8 @@ test("every section names the screen it is edited on, and the pointer's own sett
     const stages = Object.fromEntries(settingsEditorView(snapshot()).sections.map(section => [section.id, section.stage]));
     assert.deepEqual([stages.automouseFade, stages.rgbAppearance, stages.lightingFeedback, stages.lightingPower], ["auto", "base", "key", undefined],
         "a section is edited on its stage; All lighting darkens every stage, so it has none");
-    assert.deepEqual(Object.keys(areas).filter(id => areas[id] === "Autocorrect"), ["autocorrect"], "its switch heads the Autocorrect screen");
-    assert.ok(Object.values(areas).every(area => ["Pointer", "Lighting", "Autocorrect", "Settings"].includes(area)), "a section with no area of its own is a Settings one");
+    assert.equal(areas.autocorrect, "Settings", "text replacement's switch is a Settings one, as every switch is; its list is its own screen's");
+    assert.ok(Object.values(areas).every(area => ["Pointer", "Lighting", "Settings"].includes(area)), "a section with no area of its own is a Settings one");
 });
 
 test("every field edits a stored value the schema names, within what the keyboard accepts", () => {
@@ -370,15 +370,17 @@ test("the behaviour, combo and auto-mouse switches say keyboard keys change them
     assert.equal(sections.flatMap(section => section.fields).filter(field => field.offSwitch).length, 3, "no other field is a global switch before the key options are read");
 });
 
-// Autocorrect's switch is key option 12, stored with the swaps (firmware
-// settings-domain.md) and drawn on the Autocorrect screen: a section of its
-// own under Autocorrect, edited through the keyboard's own mask.
-test("the autocorrect switch is its own section under Autocorrect, and edits only its key option", () => {
+// Text replacement's switch (autocorrect, to the keyboard) is key option 12,
+// stored with the swaps (firmware settings-domain.md) and drawn on the Host
+// screen as a section of its own (D-L87), edited through the keyboard's own
+// mask.
+test("the text replacement switch is a Settings section of its own, linked to the screen that holds its list, and edits only its key option", () => {
     const current = withSettings(settings => {settings.values[24] = 0x0004;});
     const sections = settingsEditorView(current).sections;
     const section = sections.find(({id}) => id === "autocorrect");
-    assert.equal(section.area, "Autocorrect");
-    assert.deepEqual(section.fields.map(field => [field.macro, field.kind, field.enabled, Boolean(field.readOnly)]), [["autocorrect", "toggle", false, false]]);
+    assert.deepEqual([section.area, section.label, section.screenLink], ["Settings", "Text replacement", {label: "Edit replacements", screen: "autocorrect"}]);
+    assert.deepEqual(section.fields.map(field => [field.macro, field.kind, field.label, field.enabled, Boolean(field.readOnly)]), [["autocorrect", "toggle", "Enabled", false, false]]);
+    assert.match(section.fields[0].hint, /fixes typos and types your replacements when you finish a word/);
     // AC_ON, AC_OFF and AC_TOGG override it until the keyboard restarts
     // (firmware D-F66), so it says so and names its switch.
     assert.deepEqual([section.fields[0].keyboardKeys, section.fields[0].offSwitch], [true, "autocorrect"]);

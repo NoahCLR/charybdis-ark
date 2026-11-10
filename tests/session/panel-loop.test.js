@@ -457,11 +457,15 @@ test("an autocorrect edit is checked against the draft without staging it: its r
     const ask = (edit, extra = {}) => loop.handleMessage({type: "validateAutocorrect", edit, requestId: 41, draftId: draft.id, draftRevision: revision, ...extra});
     await ask({type: "addAutocorrectTypos", correction: "then", typos: [{typo: "tehn"}]});
     assert.deepEqual(last(shell), {type: "autocorrectValidation", requestId: 41, draftId: draft.id, draftRevision: revision, validation: {error: "", code: "", warnings: []}});
-    await ask({type: "addAutocorrectTypos", correction: "no", typos: [{typo: "on", match: 2}]});
+    await ask({type: "addAutocorrectTypos", correction: "no", typos: [{typo: "*on"}]});
     assert.equal(last(shell).validation.error, "");
-    assert.match(last(shell).validation.warnings[0], /shorter than four letters/);
+    assert.deepEqual(last(shell).validation.warnings, ["“*on” is a short typed form with *, so it fires inside many words."]);
     await ask({type: "addAutocorrectTypos", correction: "ten", typos: [{typo: "teh"}]});
-    assert.deepEqual(last(shell).validation, {error: "“teh” already corrects to “the”.", code: "AUTOCORRECT_EDIT_REFUSED", warnings: []});
+    assert.deepEqual(last(shell).validation, {error: "“teh” is already typed for “the”.", code: "AUTOCORRECT_EDIT_REFUSED", warnings: []});
+    await ask({type: "addAutocorrectTypos", correction: "then", typos: [{typo: "te*hn"}]});
+    assert.match(last(shell).validation.error, /has \* where it cannot go/);
+    await ask({type: "addAutocorrectTypos", macro: 5, typos: [{typo: "sig"}]});
+    assert.equal(last(shell).validation.error, "", "a replacement may play a macro");
     await ask({type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "KC_A"}]});
     assert.ok(last(shell).validation.error, "only an autocorrect edit is checked here");
     for (const stale of [{draftId: "old"}, {draftRevision: revision - 1}]) {
@@ -481,7 +485,7 @@ test("text is tried against the draft's autocorrect list without staging anythin
     const draft = loop.session.draft, before = structuredClone(draft.document), revision = draft.revision;
     const bound = {draftId: draft.id, draftRevision: revision};
     await loop.handleMessage({type: "tryAutocorrect", requestId: 9, before: "", typed: "Teh ", capsLock: false, ...bound});
-    assert.deepEqual(last(shell), {type: "autocorrectTry", requestId: 9, ...bound, result: {text: "The ", fired: [{correction: "the", typo: "teh"}], undone: false}});
+    assert.deepEqual(last(shell), {type: "autocorrectTry", requestId: 9, ...bound, result: {text: "The ", fired: [{entry: "the", correction: "the", typo: "teh"}], undone: false}});
     await loop.handleMessage({type: "tryAutocorrect", requestId: 10, before: "", typed: "Teh \b", capsLock: false, ...bound});
     assert.deepEqual(last(shell).result, {text: "Teh", fired: [], undone: true});
     await loop.handleMessage({type: "tryAutocorrect", requestId: 11, before: "", typed: 7, capsLock: false, ...bound});
@@ -504,22 +508,22 @@ test("an autocorrect list file is read and judged against the draft without stag
     assert.deepEqual({type: reply.type, requestId: reply.requestId, name: reply.name, draftId: reply.draftId, draftRevision: reply.draftRevision, error: reply.error},
         {type: "autocorrectImportPreview", requestId: 5, name: "mine.txt", ...bound, error: undefined});
     assert.equal(reply.preview.format, "txt");
-    assert.deepEqual(reply.preview.add.newCorrections, [{correction: "then", typos: ["tehn"]}]);
-    assert.deepEqual(reply.preview.add.refused.map(row => row.reason), ["It has no “->” between a typo and its correction.", "“teh” already corrects to “the”."]);
-    assert.equal(reply.preview.replace.corrections, 2);
+    assert.deepEqual(reply.preview.add.newReplacements, [{label: "then", typed: ["tehn"]}]);
+    assert.deepEqual(reply.preview.add.refused.map(row => row.reason), ["It has no “->” between what is typed and its replacement.", "“teh” is already typed for “the”."]);
+    assert.equal(reply.preview.replace.replacements, 2);
     // The chooser's file, as the shell hands it over; none chosen answers with no preview.
-    chosen = {text: "typos,correction\ntehn,then\n", name: "sheet.csv"};
+    chosen = {text: "replacement,typed\nthen,tehn then*\n", name: "sheet.csv"};
     await loop.handleMessage({type: "chooseAutocorrectFile", requestId: 6, ...bound});
-    assert.deepEqual([last(shell).name, last(shell).preview.format, last(shell).preview.entries], ["sheet.csv", "csv", [{correction: "then", typos: [{typo: "tehn", match: 0}]}]]);
+    assert.deepEqual([last(shell).name, last(shell).preview.format, last(shell).preview.entries], ["sheet.csv", "csv", [{correction: "then", typos: [{typo: "tehn"}, {typo: "then*"}]}]]);
     chosen = undefined;
     await loop.handleMessage({type: "chooseAutocorrectFile", requestId: 7, ...bound});
     assert.deepEqual(last(shell), {type: "autocorrectImportPreview", requestId: 7, name: "", ...bound});
     await loop.handleMessage({type: "previewAutocorrectImport", requestId: 8, starter: true, ...bound});
     assert.deepEqual([last(shell).preview.format, last(shell).preview.add.refused.length], ["starter", 0]);
-    assert.ok(last(shell).preview.add.newCorrections.length > 150);
+    assert.ok(last(shell).preview.add.newReplacements.length > 150);
     // A file that is no list, and a stale draft, answer with why.
     await loop.handleMessage({type: "previewAutocorrectImport", requestId: 9, text: "{nope", name: "x.json", ...bound});
-    assert.deepEqual([last(shell).error, last(shell).preview], ["This file is not a valid autocorrect list.", undefined]);
+    assert.deepEqual([last(shell).error, last(shell).preview], ["This file is not a valid text replacement list.", undefined]);
     await loop.handleMessage({type: "previewAutocorrectImport", requestId: 10, text: "a -> b", name: "x.txt", draftId: draft.id, draftRevision: revision - 1});
     assert.ok(last(shell).error);
     assert.deepEqual(draft.document, before);
@@ -541,9 +545,9 @@ test("the draft's autocorrect list is exported as a file in the format asked for
     for (const format of ["txt", "csv", "json"]) {
         await loop.handleMessage({type: "exportAutocorrect", format});
         const file = shell.exports.at(-1);
-        assert.match(file.fileName, new RegExp(`^charybdis-autocorrect-\\d{4}-\\d\\d-\\d\\d\\.${format}$`));
+        assert.match(file.fileName, new RegExp(`^charybdis-text-replacements-\\d{4}-\\d\\d-\\d\\d\\.${format}$`));
         assert.match(file.text, /tehn/, "the draft's list, the edit not yet saved included");
-        assert.equal(last(shell).notice, `Autocorrect list exported to /exports/${file.fileName}`);
+        assert.equal(last(shell).notice, `Text replacement list exported to /exports/${file.fileName}`);
     }
     await loop.handleMessage({type: "exportAutocorrect", format: "xml"});
     assert.match(last(shell).notice, /^Failed: Choose a text, CSV or JSON file\./);

@@ -43,10 +43,11 @@ export const SCREENS = Object.freeze({
         icon: '<svg viewBox="0 0 16 16"><rect x="3" y="5" width="10" height="8.5" rx="2"/><path d="M8 5V2.8M1.5 8v2.5M14.5 8v2.5"/><g fill="currentColor" stroke="none"><circle cx="8" cy="2.2" r="1.1"/><circle cx="6" cy="9" r="1.05"/><circle cx="10" cy="9" r="1.05"/></g></svg>',
         available: configureReady, render: renderers => renderers.screenMacros(),
     }),
-    // A word struck through and set right: a line of text, a stroke across
-    // it and a tick beside it.
+    // Text replacement (its id stays the keyboard's name for it,
+    // autocorrect). A word struck through and set right: a line of text, a
+    // stroke across it and a tick beside it.
     autocorrect: screen({
-        label: "Autocorrect", group: "Configure", keepOnPublish: true,
+        label: "Text replacement", group: "Configure", keepOnPublish: true,
         icon: '<svg viewBox="0 0 16 16" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5.5h8M2 10.5h5.5M3.5 3.5l5 4"/><path d="M9.5 10.8l1.8 1.8 3.2-4"/></svg>',
         available: configureReady, render: renderers => renderers.screenAutocorrect(),
     }),

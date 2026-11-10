@@ -10,7 +10,7 @@ const MATCH_OF = {"whole word": MATCH.WHOLE_WORD, "start of word": MATCH.START, 
 const US = {layout: US_HOST_LAYOUT};
 const list = (...entries) => ({entries: entries.map(([correction, ...typos]) => ({correction, typos: typos.map(typo => typeof typo === "string" ? {typo, match: MATCH.WHOLE_WORD} : {typo: typo[0], match: typo[1]})}))});
 // A fixture case's list as the codec's model, and its layout by slug.
-const listOf = entries => ({entries: entries.map(entry => ({correction: entry.correction, typos: entry.typos.map(typo => {
+const listOf = entries => ({entries: entries.map(entry => ({correction: entry.correction ?? "", ...(entry.macro === undefined ? {} : {macro: entry.macro}), typos: entry.typos.map(typo => {
     assert.ok(typo.match in MATCH_OF, `the fixture's match ${typo.match}`);
     return {typo: typo.typo, match: MATCH_OF[typo.match]};
 })}))});
@@ -37,12 +37,14 @@ test("the firmware's behaviour fixture is the version this matcher reads, and ev
     assert.ok(text.length >= 39, "the text cases are run");
     for (const entry of skipped) assert.ok(KEYBOARD_ONLY.includes(entry.keyboardOnly), `${entry.name} is skipped for a reason this test does not know: ${entry.keyboardOnly}`);
     assert.deepEqual([...new Set(skipped.map(entry => entry.keyboardOnly))].sort(), [...KEYBOARD_ONLY].sort(), "every reason listed here still skips a case");
-    for (const rule of [1, 2, 3, 4, 5, 6, 7, 9]) assert.ok(text.some(entry => entry.rule === rule), `rule ${rule} has a text case`);
+    for (const rule of [1, 2, 3, 4, 5, 6, 7, 9, 10]) assert.ok(text.some(entry => entry.rule === rule), `rule ${rule} has a text case`);
 });
 
 for (const entry of text) {
     test(`fixture ${entry.name} (rule ${entry.rule}): ${entry.description}`, () => {
-        const result = typedText(listOf(entry.list), hostOf(entry.layout), entry.capsLock, entry.screen).text;
+        // A case's stored macros type text; a slot it leaves out is empty.
+        const macros = slot => entry.macros?.[slot] === undefined ? null : {text: entry.macros[slot]};
+        const result = typedText(listOf(entry.list), hostOf(entry.layout), entry.capsLock, entry.screen, "", macros).text;
         if (entry.result !== undefined) assert.equal(result, entry.result);
         else assert.ok(result.endsWith(entry.resultEndsWith), `${JSON.stringify(result)} ends with ${JSON.stringify(entry.resultEndsWith)}`);
     });
@@ -51,20 +53,36 @@ for (const entry of skipped) test(`fixture ${entry.name} needs the keyboard: ${e
 
 test("what fired is reported in order, and an undone correction is not", () => {
     const value = list(["the", "teh", "hte"], ["thing", ["tihng", MATCH.ANYWHERE]]);
-    assert.deepEqual(typedText(value, US, false, "hte sometihng teh").fired, [{correction: "the", typo: "hte"}, {correction: "thing", typo: "tihng"}]);
+    assert.deepEqual(typedText(value, US, false, "hte sometihng teh").fired, [{entry: "the", correction: "the", typo: "hte"}, {entry: "thing", correction: "thing", typo: "tihng"}]);
     assert.deepEqual(typedText(value, US, false, "teh \b").fired, []);
-    assert.deepEqual(typedText(value, US, false, "teh hte \b").fired, [{correction: "the", typo: "teh"}]);
+    assert.deepEqual(typedText(value, US, false, "teh hte \b").fired, [{entry: "the", correction: "the", typo: "teh"}]);
     assert.equal(typedText(value, US, false, "teh hte \b").undone, true);
     assert.equal(typedText(value, US, false, "teh hte \bx").undone, false, "only while the word stands as it was put back");
 });
 
-test("a word past 32 characters is left alone, and a correction past 48 key strokes is passed over", () => {
+test("a macro replacement names its slot, plays only what can play, and shows nothing for a macro that is more than text", () => {
+    const value = {entries: [{correction: "", macro: 5, typos: [{typo: "sig", match: MATCH.WHOLE_WORD}]}, {correction: "the", typos: [{typo: "teh", match: MATCH.WHOLE_WORD}]}]};
+    const typed = typedText(value, US, false, "sig teh ", "", slot => slot === 5 ? {text: "Kind regards"} : null);
+    assert.equal(typed.text, "Kind regards the ");
+    assert.deepEqual(typed.fired, [{entry: "\u0001macro:5", correction: "", typo: "sig", macro: 5}, {entry: "the", correction: "the", typo: "teh"}]);
+    // A macro of keys and waits has no text to show: the typed form goes.
+    assert.equal(typedText(value, US, false, "sig ", "", () => ({text: null})).text, " ");
+    // Without its macro, and by default, the typed form stays.
+    assert.equal(typedText(value, US, false, "sig ", "", () => null).text, "sig ");
+    assert.equal(typedText(value, US, false, "sig ").text, "sig ");
+    // No undo: Backspace takes the ending character only.
+    assert.equal(typedText(value, US, false, "sig \b", "", () => ({text: "Kind regards"})).undone, false);
+});
+
+test("a word past 32 characters is left alone, and the longest replacement is typed", () => {
     const long = "a".repeat(29);
     const value = list(["thing", ["tihng", MATCH.ANYWHERE]], ["b".repeat(30), "c".repeat(30)]);
     assert.equal(typedText(value, US, false, `${long}tih `).text, `${long}tih `);
     assert.equal(typedText(value, US, false, `${"a".repeat(27)}tihng `).text, `${"a".repeat(27)}thing `);
     assert.equal(typedText(value, US, false, `${"a".repeat(28)}tihng `).text, `${"a".repeat(28)}tihng `, "the 33rd character suspends the word");
-    assert.equal(typedText(value, US, false, `${"c".repeat(30)} `).text, `${"c".repeat(30)} `, "30 erased and 30 typed is 60 strokes");
+    assert.equal(typedText(value, US, false, `${"c".repeat(30)} `).text, `${"b".repeat(30)} `, "30 erased and 30 typed is 60 of the 288 strokes a replacement may take");
+    const longest = list(["x".repeat(128), "y".repeat(32)]);
+    assert.equal(typedText(longest, US, false, `${"y".repeat(32)} `).text, `${"x".repeat(128)} `, "32 erased and 128 typed");
 });
 
 test("the longest typo is counted in characters, and a typo the host cannot type gives way to the next", () => {

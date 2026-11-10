@@ -62,6 +62,7 @@ function compiledOnlyPages() {
     autocorrect.writeUInt16LE(30000, 4);
     autocorrect.writeUInt32LE(40000, 6);
     autocorrect[10] = 32;
+    autocorrect[11] = 128;
     return [identity, capacity, wide, autocorrect];
 }
 
@@ -151,6 +152,7 @@ test("JavaScript consumes the same golden reports as the C firmware codec", () =
         autocorrectTextBytes: 20480,
         autocorrectBytes: 70001,
         autocorrectTextMax: 32,
+        autocorrectCorrectionMax: 128,
         supportedDomainMask: 3,
         nameMaxBytes: 32,
         layerMaskBits: 32,
@@ -207,7 +209,7 @@ test("capability pages decode the bigger profile's capacities", () => {
     assert.equal(decoded.profileSlotPayload, 131040);
     assert.equal(decoded.profileSlotSize, 131072);
     assert.equal(decoded.macroBytes, 70000);
-    assert.deepEqual([decoded.maxAutocorrectCorrections, decoded.maxAutocorrectTypos, decoded.autocorrectTextBytes, decoded.autocorrectBytes, decoded.autocorrectTextMax], [1000, 2000, 30000, 40000, 32]);
+    assert.deepEqual([decoded.maxAutocorrectCorrections, decoded.maxAutocorrectTypos, decoded.autocorrectTextBytes, decoded.autocorrectBytes, decoded.autocorrectTextMax, decoded.autocorrectCorrectionMax], [1000, 2000, 30000, 40000, 32, 128]);
     assert.equal(decoded.nameMaxBytes, 32);
     assert.equal(decoded.placementPositions, 60);
     // Profile Wire 1's layouts 1 and 2 are refused, so is any later one.
@@ -217,7 +219,7 @@ test("capability pages decode the bigger profile's capacities", () => {
         assert.throws(() => decodeCapabilityPages(older), (error) => error.code === "INCOMPATIBLE_RESPONSE" && /Update both halves/.test(error.message));
     }
     // The bytes past each page's fields stay zero.
-    for (const [page, offset] of [[1, 16], [1, 24], [2, 20], [2, 24], [3, 11], [3, 24]]) {
+    for (const [page, offset] of [[1, 16], [1, 24], [2, 20], [2, 24], [3, 12], [3, 24]]) {
         const bytes = compiledOnlyPages().map((value) => Buffer.from(value));
         bytes[page][offset] = 1;
         assert.throws(() => decodeCapabilityPages(bytes), (error) => error.code === "NONCANONICAL_RESPONSE", `page ${page} byte ${offset}`);
@@ -243,7 +245,7 @@ test("patterned capability vectors decode every semantic field exactly", () => {
     wide.writeUInt32LE(0x0002fff0, 10);
     wide.writeUInt32LE(0x00010203, 14);
     const autocorrect = Buffer.alloc(25);
-    autocorrect.set([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b], 0);
+    autocorrect.set([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c], 0);
     assert.deepEqual(decodeCapabilityPages([identity, capacity, wide, autocorrect]), {
         responseVersion: 3,
         protocol: {major: 2, minor: 7},
@@ -283,6 +285,7 @@ test("patterned capability vectors decode every semantic field exactly", () => {
         autocorrectTextBytes: 0x0605,
         autocorrectBytes: 0x0a090807,
         autocorrectTextMax: 0x0b,
+        autocorrectCorrectionMax: 0x0c,
     });
     // Firmware D-F63 reports the total on page 2 bytes 18-19; page 1 byte 7
     // is then one table's.

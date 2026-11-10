@@ -97,11 +97,6 @@ test("the webview refuses an autocorrect list file over core's limit in core's w
     assert.deepEqual([[...LIST_FILE_FORMATS], LIST_FILE_MAX_BYTES, LIST_FILE_TOO_LARGE], [[...AUTOCORRECT_FILE_FORMATS], IMPORT_MAX_BYTES, IMPORT_TOO_LARGE]);
 });
 
-test("the webview's whole-word match is the number the autocorrect list stores", async () => {
-    const {WHOLE_WORD} = await import("../../webview/view/autocorrect.mjs");
-    assert.equal(WHOLE_WORD, require("../../core/schema/autocorrect-domain-v1").AUTOCORRECT_MATCH.WHOLE_WORD);
-});
-
 test("the webview's layer-lock block is the keyboard's", () => {
     const {LAYER_LOCK_BASE: base, LAYER_LOCK_SLOTS} = require("../../core/data/user-keycodes");
     assert.deepEqual([LAYER_LOCK_BASE, LOCK_SLOTS], [base, LAYER_LOCK_SLOTS]);

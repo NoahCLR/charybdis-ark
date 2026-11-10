@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {createRequire} from "node:module";
-import {AUTOCORRECT_SECTION, SETTINGS_SCREENS, editorScreenOf, fieldParts, screenOfSection, sectionPath, sectionsIn, sectionsOn, settingGoverns} from "../../webview/view/settings-layout.mjs";
+import {SETTINGS_SCREENS, fieldParts, screenOfSection, sectionPath, sectionsIn, sectionsOn, settingGoverns} from "../../webview/view/settings-layout.mjs";
 
 const require = createRequire(import.meta.url);
 const {publishedModel} = require("../fixtures/published-model");
@@ -18,7 +18,7 @@ test("each Settings screen draws its sections in the order a person reads them",
     assert.deepEqual(ids("behaviours"), ["behaviorSettings", "keyTiming"], "where behaviours run, then Tap & hold timing");
     assert.deepEqual(ids("combos"), ["comboSettings", "comboReferences"], "Combos, then Combo layer matching");
     assert.deepEqual(ids("pointer"), ["normalPointerSpeed", "sniping", "autoMouse"], "everything filed under Pointer");
-    assert.deepEqual(ids("host"), ["host", "keyboardOptions"], "Your computer, then Key swaps & typing");
+    assert.deepEqual(ids("host"), ["host", "autocorrect", "keyboardOptions"], "Your computer, Text replacement, which types through its layout, then Key swaps & typing");
     assert.deepEqual(sectionsOn(sections, "keys"), [], "a screen that is not a Settings one draws none");
 });
 
@@ -58,12 +58,11 @@ test("a section is edited on the screen that draws it", () => {
     assert.equal(screenOfSection("startupLayers"), null, "Default layers has no editor");
     assert.equal(screenOfSection("lightingPower"), null, "Lighting draws its own");
     assert.equal(screenOfSection(undefined), null);
-    // Autocorrect's switch is on no Settings screen: its own screen draws it.
-    assert.equal(screenOfSection(AUTOCORRECT_SECTION), null);
-    assert.equal(editorScreenOf(AUTOCORRECT_SECTION), "autocorrect");
-    assert.equal(editorScreenOf("autoMouse"), "pointer");
-    assert.equal(editorScreenOf("startupLayers"), null);
-    assert.equal(byId(AUTOCORRECT_SECTION).area, "Autocorrect", "core files it under Autocorrect by the same id");
+    // Text replacement's switch is a Host setting, as every switch is a
+    // Settings screen's (D-L87): no section is edited anywhere else.
+    assert.equal(screenOfSection("autocorrect"), "host");
+    assert.equal(byId("autocorrect").area, "Settings", "core files it under Settings by the same id");
+    assert.deepEqual(byId("autocorrect").screenLink, {label: "Edit replacements", screen: "autocorrect"}, "and links to the screen that holds its list");
 });
 
 test("Key swaps & typing lists its fields under what they change", () => {

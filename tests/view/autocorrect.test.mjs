@@ -1,56 +1,86 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {AUTOCORRECT_SORTS, autocorrectRows, countWords, importLines, matchWords, triedAfter, triedWords, usageShare} from "../../webview/view/autocorrect.mjs";
+import {AUTOCORRECT_SORTS, addedReplacement, autocorrectRows, countWords, importLines, joinedEntry, macroLabel, memoryWords, replacementLabel, replacementOf, switchedOff, triedAfter, triedWords, typedTokens, usageShare} from "../../webview/view/autocorrect.mjs";
 
-const entry = (correction, ...typos) => ({correction, warnings: [], typos: typos.map((typo) => ({typo: Array.isArray(typo) ? typo[0] : typo, match: Array.isArray(typo) ? typo[1] : 0, warnings: []}))});
-const view = {entries: [entry("the", "teh", "hte"), entry("because", "becuase", "becasue", "beacuse"), entry("iPhone", "iphone"), entry("Äpfel", "aepfel"), entry("thing", ["tihng", 3])]};
-const shown = (options) => autocorrectRows(view, options).map((row) => row.entry.correction);
+// An entry as core publishes it: a replacement's text, or a number for the
+// macro slot it plays, then what is typed for it as it is written.
+const STAR = {"x": 0, "x*": 1, "*x": 2, "*x*": 3};
+const entry = (correction, ...typed) => ({...(typeof correction === "number" ? {id: `\u0001macro:${correction}`, correction: "", macro: correction} : {id: correction, correction}), warnings: [],
+    typos: typed.map((form) => ({typo: form.replace(/\*/g, ""), typed: form, match: STAR[form.replace(/[^*]+/, "x")], warnings: []}))});
+const view = {entries: [entry("the", "teh", "hte"), entry("because", "becuase", "becasue", "beacuse"), entry("iPhone", "iphone"), entry("Äpfel", "aepfel"), entry("thing", "*tihng*"), entry(5, "sig"), entry(2, "addr", "adres", "adress")]};
+const macros = [{defaultName: "Macro 0"}, {defaultName: "Macro 1"}, {name: "Address", defaultName: "Macro 2"}, {defaultName: "Macro 3"}, {defaultName: "Macro 4"}, {name: "", defaultName: "Macro 5"}];
+const shown = (options) => autocorrectRows(view, {macros, ...options}).map((row) => replacementLabel(row.entry, macros));
 
-test("the list is shown by correction as a dictionary orders words, or the most typos first", () => {
-    assert.deepEqual(AUTOCORRECT_SORTS, ["correction", "typos"]);
-    assert.deepEqual(shown(), ["Äpfel", "because", "iPhone", "the", "thing"]);
-    assert.deepEqual(shown({sort: "typos"}), ["because", "the", "Äpfel", "iPhone", "thing"]);
+test("the list is shown by replacement as a dictionary orders words, a macro by its name, or the most typed first", () => {
+    assert.deepEqual(AUTOCORRECT_SORTS, ["replacement", "typed"]);
+    assert.deepEqual(shown(), ["Address", "Äpfel", "because", "iPhone", "Macro 5", "the", "thing"]);
+    assert.deepEqual(shown({sort: "typed"}), ["Address", "because", "the", "Äpfel", "iPhone", "Macro 5", "thing"]);
     assert.deepEqual(autocorrectRows(null), []);
 });
 
-test("a search matches a correction or a typo, whatever its case, and names the typos it found", () => {
+test("a search matches a replacement, a macro's name or something typed, whatever its case, and names what it found typed", () => {
     assert.deepEqual(shown({query: " THE "}), ["the"]);
-    assert.deepEqual(autocorrectRows(view, {query: "iph"}), [{entry: view.entries[2], found: []}], "a correction that matches is not opened for its typos");
-    assert.deepEqual(autocorrectRows(view, {query: "bec"}).map((row) => row.found), [[]]);
-    assert.deepEqual(autocorrectRows(view, {query: "casue"}), [{entry: view.entries[1], found: ["becasue"]}]);
-    assert.deepEqual(autocorrectRows(view, {query: "te"}).map((row) => [row.entry.correction, row.found]), [["the", ["teh", "hte"]]]);
+    assert.deepEqual(autocorrectRows(view, {query: "iph", macros}), [{entry: view.entries[2], found: []}], "a replacement that matches marks nothing typed");
+    assert.deepEqual(autocorrectRows(view, {query: "bec", macros}).map((row) => row.found), [[]]);
+    assert.deepEqual(autocorrectRows(view, {query: "casue", macros}), [{entry: view.entries[1], found: ["becasue"]}], "something typed shows the replacement it is typed for");
+    assert.deepEqual(autocorrectRows(view, {query: "te", macros}).map((row) => [row.entry.correction, row.found]), [["the", ["teh", "hte"]]]);
+    assert.deepEqual(autocorrectRows(view, {query: "*tihng*", macros}).map((row) => row.found), [["tihng"]], "as it is written, with its *");
+    assert.deepEqual(shown({query: "addre"}), ["Address"], "a macro by its name");
+    assert.deepEqual(autocorrectRows(view, {query: "sig", macros}).map((row) => [row.entry.macro, row.found]), [[5, ["sig"]]]);
     assert.deepEqual(shown({query: "zzz"}), []);
 });
 
-test("a typo's match is said in the vocabulary's words, the whole word left unsaid", () => {
-    const model = {vocabulary: {autocorrectMatches: [[0, "Whole word"], [1, "Start of word"], [2, "End of word"], [3, "Anywhere in a word"]]}};
-    assert.deepEqual([0, 1, 2, 3].map((match) => matchWords(model, match)), ["", "start of word", "end of word", "anywhere in a word"]);
+test("a replacement is named by its text or its macro, and an edit names it by text or slot", () => {
+    assert.deepEqual(view.entries.map((row) => replacementLabel(row, macros)), ["the", "because", "iPhone", "Äpfel", "thing", "Macro 5", "Address"]);
+    assert.equal(macroLabel(null, 9), "Macro 9", "a slot the model has not named");
+    assert.deepEqual([replacementOf(view.entries[0]), replacementOf(view.entries[5])], [{correction: "the"}, {macro: 5}]);
 });
 
-test("the counts and the meter read what the keyboard holds", () => {
-    const usage = {corrections: 1, maxCorrections: 1024, typos: 1200, maxTypos: 2048, textBytes: 10, maxTextBytes: 20480, bytes: 34, capacity: 34824, free: 100, textMax: 32};
-    assert.equal(countWords(usage), "1 correction · 1,200 typos");
-    assert.equal(countWords({...usage, corrections: 2, typos: 1}), "2 corrections · 1 typo");
+test("the counts and the meter read what the keyboard holds, and no ceiling of replacements is shown", () => {
+    const usage = {corrections: 1, maxCorrections: 1024, typos: 1200, maxTypos: 2048, textBytes: 10, maxTextBytes: 20480, bytes: 34, capacity: 34824, free: 100, textMax: 32, correctionMax: 128};
+    assert.equal(countWords(usage), "1 replacement · 1,200 typed");
+    assert.equal(countWords({...usage, corrections: 2, typos: 1}), "2 replacements · 1 typed");
+    assert.equal(memoryWords(usage), "1,200 of 2,048 typed · 34 of 34,824 bytes");
+    assert.equal(memoryWords({...usage, typos: 12, maxTypos: 1024, bytes: 234}), "12 of 1,024 typed · 234 of 34,824 bytes");
     assert.equal(usageShare(usage), 100 * 1200 / 2048, "the fullest ceiling");
     assert.equal(usageShare({...usage, typos: 5000}), 100);
+    assert.equal(usageShare({...usage, typos: 0, corrections: 1024}), 100 * 34 / 34824, "the replacements' own ceiling is never the one met");
+});
+
+test("what is typed into the add row becomes typed forms at spaces and commas, and its replacement is text or a macro", () => {
+    assert.deepEqual(typedTokens("  becuase becasue,recieve*\tbeacuse "), ["becuase", "becasue", "recieve*", "beacuse"]);
+    assert.deepEqual(typedTokens(""), []);
+    assert.deepEqual(addedReplacement({kind: "text", text: " the ", macro: null}), {correction: " the "}, "core trims it");
+    assert.equal(addedReplacement({kind: "text", text: "  ", macro: 3}), null);
+    assert.deepEqual(addedReplacement({kind: "macro", text: "the", macro: 3}), {macro: 3});
+    assert.equal(addedReplacement({kind: "macro", text: "the", macro: null}), null);
+    assert.equal(joinedEntry(view, {kind: "text", text: " the ", macro: null}), view.entries[0], "the same text joins its entry");
+    assert.equal(joinedEntry(view, {kind: "text", text: "The", macro: null}), null, "another spelling is another replacement");
+    assert.equal(joinedEntry(view, {kind: "macro", text: "", macro: 5}), view.entries[5]);
+    assert.equal(joinedEntry(view, {kind: "macro", text: "the", macro: 9}), null);
+});
+
+test("text replacement is off when its Host switch is, and only then", () => {
+    const section = (enabled) => ({configDefaults: [{id: "host", fields: [{macro: "hostOs"}]}, {id: "autocorrect", fields: [{macro: "autocorrect", enabled}]}]});
+    assert.deepEqual([switchedOff(section(false)), switchedOff(section(true)), switchedOff({configDefaults: []}), switchedOff(null)], [true, false, false, false]);
 });
 
 test("an import's preview says what it would do in sentences, with the names each is about", () => {
-    const holds = {maxCorrections: 1024, maxTypos: 1024};
-    const outcome = {corrections: 5, typos: 9, removed: 0, duplicates: 2, unfit: 3,
-        newCorrections: [{correction: "because", typos: ["becuase", "becasue"]}, {correction: "then", typos: ["tehn"]}],
-        addedTypos: [{correction: "the", typos: ["hte", "tthe"]}],
-        refused: [{line: 4, text: "teh → ten", reason: "“teh” already corrects to “the”."}, {line: null, text: "x", reason: "Why."}]};
+    const holds = {maxTypos: 1024};
+    const outcome = {replacements: 5, typed: 9, removed: 0, duplicates: 2, unfit: 3,
+        newReplacements: [{label: "because", typed: ["becuase", "becasue"]}, {label: "Macro “Sign-off”", typed: ["sig"]}],
+        addedTyped: [{label: "the", typed: ["hte", "tthe*"]}],
+        refused: [{line: 4, text: "teh → ten", reason: "“teh” is already typed for “the”."}, {line: null, text: "x", reason: "Why."}]};
     assert.deepEqual(importLines(outcome, holds), [
-        {kind: "new", text: "2 new corrections, with 3 typos.", names: ["because", "then"]},
-        {kind: "added", text: "2 typos added to 1 correction you already have.", names: ["the ← hte tthe"]},
-        {kind: "duplicates", text: "2 typos are already in the list, and skipped."},
-        {kind: "unfit", text: "3 typos do not fit: the keyboard holds 1,024 corrections and 1,024 typos."},
-        {kind: "refused", text: "2 lines are refused:", names: ["4: teh → ten — “teh” already corrects to “the”.", "x — Why."]}]);
-    const replace = importLines({...outcome, removed: 1, addedTypos: [], duplicates: 1, unfit: 1, refused: [outcome.refused[0]]}, holds);
-    assert.deepEqual(replace.map((line) => line.text), ["1 entry in your list now is removed.", "2 new corrections, with 3 typos.", "1 typo is already in the list, and skipped.",
-        "1 typo does not fit: the keyboard holds 1,024 corrections and 1,024 typos.", "1 line is refused:"]);
-    assert.deepEqual(importLines({...outcome, newCorrections: [], addedTypos: [], unfit: 0, refused: []}, holds).map((line) => line.kind), ["nothing", "duplicates"]);
+        {kind: "new", text: "2 new replacements, with 3 typed for them.", names: ["because", "Macro “Sign-off”"]},
+        {kind: "added", text: "2 more typed for 1 replacement you already have.", names: ["hte tthe* → the"]},
+        {kind: "duplicates", text: "2 are already in the list, and skipped."},
+        {kind: "unfit", text: "3 do not fit: the keyboard holds 1,024 typed forms."},
+        {kind: "refused", text: "2 lines are refused:", names: ["4: teh → ten — “teh” is already typed for “the”.", "x — Why."]}]);
+    const replace = importLines({...outcome, removed: 1, newReplacements: [outcome.newReplacements[0]], addedTyped: [], duplicates: 1, unfit: 1, refused: [outcome.refused[0]]}, holds);
+    assert.deepEqual(replace.map((line) => line.text), ["1 replacement in your list now is removed.", "1 new replacement, with 2 typed for it.", "1 is already in the list, and skipped.",
+        "1 does not fit: the keyboard holds 1,024 typed forms.", "1 line is refused:"]);
+    assert.deepEqual(importLines({...outcome, newReplacements: [], addedTyped: [], unfit: 0, refused: []}, holds).map((line) => line.kind), ["nothing", "duplicates"]);
 });
 
 // Try it reads the box as the keyboard would have seen it typed: text added
@@ -72,8 +102,10 @@ test("what the Try it box holds is read as typing, a Backspace, or text that sta
     assert.deepEqual(triedAfter({before: "x", typed: "y", text: "xy"}, ""), {before: "", typed: ""});
 });
 
-test("the line under Try it says what fired last, or that Backspace put the word back", () => {
+test("the line under Try it says what fired last, a macro by its name, or that Backspace put the word back", () => {
     assert.equal(triedWords({fired: [], undone: false}), "");
-    assert.equal(triedWords({fired: [{correction: "the", typo: "hte"}, {correction: "thing", typo: "tihng"}], undone: false}), "“tihng” was corrected to “thing”.");
-    assert.match(triedWords({fired: [{correction: "the", typo: "hte"}], undone: true}), /^Backspace put the word back/);
+    assert.equal(triedWords({fired: [{entry: "the", correction: "the", typo: "hte"}, {entry: "thing", correction: "thing", typo: "tihng"}], undone: false}), "“tihng” was replaced with “thing”.");
+    assert.equal(triedWords({fired: [{entry: "\u0001macro:2", correction: "", typo: "addr", macro: 2}], undone: false}, macros), "“addr” plays macro “Address”.");
+    assert.equal(triedWords({fired: [{entry: "\u0001macro:5", correction: "", typo: "sig", macro: 5}], undone: false}, macros), "“sig” plays macro “Macro 5”.");
+    assert.match(triedWords({fired: [{entry: "the", correction: "the", typo: "hte"}], undone: true}), /^Backspace put the word back/);
 });

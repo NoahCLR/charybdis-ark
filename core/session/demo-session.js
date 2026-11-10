@@ -87,6 +87,7 @@ const DEMO_CAPABILITIES = Object.freeze({
     autocorrectTextBytes: AUTOCORRECT_DOMAIN_V1.MAX_TEXT_BYTES,
     autocorrectBytes: AUTOCORRECT_DOMAIN_V1.MAX_SIZE,
     autocorrectTextMax: AUTOCORRECT_DOMAIN_V1.TEXT_MAX,
+    autocorrectCorrectionMax: AUTOCORRECT_DOMAIN_V1.CORRECTION_MAX,
     supportedDomainMask: PROFILE_WIRE_KNOWN_MASKS.SUPPORTED_DOMAINS,
     nameMaxBytes: NAME_MAX_BYTES,
     layerMaskBits: 32,

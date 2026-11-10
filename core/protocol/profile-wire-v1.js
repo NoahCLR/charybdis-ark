@@ -208,7 +208,7 @@ function decodeCapabilityPages(pages) {
     }
     assertZeroRange(capacity, 16, 25, "capability page 1");
     assertZeroRange(wide, 20, 25, "capability page 2");
-    assertZeroRange(autocorrect, 11, 25, "capability page 3");
+    assertZeroRange(autocorrect, 12, 25, "capability page 3");
     const decoded = {
         responseVersion: identity[0],
         protocol: {major: identity[2], minor: identity[3]},
@@ -250,6 +250,7 @@ function decodeCapabilityPages(pages) {
         autocorrectTextBytes: readU16(autocorrect, 4),
         autocorrectBytes: readU32(autocorrect, 6),
         autocorrectTextMax: autocorrect[10],
+        autocorrectCorrectionMax: autocorrect[11],
     };
     assertKnownMask(decoded.featureFlags, PROFILE_WIRE_KNOWN_MASKS.FEATURE_FLAGS, "capability feature flags");
     assertKnownMask(decoded.supportedDomainMask, PROFILE_WIRE_KNOWN_MASKS.SUPPORTED_DOMAINS, "supported domain mask");

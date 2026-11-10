@@ -14,7 +14,7 @@
 
 const {PD_MODE_KEYS, formerNames, pdModeKeyOfCode} = require("../data/pd-mode-keys");
 const {AUTO_MOUSE_SWITCH_KEYS, BEHAVIOR_SWITCH_KEYS, autoMouseSwitchKeyCode, behaviorSwitchKeyCode} = require("../data/user-keycodes");
-const {VOCABULARY, layerName, slotName} = require("./vocabulary");
+const {TEXT_REPLACEMENT_KEYS, VOCABULARY, layerName, slotName} = require("./vocabulary");
 const {comboOutputBehaviorLayers, participation} = require("./participation");
 const {comboReferenceLayers, publishedComboReach} = require("./combo-reach");
 const keycodeCatalog = require("../data/keycode-catalog");
@@ -521,23 +521,29 @@ function catalogViews() {
     const entries = [];
     /** @type {Record<string, string>} */
     const labels = {};
+    /** @type {Readonly<Record<string, {label: string, tip: string} | undefined>>} */
+    const reworded = TEXT_REPLACEMENT_KEYS;
     for (const entry of keycodeCatalog.entries()) {
-        const searchTerms = [entry.name, entry.label, ...entry.aliases].filter(Boolean);
+        // A key Ark words its own way keeps QMK's words among its search
+        // terms, so either name finds it.
+        const own = reworded[entry.name], label = own?.label ?? entry.label;
+        const searchTerms = [entry.name, label, ...(own ? [entry.label] : []), ...entry.aliases].filter(Boolean);
         entries.push({
             value: entry.name,
             key: entry.name,
-            label: entry.label,
+            label,
             group: entry.group,
             aliases: entry.aliases,
             keycode: entry.value,
             searchTerms,
             search: searchTerms.join(" ").toLowerCase(),
             searchCompact: searchTerms.join("").toLowerCase(),
+            ...(own ? {tip: own.tip} : {}),
         });
-        labels[entry.name] = entry.label;
+        labels[entry.name] = label;
         for (const alias of entry.aliases) {
             if (!labels[alias]) {
-                labels[alias] = entry.label;
+                labels[alias] = label;
             }
         }
     }

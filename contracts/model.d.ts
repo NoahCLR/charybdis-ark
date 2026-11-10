@@ -9,7 +9,7 @@ export type TimingSource = 'tappingTerm' | TimingTerm;
 /** A macro step's kind (glossary "Macro step"). */
 export type MacroStepKind = 'text' | 'tap' | 'delay' | 'press' | 'release';
 /** What a profile holds that the keyboard counts against a limit (core/model/profile-usage.js). */
-export type UsageCountId = 'behaviours' | 'behaviourSteps' | 'combos' | 'lightingGroups' | 'lightingGroupRows' | 'macros' | 'customKeys' | 'pointingModes';
+export type UsageCountId = 'behaviours' | 'behaviourSteps' | 'combos' | 'lightingGroups' | 'lightingGroupRows' | 'macros' | 'autocorrectTyped' | 'customKeys' | 'pointingModes';
 
 /** Device operation identity is stable when presentation words change. */
 export type PhaseId = 'idle' | 'available' | 'empty' | 'connected' | 'demo' | 'enumerate' | 'connect' | 'refresh' | 'starting' | 'read-layout' | 'read-profile' | 'read-complete' | 'restore-complete' | 'disconnect' | 'read-combos' | 'read-base-rgb' | 'live-edit' | 'live-save' | 'live-revert' | 'edit-mode' | 'restart';
@@ -115,8 +115,6 @@ export interface Vocabulary {
     physicalHalves: WordList<number>;
     macroPlayback?: Readonly<Record<string, string>>;
     macroProtection: WordList<'auto' | 'on' | 'off'>;
-    /** Where an autocorrect typo matches a word, by the number its row stores. */
-    autocorrectMatches: WordList<number>;
     /** The setting macroProtection chooses, by its name, and Automatic as it says whether it plays uninterruptibly now ("Automatic · on"). */
     macroUninterruptible: Readonly<{label: string; automatic: Readonly<{on: string; off: string}>}>;
     macroSteps: WordList<MacroStepKind>;
@@ -236,8 +234,8 @@ export type FindingPlace =
     | {kind: 'pointing'; slot: number}
     /** `keycode`: the slot's name, as the Macros screen picks it. */
     | {kind: 'macro'; index: number; keycode: string}
-    /** An autocorrect entry, by its correction as the draft spells it (the keyboard's, for one the draft removed). */
-    | {kind: 'autocorrect'; correction: string}
+    /** A text replacement entry, by its id in the draft's list (the keyboard's, for one the draft removed): its replacement's text, or a macro replacement's key. */
+    | {kind: 'autocorrect'; entry: string}
     | {kind: 'settings'; area?: string; section?: string; stage?: string};
 export interface Finding {
     kind: string;
@@ -413,6 +411,8 @@ export interface SettingsSection {
     description?: string;
     warning?: string;
     githubLink?: {label: string; url: string};
+    /** A screen that edits what the section switches, by its id, and the words of the link to it. */
+    screenLink?: {label: string; screen: string};
     /** The words for the section's one-per-layer switches, shown together as one row of layers. */
     layerGroup?: {label: string; hint: string};
     fields: SettingField[];

@@ -1,104 +1,180 @@
 "use strict";
 const {test} = require("node:test");
 const assert = require("node:assert/strict");
-const {addTypos, changeTypo, findTypo, listUsage, listWarnings, removeEntry, removeTypo, respellCorrection, WARNING} = require("../../core/model/autocorrect-list");
-const {AUTOCORRECT_MATCH: MATCH, encodeAutocorrectDomain, autocorrectDomainSize} = require("../../core/schema/autocorrect-domain-v1");
+const {addTypos, changeReplacement, changeTypo, findEntry, findTypo, listUsage, listWarnings, removeEntry, removeTypo, typedForm, typedOf, WARNING} = require("../../core/model/autocorrect-list");
+const {AUTOCORRECT_MATCH: MATCH, encodeAutocorrectDomain, autocorrectDomainSize, entryKey} = require("../../core/schema/autocorrect-domain-v1");
 const {hostLayouts, US_HOST_LAYOUT} = require("../../core/data/host-layouts");
 
 const US = {layout: US_HOST_LAYOUT};
-const list = (...entries) => ({entries: entries.map(([correction, ...typos]) => ({correction, typos: typos.map(typo => typeof typo === "string" ? {typo, match: MATCH.WHOLE_WORD} : {typo: typo[0], match: typo[1]})}))});
+// A list from rows: a replacement's text, or a number for the macro slot it
+// plays, then its typed forms, each its letters or [letters, match].
+const list = (...entries) => ({entries: entries.map(([correction, ...typos]) => ({...(typeof correction === "number" ? {correction: "", macro: correction} : {correction}),
+    typos: typos.map(typo => typeof typo === "string" ? {typo, match: MATCH.WHOLE_WORD} : {typo: typo[0], match: typo[1]})}))});
 const says = (fn, pattern, code = "AUTOCORRECT_EDIT_REFUSED") => assert.throws(fn, error => error.code === code && pattern.test(error.message), String(pattern));
-const shape = value => value.entries.map(entry => [entry.correction, ...entry.typos.map(typo => typo.match ? [typo.typo, typo.match] : typo.typo)]);
+const shape = value => value.entries.map(entry => [entry.macro ?? entry.correction, ...entry.typos.map(typo => typo.match ? [typo.typo, typo.match] : typo.typo)]);
+const text = correction => ({correction});
 
-test("a correction is added with its first typos, and typing one that exists adds to it, never a second copy", () => {
+test("a replacement is added with what is first typed for it, and one that exists is added to, never a second copy", () => {
     const value = list();
-    addTypos(value, "because", [{typo: "becuase"}, {typo: "becasue"}], US);
+    addTypos(value, text("because"), [{typo: "becuase"}, {typo: "becasue"}], US);
     assert.deepEqual(shape(value), [["because", "becuase", "becasue"]]);
-    addTypos(value, "because", [{typo: "beacuse"}], US);
-    assert.deepEqual(shape(value), [["because", "becuase", "becasue", "beacuse"]], "the same correction, stored once");
-    addTypos(value, "thing", [{typo: "tihng", match: MATCH.ANYWHERE}], US);
+    addTypos(value, text("because"), [{typo: "beacuse"}], US);
+    assert.deepEqual(shape(value), [["because", "becuase", "becasue", "beacuse"]], "the same replacement, stored once");
+    addTypos(value, text("thing"), [{typo: "*tihng*"}], US);
     assert.deepEqual(shape(value)[1], ["thing", ["tihng", MATCH.ANYWHERE]]);
     assert.doesNotThrow(() => encodeAutocorrectDomain(value));
 });
 
-test("a typo is trimmed and stored folded; a correction is kept as written", () => {
+test("a typed form is trimmed and stored folded; a replacement is kept as written, and may be any line of text", () => {
     const value = list();
-    addTypos(value, "  iPhone ", [{typo: " IPhone "}], US);
+    addTypos(value, text("  iPhone "), [{typo: " IPhone "}], US);
     assert.deepEqual(shape(value), [["iPhone", "iphone"]]);
-    assert.equal(findTypo(value, "IPHONE")?.entry.correction, "iPhone", "a typo is found whatever its case");
+    assert.equal(findTypo(value, "IPHONE")?.entry.correction, "iPhone", "a typed form is found whatever its case");
+    assert.equal(findTypo(value, "*iphone*")?.entry.correction, "iPhone", "and however it is written");
+    addTypos(value, text("+31 6 1234 5678"), [{typo: "pnumber"}], US);
+    addTypos(value, text("Kind regards, Sam Example | sam@example.com"), [{typo: "sigoff"}], US);
+    assert.deepEqual(shape(value).slice(1), [["+31 6 1234 5678", "pnumber"], ["Kind regards, Sam Example | sam@example.com", "sigoff"]]);
+    addTypos(value, text("x".repeat(128)), [{typo: "long"}], US);
+    assert.doesNotThrow(() => encodeAutocorrectDomain(value));
+});
+
+test("a typed form is a whole word unless it is written with * where other letters may go", () => {
+    assert.deepEqual(typedOf("pnumber"), {typo: "pnumber", match: MATCH.WHOLE_WORD});
+    assert.deepEqual(typedOf("Recieve*"), {typo: "recieve", match: MATCH.START});
+    assert.deepEqual(typedOf("*mnet"), {typo: "mnet", match: MATCH.END});
+    assert.deepEqual(typedOf(" *tihng* "), {typo: "tihng", match: MATCH.ANYWHERE});
+    for (const typed of ["pnumber", "recieve*", "*mnet", "*tihng*", "dosen't"]) assert.equal(typedForm(typedOf(typed)), typed, "written back as it was typed");
+    says(() => typedOf("re*cieve"), /“re\*cieve” has \* where it cannot go.*only at the start or the end/);
+    says(() => typedOf("*"), /“\*” has no letters/);
+    says(() => typedOf("**"), /“\*\*” has no letters/);
+    says(() => typedOf("**teh"), /has \* where it cannot go/);
+    says(() => typedOf("teh**"), /has \* where it cannot go/);
+    says(() => typedOf("te h*"), /one word.*a space is neither/);
+    const value = list(["the", "teh"]);
+    addTypos(value, text("receive"), [{typo: "recieve*"}], US);
+    changeTypo(value, "recieve", {to: "*recieve"}, US);
+    assert.deepEqual(shape(value)[1], ["receive", ["recieve", MATCH.END]], "its * is changed where it stands");
+    changeTypo(value, "recieve", {to: "recieve"}, US);
+    assert.deepEqual(shape(value)[1], ["receive", "recieve"]);
+    // An older file's match stands for a form written without *.
+    addTypos(value, text("thing"), [{typo: "tihng", match: MATCH.ANYWHERE}], US);
+    assert.deepEqual(shape(value)[2], ["thing", ["tihng", MATCH.ANYWHERE]]);
+    says(() => addTypos(value, text("thing"), [{typo: "thnig", match: 7}], US), /no such match/);
+});
+
+test("a replacement may play a macro: named by its slot, for whole words only, beside text or in its place", () => {
+    const value = list(["the", "teh"]);
+    addTypos(value, {macro: 5}, [{typo: "Sig"}], US);
+    addTypos(value, {macro: 5}, [{typo: "sgi"}], US);
+    assert.deepEqual(shape(value), [["the", "teh"], [5, "sig", "sgi"]]);
+    assert.deepEqual(findEntry(value, {macro: 5}), {correction: "", macro: 5, typos: [{typo: "sig", match: 0}, {typo: "sgi", match: 0}]});
+    assert.equal(findEntry(value, entryKey({macro: 5}))?.macro, 5, "found by its key too");
+    assert.doesNotThrow(() => encodeAutocorrectDomain(value));
+    says(() => addTypos(value, {macro: 5}, [{typo: "sig*"}], US), /A macro plays for a whole word only: take the \* out of “sig\*”/);
+    says(() => addTypos(value, {macro: 128}, [{typo: "x"}], US), /Choose one of the keyboard's macros/);
+    says(() => addTypos(value, {macro: 5, correction: "both"}, [{typo: "x"}], US), /text or a macro, not both/);
+    says(() => addTypos(value, {macro: 6}, [{typo: "sig"}], {...US, macroNames: Object.assign([], {5: "Sign-off"})}), /“sig” is already typed for the macro “Sign-off”/);
+    // Text made a macro, a macro made text, and a macro changed for another.
+    changeReplacement(value, text("the"), {macro: 9}, US);
+    assert.deepEqual(shape(value), [[9, "teh"], [5, "sig", "sgi"]]);
+    changeReplacement(value, {macro: 9}, text("the"), US);
+    changeReplacement(value, {macro: 5}, {macro: 7}, US);
+    assert.deepEqual(shape(value), [["the", "teh"], [7, "sig", "sgi"]]);
+    // Changed to a macro the list has, the two join; a form with * cannot follow.
+    addTypos(value, {macro: 8}, [{typo: "addr"}], US);
+    changeReplacement(value, {macro: 8}, {macro: 7}, US);
+    assert.deepEqual(shape(value), [["the", "teh"], [7, "sig", "sgi", "addr"]]);
+    changeTypo(value, "teh", {to: "teh*"}, US);
+    says(() => changeReplacement(value, text("the"), {macro: 3}, US), /take the \* out of “teh\*” first/);
+    says(() => changeTypo(value, "teh", {macro: 7}, US), /A macro plays for a whole word only/);
+    says(() => changeTypo(value, "sig", {to: "*sig"}, US), /A macro plays for a whole word only/);
+    changeTypo(value, "sgi", {correction: "the"}, US);
+    changeTypo(value, "sig", {macro: 2}, US);
+    assert.deepEqual(shape(value), [["the", ["teh", MATCH.START], "sgi"], [7, "addr"], [2, "sig"]]);
+    removeEntry(value, {macro: 7}, US);
+    says(() => removeEntry(value, {macro: 7}, US), /the macro “Macro 7” is no longer in the list/);
+    assert.deepEqual(shape(value), [["the", ["teh", MATCH.START], "sgi"], [2, "sig"]]);
 });
 
 test("each refusal says what is wrong in plain words", () => {
     const value = list(["the", "teh"]);
-    says(() => addTypos(value, "", [{typo: "x"}], US), /Type the correction/);
-    says(() => addTypos(value, "then", [], US), /at least one typo/);
-    says(() => addTypos(value, "then", [{typo: " "}], US), /Type a typo/);
-    says(() => addTypos(value, "then", [{typo: "the-n"}], US), /letters and digits.*“-”/);
-    says(() => addTypos(value, "then", [{typo: "'then"}], US), /apostrophe/);
-    says(() => addTypos(value, "then", [{typo: "then"}], US), /“then” is the correction itself/);
-    says(() => addTypos(value, "ten", [{typo: "teh"}], US), /“teh” already corrects to “the”/);
-    says(() => addTypos(value, "the", [{typo: "TEH"}], US), /“teh” is already a typo of “the”/);
-    says(() => addTypos(value, "then", [{typo: "tehn"}, {typo: "Tehn"}], US), /“tehn” is there twice/);
-    says(() => addTypos(value, "a".repeat(33), [{typo: "x"}], US), /at most 32 bytes/);
-    says(() => addTypos(value, "then", [{typo: "é".repeat(17)}], {layout: hostLayouts().find(layout => layout.slug === "windows-german").id}), /at most 32 bytes/);
-    says(() => addTypos(value, "a\tb", [{typo: "ab"}], US), /cannot hold/);
-    says(() => addTypos(value, "then", [{typo: "tehn", match: 7}], US), /where it matches/);
+    says(() => addTypos(value, text(""), [{typo: "x"}], US), /Type the replacement/);
+    says(() => addTypos(value, text("then"), [], US), /at least one thing you type for it/);
+    says(() => addTypos(value, text("then"), [{typo: " "}], US), /Type what you would type for it/);
+    says(() => addTypos(value, text("then"), [{typo: "the-n"}], US), /letters and digits.*“-”/);
+    says(() => addTypos(value, text("then"), [{typo: "'then"}], US), /apostrophe/);
+    says(() => addTypos(value, text("then"), [{typo: "then"}], US), /“then” is the replacement itself/);
+    says(() => addTypos(value, text("ten"), [{typo: "teh"}], US), /“teh” is already typed for “the”/);
+    says(() => addTypos(value, text("the"), [{typo: "TEH"}], US), /“teh” is already typed for “the”/);
+    says(() => addTypos(value, text("then"), [{typo: "tehn"}, {typo: "Tehn"}], US), /“tehn” is there twice/);
+    says(() => addTypos(value, text("a".repeat(129)), [{typo: "x"}], US), /at most 128 bytes of text.*Use a macro for something longer/);
+    says(() => addTypos(value, text("then"), [{typo: "a".repeat(33)}], US), /at most 32 bytes/);
+    says(() => addTypos(value, text("then"), [{typo: "é".repeat(17)}], {layout: hostLayouts().find(layout => layout.slug === "windows-german").id}), /at most 32 bytes/);
+    says(() => addTypos(value, text("a\tb"), [{typo: "ab"}], US), /one line of text.*Use a macro for more than one line/);
+    says(() => addTypos(value, text("two\nlines"), [{typo: "ab"}], US), /one line of text/);
+    says(() => addTypos(value, text("then"), [{typo: "tehn", match: 7}], US), /no such match/);
     assert.deepEqual(shape(value), [["the", "teh"]], "a refused edit changes nothing");
 });
 
 test("an entry the chosen layout cannot type is refused when it is added or edited", () => {
     const german = {layout: hostLayouts().find(layout => layout.slug === "windows-german").id, layoutName: "German (Windows)"};
     const value = list();
-    says(() => addTypos(value, "über", [{typo: "ueber"}], {...US, layoutName: "US"}), /US cannot type “ü”/);
-    says(() => addTypos(value, "uber", [{typo: "über"}], {...US, layoutName: "US"}), /US cannot type “ü”/);
-    addTypos(value, "über", [{typo: "ueber"}], german);
+    says(() => addTypos(value, text("über"), [{typo: "ueber"}], {...US, layoutName: "US"}), /US cannot type “ü”/);
+    says(() => addTypos(value, text("uber"), [{typo: "über"}], {...US, layoutName: "US"}), /US cannot type “ü”/);
+    addTypos(value, text("über"), [{typo: "ueber"}], german);
     assert.deepEqual(shape(value), [["über", "ueber"]]);
-    says(() => respellCorrection(value, "über", "übér", {...US, layoutName: "US"}), /US cannot type/);
+    says(() => changeReplacement(value, text("über"), text("übér"), {...US, layoutName: "US"}), /US cannot type/);
     says(() => changeTypo(value, "ueber", {to: "üeber"}, {...US, layoutName: "US"}), /US cannot type “ü”/);
     // What was already in the list is only warned about.
-    assert.doesNotThrow(() => changeTypo(value, "ueber", {match: MATCH.START}, {...US, layoutName: "US"}));
+    assert.doesNotThrow(() => changeTypo(value, "ueber", {to: "ueber*"}, {...US, layoutName: "US"}));
+    changeTypo(value, "ueber", {to: "ueber"}, {...US, layoutName: "US"});
+    // A macro is not typed through the layout.
+    assert.doesNotThrow(() => changeReplacement(value, text("über"), {macro: 1}, {...US, layoutName: "US"}));
 });
 
-test("a correction is respelled where it stands, and respelling it to one that exists joins the two", () => {
+test("a replacement is respelled where it stands, and respelling it to one that exists joins the two", () => {
     const value = list(["teh", "hte"], ["then", "tehn"]);
-    says(() => respellCorrection(value, "nope", "x", US), /no longer in the list/);
-    respellCorrection(value, "teh", "the", US);
+    says(() => changeReplacement(value, text("nope"), text("x"), US), /“nope” is no longer in the list/);
+    changeReplacement(value, text("teh"), text("the"), US);
     assert.deepEqual(shape(value), [["the", "hte"], ["then", "tehn"]]);
-    says(() => respellCorrection(value, "the", "hte", US), /“hte” is one of its typos/);
-    respellCorrection(value, "then", "the", US);
+    says(() => changeReplacement(value, text("the"), text("hte"), US), /“hte” is typed for it/);
+    changeReplacement(value, text("then"), text("the"), US);
     assert.deepEqual(shape(value), [["the", "hte", "tehn"]]);
 });
 
-test("a typo is respelled, matched elsewhere or moved to another correction, new or not", () => {
+test("a typed form is written anew, with or without *, or moved to another replacement, new or not", () => {
     const value = list(["the", "teh", "hte"], ["then", "tehn"]);
     changeTypo(value, "teh", {to: "Tthe"}, US);
-    changeTypo(value, "tthe", {match: MATCH.START}, US);
+    changeTypo(value, "tthe", {to: "tthe*"}, US);
     assert.deepEqual(shape(value)[0], ["the", ["tthe", MATCH.START], "hte"]);
-    says(() => changeTypo(value, "hte", {to: "tehn"}, US), /“tehn” already corrects to “then”/);
-    says(() => changeTypo(value, "hte", {to: "the"}, US), /is the correction itself/);
-    says(() => changeTypo(value, "gone", {match: MATCH.END}, US), /no longer in the list/);
+    says(() => changeTypo(value, "hte", {to: "tehn"}, US), /“tehn” is already typed for “then”/);
+    says(() => changeTypo(value, "hte", {to: "the"}, US), /is the replacement itself/);
+    says(() => changeTypo(value, "gone", {to: "*gone"}, US), /no longer in the list/);
     changeTypo(value, "hte", {correction: "then"}, US);
     assert.deepEqual(shape(value), [["the", ["tthe", MATCH.START]], ["then", "tehn", "hte"]]);
     changeTypo(value, "tthe", {correction: "three"}, US);
-    assert.deepEqual(shape(value), [["then", "tehn", "hte"], ["three", ["tthe", MATCH.START]]], "its last typo gone, the entry goes; a new correction is made");
-    says(() => changeTypo(value, "hte", {correction: "hte"}, US), /is the correction itself/);
+    assert.deepEqual(shape(value), [["then", "tehn", "hte"], ["three", ["tthe", MATCH.START]]], "its last typed form gone, the entry goes; a new replacement is made");
+    says(() => changeTypo(value, "hte", {correction: "hte"}, US), /is the replacement itself/);
 });
 
-test("removing a correction's last typo removes the entry; removing an entry removes its typos", () => {
+test("removing a replacement's last typed form removes the entry; removing an entry removes what is typed for it", () => {
     const value = list(["the", "teh", "hte"], ["then", "tehn"]);
     removeTypo(value, "TEH");
     assert.deepEqual(shape(value), [["the", "hte"], ["then", "tehn"]]);
     removeTypo(value, "hte");
     assert.deepEqual(shape(value), [["then", "tehn"]]);
     says(() => removeTypo(value, "hte"), /no longer in the list/);
-    says(() => removeEntry(value, "the"), /no longer in the list/);
-    removeEntry(value, "then");
+    says(() => removeEntry(value, text("the"), US), /no longer in the list/);
+    removeEntry(value, text("then"), US);
     assert.deepEqual(shape(value), []);
 });
 
-test("usage counts what the keyboard stores: corrections, typos, text and the domain's bytes", () => {
+test("usage counts what the keyboard stores: replacements, typed forms, text and the domain's bytes", () => {
     const value = list(["the", "teh", "hte"], ["thing", ["tihng", MATCH.ANYWHERE]], ["café", "cafe"]);
     assert.deepEqual(listUsage(value), {corrections: 3, typos: 4, textBytes: 3 + 5 + 5 + 3 + 3 + 5 + 4, bytes: autocorrectDomainSize(value)});
+    // A macro replacement has a row and no text of its own.
+    const played = list(["the", "teh"], [5, "sig"]);
+    assert.deepEqual(listUsage(played), {corrections: 2, typos: 2, textBytes: 3 + 3 + 3, bytes: 8 + 6 * 4 + 9});
     assert.equal(listUsage(value).bytes, encodeAutocorrectDomain(value).length);
     assert.deepEqual(listUsage(list()), {corrections: 0, typos: 0, textBytes: 0, bytes: 8});
 });
@@ -108,27 +184,35 @@ test("warnings are found on the list and never refuse it", () => {
     const value = list(["über", "ueber"], ["straße", "strasse"], ["the", "teh"]);
     assert.deepEqual(listWarnings(value, {layout: german, layoutName: "German (Windows)"}), []);
     const untypable = listWarnings(value, {layout: US_HOST_LAYOUT, layoutName: "US"});
-    assert.deepEqual(untypable.map(({kind, correction, typo}) => ({kind, correction, typo})), [
-        {kind: WARNING.UNTYPABLE, correction: "über", typo: undefined}, {kind: WARNING.UNTYPABLE, correction: "straße", typo: undefined}]);
-    assert.match(untypable[0].text, /US cannot type “ü”, so this entry will not fire/);
+    assert.deepEqual(untypable.map(({kind, entry, typo}) => ({kind, entry, typo})), [
+        {kind: WARNING.UNTYPABLE, entry: "über", typo: undefined}, {kind: WARNING.UNTYPABLE, entry: "straße", typo: undefined}]);
+    assert.match(untypable[0].text, /US cannot type “ü”, so this replacement will not be typed/);
 
     const chained = listWarnings(list(["b", "a"], ["c", "b"]), US);
-    assert.deepEqual(chained.map(({kind, correction}) => [kind, correction]), [[WARNING.CHAIN, "b"]]);
-    assert.match(chained[0].text, /“b” is itself a typo, corrected to “c”/);
+    assert.deepEqual(chained.map(({kind, entry}) => [kind, entry]), [[WARNING.CHAIN, "b"]]);
+    assert.match(chained[0].text, /“b” is itself typed for “c”: typing it gives “c”/);
     const loop = listWarnings(list(["b", "a"], ["a", "b"]), US);
-    assert.deepEqual(loop.map(({kind, correction}) => [kind, correction]), [[WARNING.LOOP, "b"], [WARNING.LOOP, "a"]]);
-    assert.match(loop[0].text, /“a” and “b” correct to each other/);
+    assert.deepEqual(loop.map(({kind, entry}) => [kind, entry]), [[WARNING.LOOP, "b"], [WARNING.LOOP, "a"]]);
+    assert.match(loop[0].text, /“a” and “b” replace each other/);
 
     const parts = listWarnings(list(["the", ["teh", MATCH.ANYWHERE]], ["their", "thier"], ["no", ["on", MATCH.END]], ["button", "buton"]), US);
     assert.deepEqual(parts.map(({kind, typo}) => [kind, typo]), [[WARNING.SHORT_PART, "teh"], [WARNING.SHORT_PART, "on"], [WARNING.INSIDE_CORRECTION, "on"]]);
-    assert.match(parts[0].text, /shorter than four letters/);
-    assert.match(parts[2].text, /“on” also matches inside the correction “button”/);
-    assert.deepEqual(listWarnings(list(["something", ["tihng", MATCH.ANYWHERE]]), US), [], "a long part-of-word typo that matches no correction is fine");
-    assert.deepEqual(listWarnings(list(["iPhone", "iphone"]), US), [], "a typo that is its correction in other capitals changes nothing typed right");
-    assert.deepEqual(listWarnings(list(["thee", ["the", MATCH.START]]), US).map(({kind}) => kind), [WARNING.SHORT_PART, WARNING.INSIDE_CORRECTION], "a part-of-word typo inside its own correction");
+    assert.equal(parts[0].text, "“*teh*” is a short typed form with *, so it fires inside many words.");
+    assert.match(parts[2].text, /“\*on” also matches inside the replacement “button”/);
+    assert.deepEqual(listWarnings(list(["something", ["tihng", MATCH.ANYWHERE]]), US), [], "a long typed form with * that matches no replacement is fine");
+    assert.deepEqual(listWarnings(list(["iPhone", "iphone"]), US), [], "a typed form that is its replacement in other capitals changes nothing typed right");
+    assert.deepEqual(listWarnings(list(["thee", ["the", MATCH.START]]), US).map(({kind}) => kind), [WARNING.SHORT_PART, WARNING.INSIDE_CORRECTION], "a typed form with * inside its own replacement");
+
+    // A replacement that plays a macro with no steps does nothing, and says so
+    // by the macro's name; one whose macro has steps is fine.
+    const macros = list(["the", "teh"], [5, "sig"], [6, "addr"]);
+    assert.deepEqual(listWarnings(macros, US), [], "nothing is known of the macros");
+    const empty = listWarnings(macros, {...US, macroNames: Object.assign([], {5: "Sign-off"}), emptyMacros: new Set([5])});
+    assert.deepEqual(empty.map(({kind, entry, typo}) => ({kind, entry, typo})), [{kind: WARNING.EMPTY_MACRO, entry: entryKey({macro: 5}), typo: undefined}]);
+    assert.match(empty[0].text, /“Sign-off” has no steps, so this replacement does nothing yet/);
 });
 
-test("two lists' entries pair by correction, a respelled entry with the one that took its typos", () => {
+test("two lists' entries pair by replacement, a changed one with the one that took what is typed for it", () => {
     const {pairEntries} = require("../../core/model/autocorrect-list");
     const before = list(["the", "teh", "hte"], ["because", "becuase"], ["gone", "goen"]);
     const after = list(["The", "teh", "hte", "tthe"], ["because", "becuase", "becasue"], ["new", "nwe"]);
@@ -138,9 +222,12 @@ test("two lists' entries pair by correction, a respelled entry with the one that
     const split = pairEntries(list(["the", "teh", "hte", "tthe"]), list(["then", "teh"], ["The", "hte", "tthe"]));
     assert.deepEqual(split.map(pair => [pair.before?.correction, pair.after?.correction]), [["the", "The"], [undefined, "then"]]);
     assert.deepEqual(pairEntries(list(), list()), []);
+    // Text made a macro is the same entry; a macro is paired by its slot.
+    const played = pairEntries(list(["the", "teh"], [5, "sig"]), list([9, "teh"], [5, "sig", "sgi"]));
+    assert.deepEqual(played.map(pair => [pair.before?.macro ?? pair.before?.correction, pair.after?.macro ?? pair.after?.correction]), [["the", 9], [5, 5]]);
 });
 
-test("an entry is put back with its typos, each taken from wherever it went, in either direction", () => {
+test("an entry is put back with what is typed for it, each taken from wherever it went, in either direction", () => {
     const {restoreEntry} = require("../../core/model/autocorrect-list");
     const theirs = list(["the", "teh", "hte"], ["then", "tehn"]);
     const moved = list(["the", "teh"], ["then", "tehn", "hte"]);
@@ -163,4 +250,11 @@ test("an entry is put back with its typos, each taken from wherever it went, in 
     const stolen = list(["thee", "teh", "hte"], ["then", "tehn"]);
     restoreEntry(stolen, theirs, "the");
     assert.deepEqual(shape(stolen), [["then", "tehn"], ["the", "teh", "hte"]]);
+    // Text that was made a macro comes back as text, and a macro as a macro.
+    const played = list([9, "teh", "hte"], ["then", "tehn"]);
+    restoreEntry(played, theirs, "the", entryKey({macro: 9}));
+    assert.deepEqual(shape(played), [["then", "tehn"], ["the", "teh", "hte"]]);
+    const texted = list(["the", "sig"]);
+    restoreEntry(texted, list([5, "sig"]), entryKey({macro: 5}), "the");
+    assert.deepEqual(shape(texted), [[5, "sig"]]);
 });

@@ -183,9 +183,9 @@ const PROFILE_FULL_WORDS = Object.freeze({
         lightingTableGroupRows: (most) => `The keyboard holds at most ${most} accents on any one of layers, pointing modes, combo feedback and key feedback. Remove one there before adding another.`,
         behaviours: (most) => `The keyboard holds at most ${most} behaviours. Remove one before adding another.`,
         behaviourSteps: (most) => `The keyboard holds at most ${most} behaviour tap counts, added up across all behaviours. Remove a tap count or a behaviour first.`,
-        autocorrectCorrections: (most) => `The keyboard holds at most ${most.toLocaleString("en-US")} autocorrect corrections. Remove an entry before adding another.`,
-        autocorrectTypos: (most) => `The keyboard holds at most ${most.toLocaleString("en-US")} autocorrect typos. Remove a typo before adding another.`,
-        autocorrectText: (most) => `The autocorrect list holds at most ${most.toLocaleString("en-US")} bytes of text across its corrections and typos. Remove an entry first.`,
+        autocorrectCorrections: (most) => `The keyboard holds at most ${most.toLocaleString("en-US")} text replacements. Remove one before adding another.`,
+        autocorrectTypos: (most) => `The keyboard holds at most ${most.toLocaleString("en-US")} typed forms across all text replacements. Remove one before adding another.`,
+        autocorrectText: (most) => `The text replacement list holds at most ${most.toLocaleString("en-US")} bytes of text across its replacements and what is typed for them. Remove a replacement first.`,
     }),
     profile: "This change does not fit: the keyboard's profile is full. Remove an accent, a behaviour, a combo or a macro first.",
     name: "The keyboard's profile is full, so this name does not fit. Shorten another name, or remove a behaviour or combo.",
@@ -320,7 +320,7 @@ const SETTINGS_SECTIONS = Object.freeze({
     keyTiming: "Tap & hold timing", normalPointerSpeed: "Pointer speed", sniping: "Auto-sniping", autoMouse: "Auto-mouse",
     automouseFade: "Auto-mouse fade", lightingPower: "All lighting", rgbAppearance: "Background effect", lightingFeedback: "Key feedback flash",
     startupLayers: "Default layers", behaviorSettings: "Where behaviours run", comboSettings: "How combos run", comboReferences: "Combo layer matching",
-    keyboardOptions: "Key swaps & typing", host: "Your computer", autocorrect: "On or off",
+    keyboardOptions: "Key swaps & typing", host: "Your computer", autocorrect: "Text replacement",
 });
 
 // A Settings screen as anything but the rail names it. The rail lists
@@ -346,9 +346,14 @@ const THRESHOLDS = Object.freeze({tapHoldTerm: "tap / hold", longHoldTerm: "long
 /** @param {import("../../contracts/model.js").WordList<unknown>} list @param {unknown} key @returns {string} */
 const word = (list, key) => (list.find(([id]) => id === key)?.[1] ?? String(key ?? ""));
 
-// Where an autocorrect typo matches a word.
-/** @type {import("../../contracts/model.js").WordList<number>} */
-const AUTOCORRECT_MATCHES = [[0, "Whole word"], [1, "Start of word"], [2, "End of word"], [3, "Anywhere in a word"]];
+// QMK's switch keys for autocorrect, which is text replacement here
+// (GLOSSARY.md): each key's words, and what it does. The help says
+// "autocorrect" too, so a search for the keys' own name finds them.
+const TEXT_REPLACEMENT_KEYS = Object.freeze({
+    QK_AUTOCORRECT_ON: {label: "Text replacement On", tip: "Turns text replacement (autocorrect) on until the keyboard restarts. It does not change the switch in Host settings, and cannot turn on what is off there."},
+    QK_AUTOCORRECT_OFF: {label: "Text replacement Off", tip: "Turns text replacement (autocorrect) off until the keyboard restarts: for a password field or a terminal. It does not change the switch in Host settings."},
+    QK_AUTOCORRECT_TOGGLE: {label: "Toggle Text replacement", tip: "Turns text replacement (autocorrect) off or back on until the keyboard restarts. It does not change the switch in Host settings."},
+});
 // How a macro plays: whether it is uninterruptible, chosen or automatic.
 /** @type {import("../../contracts/model.js").WordList<"auto" | "on" | "off">} */
 const MACRO_PROTECTION = [["auto", "Automatic"], ["on", "On"], ["off", "Off"]];
@@ -368,9 +373,6 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     physicalHalves: [[0, "left"], [1, "right"], [0xff, "side not set"]],
     macroPlayback: {setup: "setup", blocked: "blocked", unavailable: "unavailable"},
     macroProtection: MACRO_PROTECTION,
-    // Where an autocorrect typo matches a word (firmware glossary "Where it
-    // matches"), by the number its row stores.
-    autocorrectMatches: AUTOCORRECT_MATCHES,
     // The setting macroProtection chooses (firmware glossary "Uninterruptible
     // playback"), as its field and Review name it, and Automatic as it says
     // whether it plays the macro uninterruptibly now ("Automatic · on").
@@ -606,12 +608,14 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     // file's differences: by their headings, but for three. The summary
     // already names behaviour and combo rows "Behaviours" and "Combos", so
     // their sections say "settings"; Key feedback flash is counted with the
-    // Key feedback lighting stage, so it takes the stage's name.
+    // Key feedback lighting stage, so it takes the stage's name; and Text
+    // replacement's section, which is its switch, is counted beside its list
+    // and says so.
     fileSections: {
         keyTiming: SETTINGS_SECTIONS.keyTiming, startupLayers: SETTINGS_SECTIONS.startupLayers, behaviorSettings: "Behaviour settings", comboSettings: "Combo settings",
         comboReferences: SETTINGS_SECTIONS.comboReferences, keyboardOptions: SETTINGS_SECTIONS.keyboardOptions, lightingPower: SETTINGS_SECTIONS.lightingPower, rgbAppearance: SETTINGS_SECTIONS.rgbAppearance,
         lightingFeedback: "Key feedback", normalPointerSpeed: SETTINGS_SECTIONS.normalPointerSpeed, sniping: SETTINGS_SECTIONS.sniping, autoMouse: SETTINGS_SECTIONS.autoMouse,
-        autocorrect: SETTINGS_SECTIONS.autocorrect,
+        autocorrect: "Text replacement switch",
     },
     // Why a behaviour, or a key toward a combo, does not take part
     // (participation.js), in the words of the switch that says no, and of the
@@ -636,6 +640,7 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
         behaviourSteps: {label: "Behaviour tap counts", what: "Each behaviour's tap counts, up to the deepest one it sets, added up across all behaviours."},
         combos: {label: "Combos", what: "Combos on any layer."},
         macros: {label: "Macros", what: "Macro slots with steps."},
+        autocorrectTyped: {label: "Text replacement typed", what: "Everything typed for a text replacement, added up across the list."},
         customKeys: {label: "Custom keys", what: "Custom keys with a name, a shortcut or a behaviour."},
         pointingModes: {label: "Pointing modes", what: "Slots that hold a pointing mode."},
         lightingGroups: {label: "LED sets", what: "The different sets of LEDs accents light; accents that light the same LEDs share one."},
@@ -749,7 +754,7 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     settingOff: {switches: {behaviour: {off: "Behaviours are off.", fix: `Turn them on in ${SETTINGS_SCREENS.behaviours} →`},
         combo: {off: "Combos are off.", fix: `Turn them on in ${SETTINGS_SCREENS.combos} →`},
         autoMouse: {off: "Auto-mouse is off.", fix: `Turn it on in ${SETTINGS_SCREENS.pointer} →`},
-        autocorrect: {off: "Autocorrect is off.", fix: "Turn it on in Autocorrect →"}}, stage: "This stage paints nothing."},
+        autocorrect: {off: "Text replacement is off.", fix: `Turn it on in ${SETTINGS_SCREENS.host} →`}}, stage: "This stage paints nothing."},
     // A behaviour's own switch, as its editor labels it and the review names
     // it, and the fold its timings open from.
     behaviourFields: {anchor: "Keeps the pointer layer on", timings: "Timings"},
@@ -809,7 +814,7 @@ const modifierNames = (mask) => VOCABULARY.modifiers.filter(([bit]) => mask & bi
 // that screen is (the pointer's settings are Pointer's); Settings is the
 // other Settings screens'. The interface keeps a copy of the order
 // (webview/view/review.mjs AREAS, pinned by tests/view/enum-drift.test.mjs).
-const REVIEW_AREAS = Object.freeze({keys: "Keys", layers: "Layers", behaviours: "Behaviours", combos: "Combos", customKeys: "Custom keys", macros: "Macros", autocorrect: "Autocorrect",
+const REVIEW_AREAS = Object.freeze({keys: "Keys", layers: "Layers", behaviours: "Behaviours", combos: "Combos", customKeys: "Custom keys", macros: "Macros", autocorrect: "Text replacement",
     pointer: "Pointer", pointing: "Pointing modes", lighting: "Lighting", settings: "Settings", profile: "Profile", recovery: "Recovery"});
 // Each part of the profile as the area Review groups its changes under, by
 // the area core/schema/profile-domains.js gives it: where a refusal says the
@@ -866,4 +871,4 @@ function failureSentence(error) {
     return INCOMPATIBLE_ANSWERS.has(String(code)) ? FAILURE_WORDS.incompatible : FAILURE_WORDS.unreadable;
 }
 
-module.exports = {PHASE, listed, PHASE_WORDS, HALVES_WORDS, LIVE_RESULT_WORDS, SAVE_STEP_WORDS, SAVE_FAILURE_WORDS, APPLY_VERDICTS, SAVE_WORDS, INTERRUPTION_REASONS, PROFILE_FULL_WORDS, heldWords, EDIT_MODE_WORDS, editModeWords, quietWords, VOCABULARY, word, layerName, macroDefaultName, slotName, branchName, ledsCalled, LAYER_KEY_VERBS, wordedMacroError, protectionWords, settingsPath, modifierNames, PROFILE_AREAS, REVIEW_AREAS, FAILURE_WORDS, sayable, arkCode, failureSentence};
+module.exports = {TEXT_REPLACEMENT_KEYS, PHASE, listed, PHASE_WORDS, HALVES_WORDS, LIVE_RESULT_WORDS, SAVE_STEP_WORDS, SAVE_FAILURE_WORDS, APPLY_VERDICTS, SAVE_WORDS, INTERRUPTION_REASONS, PROFILE_FULL_WORDS, heldWords, EDIT_MODE_WORDS, editModeWords, quietWords, VOCABULARY, word, layerName, macroDefaultName, slotName, branchName, ledsCalled, LAYER_KEY_VERBS, wordedMacroError, protectionWords, settingsPath, modifierNames, PROFILE_AREAS, REVIEW_AREAS, FAILURE_WORDS, sayable, arkCode, failureSentence};

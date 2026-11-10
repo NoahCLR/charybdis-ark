@@ -7,10 +7,12 @@
 // can type under Caps Lock, and the undo. It is the one matcher: Try it shows
 // its result, the list's warnings ask it which typo fires, and the firmware's
 // behaviour fixture holds it to the keyboard (tests/model). What needs a key,
-// a timing or a setting (shortcuts, held keys, macros, the queue) has no form
-// in text and is not here.
+// a timing or a setting (shortcuts, held keys, macro keys, the queue) has no
+// form in text and is not here. A replacement that plays a macro is: the
+// typed form goes and the macro's text, when it is only text, takes its
+// place.
 
-const {AUTOCORRECT_DOMAIN_V1, AUTOCORRECT_MATCH} = require("../schema/autocorrect-domain-v1");
+const {AUTOCORRECT_DOMAIN_V1, AUTOCORRECT_MATCH, entryKey, playsMacro} = require("../schema/autocorrect-domain-v1");
 const {AUTOCORRECT_APOSTROPHE, capitalOfWordCharacter, foldWordCharacter} = require("../data/autocorrect-words");
 const {hostLayout} = require("../data/host-layouts");
 
@@ -22,11 +24,13 @@ const {hostLayout} = require("../data/host-layouts");
  * @typedef {{entry: Entry, typo: Typo, characters: string[]}} Listed a typo with its entry, and its characters
  * @typedef {{whole: Map<string, Listed>, parts: Listed[]}} Index a list's whole-word typos by their text, and its part-of-word typos in the domain's byte order
  * @typedef {{entry: Entry, typo: Typo, start: number, end: number}} Fired the typo that fires on a word, and the characters of the word it matched
+ * @typedef {(slot: number) => {text: string | null} | null} Macros what a macro slot plays: its text when it types only text, `text: null` when it does more, and null for a slot that is empty or cannot play
+ * @typedef {{entry: string, correction: string, typo: string, macro?: number}} Replaced a replacement that fired: its entry's key, its text ("" for a macro), the typed form, and the macro slot it played
  */
 
 // The keyboard follows this many characters of a word, and types no
 // correction that takes more key strokes than this, erasing included.
-const WORD_MAX = 32, STROKES_MAX = 48;
+const WORD_MAX = 32, STROKES_MAX = 288;
 const BACKSPACE = "\b";
 // Enter and Tab end a word and print nothing a Backspace could take back.
 const ENDS_WITHOUT_UNDO = new Set(["\n", "\t"]);
@@ -150,15 +154,17 @@ function formOf(matched, correction) {
 // `before` is text already there that the keyboard did not see typed: the
 // first character starts a word after it, and a Backspace into it deletes
 // what the keyboard does not know, as on the keyboard.
-/** @param {AutocorrectList} list @param {Host} host @param {boolean} capsLock @param {string} screen @param {string} [before] @returns {{text: string, fired: {correction: string, typo: string}[], undone: boolean}} */
-function typedText(list, host, capsLock, screen, before = "") {
+// `macros` says what each macro slot plays; without it every macro
+// replacement is passed over, as one with an empty slot is.
+/** @param {AutocorrectList} list @param {Host} host @param {boolean} capsLock @param {string} screen @param {string} [before] @param {Macros} [macros] @returns {{text: string, fired: Replaced[], undone: boolean}} */
+function typedText(list, host, capsLock, screen, before = "", macros = () => null) {
     const index = indexed(list), layout = hostLayout(host.layout);
     const macos = host.macos ?? layout?.os === "macos";
     /** @param {string} character */
     const strokes = character => strokesFor(layout, macos, capsLock, character);
 
     const out = [...before];
-    /** @type {{correction: string, typo: string}[]} */
+    /** @type {Replaced[]} */
     const fired = [];
     /** @type {string[]} */
     let word = [];
@@ -202,13 +208,24 @@ function typedText(list, host, capsLock, screen, before = "") {
         while (end > first && word[end - 1] === AUTOCORRECT_APOSTROPHE) end--;
         if (suspended || leftAlone || first === end) return null;
         const inWord = /** @param {Fired} choice @returns {Fired} */ choice => ({...choice, start: choice.start + first, end: choice.end + first});
-        const choice = choose(index, word.slice(first, end).map(folded), candidate => corrected(inWord(candidate)) !== null);
+        // A macro plays for the whole word, with nothing typed after it that
+        // the erase would take along, and only when its slot can play.
+        /** @param {Fired} candidate */
+        const plays = candidate => candidate.start === 0 && candidate.end === end - first && end === word.length ? macros(/** @type {number} */ (candidate.entry.macro)) : null;
+        const choice = choose(index, word.slice(first, end).map(folded), candidate => playsMacro(candidate.entry) ? plays(candidate) !== null : corrected(inWord(candidate)) !== null);
+        if (choice && playsMacro(choice.entry)) {
+            // The typed form goes and the macro plays; there is no undo.
+            out.length -= word.length - first;
+            out.push(...(plays(choice)?.text ?? ""));
+            fired.push({entry: entryKey(choice.entry), correction: "", typo: choice.typo.typo, macro: choice.entry.macro});
+            return null;
+        }
         const result = choice && corrected(inWord(choice));
         // A word that already reads as the correction would leave it stays.
         if (!choice || !result || (result.kept === result.text.length && result.kept === word.length)) return null;
         out.length -= word.length - result.kept;
         out.push(...result.text.slice(result.kept));
-        fired.push({correction: choice.entry.correction, typo: choice.typo.typo});
+        fired.push({entry: entryKey(choice.entry), correction: choice.entry.correction, typo: choice.typo.typo});
         return {kept: result.kept, typed: result.text.length - result.kept};
     };
 

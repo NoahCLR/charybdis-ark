@@ -12,7 +12,7 @@ pages carry are [blob-and-digests.md](blob-and-digests.md).
 ## Raw HID reports
 
 The firmware answers Raw HID itself (D-F31,
-[`0031`](https://github.com/NoahCLR/charybdis-4x6/blob/3d13219524187e2c879ba09b7108716279d42a5b/docs/adr/0031-via-is-not-supported.md)): QMK's Raw HID interface,
+[`0031`](https://github.com/NoahCLR/charybdis-4x6/blob/e28ffca6f293c122d3be25c219caa222905073a3/docs/adr/0031-via-is-not-supported.md)): QMK's Raw HID interface,
 usage page `0xFF60`, 32-byte reports both ways. Every report goes to the
 Profile Wire handlers and is sent back exactly once, in place, as the reply,
 with the same length.
@@ -131,8 +131,9 @@ Page 3, the [autocorrect list](autocorrect-domain.md#ceilings)'s ceilings
 | 2–3 | maximum typos | 1,024 |
 | 4–5 | text capacity in bytes, corrections and typos together | 20,480 |
 | 6–9 | autocorrect domain capacity in bytes | 34,824 |
-| 10 | maximum bytes in one correction or typo | 32 |
-| 11–24 | zero | |
+| 10 | maximum bytes in one typo | 32 |
+| 11 | maximum bytes in one text correction | 128 |
+| 12–24 | zero | |
 
 The values come from one header, `users/noah/lib/compat/qmk_profile_capabilities.h`,
 which the Raw HID channel and the contract probe (`tests/host/run_contract_probe.sh`)
@@ -144,7 +145,7 @@ Held by: `tests/host/run_profile_wire_v1_tests.sh` (`profile_wire_v1_test.c`, th
 
 Capability page 0 bytes 9–12. It holds only what a build varies by; no
 firmware behaviour depends on a bit, the word only describes the build (D-F28,
-[`0028`](https://github.com/NoahCLR/charybdis-4x6/blob/3d13219524187e2c879ba09b7108716279d42a5b/docs/adr/0028-new-base-32-bit-profile-lengths.md)).
+[`0028`](https://github.com/NoahCLR/charybdis-4x6/blob/e28ffca6f293c122d3be25c219caa222905073a3/docs/adr/0028-new-base-32-bit-profile-lengths.md)).
 
 | Bit | Meaning |
 | ---: | --- |
@@ -297,7 +298,7 @@ Held by: `tests/host/run_qmk_portable_profile_tests.sh` (`qmk_portable_profile_t
 ## Flash pauses — GET `0x0D`
 
 Each half measures how long its profile-slot flash work stops the keyboard
-(D-F29, [`0029`](https://github.com/NoahCLR/charybdis-4x6/blob/3d13219524187e2c879ba09b7108716279d42a5b/docs/adr/0029-profile-slots-in-their-own-flash-region.md)).
+(D-F29, [`0029`](https://github.com/NoahCLR/charybdis-4x6/blob/e28ffca6f293c122d3be25c219caa222905073a3/docs/adr/0029-profile-slots-in-their-own-flash-region.md)).
 Byte page `0` is the master half's figures; page `1` the slave half's, as the
 master half last pulled them over the split link; page 2 and above answer
 status `2`. Page 1 answers status `3` until a pull has succeeded.

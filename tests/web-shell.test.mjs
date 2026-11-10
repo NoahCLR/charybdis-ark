@@ -224,11 +224,11 @@ test("a chosen profile file has the portable document's size limit", async () =>
     await assert.rejects(readProfileFile(file(FILE_MAX_BYTES + 1)), /too large/);
 });
 
-test("a chosen autocorrect list has its own formats and size limit", async () => {
+test("a chosen text replacement list has its own formats and size limit", async () => {
     assert.deepEqual({accept: LIST_FILE.accept, max: LIST_FILE.max}, {accept: ".txt,.csv,.json,text/plain,text/csv,application/json", max: IMPORT_MAX_BYTES});
     const file = (size) => ({size, name: "typos.csv", text: async () => "teh,the"});
     assert.deepEqual(await readProfileFile(file(IMPORT_MAX_BYTES), LIST_FILE), {text: "teh,the", name: "typos.csv"});
-    await assert.rejects(readProfileFile(file(IMPORT_MAX_BYTES + 1), LIST_FILE), /too large for an autocorrect list/);
+    await assert.rejects(readProfileFile(file(IMPORT_MAX_BYTES + 1), LIST_FILE), /too large for a text replacement list/);
 });
 
 test("a stored recovery copy lists with what made it and its keyboard, an older one without", () => {

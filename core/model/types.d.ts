@@ -31,6 +31,8 @@ export interface ProfileDestination extends Partial<ActionLimits> {
     maxAutocorrectTypos?: number;
     autocorrectTextBytes?: number;
     autocorrectBytes?: number;
+    autocorrectTextMax?: number;
+    autocorrectCorrectionMax?: number;
     brightnessMax?: number;
     effects?: {id: number; name: string}[];
     detectedHostOs?: number;

@@ -78,10 +78,12 @@ export interface PdConfig {
 }
 /** Where a typo matches a word, as the keyboard stores it: 0 the whole word, 1 its start, 2 its end, 3 anywhere in it. */
 export type AutocorrectMatch = 0 | 1 | 2 | 3;
-/** A typo as an edit names it; `match` left out is the whole word. */
+/** A typed form as an edit names it (the firmware's and this contract's name for one is a typo): written as a person writes it, a whole word or with `*` where other letters may go (`recieve*`, `*mnet`, `*tihng*`). `match` is only an older list file's, for one written without `*`. */
 export interface AutocorrectTypoEdit {typo: string; match?: AutocorrectMatch}
-/** A correction with its typos, as a file or the starter list gives one. */
-export interface AutocorrectEntryEdit {correction: string; typos: AutocorrectTypoEdit[]}
+/** What an edit names as a replacement (a correction, in the firmware's and this contract's names): its text, or the number of the macro slot it plays. One of the two. */
+export type AutocorrectReplacement = {correction: string; macro?: undefined} | {macro: number; correction?: undefined};
+/** A replacement with what is typed for it, as a file or the starter list gives one. */
+export type AutocorrectEntryEdit = AutocorrectReplacement & {typos: AutocorrectTypoEdit[]};
 export interface SettingEdit {macro: string; enabled?: boolean; value?: Scalar | boolean}
 
 export interface EditPayloads {
@@ -113,15 +115,15 @@ export interface EditPayloads {
         | {protection: 'auto' | 'on' | 'off'; payload?: string; name?: string}
     );
     validateMacro: {keycode: string; payload: string; requestId: number};
-    /** Typos for a correction: the entry is made when the list has none of that exact spelling, otherwise they are added to it. */
-    addAutocorrectTypos: {correction: string; typos: AutocorrectTypoEdit[]; expectedFingerprint?: string};
-    /** A correction respelled where it stands; respelled to one the list already has, its typos join that one. */
-    updateAutocorrectCorrection: {correction: string; to: string; expectedFingerprint?: string};
-    /** One typo respelled (`to`), matched elsewhere (`match`), or moved to another correction, made when the list has none of that spelling. */
-    updateAutocorrectTypo: {typo: string; to?: string; match?: AutocorrectMatch; correction?: string; expectedFingerprint?: string};
-    /** A typo removed; a correction's last typo takes its entry with it. */
+    /** Typed forms for a replacement: the entry is made when the list has none of that exact text or macro, otherwise they are added to it. */
+    addAutocorrectTypos: AutocorrectReplacement & {typos: AutocorrectTypoEdit[]; expectedFingerprint?: string};
+    /** A replacement changed where it stands: its text respelled (`to`), or made to play a macro (`toMacro`). Changed to one the list already has, what is typed for it joins that one. */
+    updateAutocorrectCorrection: AutocorrectReplacement & ({to: string; toMacro?: undefined} | {toMacro: number; to?: undefined}) & {expectedFingerprint?: string};
+    /** One typed form, named by its stored letters, written anew (`to`, with its `*`), or moved to another replacement (`correction` or `macro`), made when the list has none such. */
+    updateAutocorrectTypo: {typo: string; to?: string; correction?: string; macro?: number; expectedFingerprint?: string};
+    /** A typed form removed; a replacement's last one takes its entry with it. */
     deleteAutocorrectTypo: {typo: string; expectedFingerprint?: string};
-    deleteAutocorrectEntry: {correction: string; expectedFingerprint?: string};
+    deleteAutocorrectEntry: AutocorrectReplacement & {expectedFingerprint?: string};
     /** A file's entries, or the starter list's, added to the list or replacing it. What the list cannot take of them is left out, as the import's preview said it would be. */
     importAutocorrect: {mode: 'add' | 'replace'; entries: AutocorrectEntryEdit[]; expectedFingerprint?: string};
     /** An autocorrect edit checked against the draft without staging it: answered with what it would be refused for, or would newly warn about. */
@@ -153,7 +155,7 @@ export type EditOf<K extends keyof EditPayloads> = {type: K} & EditPayloads[K];
 export type PanelEdit = {[K in keyof EditPayloads]: EditOf<K>}[keyof EditPayloads];
 /** Every posted edit the draft stages: an import opens a review and a macro or autocorrect check is answered, none of them an edit. core/model/draft-edits.js registers each one. */
 export type DraftEditType = Exclude<keyof EditPayloads, 'reviewPortableProfile' | 'validateMacro' | 'validateAutocorrect'>;
-/** The edits the Autocorrect screen makes to the list. */
+/** The edits the Text replacement screen makes to the list. */
 export type AutocorrectEditType = 'addAutocorrectTypos' | 'updateAutocorrectCorrection' | 'updateAutocorrectTypo' | 'deleteAutocorrectTypo' | 'deleteAutocorrectEntry' | 'importAutocorrect';
 export type AutocorrectEdit = Extract<PanelEdit, {type: AutocorrectEditType}>;
 

@@ -77,8 +77,9 @@ function fakeKeyboard({document, compiled, settingsVersion = 11, compiledOnly = 
         p.writeUInt32LE(130048, 10); p.writeUInt32LE(34903, 14); p.writeUInt16LE(640, 18);
     }), page(25, (p) => {
         // The autocorrect list's ceilings (firmware D-F68): corrections,
-        // typos, text bytes, the domain, bytes in one text.
-        p.writeUInt16LE(1024, 0); p.writeUInt16LE(1024, 2); p.writeUInt16LE(20480, 4); p.writeUInt32LE(34824, 6); p[10] = 32;
+        // typos, text bytes, the domain, bytes in one typo and in one text
+        // correction.
+        p.writeUInt16LE(1024, 0); p.writeUInt16LE(1024, 2); p.writeUInt16LE(20480, 4); p.writeUInt32LE(34824, 6); p[10] = 32; p[11] = 128;
     })];
     // Committed (or running its defaults), converged with the slave half,
     // nothing pending.

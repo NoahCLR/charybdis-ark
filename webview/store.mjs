@@ -101,13 +101,15 @@ export const STATE_FIELDS = {
     feedbackRow: kept("hold"),
     macroSlot: kept(null),
     macroSearch: kept(""),
-    // The Autocorrect screen: its search and order, the entry open for
-    // editing, the Add form as typed, and the core's answer to the edit
-    // being typed. The forms start again when the draft is replaced.
+    // The Text replacement screen: its search and order, the row being
+    // added, the part of an entry open for editing, and the core's answer to
+    // the edit being typed. The forms start again when the draft is replaced.
     autocorrectSearch: kept(""),
-    autocorrectSort: kept("correction"),
-    autocorrectOpen: resets(null),
-    autocorrectAdd: resetsTo(/** @type {PanelState["autocorrectAdd"]} */ ({correction: "", typos: "", match: 0}), () => ({correction: "", typos: "", match: 0})),
+    autocorrectSort: kept("replacement"),
+    autocorrectAdding: resets(null),
+    autocorrectEdit: resets(null),
+    autocorrectExport: kept(false),
+    autocorrectTryOpen: kept(false),
     autocorrectCheck: resets(null),
     autocorrectImport: resets(null),
     // What was typed into Try it stays through a draft change: it is tried

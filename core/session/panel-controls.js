@@ -294,10 +294,10 @@ const PORTABLE_ACTIONS = Object.freeze({
     // The draft's autocorrect list as a file (D-L85): what is on screen, the
     // edits not yet saved included. Saving the file is the shell's.
     exportAutocorrect: async ({session, message, shell}) => {
-        if (!session.draft) throw new Error("Read the keyboard before exporting its autocorrect list.");
+        if (!session.draft) throw new Error("Read the keyboard before exporting its text replacement list.");
         const {format} = /** @type {Extract<PortableMessage, {type: "exportAutocorrect"}>} */ (message);
         const where = await shell.saveExport?.(exportedList(session.draft.current, format));
-        if (where) session.notice = `Autocorrect list exported to ${where}`;
+        if (where) session.notice = `Text replacement list exported to ${where}`;
     },
     manageLayers: async ({session, service}) => {
         const before = session.draft?.current || await service.readPortableProfile();

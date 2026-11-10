@@ -3,8 +3,8 @@
 The words for the app: how a person reads the keyboard, edits it in a draft,
 reviews and keeps changes, and backs them up. The keyboard's own words
 (profile, half, generation, working copy, edit mode, Save, Apply, behaviour,
-pointing mode, switch key, the autocorrect list with its entries, corrections
-and typos, and the rest) are in the [firmware's
+pointing mode, switch key, the autocorrect list with its entries, and the
+rest) are in the [firmware's
 glossary](upstream/firmware/GLOSSARY.md), which Ark imports at a pinned
 commit. A person sees the keyboard's Apply and its Save both as **Save**
 (D-L72).
@@ -137,19 +137,54 @@ _Avoid_: restore (alone), load, upload
 
 **Screen**:
 One of Ark's top-level views chosen from the rail, in three groups: Keymap,
-Lighting, Macros, Autocorrect, Custom keys and Pointing modes under
+Lighting, Macros, Text replacement, Custom keys and Pointing modes under
 Configure; Behaviours, Combos, Pointer and Host under Settings; Backups and
 Keyboard under Keyboard. Outside the rail, a Settings screen is named with "settings" after
 it (Behaviour settings, Combo settings, Pointer settings, Host settings),
 since nothing around a link or a tip says it is one.
 _Avoid_: page, tab, area (for this), surface, panel
 
+**Text replacement**:
+What a person calls the keyboard replacing what is typed when a word ends: a
+typo fixed, longer text typed, a macro played. It is the name on the rail,
+the screen, the Host card, the Memory panel, the picker and every message.
+The keyboard, its firmware and its keys call it **autocorrect**, and Ark's
+code, contracts, screen id, domain name and files keep that name
+(`autocorrect`, `AC_ON`, `core/model/autocorrect-*.js`); the picker's help
+and the guide say "autocorrect" once, so a search for it finds the feature.
+_Avoid_: autocorrect (in anything a person reads, but for that one mention),
+text expansion, snippets, shortcut (a custom key's)
+
+**Replacement**:
+What an entry of the text replacement list puts in place of what was typed:
+a line of text of up to 128 bytes, or a macro, named by its slot and shown by
+its name. Stored once. The firmware and Ark's code call it a `correction`.
+_Avoid_: correction (in anything a person reads), word, expansion, output
+
+**Typed** (a typed form):
+What is typed to get a replacement: one word of letters and digits, a
+misspelling or an abbreviation such as `pnumber`. A column, a count and a
+label read **Typed** ("12 typed"); a sentence says "a typed form" or "what is
+typed for it". It belongs to one replacement. The firmware and Ark's code
+call it a `typo`.
+_Avoid_: typo (as the term; a misspelling is still a typo, and "common typo
+fixes" says so), variation, trigger, abbreviation (as the term), pattern
+
+**`*`** (in a typed form):
+Where other letters may go. A typed form is the whole word unless it is
+written with one: `recieve*` the start of a word, `*mnet` the end, `*tihng*`
+anywhere in one (D-L84). It is how Ark writes, shows and takes the four
+matches the keyboard stores; no control, label or message names a match.
+_Avoid_: whole word, start of word, end of word, anywhere (as a choice or a
+label), match type, wildcard, boundary
+
 **Try it**:
-The box on the Autocorrect screen that is typed in as on the keyboard and
-shows what the computer would end with, under the draft's list and host
+The box on the Text replacement screen that is typed in as on the keyboard
+and shows what the computer would end with, under the draft's list and host
 layout. It runs the keyboard's own rules over text (D-L86), so it shows the
-corrections and the undo, and nothing that needs a key or a timing: a
-shortcut, a cursor key, a held key, a macro.
+replacements and the undo, and nothing that needs a key or a timing: a
+shortcut, a cursor key, a held key, a macro key. For a replacement that plays
+a macro it says which, and shows the macro's text when that is all it is.
 _Avoid_: preview (for this), simulator, test box
 
 **Area**:

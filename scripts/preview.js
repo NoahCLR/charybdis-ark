@@ -55,6 +55,18 @@ function fillPreviewLayer(document) {
     return document;
 }
 
+// The fixture's text replacement list fixes typos only. The preview adds
+// what else a list holds: an abbreviation for a phone number and one for a
+// sign-off of some length, so a long replacement is there to look at.
+/** @param {import("../core/model/types.js").PortableDocument} document */
+function withPreviewReplacements(document) {
+    return portable.editProfileDomains(document, {capabilities}, open => {
+        open("autocorrect").entries.push(
+            {correction: "+31 6 1234 5678", typos: [{typo: "pnumber", match: 0}]},
+            {correction: "Kind regards, Sam Example | sam@example.com | Example Street 12, Amsterdam", typos: [{typo: "sigoff", match: 0}, {typo: "regards", match: 1}]});
+    });
+}
+
 /** @type {Partial<import("../core/session/types.js").DeviceCapabilities> & {brightnessMax: number}} */
 const capabilities = {
     protocol: {major: 2, minor: 1},
@@ -83,6 +95,7 @@ const capabilities = {
     autocorrectTextBytes: 20480,
     autocorrectBytes: 34824,
     autocorrectTextMax: 32,
+    autocorrectCorrectionMax: 128,
 };
 
 // The web page's shell as the preview stands in for it: what the page offers
@@ -172,7 +185,7 @@ const keyboardStatus = (stopped) => ({saving: false, autoSaving: false, savedByK
 
 /** @param {import("../core/session/types.js").PanelShell} [shell] @param {{live?: boolean, mode?: number, stopped?: boolean, held?: boolean, apply?: import("../contracts/model.js").ApplyView}} [options] */
 function buildModel(shell = WEB_SHELL, {live = false, mode = 2, stopped = false, held = false, apply} = {}) {
-    const doc = fillPreviewLayer(document32());
+    const doc = withPreviewReplacements(fillPreviewLayer(document32()));
     const snapshot = {
         document: doc,
         fingerprint: portable.fingerprint(doc),
@@ -186,7 +199,7 @@ function buildModel(shell = WEB_SHELL, {live = false, mode = 2, stopped = false,
     const deviceId = "preview-charybdis";
     let liveSnapshot;
     if (live) {
-        const working = editLayers(fillPreviewLayer(document32()), layers => {layers[0][13] = /** @type {number} */ (keycodes.encode("KC_ESC"));});
+        const working = editLayers(withPreviewReplacements(fillPreviewLayer(document32())), layers => {layers[0][13] = /** @type {number} */ (keycodes.encode("KC_ESC"));});
         const bytes = Buffer.from(working.profile, "base64"), saved = Buffer.from(doc.profile, "base64");
         liveSnapshot = {...snapshot, document: working, fingerprint: portable.fingerprint(working), summary: portable.summary(working), saved: snapshot,
             runtime: null, live: {mode, session: 0x5e550001, revision: 1, savedGeneration: 42, savedOrigin: 0, unsaved: true, converged: true, working: bytes, saved, defaults: saved,

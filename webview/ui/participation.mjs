@@ -6,7 +6,7 @@ import {getModel, render, state} from "../store.mjs";
 import {layerSwitchGrid, switchedLayers} from "./layer-switches.mjs";
 import {ALL_LAYERS} from "../view/layout.mjs";
 import {layerOff, masterOff} from "../view/participation.mjs";
-import {AUTOCORRECT_SECTION, editorScreenOf} from "../view/settings-layout.mjs";
+import {screenOfSection} from "../view/settings-layout.mjs";
 import {phraseSentence, said, vocabulary} from "../view/vocabulary.mjs";
 /** @typedef {import("../../contracts/model.js").SettingOffSwitch} SettingOffSwitch */
 
@@ -29,7 +29,7 @@ const kindOf = (noun) => noun === "combo" ? "combo" : "behavior";
 // A global switch a banner names: the Settings section it is in, and its field.
 /** @type {Readonly<Record<SettingOffSwitch, {section: string, macro: string}>>} */
 const SWITCHES = {behaviour: {section: "behaviorSettings", macro: "behaviorsEnabled"}, combo: {section: "comboSettings", macro: "combosEnabled"},
-    autoMouse: {section: "autoMouse", macro: "autoMouse"}, autocorrect: {section: AUTOCORRECT_SECTION, macro: "autocorrect"}};
+    autoMouse: {section: "autoMouse", macro: "autoMouse"}, autocorrect: {section: "autocorrect", macro: "autocorrect"}};
 // A banner that says a global switch is off, and goes to it, marking its row.
 // `detail` is what that means where the banner is.
 /** @param {SettingOffSwitch} name @param {string} [detail] @returns {HTMLElement} */
@@ -38,7 +38,7 @@ export function settingOffBanner(name, detail = "") {
     const {section, macro} = SWITCHES[name];
     const banner = el(`<button type="button" class="callout master-off" data-master-off><strong>${esc(words.off)}</strong> ${detail ? `${esc(detail)} ` : ""}${esc(words.fix)}</button>`);
     banner.addEventListener("click", () => {
-        Object.assign(state, {screen: editorScreenOf(section), reveal: `.setrow:has([data-macro="${macro}"])`});
+        Object.assign(state, {screen: screenOfSection(section), reveal: `.setrow:has([data-macro="${macro}"])`});
         render();
     });
     return banner;
