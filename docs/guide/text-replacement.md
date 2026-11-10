@@ -126,8 +126,9 @@ auto-mouse; searching it for "autocorrect" finds them too.
 The screen works as [Macros](macros.md) does: the list of **Replacements**
 at the left, and the one you pick open beside it.
 
-Each replacement is on one line, text as it is and a macro as **▶** and its
-name, with its inputs under it, each written as you wrote it, with its `*`.
+Each replacement is on one line, text as it is and a macro by its name after
+the macros' icon (the one Macros and the key picker show), with its inputs
+under it, each written as you wrote it, with its `*`.
 That is what a replacement is called everywhere: here, in its editor's
 title, in Review and in an import's summary. The first is open until you
 pick another, and the one you picked stays open when you come back to the

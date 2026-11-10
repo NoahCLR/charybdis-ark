@@ -95,9 +95,9 @@ test("a replacement may play a macro: named by its slot, for whole words only, b
 test("a replacement has one name wherever it is listed, and one inside a sentence; a field's text is its inputs, split at spaces", () => {
     const names = Object.assign([], {5: "Sign-off"});
     assert.equal(replacementCalled({correction: "because"}, names), "because");
-    assert.equal(replacementCalled({correction: "", macro: 5}, names), "▶ Sign-off");
-    assert.equal(replacementCalled({macro: 6}, names), "▶ Macro 6", "a macro with no name by what Macros calls it");
-    assert.equal(replacementCalled({macro: 6}), "▶ Macro 6");
+    assert.equal(replacementCalled({correction: "", macro: 5}, names), "Sign-off");
+    assert.equal(replacementCalled({macro: 6}, names), "Macro 6", "a macro with no name by what Macros calls it");
+    assert.equal(replacementCalled({macro: 6}), "Macro 6");
     assert.equal(replacementSaid({correction: "because"}, names), "“because”");
     assert.equal(replacementSaid({macro: 5}, names), "the macro “Sign-off”");
     assert.deepEqual(splitInputs("  teh   hte\trecieve* "), ["teh", "hte", "recieve*"]);

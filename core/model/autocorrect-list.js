@@ -60,15 +60,14 @@ function requireTypable(text, host, what) {
 // A macro as the screens call it: its name, or "Macro 5".
 /** @param {number} slot @param {MacroNames} [macroNames] */
 const macroCalled = (slot, macroNames) => macroNames?.[slot] || macroDefaultName(slot);
-// The mark before the name of a macro a replacement plays.
-const PLAYS = "▶";
 // A replacement as it is named wherever one is listed, the one way to name
-// it: its text, or the macro it plays by that macro's name after the mark
-// ("▶ Sign-off"). The bank, the editor's title, Review, an import's summary
-// and a file's refused line all read this; the panel publishes it as each
-// entry's `label`.
+// it: its text, or the macro it plays by that macro's name ("Sign-off"). The
+// bank, the editor's title, Review and an import's summary all read this; the
+// panel publishes it as each entry's `label`. A macro's is told apart by the
+// macros' mark, which the interface draws before it wherever it lists one
+// (Review's `mark`, an entry's `macro`), never by a character in the name.
 /** @param {{correction?: string, macro?: number}} target @param {MacroNames} [macroNames] */
-const replacementCalled = (target, macroNames) => target.macro === undefined ? String(target.correction) : `${PLAYS} ${macroCalled(target.macro, macroNames)}`;
+const replacementCalled = (target, macroNames) => target.macro === undefined ? String(target.correction) : macroCalled(target.macro, macroNames);
 // The same inside a sentence: its text in quotes, or "the macro “Sign-off”".
 /** @param {{correction?: string, macro?: number}} target @param {MacroNames} [macroNames] */
 const replacementSaid = (target, macroNames) => target.macro === undefined ? quoted(String(target.correction)) : `the macro ${quoted(macroCalled(target.macro, macroNames))}`;

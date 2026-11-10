@@ -466,7 +466,8 @@ function profileReview(before, after, capabilities) {
         /** @param {import("../schema/autocorrect-domain-v1.js").Entry} entry @param {Decoded} profile */
         const replacement = (entry, profile) => replacementCalled(entry, profile.settings.macroNames);
         /** @param {import("../schema/autocorrect-domain-v1.js").Entry | undefined} entry @param {Decoded} mine @param {Decoded} theirs @param {import("../schema/autocorrect-domain-v1.js").Entry | undefined} twin @param {string} moved @returns {Fields} */
-        const fields = (entry, mine, theirs, twin, moved) => new Map(/** @type {[string, Field][]} */ (!entry ? [] : [["Replacement", replacement(entry, mine)],
+        const fields = (entry, mine, theirs, twin, moved) => new Map(/** @type {[string, Field][]} */ (!entry ? [] : [["Replacement",
+                entry.macro === undefined ? replacement(entry, mine) : {text: replacement(entry, mine), key: `macro:${entry.macro}`, mark: {kind: "macro"}}],
             ...entry.typos.map(typo => {
                 const elsewhere = twin?.typos.some(row => row.typo === typo.typo) ? undefined : findTypo(theirs.autocorrect, typo.typo)?.entry;
                 return [`typo:${typo.typo}`, {label: "Input", key: typo.match,
@@ -476,7 +477,8 @@ function profileReview(before, after, capabilities) {
         const shown = next ? replacement(next, b) : replacement(/** @type {import("../schema/autocorrect-domain-v1.js").Entry} */ (old), a);
         const key = entryKey(/** @type {import("../schema/autocorrect-domain-v1.js").Entry} */ (old ?? next));
         item(AREA.autocorrect, UNIT.autocorrect(key, old && next && entryKey(old) !== entryKey(next) ? entryKey(next) : undefined), shown,
-            fields(old, a, b, next, "moved to"), fields(next, b, a, old, "moved from"), {kind: "autocorrect", entry: entryKey(/** @type {import("../schema/autocorrect-domain-v1.js").Entry} */ (next ?? old))}, [Boolean(old), Boolean(next)]);
+            fields(old, a, b, next, "moved to"), fields(next, b, a, old, "moved from"), {kind: "autocorrect", entry: entryKey(/** @type {import("../schema/autocorrect-domain-v1.js").Entry} */ (next ?? old))}, [Boolean(old), Boolean(next)],
+            (next ?? old)?.macro === undefined ? undefined : {kind: "macro"});
     }
     if (a.settings.values[HOST_SETTING] !== b.settings.values[HOST_SETTING]) {
         const oldHost = hostSettings(a.settings.values, before.hostOs?.detected), nextHost = hostSettings(b.settings.values, after.hostOs?.detected);

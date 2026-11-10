@@ -286,7 +286,8 @@ test("a replacement can play a macro: Pick… opens the keycode picker on the ma
     // The field names the macro; the bank names the replacement as the core calls it.
     await expect(field).toHaveValue("Macro 3");
     await expect(field).toHaveAttribute("data-ac-macro", "3");
-    await expect(bank(page).locator("[data-ac-new-item] .v")).toHaveText("▶ Macro 3");
+    await expect(bank(page).locator("[data-ac-new-item] .v")).toHaveText("Macro 3");
+    await expect(bank(page).locator('[data-ac-new-item] .v .kind-icon[data-kind="macro"]')).toHaveCount(1);
     const first = fresh.locator("[data-ac-first]");
     await expect(first).toBeFocused();
     await first.fill("sig sgi");
@@ -459,14 +460,17 @@ test("a replacement that plays a macro is named by its macro, told apart, and ed
     // As core publishes a list with one: its id is no text's, its macro a slot.
     await publish(page, (model) => {
         model.macros[5] = {...model.macros[5], name: "Sign-off", empty: false};
-        model.autocorrect.entries.push({id: "\u0001macro:5", label: "▶ Sign-off", correction: "", macro: 5, warnings: [], typos: [{typo: "sig", input: "sig", warnings: []}]},
-            {id: "\u0001macro:6", label: "▶ Macro 6", correction: "", macro: 6, warnings: ["“Macro 6” has no steps, so this replacement does nothing yet. Add steps in Macros, or choose another replacement."], typos: [{typo: "addr", input: "addr", warnings: []}]});
+        model.autocorrect.entries.push({id: "\u0001macro:5", label: "Sign-off", correction: "", macro: 5, warnings: [], typos: [{typo: "sig", input: "sig", warnings: []}]},
+            {id: "\u0001macro:6", label: "Macro 6", correction: "", macro: 6, warnings: ["“Macro 6” has no steps, so this replacement does nothing yet. Add steps in Macros, or choose another replacement."], typos: [{typo: "addr", input: "addr", warnings: []}]});
     });
     // It is called what the core calls it, in the bank and in its editor's title; its field names the macro.
     const played = bank(page).locator('[data-ac-entry$="macro:5"]');
-    await expect(played.locator(".v")).toHaveText("▶ Sign-off");
+    await expect(played.locator(".v")).toHaveText("Sign-off");
+    // A macro replacement is told apart by the macros' mark, as the picker and Review show a macro, never by a character in its name.
+    await expect(played.locator('.v .kind-icon[data-kind="macro"]')).toHaveCount(1);
+    await expect(bank(page).locator('[data-ac-entry="because"] .v .kind-icon')).toHaveCount(0);
     await played.click();
-    await expect(editor(page).locator(".title-name-text")).toHaveText("▶ Sign-off");
+    await expect(editor(page).locator(".title-name-text")).toHaveText("Sign-off");
     await expect(editor(page).locator("[data-ac-kind]")).toHaveText("Macro");
     await expect(editor(page).locator('[data-f$=":kind:macro"]')).toBeChecked();
     await expect(editor(page).locator("input[data-ac-macro]")).toHaveValue("Sign-off");
@@ -1085,7 +1089,7 @@ test("in the demo a replacement is made to play a macro, Try it says which, and 
     const name = (await picker.locator('[data-pick="MACRO_0"] .l').innerText()).trim();
     await pickMacro(page, "MACRO_0");
     await expect(fresh.locator("input[data-ac-macro]")).toHaveValue(name);
-    await expect(bank(page).locator("[data-ac-new-item] .v")).toHaveText(`▶ ${name}`);
+    await expect(bank(page).locator("[data-ac-new-item] .v")).toHaveText(name);
     // A * is refused for a macro, in plain words.
     const first = fresh.locator("[data-ac-first]");
     await first.fill("spot*");
@@ -1094,7 +1098,7 @@ test("in the demo a replacement is made to play a macro, Try it says which, and 
     await first.press("Enter");
     await expect(count(page)).toHaveText("9 replacements · 15 inputs");
     const played = bank(page).locator("[data-ac-entry]").filter({has: page.locator('[data-ac-input="spot"]')});
-    await expect(played.locator(".v")).toHaveText(`▶ ${name}`);
+    await expect(played.locator(".v")).toHaveText(name);
     await expect(played).toHaveAttribute("aria-current", "true");
     await expect(editor(page).locator("[data-ac-kind]")).toHaveText("Macro");
     // Try it: the box keeps what was typed; in the preview the input goes, and the line says what plays.
@@ -1111,7 +1115,7 @@ test("in the demo a replacement is made to play a macro, Try it says which, and 
     // Review names it by its macro.
     await page.locator('.commit [data-act="review"]').click();
     const review = page.locator('.sheet[aria-label="Review changes"]');
-    await expect(review).toContainText(`▶ ${name}`);
+    await expect(review).toContainText(name);
     await page.keyboard.press("Escape");
     // Deleted from its header, and back with one undo.
     await editor(page).locator('[data-act="ac-delete"]').click();

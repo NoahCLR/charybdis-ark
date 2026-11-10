@@ -55,7 +55,7 @@ import {topbar} from "./frame.mjs";
 import {dialogFoot} from "./dialog-foot.mjs";
 import {openPicker} from "./picker.mjs";
 import {attachInfoMarks, infoMark} from "./info-mark.mjs";
-import {replacementMark} from "./marks.mjs";
+import {marked, replacementMark} from "./marks.mjs";
 import {titleText} from "./title-name.mjs";
 import {settingOffBanner, settingSwitchedOff} from "./participation.mjs";
 import {getModel, post, render, state} from "../store.mjs";
@@ -185,7 +185,7 @@ export function receiveAutocorrectValidation(message) {
         const redraw = (joins?.entry ?? null) !== (fresh.joins?.entry ?? null);
         state.autocorrectNew = {...fresh, joins, label};
         if (redraw) render();
-        else if (label) /** @type {HTMLElement | null} */ (document.querySelector("[data-ac-new-item] .v"))?.replaceChildren(label);
+        else if (label) { const shown = /** @type {HTMLElement | null} */ (document.querySelector("[data-ac-new-item] .v")); shown?.replaceWith(el(`<span class="v">${named_(getModel(), label, fresh.kind === "macro")}</span>`)); }
     }
     paintFeedback();
     if (!waiting) return;
@@ -427,7 +427,7 @@ function bank(model, list, rows, open, canEdit) {
     if (fresh && !searching) {
         const named = addedReplacement(fresh);
         const cell = el(`<button type="button" class="mslot ac-item" data-ac-new-item aria-current="${esc(fresh.shown)}">
-            <span class="v">${esc(!named ? "New replacement" : fresh.label || (fresh.kind === "macro" ? macroName(model, fresh.macro) : fresh.text.trim()))}</span>
+            <span class="v">${!named ? "New replacement" : named_(model, fresh.label || (fresh.kind === "macro" ? macroName(model, fresh.macro) : fresh.text.trim()), fresh.kind === "macro")}</span>
             <span class="n">not on your list yet</span></button>`);
         cell.addEventListener("click", openNew);
         cells.appendChild(cell);
@@ -453,6 +453,11 @@ function bank(model, list, rows, open, canEdit) {
     return card;
 }
 
+// A replacement as it is listed: what the core calls it, a macro's after the
+// macros' mark, as the picker and Review show a macro (markup).
+/** @param {Model} model @param {string} label @param {boolean} macro */
+const named_ = (model, label, macro) => macro ? marked(model, {kind: "macro"}, label) : esc(label);
+
 // A replacement in the bank: what the core calls it on one line, with its
 // inputs under it. An input a search found is marked.
 /** @param {Model} model @param {ReturnType<typeof autocorrectRows>[number]} row @param {boolean} open @param {boolean} changed */
@@ -460,7 +465,7 @@ function item(model, {entry, found}, open, changed) {
     const warned = entry.warnings.length > 0 || entry.typos.some((typo) => typo.warnings.length);
     const tip = `${entry.label} · inputs: ${entry.typos.map((typo) => typo.input).join(", ")}${warned ? " · has a warning" : ""}`;
     const cell = el(`<button type="button" class="mslot filled ac-item ${warned ? "caution" : ""}" data-ac-entry="${esc(entry.id)}" aria-current="${esc(open)}" data-tip="${esc(tip)}">
-        <span class="v">${esc(entry.label)}</span>${changed ? draftDot(model?.draft, "corner") : ""}
+        <span class="v">${named_(model, entry.label, entry.macro !== undefined)}</span>${changed ? draftDot(model?.draft, "corner") : ""}
         <span class="n">${entry.typos.map((typo) => `<span ${found.includes(typo.typo) ? `class="found"` : ""} data-ac-input="${esc(typo.typo)}">${esc(typo.input)}</span>`).join(" ")}</span></button>`);
     cell.addEventListener("click", () => openInEditor(entry.id));
     return cell;
@@ -1037,7 +1042,7 @@ function importSheet(canEdit) {
     const preview = asked.pending || asked.error ? undefined : asked.preview;
     /** @param {import("../../contracts/messages.js").AutocorrectImportOutcome} outcome */
     const lines = (outcome) => importLines(outcome).map((line) => `<li data-ac-line="${esc(line.kind)}">${esc(line.text)}${line.names?.length
-        ? `<span class="ac-names">${line.names.slice(0, NAMES_SHOWN).map((name) => `<span>${esc(name)}</span>`).join("")}${line.names.length > NAMES_SHOWN ? `<span>and ${esc(line.names.length - NAMES_SHOWN)} more</span>` : ""}</span>` : ""}</li>`).join("");
+        ? `<span class="ac-names">${line.names.slice(0, NAMES_SHOWN).map((name) => `<span>${name.macro ? marked(getModel(), {kind: "macro"}, name.text) : esc(name.text)}</span>`).join("")}${line.names.length > NAMES_SHOWN ? `<span>and ${esc(line.names.length - NAMES_SHOWN)} more</span>` : ""}</span>` : ""}</li>`).join("");
     /** @param {import("../../contracts/messages.js").AutocorrectImportOutcome} outcome */
     const changes = (outcome) => outcome.newReplacements.length + outcome.addedInputs.length > 0;
     /** @param {import("../../contracts/messages.js").AutocorrectImportOutcome} outcome */

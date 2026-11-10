@@ -93,7 +93,7 @@ export const LIST_FILE_TOO_LARGE = "This file is too large for a text replacemen
 
 // What importing a file one way would do, as the lines its preview shows:
 // each a sentence, with the names it is about where it has some.
-/** @param {import("../../contracts/messages.js").AutocorrectImportOutcome} outcome @returns {{kind: "new" | "added" | "duplicates" | "refused" | "unfit" | "removed" | "nothing", text: string, names?: string[]}[]} */
+/** @param {import("../../contracts/messages.js").AutocorrectImportOutcome} outcome @returns {{kind: "new" | "added" | "duplicates" | "refused" | "unfit" | "removed" | "nothing", text: string, names?: {text: string, macro?: boolean}[]}[]} */
 export function importLines(outcome) {
     /** @param {{inputs: string[]}[]} groups */
     const inputs = (groups) => groups.reduce((total, group) => total + group.inputs.length, 0);
@@ -101,14 +101,14 @@ export function importLines(outcome) {
     const lines = [];
     if (outcome.removed) lines.push({kind: "removed", text: `${counted(outcome.removed, "replacement", "replacements")} in your list now ${outcome.removed === 1 ? "is" : "are"} deleted.`});
     if (outcome.newReplacements.length) lines.push({kind: "new", text: `${counted(outcome.newReplacements.length, "new replacement", "new replacements")}, with ${counted(inputs(outcome.newReplacements), "input", "inputs")}.`,
-        names: outcome.newReplacements.map((entry) => entry.label)});
+        names: outcome.newReplacements.map((entry) => ({text: entry.label, ...(entry.macro ? {macro: true} : {})}))});
     if (outcome.addedInputs.length) lines.push({kind: "added", text: `${counted(inputs(outcome.addedInputs), "more input", "more inputs")} for ${counted(outcome.addedInputs.length, "replacement", "replacements")} you already have.`,
-        names: outcome.addedInputs.map((entry) => `${entry.inputs.join(" ")} → ${entry.label}`)});
+        names: outcome.addedInputs.map((entry) => ({text: `${entry.inputs.join(" ")} → ${entry.label}`, ...(entry.macro ? {macro: true} : {})}))});
     if (outcome.duplicates) lines.push({kind: "duplicates", text: `${n(outcome.duplicates)} ${outcome.duplicates === 1 ? "is" : "are"} already in the list, and skipped.`});
     // What stopped the first of them is core's to say (`unfitWhy`).
     if (outcome.unfit) lines.push({kind: "unfit", text: `${n(outcome.unfit)} ${outcome.unfit === 1 ? "does" : "do"} not fit: ${outcome.unfitWhy}.`});
     if (outcome.refused.length) lines.push({kind: "refused", text: `${counted(outcome.refused.length, "line is", "lines are")} refused:`,
-        names: outcome.refused.map((row) => `${row.line === null ? "" : `${row.line}: `}${row.text} — ${row.reason}`)});
+        names: outcome.refused.map((row) => ({text: `${row.line === null ? "" : `${row.line}: `}${row.text} — ${row.reason}`}))});
     if (!outcome.newReplacements.length && !outcome.addedInputs.length && !outcome.removed) lines.unshift({kind: "nothing", text: "Nothing in it would change your list."});
     return lines;
 }

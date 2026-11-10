@@ -136,7 +136,7 @@ test("an import is planned by the list editor's rules: new replacements, inputs 
     const rows = parseAutocorrectFile([":teh: -> the", ":hte: -> the", ":Becuase: -> because", "becasue -> because", ":tehn: -> ten", ":thne: -> thne", ":t-h: -> the", ":uber: -> über", "", ":hte: -> the", ":sig: => 5", ":si*g: -> x", ":addr => 6", ":far: => 128"].join("\n"), "in.txt").rows;
     const plan = planImport(current, rows, "add", {...US, macroNames: Object.assign([], {5: "Sign-off"})}, CEILINGS);
     assert.deepEqual(shape(plan.list), [["the", "teh", "hte"], ["then", "tehn"], ["because", "becuase", ["becasue", MATCH.ANYWHERE]], [5, "sig"]]);
-    assert.deepEqual(plan.newReplacements, [{label: "because", inputs: ["becuase", "*becasue*"]}, {label: "▶ Sign-off", inputs: ["sig"]}], "an input is listed as it is written");
+    assert.deepEqual(plan.newReplacements, [{label: "because", inputs: ["becuase", "*becasue*"]}, {label: "Sign-off", macro: true, inputs: ["sig"]}], "an input is listed as it is written");
     assert.deepEqual(plan.addedInputs, [{label: "the", inputs: ["hte"]}]);
     assert.equal(plan.duplicates, 2, "one the list had, one the file gives twice");
     assert.deepEqual(plan.refused, [
@@ -145,7 +145,7 @@ test("an import is planned by the list editor's rules: new replacements, inputs 
         {line: 7, text: "t-h → the", reason: "An input is one word: letters and digits, with an apostrophe only between them; “-” is neither."},
         {line: 8, text: "uber → über", reason: "US cannot type “ü”, so the keyboard could not type this replacement."},
         {line: 12, text: "si*g → x", reason: "“si*g” has * where it cannot go. Put * only at the start or the end, where other letters may go."},
-        {line: 13, text: "addr → ▶ Macro 6", reason: "A macro plays for a whole word only: take the * out of “addr*”."},
+        {line: 13, text: "addr → the macro “Macro 6”", reason: "A macro plays for a whole word only: take the * out of “addr*”."},
         {line: 14, text: "far → macro 128", reason: "Choose one of the keyboard's macros."}]);
     assert.deepEqual([plan.unfit, plan.unfitWhy, plan.removed], [0, "", 0]);
     assert.deepEqual(shape(current), [["the", "teh"], ["then", "tehn"]], "the list given is left as it is");

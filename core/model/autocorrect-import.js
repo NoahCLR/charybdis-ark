@@ -20,7 +20,7 @@
 // version) is refused whole.
 
 const {AUTOCORRECT_DOMAIN_V1, AUTOCORRECT_MATCH, autocorrectCounts, sizeOfCounts, entryKey, isMacroSlot, playsMacro} = require("../schema/autocorrect-domain-v1");
-const {addTypos, findEntry, findTypo, replacementCalled, splitInputs, targetOf, inputForm, typoOf} = require("./autocorrect-list");
+const {addTypos, findEntry, findTypo, replacementCalled, replacementSaid, splitInputs, targetOf, inputForm, typoOf} = require("./autocorrect-list");
 const {AUTOCORRECT_STARTER} = require("../data/autocorrect-starter");
 
 /**
@@ -240,7 +240,7 @@ const namedBy = row => row.macro === undefined ? {correction: row.correction} : 
 // A row as a refused line shows it: the input, an arrow, the replacement as
 // it is named everywhere, or the number a file gave for a macro there is none of.
 /** @param {Row} row @param {Host} host */
-const shownRow = (row, host) => `${row.typo} → ${row.macro !== undefined && !isMacroSlot(row.macro) ? `macro ${row.macro}` : replacementCalled(row, host.macroNames)}`;
+const shownRow = (row, host) => `${row.typo} → ${row.macro !== undefined && !isMacroSlot(row.macro) ? `macro ${row.macro}` : row.macro !== undefined ? replacementSaid(row, host.macroNames) : replacementCalled(row, host.macroNames)}`;
 
 // Rows as entries, each replacement once with its inputs in the order
 // given, as an import posts them back: written with their `*`, with an older
@@ -305,7 +305,7 @@ function planImport(current, rows, mode, host, ceilings) {
             counts.typos++; counts.textBytes += text; size += bytes;
             if (!entry) counts.corrections++;
             const group = had.has(key) ? added : made;
-            const listed = group.get(key) ?? {label: replacementCalled(target, host.macroNames), inputs: []};
+            const listed = group.get(key) ?? {label: replacementCalled(target, host.macroNames), ...(target.macro === undefined ? {} : {macro: true}), inputs: []};
             group.set(key, listed);
             listed.inputs.push(inputForm(typo));
         } catch (error) {

@@ -44,7 +44,7 @@ test("the view lists each replacement once with its inputs, as it is written, in
         {id: "receive", label: "receive", correction: "receive", warnings: [], typos: [{typo: "recieve", input: "recieve*", warnings: []}]},
         {id: "the", label: "the", correction: "the", warnings: [], typos: [{typo: "hte", input: "hte", warnings: []}, {typo: "teh", input: "teh", warnings: []}]},
         {id: "thing", label: "thing", correction: "thing", warnings: [], typos: [{typo: "tihng", input: "*tihng*", warnings: []}]},
-        {id: entryKey({macro: 5}), label: "▶ Macro 5 named", correction: "", macro: 5, warnings: [], typos: [{typo: "sig", input: "sig", warnings: []}]}],
+        {id: entryKey({macro: 5}), label: "Macro 5 named", correction: "", macro: 5, warnings: [], typos: [{typo: "sig", input: "sig", warnings: []}]}],
         "each named once, by core: its text, or its macro's name after the mark");
     const bytes = autocorrectDomainSize(validateSnapshot(current.document).autocorrect);
     // The share both memory meters draw is the list's bytes of its own limit;
@@ -177,8 +177,8 @@ test("an edit is asked which entry it names: the one the list has for its replac
     // same one whatever spaces are typed around it, and no other in other capitals.
     assert.deepEqual(editNames(current, {type: "addAutocorrectTypos", correction: " the ", inputs: "hte"}), {entry: "the", label: "the", listed: true, unfinished: false, listedSaid: "“the” is already on your list. Add inputs to it there."});
     assert.deepEqual(editNames(current, {type: "addAutocorrectTypos", correction: "The", inputs: "hte"}), {entry: "The", label: "The", listed: false, unfinished: false});
-    assert.deepEqual(editNames(current, {type: "addAutocorrectTypos", macro: 5, typos: [{typo: "sgi"}]}), {entry: macro, label: "▶ Macro 5 named", listed: true, unfinished: false, listedSaid: "The macro “Macro 5 named” is already on your list. Add inputs to it there."});
-    assert.deepEqual(editNames(current, {type: "addAutocorrectTypos", macro: 6, inputs: "addr"}), {entry: entryKey({macro: 6}), label: "▶ Macro 6", listed: false, unfinished: false});
+    assert.deepEqual(editNames(current, {type: "addAutocorrectTypos", macro: 5, typos: [{typo: "sgi"}]}), {entry: macro, label: "Macro 5 named", listed: true, unfinished: false, listedSaid: "The macro “Macro 5 named” is already on your list. Add inputs to it there."});
+    assert.deepEqual(editNames(current, {type: "addAutocorrectTypos", macro: 6, inputs: "addr"}), {entry: entryKey({macro: 6}), label: "Macro 6", listed: false, unfinished: false});
     // One that names no input yet is only asked what it would be.
     assert.equal(editNames(current, {type: "addAutocorrectTypos", correction: "the", inputs: "  "}).unfinished, true);
     assert.deepEqual(editNames(current, {type: "addAutocorrectTypos", correction: "new"}), {entry: "new", label: "new", listed: false, unfinished: true});
@@ -189,8 +189,8 @@ test("an edit is asked which entry it names: the one the list has for its replac
     assert.deepEqual(editNames(current, {type: "updateAutocorrectCorrection", correction: "the", to: " then "}),
         {entry: "then", label: "then", listed: true, joins: "“then” is already on your list: this one's inputs will join it."});
     assert.deepEqual(editNames(current, {type: "updateAutocorrectCorrection", correction: "the", toMacro: 5}),
-        {entry: macro, label: "▶ Macro 5 named", listed: true, joins: "The macro “Macro 5 named” is already on your list: this one's inputs will join it."});
-    assert.deepEqual(editNames(current, {type: "updateAutocorrectCorrection", macro: 5, toMacro: 5}), {entry: macro, label: "▶ Macro 5 named", listed: false});
+        {entry: macro, label: "Macro 5 named", listed: true, joins: "The macro “Macro 5 named” is already on your list: this one's inputs will join it."});
+    assert.deepEqual(editNames(current, {type: "updateAutocorrectCorrection", macro: 5, toMacro: 5}), {entry: macro, label: "Macro 5 named", listed: false});
     // An edit that names no replacement to go to names nothing.
     assert.deepEqual(editNames(current, {type: "updateAutocorrectTypo", typo: "teh", to: "teh*"}), {});
     assert.deepEqual(editNames(current, {type: "deleteAutocorrectEntry", correction: "the"}), {});
@@ -234,10 +234,10 @@ test("Review lists each changed entry once: added, removed, respelled or made a 
     assert.deepEqual(brief, [
         ["because", "changed", UNIT.autocorrect("because"), [["Input", "removed", "becasue · moved to “cause”", null], ["Input", "added", null, "beacuse"]]],
         ["gone", "removed", UNIT.autocorrect("gone"), [["Replacement", "removed", "gone", null], ["Input", "removed", "goen", null]]],
-        ["▶ Macro 5 named", "changed", UNIT.autocorrect("signed", macro(5)), [["Replacement", "changed", "signed", "▶ Macro 5 named"]]],
+        ["Macro 5 named", "changed", UNIT.autocorrect("signed", macro(5)), [["Replacement", "changed", "signed", "Macro 5 named"]]],
         ["The", "changed", UNIT.autocorrect("the", "The"), [["Replacement", "changed", "the", "The"]]],
         ["thing", "changed", UNIT.autocorrect("thing"), [["Input", "changed", "*tihng*", "*tihng"]]],
-        ["▶ Macro 6", "changed", UNIT.autocorrect(macro(6)), [["Input", "added", null, "adres"]]],
+        ["Macro 6", "changed", UNIT.autocorrect(macro(6)), [["Input", "added", null, "adres"]]],
         ["cause", "added", UNIT.autocorrect("cause"), [["Replacement", "added", null, "cause"], ["Input", "added", null, "becasue · moved from “because”"]]],
         ["new", "added", UNIT.autocorrect("new"), [["Replacement", "added", null, "new"], ["Input", "added", null, "nwe"]]],
     ]);

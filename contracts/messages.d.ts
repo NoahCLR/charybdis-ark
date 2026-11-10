@@ -115,8 +115,9 @@ export interface AutocorrectImportRefused {line: number | null; text: string; re
 /** What importing a file one way would do: the list's size after it, the replacements it makes and the inputs it adds to replacements the list has (each by its label, as an entry's is, with its inputs as written), how many inputs it skips as already there, what it refuses, in the file's order, how many inputs do not fit what the keyboard holds and what stopped the first of them (`unfitWhy`, the end of a sentence), and how many entries replacing takes away. */
 export interface AutocorrectImportOutcome {
     replacements: number; inputs: number;
-    newReplacements: {label: string; inputs: string[]}[];
-    addedInputs: {label: string; inputs: string[]}[];
+    /** `macro` marks one that plays a macro, which the summary draws with the macros' mark. */
+    newReplacements: {label: string; macro?: true; inputs: string[]}[];
+    addedInputs: {label: string; macro?: true; inputs: string[]}[];
     duplicates: number; refused: AutocorrectImportRefused[]; unfit: number; unfitWhy: string; removed: number;
 }
 /** A list file read and judged both ways (core/model/autocorrect-import.js): what it holds, and what Add and Replace would each do. */

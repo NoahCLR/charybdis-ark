@@ -164,7 +164,8 @@ What an entry of the text replacement list puts in place of its input:
 a line of text of up to 128 bytes, or a macro, named by its slot and shown by
 its name. Stored once. A replacement is **deleted** (an input is
 **removed**). Wherever one is listed it is called the same, by core
-(`replacementCalled`): its text, or "▶" and its macro's name; in a sentence,
+(`replacementCalled`): its text, or its macro's name, which the screens draw
+after the macros' mark (never a character such as "▶"); in a sentence,
 its text in quotes or "the macro “Sign-off”". The firmware and Ark's code
 call it a `correction`.
 _Avoid_: correction (in anything a person reads), word, expansion, output

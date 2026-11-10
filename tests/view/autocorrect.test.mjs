@@ -6,13 +6,13 @@ import {addedReplacement, autocorrectRows, bytesWords, countWords, freeWords, im
 // macro slot it plays, then its inputs as it is written. Its label is core's
 // name for it: its text, or its macro's name after the mark of one that plays.
 const macros = [{defaultName: "Macro 0"}, {defaultName: "Macro 1"}, {name: "Address", defaultName: "Macro 2"}, {defaultName: "Macro 3"}, {defaultName: "Macro 4"}, {name: "", defaultName: "Macro 5"}];
-const entry = (correction, ...typed) => ({...(typeof correction === "number" ? {id: `\u0001macro:${correction}`, label: `▶ ${macros[correction].name || macros[correction].defaultName}`, correction: "", macro: correction}
+const entry = (correction, ...typed) => ({...(typeof correction === "number" ? {id: `\u0001macro:${correction}`, label: `${macros[correction].name || macros[correction].defaultName}`, correction: "", macro: correction}
     : {id: correction, label: correction, correction}), warnings: [], typos: typed.map((form) => ({typo: form.replace(/\*/g, ""), input: form, warnings: []}))});
 const view = {entries: [entry("the", "teh", "hte"), entry("because", "becuase", "becasue", "beacuse"), entry("iPhone", "iphone"), entry("Äpfel", "aepfel"), entry("thing", "*tihng*"), entry(5, "sig"), entry(2, "addr", "adres", "adress")]};
 const shown = (options) => autocorrectRows(view, {macros, ...options}).map((row) => row.entry.label);
 
 test("the list is shown by replacement as a dictionary orders words, a macro by its macro's name", () => {
-    assert.deepEqual(shown(), ["▶ Address", "Äpfel", "because", "iPhone", "▶ Macro 5", "the", "thing"]);
+    assert.deepEqual(shown(), ["Address", "Äpfel", "because", "iPhone", "Macro 5", "the", "thing"]);
     assert.deepEqual(autocorrectRows(null), []);
 });
 
@@ -40,7 +40,7 @@ test("a search is a plain one over what core publishes, whatever its case: a rep
     assert.deepEqual(autocorrectRows(view, {query: "*tihng*", macros}).map((row) => row.found), [["tihng"]], "as it is written, with its *");
     assert.deepEqual(autocorrectRows(view, {query: "tihng", macros}).map((row) => row.found), [["tihng"]], "or without");
     assert.deepEqual(autocorrectRows(view, {query: "*", macros}).map((row) => row.entry.id), ["thing"], "a * finds the inputs written with one");
-    assert.deepEqual(shown({query: "addre"}), ["▶ Address"], "a macro by its name");
+    assert.deepEqual(shown({query: "addre"}), ["Address"], "a macro by its name");
     assert.deepEqual(autocorrectRows(view, {query: "sig", macros}).map((row) => [row.entry.macro, row.found]), [[5, ["sig"]]]);
     assert.deepEqual(shown({query: "zzz"}), []);
 });
@@ -70,15 +70,15 @@ test("a replacement being made names its text or its macro, and nothing while it
 
 test("an import's preview says what it would do in sentences, with the names each is about", () => {
     const outcome = {replacements: 5, inputs: 9, removed: 0, duplicates: 2, unfit: 3, unfitWhy: "the keyboard holds 1,024 inputs",
-        newReplacements: [{label: "because", inputs: ["becuase", "becasue"]}, {label: "▶ Sign-off", inputs: ["sig"]}],
+        newReplacements: [{label: "because", inputs: ["becuase", "becasue"]}, {label: "Sign-off", macro: true, inputs: ["sig"]}],
         addedInputs: [{label: "the", inputs: ["hte", "tthe*"]}],
         refused: [{line: 4, text: "teh → ten", reason: "“teh” is already an input for “the”."}, {line: null, text: "x", reason: "Why."}]};
     assert.deepEqual(importLines(outcome), [
-        {kind: "new", text: "2 new replacements, with 3 inputs.", names: ["because", "▶ Sign-off"]},
-        {kind: "added", text: "2 more inputs for 1 replacement you already have.", names: ["hte tthe* → the"]},
+        {kind: "new", text: "2 new replacements, with 3 inputs.", names: [{text: "because"}, {text: "Sign-off", macro: true}]},
+        {kind: "added", text: "2 more inputs for 1 replacement you already have.", names: [{text: "hte tthe* → the"}]},
         {kind: "duplicates", text: "2 are already in the list, and skipped."},
         {kind: "unfit", text: "3 do not fit: the keyboard holds 1,024 inputs."},
-        {kind: "refused", text: "2 lines are refused:", names: ["4: teh → ten — “teh” is already an input for “the”.", "x — Why."]}]);
+        {kind: "refused", text: "2 lines are refused:", names: [{text: "4: teh → ten — “teh” is already an input for “the”."}, {text: "x — Why."}]}]);
     const replace = importLines({...outcome, removed: 1, newReplacements: [outcome.newReplacements[0]], addedInputs: [], duplicates: 1, unfit: 1, unfitWhy: "the keyboard's profile is full", refused: [outcome.refused[0]]});
     assert.deepEqual(replace.map((line) => line.text), ["1 replacement in your list now is deleted.", "1 new replacement, with 2 inputs.", "1 is already in the list, and skipped.",
         "1 does not fit: the keyboard's profile is full.", "1 line is refused:"], "a replacement is deleted, and what stopped the first that did not fit is core's to say");
