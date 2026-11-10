@@ -21,8 +21,8 @@ const {hostLayout} = require("../data/host-layouts");
  * @typedef {import("../schema/autocorrect-domain-v1.js").Entry} Entry
  * @typedef {Entry["typos"][number]} Typo
  * @typedef {{layout: number, macos?: boolean}} Host the host layout the keyboard types through; `macos` when the host's system is macOS though the layout is not one of its own
- * @typedef {{entry: Entry, typo: Typo, characters: string[]}} Listed a typo with its entry, and its characters
- * @typedef {{whole: Map<string, Listed>, parts: Listed[]}} Index a list's whole-word typos by their text, and its part-of-word typos in the domain's byte order
+ * @typedef {{entry: Entry, typo: Typo, length: number}} Listed a typo with its entry, and how many characters it has
+ * @typedef {{whole: Map<string, Listed>, parts: Listed[]}} Index a list's whole-word typos by their text, and its part-of-word typos, the longest first and equally long ones in the domain's byte order
  * @typedef {{entry: Entry, typo: Typo, start: number, end: number}} Fired the typo that fires on a word, and the characters of the word it matched
  * @typedef {(slot: number) => {text: string | null} | null} Macros what a macro slot plays: its text when it types only text, `text: null` when it does more, and null for a slot that is empty or cannot play
  * @typedef {Replaced & {start: number, end: number}} Mark where a standing replacement's text is in the text tried, by its offsets
@@ -43,29 +43,47 @@ const folded = character => foldWordCharacter(character) ?? character;
 /** @param {string} character */
 const isCapital = character => folded(character) !== character;
 
+// Two texts in the order of their UTF-8 bytes, which is the order of their
+// characters' code points, compared without encoding either. A string's own
+// order is by UTF-16 units, where a character outside the basic plane (two
+// surrogates) falls below U+E000 to U+FFFF; in bytes it is above them.
+/** @param {string} a @param {string} b */
+function byBytes(a, b) {
+    const shared = Math.min(a.length, b.length);
+    for (let at = 0; at < shared; at++) {
+        const x = a.charCodeAt(at), y = b.charCodeAt(at);
+        if (x === y) continue;
+        const outsideX = x >= 0xd800 && x <= 0xdfff, outsideY = y >= 0xd800 && y <= 0xdfff;
+        return outsideX === outsideY ? x - y : outsideX ? 1 : -1;
+    }
+    return a.length - b.length;
+}
+
+// A list's typos as the matcher looks them up. Made once for a text or a
+// whole list's warnings: making it is a pass over every typo and a sort.
 /** @param {AutocorrectList} list @returns {Index} */
 function indexed(list) {
     /** @type {Index} */
     const index = {whole: new Map(), parts: []};
     for (const entry of list.entries) for (const typo of entry.typos) {
-        const listed = {entry, typo, characters: [...typo.typo]};
+        const listed = {entry, typo, length: [...typo.typo].length};
         if (typo.match === AUTOCORRECT_MATCH.WHOLE_WORD) index.whole.set(typo.typo, listed); else index.parts.push(listed);
     }
-    index.parts.sort((a, b) => Buffer.compare(Buffer.from(a.typo.typo), Buffer.from(b.typo.typo)));
+    index.parts.sort((a, b) => b.length - a.length || byBytes(a.typo.typo, b.typo.typo));
     return index;
 }
 
-// Where in a folded word a part-of-word typo sits: its start, its end, or
-// the first place it is found; -1 when it does not fit.
-/** @param {string[]} word @param {Listed} part */
-function placeOf(word, part) {
-    const {characters} = part, last = word.length - characters.length;
-    if (last < 0) return -1;
-    const first = part.typo.match === AUTOCORRECT_MATCH.END ? last : 0;
-    for (let at = first; at <= (part.typo.match === AUTOCORRECT_MATCH.ANYWHERE ? last : first); at++) {
-        if (characters.every((character, offset) => word[at + offset] === character)) return at;
-    }
-    return -1;
+// Where in a folded word a part-of-word typo sits, in characters: its start,
+// its end, or the first place it is found; -1 when it does not fit.
+/** @param {string} text the word @param {number} length its characters @param {Listed} part */
+function placeOf(text, length, part) {
+    const {typo, match} = part.typo;
+    if (part.length > length) return -1;
+    if (match === AUTOCORRECT_MATCH.START) return text.startsWith(typo) ? 0 : -1;
+    if (match === AUTOCORRECT_MATCH.END) return text.endsWith(typo) ? length - part.length : -1;
+    const at = text.indexOf(typo);
+    // A place in the text counts a character outside the basic plane as two.
+    return at <= 0 ? at : [...text.slice(0, at)].length;
 }
 
 // The typo that fires on a finished, folded word: the whole-word typo that
@@ -81,16 +99,14 @@ function choose(index, word, takes = () => true) {
         const fired = {entry: whole.entry, typo: whole.typo, start: 0, end: word.length};
         if (takes(fired)) return fired;
     }
-    /** @type {Fired | null} */
-    let best = null;
+    // The longest come first, so the first that fits and is taken is it.
     for (const part of index.parts) {
-        if (best && part.characters.length <= best.end - best.start) continue;
-        const start = placeOf(word, part);
+        const start = placeOf(text, word.length, part);
         if (start < 0) continue;
-        const fired = {entry: part.entry, typo: part.typo, start, end: start + part.characters.length};
-        if (takes(fired)) best = fired;
+        const fired = {entry: part.entry, typo: part.typo, start, end: start + part.length};
+        if (takes(fired)) return fired;
     }
-    return best;
+    return null;
 }
 
 // The words of a text, folded: letters and digits with apostrophes between
@@ -113,11 +129,15 @@ function wordsOf(text) {
 }
 
 // The typo that fires on a folded word on a host that types everything, and
-// the characters of the word it matched.
-/** @param {AutocorrectList} list @param {string} word @returns {Fired | null} */
-function firingTypo(list, word) {
-    return choose(indexed(list), [...word]);
+// the characters of the word it matched: asked of one list for as many words
+// as there are, its index made once.
+/** @param {AutocorrectList} list @returns {(word: string) => Fired | null} */
+function typoFinder(list) {
+    const index = indexed(list);
+    return word => choose(index, [...word]);
 }
+/** @param {AutocorrectList} list @param {string} word @returns {Fired | null} */
+const firingTypo = (list, word) => typoFinder(list)(word);
 
 // How many key strokes show this character on this host under its Caps Lock;
 // none when nothing the layout types shows it. Caps Lock changes letters
@@ -293,4 +313,4 @@ function typedText(list, host, capsLock, screen, before = "", macros = () => nul
     return {text: out.join(""), fired, marks, undone};
 }
 
-module.exports = {firingTypo, typedText, wordsOf};
+module.exports = {firingTypo, typedText, typoFinder, wordsOf};

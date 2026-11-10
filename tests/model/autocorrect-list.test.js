@@ -212,6 +212,38 @@ test("warnings are found on the list and never refuse it", () => {
     assert.match(empty[0].text, /“Sign-off” has no steps, so this replacement does nothing yet/);
 });
 
+// A list at the keyboard's ceiling of inputs, every one written with `*` at
+// both ends, which is how a QMK dictionary's lines without colons import.
+const fullList = () => {
+    const letters = "abcdefghijklmnopqrstuvwxyz";
+    const wordOf = (seed, length) => {
+        let word = "", value = seed * 7919 + 13;
+        for (let at = 0; at < length; at++) {word += letters[value % 26]; value = Math.floor(value / 26) + seed * 31 + at * 17;}
+        return word;
+    };
+    const entries = [], seen = new Set();
+    for (let seed = 0; entries.length < 1024; seed++) {
+        const typo = wordOf(seed, 8);
+        if (seen.has(typo)) continue;
+        seen.add(typo);
+        entries.push({correction: `${wordOf(seed + 50000, 5)} ${wordOf(seed + 90000, 5)}`, typos: [{typo, match: MATCH.ANYWHERE}]});
+    }
+    return {entries};
+};
+
+test("a full list of inputs with * is checked for warnings within a keystroke's budget", () => {
+    const value = fullList();
+    assert.doesNotThrow(() => encodeAutocorrectDomain(value), "the list is one the keyboard takes");
+    listWarnings(value, US);
+    const started = process.hrtime.bigint();
+    listWarnings(value, US);
+    const took = Number(process.hrtime.bigint() - started) / 1e6;
+    // It took seconds while every word of every replacement built the list's
+    // index again; a few milliseconds now, and the budget leaves a slow
+    // machine a wide margin.
+    assert.ok(took < 150, `listWarnings took ${took.toFixed(0)} ms for 1,024 inputs with *`);
+});
+
 test("two lists' entries pair by replacement, a changed one with the one that took its inputs", () => {
     const {pairEntries} = require("../../core/model/autocorrect-list");
     const before = list(["the", "teh", "hte"], ["because", "becuase"], ["gone", "goen"]);

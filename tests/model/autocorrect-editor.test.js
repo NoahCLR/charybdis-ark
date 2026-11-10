@@ -284,6 +284,24 @@ test("text is tried against the snapshot's list on its host layout, after text a
     assert.equal(tryText(windows, {before: "", typed: "IPHONe ", capsLock: true}).text, "iPhone ");
 });
 
+test("what is kept of a decoded profile is kept per host system, and a view of a full list read twice is read once", () => {
+    // A draft revision carries its decoded form; the host's system is left to
+    // detection here, so one decoded profile answers for either system.
+    const auto = fixtureWith(fixture([["iPhone", "iphone"]]).document, 0), decoded = validateSnapshot(auto);
+    const mac = {document: auto, decoded, fingerprint: fingerprint(auto), hostOs: {detected: 1}}, windows = {...mac, hostOs: {detected: 2}};
+    for (let pass = 0; pass < 2; pass++) {
+        assert.equal(tryText(mac, {before: "", typed: "IPHONe ", capsLock: true}).text, "IPHONe ");
+        assert.equal(tryText(windows, {before: "", typed: "IPHONe ", capsLock: true}).text, "iPhone ");
+    }
+    assert.deepEqual(autocorrectEditorView(mac, CURRENT_CAPABILITIES), autocorrectEditorView(mac, CURRENT_CAPABILITIES));
+    // A check of what is typed warns of what is new against the list as it
+    // stood, which it does not walk again.
+    const before = fixture([["the", "teh"]]), held = {...before, decoded: validateSnapshot(before.document)};
+    const after = draftEdit(held, {type: "addAutocorrectTypos", correction: "then", typos: [{typo: "*te*"}]}, CURRENT_CAPABILITIES);
+    assert.deepEqual(newWarnings(held, after), newWarnings(held, after));
+    assert.equal(newWarnings(held, after).length, 1);
+});
+
 test("a try plays a replacement's macro: its text when it is only text, nothing shown when it is more, and not at all when it is empty", () => {
     const current = fixture([[5, "sig"], [6, "addr"], [7, "win"], ["the", "teh"]], 0, {5: "Kind regards", 7: "{KC_A}"});
     const tried = tryText(current, {before: "", typed: "sig addr teh ", capsLock: false});

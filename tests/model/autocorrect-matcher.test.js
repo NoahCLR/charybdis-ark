@@ -1,7 +1,7 @@
 "use strict";
 const {test} = require("node:test");
 const assert = require("node:assert/strict");
-const {typedText, firingTypo, wordsOf} = require("../../core/model/autocorrect-matcher");
+const {typedText, firingTypo, typoFinder, wordsOf} = require("../../core/model/autocorrect-matcher");
 const {AUTOCORRECT_MATCH: MATCH} = require("../../core/schema/autocorrect-domain-v1");
 const {hostLayouts, US_HOST_LAYOUT} = require("../../core/data/host-layouts");
 const fixture = require("../../upstream/firmware/tests/fixtures/autocorrect_v1.json");
@@ -142,4 +142,17 @@ test("the typo that fires on a word: the whole word first, then the longest part
     assert.equal(firingTypo(value, "mnets"), null, "an end-of-word typo does not match the start");
     assert.equal(firingTypo(value, "tehe"), null, "a whole-word typo matches nothing longer");
     assert.equal(firingTypo(value, "the"), null);
+});
+
+test("of part-of-word typos equally long, the first in the domain's order fires: by their UTF-8 bytes; one finder answers for every word", () => {
+    // In bytes z is below é, and a character outside the basic plane is above every one inside it.
+    for (const [low, high] of [["a", "b"], ["z", "é"], ["é", "\uffee"], ["\uffee", "\u{10400}"], ["\u{10400}", "\u{10401}"]]) {
+        assert.equal(Buffer.compare(Buffer.from(low), Buffer.from(high)), -1, `${low} is below ${high} in bytes`);
+        const value = list(["x", [`${high}q`, MATCH.ANYWHERE]], ["y", [`${low}q`, MATCH.ANYWHERE]]);
+        const fires = typoFinder(value);
+        assert.equal(fires(`${high}q${low}q`)?.typo.typo, `${low}q`, `${low}q before ${high}q`);
+        assert.deepEqual(fires(`${low}q${high}q`), {entry: value.entries[1], typo: value.entries[1].typos[0], start: 0, end: 2});
+        assert.deepEqual(fires(`${high}q${low}q`), firingTypo(value, `${high}q${low}q`));
+        assert.deepEqual(fires(`w${high}q`), {entry: value.entries[0], typo: value.entries[0].typos[0], start: 1, end: 3}, "a place is counted in characters");
+    }
 });

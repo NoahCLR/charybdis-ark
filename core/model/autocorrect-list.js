@@ -21,7 +21,7 @@
 
 const {AUTOCORRECT_DOMAIN_V1, AUTOCORRECT_MATCH, autocorrectDomainSize, correctionProblem, entryKey, entryOfKey, foldTypo, isMacroSlot, playsMacro, typoProblem} = require("../schema/autocorrect-domain-v1");
 const {AUTOCORRECT_APOSTROPHE, foldWordCharacter} = require("../data/autocorrect-words");
-const {firingTypo, wordsOf} = require("./autocorrect-matcher");
+const {typoFinder, wordsOf} = require("./autocorrect-matcher");
 const {layoutTypes} = require("../data/host-layouts");
 const {macroDefaultName} = require("./vocabulary");
 
@@ -268,8 +268,10 @@ function listWarnings(list, host) {
     const corrected = new Map();
     /** @type {Map<Typo, string>} */
     const inside = new Map();
+    // One finder for the whole list: its index is made once, not per word.
+    const fires = typoFinder(list);
     for (const entry of list.entries) for (const word of playsMacro(entry) ? [] : wordsOf(entry.correction)) {
-        const fired = firingTypo(list, word);
+        const fired = fires(word);
         if (!fired) continue;
         // An input that is its own replacement in other capitals (iphone
         // for iPhone) leaves the word as it is typed.

@@ -44,16 +44,42 @@ function macroPlays(decoded, host) {
     });
 }
 
+// What is worked out of a decoded profile for a host system, kept while that
+// decoded form lives: a draft revision keeps its own, so the screen's view,
+// each check of what is typed and each Try it key read the same answer
+// instead of parsing every macro and walking the list again.
+/** @typedef {{host: ReturnType<typeof readHost>, warnings?: import("./autocorrect-list.js").Warning[]}} Kept */
+/** @type {WeakMap<import("./types.js").DecodedProfile, Map<unknown, Kept>>} */
+const kept = new WeakMap();
+/** @param {import("./types.js").DecodedProfile} decoded @param {import("./types.js").SnapshotFacts["hostOs"]} [hostOs] @returns {Kept} */
+function keptFor(decoded, hostOs) {
+    const byHost = kept.get(decoded) ?? new Map();
+    kept.set(decoded, byHost);
+    /** @type {Kept} */
+    const held = byHost.get(hostOs?.detected) ?? {host: readHost(decoded, hostOs)};
+    byHost.set(hostOs?.detected, held);
+    return held;
+}
+
 // The host layout the keyboard types replacements through, with its name, and
 // the macros a replacement may play: their names and which hold nothing.
 /** @param {import("./types.js").DecodedProfile} decoded @param {import("./types.js").SnapshotFacts["hostOs"]} [hostOs] @returns {Required<Host> & {macos: boolean, plays: ReturnType<typeof macroPlays>}} */
-function hostOf(decoded, hostOs) {
+function readHost(decoded, hostOs) {
     const host = hostSettings(decoded.settings.values, hostOs?.detected);
     const plays = macroPlays(decoded, host);
     // The keyboard takes the host for a Mac by its layout or by its system
     // (firmware autocorrect-v1.md, "What counts as typing").
     return {layout: host.layout, layoutName: word(VOCABULARY.hostLayouts, host.layout), macos: hostLayout(host.layout)?.os === "macos" || host.effective === MACOS,
         macroNames: decoded.settings.macroNames || [], emptyMacros: new Set(plays.flatMap((macro, slot) => macro ? [] : [slot])), plays};
+}
+/** @param {import("./types.js").DecodedProfile} decoded @param {import("./types.js").SnapshotFacts["hostOs"]} [hostOs] */
+const hostOf = (decoded, hostOs) => keptFor(decoded, hostOs).host;
+// What will misbehave in a decoded profile's list on its host layout
+// (autocorrect-list.js listWarnings).
+/** @param {import("./types.js").DecodedProfile} decoded @param {import("./types.js").SnapshotFacts["hostOs"]} [hostOs] */
+function warningsOf(decoded, hostOs) {
+    const held = keptFor(decoded, hostOs);
+    return held.warnings ??= listWarnings(decoded.autocorrect, held.host);
 }
 
 // How many replacements and inputs the chosen layout leaves unable to
@@ -73,7 +99,7 @@ function autocorrectEditorView(snapshot, capabilities) {
     if (!snapshot?.document || snapshot.incomplete) return null;
     const decoded = decodedOf(snapshot), list = decoded.autocorrect;
     const host = hostOf(decoded, snapshot.hostOs);
-    const warnings = listWarnings(list, host);
+    const warnings = warningsOf(decoded, snapshot.hostOs);
     /** @param {string} entry @param {string} [typo] */
     const said = (entry, typo) => warnings.filter(warning => warning.entry === entry && warning.typo === typo).map(warning => warning.text);
     const used = listUsage(list), ceilings = autocorrectCeilings(capabilities);
@@ -128,8 +154,8 @@ function editAutocorrect(document, message, draft) {
 /** @param {import("./types.js").CompleteSnapshot} before @param {import("./types.js").PortableDocument} after */
 function newWarnings(before, after) {
     const old = decodedOf(before), next = decodedOf({document: after});
-    const had = new Set(listWarnings(old.autocorrect, hostOf(old, before.hostOs)).map(warning => warning.text));
-    return listWarnings(next.autocorrect, hostOf(next, before.hostOs)).filter(warning => !had.has(warning.text)).map(warning => warning.text);
+    const had = new Set(warningsOf(old, before.hostOs).map(warning => warning.text));
+    return warningsOf(next, before.hostOs).filter(warning => !had.has(warning.text)).map(warning => warning.text);
 }
 
 // What a list file, or the starter list, would do to a snapshot's list,
