@@ -248,7 +248,10 @@ durability, split scheduling or a physical interruption. A successful
 Run `npm run preview`, serve the folder (`node scripts/serve.js . --port 8972`)
 and open `preview/index.html`. The page stands in for the web shell: it
 answers the panel's `ready` with one fixture model, turns the theme toggle,
-and logs every edit posted back. `?shell=` answers in other states (no
+and logs every edit posted back. It applies none of them. Two checks it does
+answer, by the production rules, since their screens wait on them: a macro's
+steps, and a text replacement edit, which the Text replacement screen posts
+only once its check has passed (`scripts/preview-macro-shell.mjs`). `?shell=` answers in other states (no
 keyboard, a browser without WebHID, the demo, a live keyboard; each is
 commented in `scripts/preview.js`), `?theme=light` starts in the light theme,
 and `?screen=lighting` opens a screen. `npm run preview -- --multiple` adds a

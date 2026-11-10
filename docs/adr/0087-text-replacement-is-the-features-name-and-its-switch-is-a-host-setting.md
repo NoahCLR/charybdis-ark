@@ -8,7 +8,7 @@ What the firmware calls autocorrect (firmware D-F68, D-F69) is **Text replacemen
 
 The firmware's name stays where the firmware's things are named: the domain (`autocorrect`), the screen's id, the source files and identifiers, the contracts' edit and message types, the imported specs and fixtures, and QMK's keycodes. Renaming them would be a second vocabulary for one wire format, and a diff across every layer for no change a person sees. The seam is `GLOSSARY.md`, which maps the two, and the place a string is written: a string a person reads says text replacement, replacement and input; an identifier keeps the firmware's word.
 
-"Autocorrect" is said to a person in one place, on purpose: the first paragraph of the guide's page. A search for the word still finds the feature's keys in the picker, whose search keeps QMK's own labels beside Ark's; the keys have no help of their own, as no switch key has (D-L88). "Shortcut" is not used for it: that is a custom key's (firmware D-F26).
+"Autocorrect" is said to a person only where QMK's or the keyboard's own thing is named as theirs: the guide's first paragraph, which says the feature is the keyboard's autocorrect, "QMK's autocorrect dictionary" for the text file format, and "QMK's autocorrect keys". It is never Ark's name for the feature, its screen, its list or a message. A search for the word still finds the feature's keys in the picker, whose search keeps QMK's own labels beside Ark's; the keys have no help of their own, as no switch key has (D-L88). "Shortcut" is not used for it: that is a custom key's (firmware D-F26).
 
 ## The switch
 
@@ -18,7 +18,7 @@ Text replacement follows that. Its stored switch, key option 12 of the settings 
 
 So a section is edited on the screen `SETTINGS_SCREENS` draws it on and nowhere else: `screenOfSection` is the one answer to where Review's Show goes, and no section is special.
 
-The list's memory is the Keyboard screen's with the rest of the profile's: **Text replacement inputs** among the counts in use, the ceiling an edit meets first (D-L84), and **Text replacement memory** after Macro memory, the list's bytes against its own limit. The screen's bank shows the same two figures (D-L88).
+The list's memory is the Keyboard screen's with the rest of the profile's: **Text replacement inputs** among the counts in use, the ceiling an edit meets first (D-L84), and **Text replacement memory** after Macro memory, the list's bytes against its own limit. The screen's bank shows the same two figures (D-L88), and both meters draw one share, which core works out (`usage.share`); the bank also says how many bytes are free, as Macro memory does: what the list can still grow by, bounded by its text's ceiling and the profile's shared room too.
 
 ## Considered options
 

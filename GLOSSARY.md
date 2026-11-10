@@ -150,16 +150,23 @@ typo fixed, longer text typed, a macro played. It is the name on the rail,
 the screen, the Host card, the Memory panel, the picker and every message.
 The keyboard, its firmware and its keys call it **autocorrect**, and Ark's
 code, contracts, screen id, domain name and files keep that name
-(`autocorrect`, `AC_ON`, `core/model/autocorrect-*.js`); the guide says
-"autocorrect" once, and the picker's search keeps QMK's words for its keys,
-so a search for it finds the feature.
-_Avoid_: autocorrect (in anything a person reads, but for that one mention),
-text expansion, snippets, shortcut (a custom key's)
+(`autocorrect`, `AC_ON`, `core/model/autocorrect-*.js`). A person reads
+"autocorrect" only where QMK's or the keyboard's own thing is named as
+theirs: "QMK's autocorrect dictionary" (the file format), "QMK's autocorrect
+keys", "the keyboard's autocorrect" where the guide first says what the
+feature is. The picker's search keeps QMK's words for its keys, so a search
+for it finds the feature.
+_Avoid_: autocorrect (as Ark's name for the feature, its screen, its list or
+anything on it), text expansion, snippets, shortcut (a custom key's)
 
 **Replacement**:
 What an entry of the text replacement list puts in place of its input:
 a line of text of up to 128 bytes, or a macro, named by its slot and shown by
-its name. Stored once. The firmware and Ark's code call it a `correction`.
+its name. Stored once. A replacement is **deleted** (an input is
+**removed**). Wherever one is listed it is called the same, by core
+(`replacementCalled`): its text, or "▶" and its macro's name; in a sentence,
+its text in quotes or "the macro “Sign-off”". The firmware and Ark's code
+call it a `correction`.
 _Avoid_: correction (in anything a person reads), word, expansion, output
 
 **Input**:
@@ -179,15 +186,18 @@ the term), pattern
 Where other letters may go. An input is the whole word unless it is
 written with one: `recieve*` the start of a word, `*mnet` the end, `*tihng*`
 anywhere in one (D-L84). It is how Ark writes, shows and takes the four
-matches the keyboard stores; no control, label or message names a match.
+matches the keyboard stores; no control, label or message names a match. It
+may be called **the wildcard** ("Add *, the wildcard, where other letters
+may go"), and an input written with one "catches" the words it matches.
 _Avoid_: whole word, start of word, end of word, anywhere (as a choice or a
-label), match type, wildcard, boundary
+label), match type, boundary; fires (in anything a person reads: an input
+catches a word, and the keyboard replaces it)
 
 **Try it**:
 The last section of a replacement's editor on the Text replacement screen: a
 box to type in, which Ark never changes, and under it the **preview**, that
-text as the keyboard would type it once the draft is applied, under the
-draft's list and host layout, each replaced part marked. It runs the
+text as the keyboard would type it with the draft's list, through the
+draft's host layout, each replaced part marked. It runs the
 keyboard's own rules over text (D-L86), so the preview shows the replacements
 and the undo, and nothing that needs a key or a timing: a shortcut, a cursor
 key, a held key, a macro key. For a replacement that plays a macro it says

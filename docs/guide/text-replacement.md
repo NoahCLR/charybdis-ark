@@ -128,25 +128,31 @@ at the left, and the one you pick open beside it.
 
 Each replacement is on one line, text as it is and a macro as **▶** and its
 name, with its inputs under it, each written as you wrote it, with its `*`.
-The first is open until you pick another, and the one you picked stays open
-when you come back to the screen. A dot marks one changed in your draft.
+That is what a replacement is called everywhere: here, in its editor's
+title, in Review and in an import's summary. The first is open until you
+pick another, and the one you picked stays open when you come back to the
+screen. A dot marks one changed in your draft.
 
 **Search** finds replacements by their text, by a macro's name or by an
-input, and marks the inputs it found. The heading counts your inputs against
-what the keyboard holds, and under the list are **+ New replacement**,
-**Import…** and **Export**, and the list's [memory](#memory).
+input as it is written, and marks the inputs it found. A search that finds
+nothing leaves the replacement that was open as it is. The heading counts
+your inputs against what the keyboard holds, and under the list are **+ New
+replacement** (while you are not searching), **Import…** and **Export**, and
+the list's [memory](#memory).
 
 ## Writing a replacement
 
 The replacement open at the right has its name across the top, **Text** or
-**Macro** beside it, and **Delete replacement**, which removes it with its
+**Macro** beside it, and **Delete replacement**, which deletes it with its
 inputs. Under that are its three parts.
 
 ### Replacement
 
 Choose **Text** and type it; a counter under the field says how many of its
 128 bytes it uses. Enter, or leaving the field, keeps it; Escape puts back
-what it was. Changing it to a replacement the list already has joins the two.
+what it was. Changing it to a replacement the list already has joins the
+two, and Ark says so under the field before you keep it: "“the” is already
+on your list: this one's inputs will join it."
 
 Or choose **Macro**. The macro's name shows in the field beside it;
 **Pick…**, or the field itself, opens the same picker a key's keycode is
@@ -155,21 +161,24 @@ play nothing). Pick one and choose **Use keycode**. With no macro that has
 steps yet, Pick… is off and **Make one in Macros →** goes there.
 **Edit in Macros →**, in the editor's header, goes to the picked macro to see
 or change its steps. Choosing Text or Macro changes nothing until you type
-the text or pick the macro.
+the text or pick the macro, and a line under the choice says so until then.
 
 The ⓘ beside **Replacement**, **Inputs** and **Try it** sums up how each
 works: when the keyboard replaces, capitals, Backspace and macros; how an
 input is written with `*`, the wildcard, with examples and where it may go;
 and what the preview can and cannot show. Hover
-it, or reach it with Tab; Escape closes it.
+it, or reach it with Tab; Escape closes it. In a small window the list opens
+where there is room, and scrolls when it is taller than that.
 
 ### Inputs
 
 The inputs are chips.
 
 - **+ Input** opens a field: type an input and press Enter. Several with
-  spaces between them are each added. The field stays for the next; Enter in
-  it empty, or Escape, closes it.
+  spaces between them are each added. The field empties for the next at
+  once, so you can type one after another without waiting; Enter in it
+  empty, or Escape, closes it. An input Ark can't keep comes back into the
+  field with the reason under it, and nothing is added.
 - **A chip** opens in place when you click it: change how it is written,
   with or without `*`, and press Enter, or choose **Remove** beside it.
   Escape leaves it as it was. Removing a replacement's last input deletes
@@ -185,9 +194,10 @@ To give an input to another replacement, remove it here and add it there.
 2. Press Enter, type its first input, and press Enter again. Several inputs
    with spaces between them are all added.
 
-It joins your list with that first input, and stays open for more. Until
-then it waits at the top of the list as **not on your list yet**, and
-**Discard** lets it go.
+It joins your list with that first input, and stays open for more. Leaving
+the editor from that field, for another replacement or another screen, keeps
+the input as Enter does. Until then it waits at the top of the list as **not
+on your list yet**, with what you typed for it, and **Discard** lets it go.
 
 If the list already has that replacement, Ark says so and offers **Open it**
 instead: the list never holds the same replacement twice.
@@ -195,7 +205,8 @@ instead: the list never holds the same replacement twice.
 ### What Ark checks
 
 Ark checks what you type as you type it, and says under the field why it
-can't be kept:
+can't be kept. What it can't keep stays in its field, whenever you press
+Enter, and nothing changes:
 
 - an input is the replacement itself;
 - an input already belongs to another replacement ("“teh” is already an
@@ -220,7 +231,7 @@ list, whichever replacement is open.
 
 Type in its box as you would anywhere. Ark never changes what you type
 there. Under the box, **Your keyboard would type** shows the same text as
-your keyboard would type it once you [Apply](review-and-save.md) the draft:
+your keyboard would type it with this draft's list:
 type `teh` and a space, and the box still reads "teh " while the preview
 reads "the ". Each replaced part is marked in the preview, and hovering it
 says what it replaced. The line beside it says what was replaced last, and
@@ -228,9 +239,9 @@ that replacement is marked in the list; **Show it →** opens it.
 
 Backspace straight after a replacement puts the word back in the preview, as
 it would on the keyboard. **Preview with Caps Lock on** says whether the
-preview takes Caps Lock to be on; it follows your own Caps Lock while you
-type there, and can be set by hand. **Clear** empties the box and the
-preview.
+preview takes Caps Lock to be on; set it by hand, and it follows your own
+Caps Lock when you turn that on or off while you type there. **Clear**
+empties the box and the preview.
 
 With a keyboard connected and text replacement on, the keyboard replaces as
 you type in the box too, by the list that is already applied, and the box
@@ -240,7 +251,7 @@ The preview is always the draft's list, so the two differ exactly where your
 draft does.
 
 For a replacement that plays a macro, the line says which: "“sig” plays
-macro “Sign-off”." The preview shows the macro's text when the macro is only
+the macro “Sign-off”." The preview shows the macro's text when the macro is only
 text; for a macro of keys and waits it shows the input gone, since Ark does
 not play macros.
 
@@ -254,7 +265,7 @@ whether text replacement is on or off.
 
 An empty list offers **Add common typo fixes**: about 200 common English
 words with the ways they are usually mistyped, some 400 inputs, each a
-whole word. It is written for Ark, and no input in it is an English word. It is added like a file: Ark first shows what it would do, as below.
+whole word (the button's tip gives the exact counts). It is written for Ark, and no input in it is an English word. It is added like a file: Ark first shows what it would do, as below.
 
 ## Importing a list
 
@@ -267,7 +278,7 @@ screen. Ark reads three formats, by the file's extension:
   spaces between them, each with its own `*`. A row that plays a macro has
   the macro's number in a `macro` column and no replacement. Files as Excel,
   Numbers and Google Sheets save them all work: commas or semicolons, quoted
-  cells.
+  cells, rows padded with empty cells.
 - **`.txt`**, QMK's autocorrect dictionary: a line for each input,
   `typo -> correction`. QMK writes where it matches with colons, which Ark
   reads as its `*`: `:teh:` is `teh`, `:recieve` is `recieve*`, `mnet:` is
@@ -290,15 +301,16 @@ used:
 - the new replacements it makes, and their inputs;
 - what it adds to replacements you already have;
 - what is already in your list, which is skipped;
-- the lines it refuses, each with its line or row number and the reason: the
-  same checks as when you [write a replacement](#what-ark-checks).
-  An input that your list already has for another replacement is
-  refused and named;
-- how many don't fit, when the file holds more than the keyboard does.
+- the lines it refuses, in the file's order, each with its line or row number
+  and the reason: the same checks as when you
+  [write a replacement](#what-ark-checks). An input that your list already
+  has for another replacement is refused and named;
+- how many don't fit, and what stopped them: the inputs or the text the
+  keyboard holds, the list's own memory, or a profile that is full.
 
 Then choose **Add to my list**, which keeps your entries, or **Replace my
-list**, which removes them first; or **Cancel**. Either is one step of the
-draft, so Undo takes all of it back.
+list**, which deletes them first and is written in red; or **Cancel**.
+Either is one step of the draft, so Undo takes all of it back.
 
 ## Exporting your list
 
@@ -311,7 +323,12 @@ from its menu:
 - **CSV**: a header row `replacement,inputs`, then a row for each
   replacement with all its inputs in one cell. With a replacement
   that plays a macro in the list, a third column, `macro`, holds the macro's
-  number.
+  number. The file starts with a byte order mark, so Excel reads its accents.
+  A spreadsheet may still retype a cell as it opens the file: a replacement
+  of digits can lose a leading zero, and one that starts with `+`, `-` or `=`
+  (a phone number such as `+31 6 1234 5678`) can be read as a formula. Format
+  the column as text before you save from the spreadsheet, or keep the list
+  in JSON.
 - **JSON**: Ark's format, version 1:
 
   ```json
@@ -336,18 +353,18 @@ number, so a list with one fits the keyboard it came from.
 A warning marks a replacement in the list and a chip in its editor in amber,
 with its reason in a line under what it is about. It never stops you saving.
 
-- **It will not fire on your host layout.** After you change the host
-  layout, the top of the screen says how many replacements the new layout
-  can't type, and each is marked. The keyboard skips them. Change the layout
-  back or edit them. Review lists it too, as a warning to confirm once
-  before saving.
+- **Your host layout can't type it.** After you change the host
+  layout, the top of the screen says how many replacements and inputs the
+  new layout can't type, and each is marked. The keyboard skips them. Change
+  the layout back or edit them. Review lists it too, as a warning to confirm
+  once before saving.
 - **Its macro is empty.** The keyboard leaves what you typed. Add steps in
   Macros or choose another replacement. Review lists it too, as it lists a
   pointing mode that runs an empty macro.
 - **A replacement is itself an input for another.** With `a` for `b` and `b`
   for `c`, typing "b" yourself gives "c". Two entries that replace each
   other are marked as a loop.
-- **A short input with `*`.** Under four letters, it fires inside many
+- **A short input with `*`.** Under four letters, it catches many
   words you meant.
 - **An input that matches inside a replacement.** Typing that
   replacement would change it.
@@ -356,18 +373,21 @@ with its reason in a line under what it is about. It never stops you saving.
 
 The list's heading counts your inputs against what the keyboard holds: 1,024
 on current firmware. Under the list, **Text replacement memory** shows the
-bytes the list uses of its 34,824, with a bar, and counts your replacements
-and inputs. The list also shares the profile's memory with everything else;
-the [Keyboard screen](connecting.md#the-keyboard-screen)'s **Memory** panel
+bytes the list uses of its 34,824, with a bar, how many bytes are free, and
+your replacements and inputs. What is free is what the list can still grow
+by: its own memory, the 20,480 bytes of text it may hold, or the room left
+in the profile, whichever is least. The list shares the profile's memory
+with everything else; the
+[Keyboard screen](connecting.md#the-keyboard-screen)'s **Memory** panel
 shows both, with **Text replacement inputs** among the counts and **Text
-replacement memory** after Macro memory.
+replacement memory** after Macro memory, its bar as full as the one here.
 
 ## Review and backups
 
 Review lists each changed entry once, under **Text replacement**: added,
-removed, or with another replacement, and each input added, removed or
-written anew, as it is written. **Discard** puts one
-entry back. The switch is a setting, reviewed under **Settings**. See
+deleted, or with another replacement, and each input added, removed or
+written anew, as it is written. **Show** opens that replacement in its
+editor, and **Discard** puts one entry back. The switch is a setting, reviewed under **Settings**. See
 [Review and save](review-and-save.md#review).
 
 A [backup](backups.md) holds the whole list.
