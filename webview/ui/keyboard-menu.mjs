@@ -11,6 +11,7 @@
 // on the button.
 
 // Selector assertions refer to elements created by this module's authored markup.
+import {menuKey} from "../lib/menu-keys.mjs";
 import * as controls from "../view/controls.mjs";
 import {esc, watchPressOutside} from "../lib/dom.mjs";
 import {getModel, post, postLeavingDemo, render, state} from "../store.mjs";
@@ -87,16 +88,7 @@ export function bindKeyboardMenu(node) {
     const list = /** @type {HTMLElement | null} */ (node.querySelector("#rail-menu"));
     if (!list) return;
     list.addEventListener("keydown", (event) => {
-        const items = [.../** @type {NodeListOf<HTMLElement>} */ (list.querySelectorAll(ITEMS))];
-        const at = items.indexOf(/** @type {HTMLElement} */ (document.activeElement));
-        const step = /** @type {Record<string, number>} */ ({ArrowDown: 1, ArrowUp: -1})[event.key];
-        if (step) items[(at + step + items.length) % items.length]?.focus();
-        else if (event.key === "Home") items[0]?.focus();
-        else if (event.key === "End") items[items.length - 1]?.focus();
-        else if (event.key === "Escape" || event.key === "Tab") { closeKeyboardMenu(); render(); focusButton(); }
-        else return;
-        event.preventDefault();
-        event.stopPropagation();
+        menuKey(event, [.../** @type {NodeListOf<HTMLElement>} */ (list.querySelectorAll(ITEMS))], () => { closeKeyboardMenu(); render(); focusButton(); });
     });
     list.addEventListener("click", (event) => {
         const item = /** @type {HTMLButtonElement | null} */ (/** @type {Element} */ (event.target).closest('[role^="menuitem"]'));
