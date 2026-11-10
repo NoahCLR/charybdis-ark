@@ -232,13 +232,19 @@ const isRecord = (value) => typeof value === "object" && value !== null && !Arra
 // its refusal thrown: the edit is made of the draft as it stands and the
 // result thrown away, so the check and the edit cannot disagree. An add that
 // names no input yet is not made: it is only asked which entry it would be.
+// A refusal of the edit still says which entry its replacement is (`named`
+// on what is thrown), since whether the list has it is true either way.
 /** @param {import("../model/types.js").CompleteSnapshot} snapshot @param {import("../../contracts/edits.js").AutocorrectEdit} edit @param {import("../model/types.js").ProfileDestination} [capabilities] @returns {Pick<import("../../contracts/messages.js").AutocorrectValidation, "warnings" | "entry" | "label" | "listed" | "listedSaid">} */
 function autocorrectEditStatus(snapshot, edit, capabilities) {
     if (draftEditEntry(edit?.type)?.editor !== "autocorrect") throw Object.assign(new Error("Unsupported draft edit."), {code: "PROFILE_DRAFT_CONFLICT"});
     const {entry, label, listed, listedSaid, joins, unfinished} = editNames(snapshot, edit);
     const named = entry === undefined ? {} : {entry, label, listed: Boolean(listed), ...(listedSaid ? {listedSaid} : {})};
     if (unfinished) return {warnings: [], ...named};
-    return {warnings: [...(joins ? [joins] : []), ...newWarnings(snapshot, applyDraftEdit(snapshot, edit, {capabilities}))], ...named};
+    try {
+        return {warnings: [...(joins ? [joins] : []), ...newWarnings(snapshot, applyDraftEdit(snapshot, edit, {capabilities}))], ...named};
+    } catch (error) {
+        throw Object.assign(/** @type {object} */ (error), {named});
+    }
 }
 
 // Edit/control paths publish, including the ones that decline or fail:
@@ -272,7 +278,8 @@ async function handleMessage(session, message, shell) {
             const draft = boundDraft(session, panelState(session), message, "Read the keyboard and wait for its current operation before editing your text replacements.");
             reply.validation = {...reply.validation, ...autocorrectEditStatus(draft.current, inspection.edit, draft.capabilities)};
         } catch (error) {
-            reply.validation = {error: failureSentence(error), code: /** @type {import("./types.js").OperationFailure} */ (error).code || "AUTOCORRECT_EDIT_REFUSED", warnings: []};
+            reply.validation = {error: failureSentence(error), code: /** @type {import("./types.js").OperationFailure} */ (error).code || "AUTOCORRECT_EDIT_REFUSED", warnings: [],
+                .../** @type {{named?: Pick<import("../../contracts/messages.js").AutocorrectValidation, "entry" | "label" | "listed" | "listedSaid">}} */ (error).named};
         }
         // As a macro's inspection: nothing staged, no toast, no HID.
         await shell.post(reply);

@@ -179,8 +179,9 @@ export function receiveAutocorrectValidation(message) {
     // list has it already.
     const fresh = state.autocorrectNew;
     if (answer?.form === "new" && fresh && !fresh.sent) {
-        const joins = !answer.error && answer.listed && answer.entry !== undefined ? {entry: answer.entry, said: answer.listedSaid || ""} : null;
-        const label = answer.error ? fresh.label : answer.label;
+        // Whether the list has it is true whatever is wrong with its input.
+        const joins = answer.listed && answer.entry !== undefined ? {entry: answer.entry, said: answer.listedSaid || ""} : null;
+        const label = answer.label ?? fresh.label;
         const redraw = (joins?.entry ?? null) !== (fresh.joins?.entry ?? null);
         state.autocorrectNew = {...fresh, joins, label};
         if (redraw) render();

@@ -236,7 +236,11 @@ test("a new replacement the list already has is offered to be opened, and makes 
     await replacement.fill("because of");
     await expect(fresh.locator("[data-ac-joins]")).toHaveCount(0);
     await expect(fresh.locator("[data-ac-first]")).toBeEnabled();
+    // Whether the list has it is said whatever is wrong with the input typed for it so far.
+    await fresh.locator("[data-ac-first]").fill("teh");
+    await expect(fresh.locator('[data-ac-feedback="new"]')).toContainText("“teh” is already an input for “the”.");
     await replacement.fill("because");
+    await expect(fresh.locator("[data-ac-joins]")).toContainText("“because” is already on your list.");
     await fresh.locator('[data-act="ac-open-joined"]').click();
     await expect(editor(page)).toHaveAttribute("data-ac-editor", "because");
     await expect(page.locator("[data-ac-new], [data-ac-new-item]")).toHaveCount(0);

@@ -462,7 +462,8 @@ test("an autocorrect edit is checked against the draft without staging it: its r
     assert.equal(last(shell).validation.error, "");
     assert.deepEqual(last(shell).validation.warnings, ["“*on” is a short input with *, so it catches many words."]);
     await ask({type: "addAutocorrectTypos", correction: "ten", typos: [{typo: "teh"}]});
-    assert.deepEqual(last(shell).validation, {error: "“teh” is already an input for “the”.", code: "AUTOCORRECT_EDIT_REFUSED", warnings: []});
+    assert.deepEqual(last(shell).validation, {error: "“teh” is already an input for “the”.", code: "AUTOCORRECT_EDIT_REFUSED", warnings: [], entry: "ten", label: "ten", listed: false},
+        "a refusal still says which entry its replacement is");
     await ask({type: "addAutocorrectTypos", correction: "then", typos: [{typo: "te*hn"}]});
     assert.match(last(shell).validation.error, /has \* where it cannot go/);
     await ask({type: "addAutocorrectTypos", macro: 5, typos: [{typo: "sig"}]});
@@ -475,7 +476,10 @@ test("an autocorrect edit is checked against the draft without staging it: its r
     await ask({type: "addAutocorrectTypos", correction: "the", inputs: ""});
     assert.deepEqual(last(shell).validation, {error: "", code: "", warnings: [], entry: "the", label: "the", listed: true, listedSaid: "“the” is already on your list. Add inputs to it there."});
     await ask({type: "addAutocorrectTypos", correction: "the", inputs: "teh"});
-    assert.deepEqual(last(shell).validation, {error: "“teh” is already an input for “the”.", code: "AUTOCORRECT_EDIT_REFUSED", warnings: []});
+    assert.deepEqual(last(shell).validation, {error: "“teh” is already an input for “the”.", code: "AUTOCORRECT_EDIT_REFUSED", warnings: [], entry: "the", label: "the", listed: true,
+        listedSaid: "“the” is already on your list. Add inputs to it there."}, "and that the list has it, whatever is wrong with the input");
+    await ask({type: "addAutocorrectTypos", correction: "  ", inputs: "teh"});
+    assert.deepEqual(last(shell).validation, {error: "Type the replacement.", code: "AUTOCORRECT_EDIT_REFUSED", warnings: []}, "a replacement that is none names no entry");
     // Changing a replacement to one the list has joins the two, and says so first.
     await ask({type: "updateAutocorrectCorrection", correction: "thing", to: "the"});
     assert.deepEqual(last(shell).validation, {error: "", code: "", warnings: ["“the” is already on your list: this one's inputs will join it."], entry: "the", label: "the", listed: true});

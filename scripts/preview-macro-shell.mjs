@@ -44,15 +44,18 @@ export function inspectAutocorrect(message, model) {
     const host = {layout: model.macroUnicode.layout ?? US_HOST_LAYOUT, layoutName: model.autocorrect?.layoutName, macroNames, emptyMacros: new Set(model.macros.flatMap((macro, slot) => macro.empty ? [slot] : []))};
     /** @type {import("../contracts/messages.js").AutocorrectValidation} */
     let validation;
+    /** @type {Pick<import("../contracts/messages.js").AutocorrectValidation, "entry" | "label" | "listed" | "listedSaid">} */
+    let named = {};
     try {
         const {entry, label, listed, listedSaid, joins, unfinished} = listEditNames(list(), macroNames, message.edit);
+        named = entry === undefined ? {} : {entry, label, listed: Boolean(listed), ...(listedSaid ? {listedSaid} : {})};
         const before = list(), after = list();
         if (!unfinished && message.edit.type !== "importAutocorrect") changeList(after, message.edit, host, {maxCorrections: Infinity, maxTypos: Infinity, maxTextBytes: Infinity, capacity: Infinity, sharedFree: Infinity});
         const had = new Set(listWarnings(before, host).map(warning => warning.text));
         validation = {error: "", code: "", warnings: [...(joins ? [joins] : []), ...listWarnings(after, host).filter(warning => !had.has(warning.text)).map(warning => warning.text)],
-            ...(entry === undefined ? {} : {entry, label, listed: Boolean(listed), ...(listedSaid ? {listedSaid} : {})})};
+            ...named};
     } catch (error) {
-        validation = {error: error instanceof Error ? error.message : String(error), code: "AUTOCORRECT_EDIT_REFUSED", warnings: []};
+        validation = {error: error instanceof Error ? error.message : String(error), code: "AUTOCORRECT_EDIT_REFUSED", warnings: [], ...named};
     }
     return {type: "autocorrectValidation", requestId: message.requestId, draftId: message.draftId, draftRevision: message.draftRevision, validation};
 }
