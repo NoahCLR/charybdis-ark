@@ -26,6 +26,10 @@ const KEYBOARD_ONLY = [
     "a dead-key sequence the layout does not resolve", "a cursor key", "a shortcut", "a mouse click", "a macro",
     "a key held until the computer repeats it", "a held modifier", "a macro key pressed during a correction",
     "more keys than the queue holds", "the stored switch",
+    // A text matcher cannot tell how a character was typed: the keyboard
+    // passes over a word whose ending character a dead key composed, and the
+    // preview replaces it (firmware autocorrect-v1.md, "What a word is").
+    "a word ended through a dead key",
 ];
 
 const text = fixture.cases.filter(entry => entry.screen !== undefined);
@@ -34,7 +38,7 @@ const skipped = fixture.cases.filter(entry => entry.screen === undefined);
 test("the firmware's behaviour fixture is the version this matcher reads, and every case is run or skipped for a known reason", () => {
     assert.equal(fixture.version, 1);
     assert.equal(text.length + skipped.length, fixture.cases.length);
-    assert.ok(text.length >= 39, "the text cases are run");
+    assert.ok(text.length >= 57, "the text cases are run");
     for (const entry of skipped) assert.ok(KEYBOARD_ONLY.includes(entry.keyboardOnly), `${entry.name} is skipped for a reason this test does not know: ${entry.keyboardOnly}`);
     assert.deepEqual([...new Set(skipped.map(entry => entry.keyboardOnly))].sort(), [...KEYBOARD_ONLY].sort(), "every reason listed here still skips a case");
     for (const rule of [1, 2, 3, 4, 5, 6, 7, 9, 10]) assert.ok(text.some(entry => entry.rule === rule), `rule ${rule} has a text case`);

@@ -892,7 +892,7 @@ function trySection(model, list) {
         <div class="card-h"><h3>Try it</h3>${infoMark({id: "ac-info-try", label: "About the preview", heading: "About the preview", rows: [
                 {term: "Preview", says: `What your keyboard would type with this draft's list, through ${list.layoutName}.`},
                 {term: "Your text", says: "The box keeps what you type. Only the preview shows replacements."},
-                {term: "Not shown", says: "Clicks, shortcuts, arrow keys and held keys. On the keyboard they start a new word or pause replacing until the next one."},
+                {term: "Not shown", says: "Clicks, shortcuts, arrow keys and held keys. On the keyboard they start a new word or pause replacing until the next one. A word ended through a dead key is left alone by the keyboard, and replaced here."},
                 {term: "Caps Lock", says: "The switch follows your own Caps Lock when it changes as you type here, or set it yourself for the preview."}]})}
             <button class="btn tiny ghost destructive right" data-act="ac-try-clear" ${tried.text ? "" : "disabled"} data-tip="Empty the box and its preview.">Clear</button></div>
         <div class="card-b stack">

@@ -257,7 +257,10 @@ not play macros.
 
 Try it reads text, so its preview can't show what depends on keys and time:
 a shortcut, a cursor key, a held key, a macro key, or keys pressed while a
-replacement is typed. An edit in the middle of the box counts as a click
+replacement is typed. It also can't tell how a character was typed: the
+keyboard leaves a word alone when the character that ended it came through a
+dead key (a quote on US-International, typed as the dead key and then
+Space), and the preview shows it replaced. An edit in the middle of the box counts as a click
 would: the text stays and the next key starts a new word. Try it works
 whether text replacement is on or off.
 
