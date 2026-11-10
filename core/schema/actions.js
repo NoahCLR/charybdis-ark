@@ -92,8 +92,8 @@ const layerOfRef = text => {
 // combos and AC_ON, AC_OFF and AC_TOGG for autocorrect, and the keyboard's
 // BH_ON, BH_OFF and BH_TOGG for behaviours and AM_ON, AM_OFF and AM_TOGG for
 // auto-mouse. The firmware runs all twelve, wherever they are sent.
-const QMK_SWITCH_KEYS = Object.freeze(["QK_COMBO_ON", "QK_COMBO_OFF", "QK_COMBO_TOGGLE", "QK_AUTOCORRECT_ON", "QK_AUTOCORRECT_OFF", "QK_AUTOCORRECT_TOGGLE"]
-    .map(name => /** @type {number} */ (keycodes.encode(name))));
+const QMK_SWITCH_KEY_NAMES = Object.freeze(["QK_COMBO_ON", "QK_COMBO_OFF", "QK_COMBO_TOGGLE", "QK_AUTOCORRECT_ON", "QK_AUTOCORRECT_OFF", "QK_AUTOCORRECT_TOGGLE"]);
+const QMK_SWITCH_KEYS = Object.freeze(QMK_SWITCH_KEY_NAMES.map(name => /** @type {number} */ (keycodes.encode(name))));
 /** @param {number} code */
 const isSwitchKey = code => QMK_SWITCH_KEYS.includes(code) || behaviorSwitchKeyName(code) !== undefined || autoMouseSwitchKeyName(code) !== undefined;
 
@@ -132,4 +132,4 @@ function placementProblem(action, placement, {layerCount = LAYERS} = {}) {
 /** @param {string} expression */
 const momentaryCall = expression => callParts(expression.replace(/\s+(?=\()/, ""))?.name === "MO";
 
-module.exports = {placementProblem, momentaryCall, isOwnedLayerCode, isSwitchKey, KNOWN_ACTION_ABIS, ACTION_ABI, knownActionAbi, actionName, nativeCode, keycodeAction, pointingSlotOfCode, layerRef, layerOfRef};
+module.exports = {placementProblem, momentaryCall, isOwnedLayerCode, isSwitchKey, QMK_SWITCH_KEY_NAMES, KNOWN_ACTION_ABIS, ACTION_ABI, knownActionAbi, actionName, nativeCode, keycodeAction, pointingSlotOfCode, layerRef, layerOfRef};

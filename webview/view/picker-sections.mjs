@@ -29,9 +29,9 @@ export const pickable = (entry) => entry.offered !== false;
 const isKeyboardKey = inGroups("kb");
 // The keyboard's 128 custom keys, by the names the model gives them.
 const isCustom = inGroups("Custom keys");
-// The keyboard's switch keys for behaviours and auto-mouse, in core's group
-// for them, and QMK's for combos and autocorrect, by their catalogue names.
-const isSwitchKey = (/** @type {Entry} */ entry) => entry.group === "Switch keys" || /^QK_(?:COMBO|AUTOCORRECT)_(?:ON|OFF|TOGGLE)$/.test(valueOf(entry));
+// The switch keys, in core's group for them: QMK's for combos and
+// autocorrect, and the keyboard's for behaviours and auto-mouse.
+const isSwitchKey = inGroups("Switch keys");
 /** @param {Entry} entry */
 const isSymbol = (entry) => entry.group === "shifted" || (entry.group === "basic" && SYMBOLS.has(valueOf(entry)));
 /** @param {Entry} entry */

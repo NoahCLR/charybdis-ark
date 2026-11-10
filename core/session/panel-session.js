@@ -88,11 +88,16 @@ function shellModel(shell) {
 // keyboard's own), and its override the runtime page 1's.
 /** @param {{master: boolean, override: boolean}} toggle */
 const turnedOffByKey = ({master, override}) => master && !override;
+// Autocorrect's stored switch, as the keyboard's settings were read.
+/** @param {State["settingsView"]} settings */
+function autocorrectStored(settings) {
+    const stored = settings?.sections.flatMap(section => section.fields).find(field => field.offSwitch === "autocorrect");
+    return Boolean(stored && "enabled" in stored && stored.enabled);
+}
 /** @param {import("../protocol/types.js").RuntimeRead} runtime @param {State["committed"]} committed @param {State["settingsView"]} settings @returns {Readonly<Record<import("../../contracts/model.js").SettingOffSwitch, boolean>>} */
 function switchesOffByKey(runtime, committed, settings) {
     const autoMouse = {master: Boolean(committed?.domains?.settings?.values?.[SETTING.AUTO_MOUSE_ENABLED]), override: runtime.autoMouse.override};
-    const stored = settings?.sections.flatMap(section => section.fields).find(field => field.offSwitch === "autocorrect");
-    const autocorrect = {master: Boolean(stored && "enabled" in stored && stored.enabled), override: runtime.autocorrect.override};
+    const autocorrect = {master: autocorrectStored(settings), override: runtime.autocorrect.override};
     return {combo: turnedOffByKey(runtime.combos), behaviour: turnedOffByKey(runtime.behaviours), autoMouse: turnedOffByKey(autoMouse), autocorrect: turnedOffByKey(autocorrect)};
 }
 // Whether the keyboard is replacing text now, as it reports it: its stored
@@ -100,8 +105,7 @@ function switchesOffByKey(runtime, committed, settings) {
 // so beside its box, where the keyboard then replaces what is typed too.
 /** @param {import("../protocol/types.js").RuntimeRead} runtime @param {State["settingsView"]} settings */
 function replacingNow(runtime, settings) {
-    const stored = settings?.sections.flatMap(section => section.fields).find(field => field.offSwitch === "autocorrect");
-    return Boolean(stored && "enabled" in stored && stored.enabled) && runtime.autocorrect.override;
+    return autocorrectStored(settings) && runtime.autocorrect.override;
 }
 
 /** @param {Session} session @param {State} state @param {Snapshot | undefined} snapshot */

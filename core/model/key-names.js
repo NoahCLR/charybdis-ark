@@ -411,4 +411,4 @@ function unnamedKeyCount(layers, capabilities) {
     return layers.flatMap((entry) => entry.keys).filter((key) => !named(key)).length;
 }
 
-module.exports = {compactKeyLabels, heldModifierWords, hostKeyVocabulary, hostKeyLabel, keyKind, keyLabel, keyLabelWithName, keyLayer, keyLayerForm, layerKeyLabel, layerModWords, layerTapWords, profileKeyNames, shortcutAct, shortcutKeys, shortcutLabel, shortcutLayerNames, unnamedKeyCount};
+module.exports = {SWITCH_KEY_FAMILIES, compactKeyLabels, heldModifierWords, hostKeyVocabulary, hostKeyLabel, keyKind, keyLabel, keyLabelWithName, keyLayer, keyLayerForm, layerKeyLabel, layerModWords, layerTapWords, profileKeyNames, shortcutAct, shortcutKeys, shortcutLabel, shortcutLayerNames, unnamedKeyCount};

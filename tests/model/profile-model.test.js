@@ -182,6 +182,10 @@ test("the switch keys for behaviours are named and offered only on the vocabular
         ["0x7EE0", "BH_ON", "Behaviours On"], ["0x7EE1", "BH_OFF", "Behaviours Off"], ["0x7EE2", "BH_TOGG", "Toggle Behaviours"], ["0x7EE3", "0x7EE3", "0x7EE3"]]);
     assert.deepEqual(model.qmkKeycodes.filter(key => /^BH_/.test(key.value)).map(key => [key.value, key.keycode, key.group, key.offered]),
         [["BH_ON", 0x7ee0, "Switch keys", undefined], ["BH_OFF", 0x7ee1, "Switch keys", undefined], ["BH_TOGG", 0x7ee2, "Switch keys", undefined]]);
+    // QMK's own switch keys, for combos and autocorrect, are published in the
+    // same group, so the picker offers every switch key by its group alone.
+    assert.deepEqual(model.qmkKeycodes.filter(key => key.group === "Switch keys" && key.value.startsWith("QK_")).map(key => key.value),
+        ["QK_COMBO_ON", "QK_COMBO_OFF", "QK_COMBO_TOGGLE", "QK_AUTOCORRECT_ON", "QK_AUTOCORRECT_OFF", "QK_AUTOCORRECT_TOGGLE"]);
     // The released firmware's vocabulary, before the keys (Profile Wire 2.0).
     const older = readback({...state, capabilities: {actionAbiDigest: 0x67df11b3}});
     assert.ok(!older.qmkKeycodes.some(key => /^BH_/.test(key.value)), "firmware without them is not offered them");

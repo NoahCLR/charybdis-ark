@@ -13,7 +13,6 @@
 // be a lie about what the keyboard is running.
 
 const {PD_MODE_KEYS, formerNames, pdModeKeyOfCode} = require("../data/pd-mode-keys");
-const {AUTO_MOUSE_SWITCH_KEYS, BEHAVIOR_SWITCH_KEYS, autoMouseSwitchKeyCode, behaviorSwitchKeyCode} = require("../data/user-keycodes");
 const {TEXT_REPLACEMENT_KEYS, VOCABULARY, layerName, slotName} = require("./vocabulary");
 const {comboOutputBehaviorLayers, participation} = require("./participation");
 const {comboReferenceLayers, publishedComboReach} = require("./combo-reach");
@@ -25,8 +24,8 @@ const {behaviorRowsForView, builtInBranches, comboRowsForView, rgbForView} = req
 const {emptyCells} = require("./empty-cells");
 const {dualRole, effectiveTimings, holdTermSetting} = require("./gesture-timing");
 const {timingAlone} = require("./inert-behaviors");
-const {compactKeyLabels, heldModifierWords, hostKeyVocabulary, keyKind, keyLabel, keyLayer, keyLayerForm, layerModWords, layerTapWords, profileKeyNames, shortcutAct, shortcutKeys, shortcutLabel, shortcutLayerNames} = require("./key-names");
-const {keycodeAction, knownActionAbi, layerRef, nativeCode} = require("../schema/actions");
+const {SWITCH_KEY_FAMILIES, compactKeyLabels, heldModifierWords, hostKeyVocabulary, keyKind, keyLabel, keyLayer, keyLayerForm, layerModWords, layerTapWords, profileKeyNames, shortcutAct, shortcutKeys, shortcutLabel, shortcutLayerNames} = require("./key-names");
+const {QMK_SWITCH_KEY_NAMES, keycodeAction, knownActionAbi, layerRef, nativeCode} = require("../schema/actions");
 const {dpiChoices} = require("./pointer-dpi");
 const {pointingTapKeys} = require("./pointing-taps");
 const {linkStarts, linkTargets, pointerCoveredLayers} = require("./pointing-links");
@@ -138,8 +137,7 @@ function profileModel(content, capabilities, editing) {
     // So is each switch key for behaviours and for auto-mouse, in a group of
     // its own, on firmware whose vocabulary has them; the picker puts them
     // beside QMK's switch keys for combos.
-    const switchKeyFamilies = /** @type {const} */ ([[BEHAVIOR_SWITCH_KEYS, behaviorSwitchKeyCode], [AUTO_MOUSE_SWITCH_KEYS, autoMouseSwitchKeyCode]]);
-    if (knownActionAbi(capabilities?.actionAbiDigest ?? 0)) for (const [family, codeOf] of switchKeyFamilies) for (const name of family) {
+    if (knownActionAbi(capabilities?.actionAbiDigest ?? 0)) for (const [family, codeOf] of SWITCH_KEY_FAMILIES) for (const name of family) {
         const code = /** @type {number} */ (codeOf(name)), native = keycodes.resolve(code).name, label = names.labels[name];
         present(code, {value: name, key: name, label, group: "Switch keys", aliases: [native], keycode: code, searchTerms: [name, label], search: `${name} ${label}`.toLowerCase(), searchCompact: `${name}${label}`.toLowerCase()});
     }
@@ -532,7 +530,9 @@ function catalogViews() {
             value: entry.name,
             key: entry.name,
             label,
-            group: entry.group,
+            // QMK's switch keys for combos and autocorrect are offered with
+            // the keyboard's own, in the one group the picker reads.
+            group: QMK_SWITCH_KEY_NAMES.includes(entry.name) ? "Switch keys" : entry.group,
             aliases: entry.aliases,
             keycode: entry.value,
             searchTerms,
