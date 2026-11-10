@@ -129,7 +129,7 @@ test("New replacement opens an editor with its text focused, and it joins the li
     const replacement = fresh.locator('[data-f="autocorrect:new:replacement"]'), first = fresh.locator("[data-ac-first]");
     await expect(replacement).toBeFocused();
     await expect(first).toBeDisabled();
-    await expect(fresh.locator(".card-b > .note").first()).toHaveText("Add * where other letters may go: recieve* also fixes recieved and recieving. It joins your list with its first input.");
+    await expect(fresh.locator(".card-b > .note").first()).toHaveText("It joins your list with its first input.");
     // No control says where an input matches: the * does.
     await expect(fresh.locator('[data-f*=":match"]')).toHaveCount(0);
     await replacement.fill("definitely");
@@ -184,33 +184,43 @@ test("a new replacement the list already has is offered to be opened, and makes 
     expect(await edits(page)).toEqual([]);
 });
 
-test("a replacement can play a macro: Pick… opens the keycode picker on the macros alone, and it is posted by its slot", async ({page}) => {
+test("a replacement can play a macro: Pick… opens the keycode picker on the macros with steps, and it is posted by its slot", async ({page}) => {
     await openControls(page, "autocorrect");
+    // Macros 3 and 7 have steps; the rest are empty, and an empty macro would play nothing.
+    await publish(page, (model) => {
+        model.macros = model.macros.map((macro, slot) => ({...macro, empty: slot !== 3 && slot !== 7}));
+    });
     await bank(page).locator('[data-act="ac-add"]').click();
     const fresh = page.locator("[data-ac-new]");
     await fresh.locator(".seg label", {hasText: "Macro"}).click();
     await expect(fresh.locator('[data-f="autocorrect:new:kind:macro"]')).toBeChecked();
     await expect(fresh.locator("[data-ac-text]")).toHaveCount(0);
     await expect(fresh.locator("select")).toHaveCount(0);
-    const key = fresh.locator('.pd-key[data-act="ac-pick"]');
-    await expect(key).toBeFocused();
-    await expect(key).toHaveText("+ Macro");
-    await expect(fresh.locator(".card-b > .note").first()).toHaveText("A macro plays for the whole word only: its inputs take no *, and Backspace does not take it back.");
+    // A read-only field names the macro and Pick… beside it chooses one, as a custom key's shortcut is.
+    const field = fresh.locator(".ac-macro input[data-ac-macro]"), pick = fresh.locator('.ac-macro .btn[data-act="ac-pick"]');
+    await expect(pick).toHaveText("Pick…");
+    await expect(pick).toBeFocused();
+    await expect(field).toHaveValue("");
+    await expect(field).toHaveAttribute("placeholder", "No macro yet");
+    await expect(field).toHaveAttribute("readonly", "");
+    await expect(fresh.locator(".pd-key")).toHaveCount(0);
+    // How a macro differs is behind the Replacement heading's info mark, not written under it.
+    await expect(fresh.locator(".card-b > .note")).not.toContainText(["A macro plays"]);
+    await expect(fresh.locator("#ac-info-replacement")).toContainText("Backspace does not take it back");
     await expect(fresh.locator('[data-act="ac-edit-macro"]')).toHaveCount(0);
-    await fresh.locator('.btn[data-act="ac-pick"]', {hasText: "Pick…"}).click();
-    // The picker, as a key's is, with one section: the macros by name, those in use apart from the empty ones.
+    await pick.click();
+    // The picker, as a key's is, with one section: the macros that have steps, by name.
     const picker = page.locator(".sheet.picker");
     await expect(picker).toBeVisible();
     await expect(picker.locator(".picker-side button")).toHaveText(["Macros"]);
     await expect(picker.locator(".pkb")).toHaveCount(0);
     await expect(picker.locator(".pk-mods")).toHaveCount(0);
-    await expect(picker.locator(".pk-label").last()).toHaveText("Empty");
-    expect(await picker.locator("[data-pick]").evaluateAll((tiles) => tiles.every((tile) => /^MACRO_\d+$/.test(tile.dataset.pick)))).toBe(true);
-    await expect(picker.locator("[data-pick]")).toHaveCount(128);
+    await expect(picker.locator(".pk-label")).toHaveText(["In use"]);
+    expect(await picker.locator("[data-pick]").evaluateAll((tiles) => tiles.map((tile) => tile.dataset.pick))).toEqual(["MACRO_3", "MACRO_7"]);
     await pickMacro(page, "MACRO_3");
     await expect(picker).toHaveCount(0);
-    await expect(key).toHaveText("▶ Macro 3");
-    await expect(key).toHaveAttribute("data-ac-macro", "3");
+    await expect(field).toHaveValue("▶ Macro 3");
+    await expect(field).toHaveAttribute("data-ac-macro", "3");
     await expect(bank(page).locator("[data-ac-new-item] .v")).toHaveText("▶ Macro 3");
     const first = fresh.locator("[data-ac-first]");
     await expect(first).toBeFocused();
@@ -218,14 +228,14 @@ test("a replacement can play a macro: Pick… opens the keycode picker on the ma
     await clearPosts(page);
     await first.press("Enter");
     expect(await edits(page)).toEqual([expect.objectContaining({type: "addAutocorrectTypos", macro: 3, typos: [{typo: "sig"}, {typo: "sgi"}], expectedFingerprint: identity})]);
-    // The picker opens on the macro chosen; Escape closes it and changes nothing.
-    await key.click();
+    // A click on the field opens the picker on the macro chosen; Escape closes it and changes nothing.
+    await field.click();
     await expect(picker.locator('[data-pick="MACRO_3"]')).toHaveClass(/\bon\b/);
     await page.keyboard.press("Escape");
     await expect(picker).toHaveCount(0);
-    await expect(key).toHaveText("▶ Macro 3");
-    // Edit in Macros goes to that macro, as a pointing mode's light goes to Lighting.
-    await expect(fresh.locator('[data-act="ac-edit-macro"]')).toHaveText("Edit in Macros →");
+    await expect(field).toHaveValue("▶ Macro 3");
+    // Edit in Macros is in the header, as a macro's Place on a key → is, and goes to that macro.
+    await expect(fresh.locator('.card-h [data-act="ac-edit-macro"]')).toHaveText("Edit in Macros →");
     await fresh.locator('[data-act="ac-edit-macro"]').click();
     await expect(page.locator(".main > .topbar h1")).toHaveText("Macros");
     await expect(page.locator('.mslot[data-slot="MACRO_3"]')).toHaveAttribute("aria-current", "true");
@@ -248,12 +258,13 @@ test("a replacement is changed in its editor, to other text or to a macro, and d
     await text.press("Escape");
     await expect(text).toHaveValue("the");
     expect(await edits(page)).toEqual([]);
-    // Macro shows the macro's key with none chosen; picking one posts the change.
+    // Macro shows an empty macro field; picking one posts the change.
+    await publish(page, (model) => { model.macros[7] = {...model.macros[7], empty: false}; });
     await item(page, "iPhone").click();
     await editor(page).locator(".seg label", {hasText: "Macro"}).click();
-    await expect(editor(page).locator('.pd-key[data-act="ac-pick"]')).toHaveText("+ Macro");
+    await expect(editor(page).locator("input[data-ac-macro]")).toHaveValue("");
     expect(await edits(page)).toEqual([]);
-    await editor(page).locator('.pd-key[data-act="ac-pick"]').click();
+    await editor(page).locator('[data-act="ac-pick"]').click();
     await pickMacro(page, "MACRO_7");
     expect(await edits(page)).toEqual([expect.objectContaining({type: "updateAutocorrectCorrection", correction: "iPhone", toMacro: 7, expectedFingerprint: identity})]);
     // Back on Text with nothing kept, it is the text it was.
@@ -269,7 +280,18 @@ test("inputs are chips: + Input adds one or several and stays for the next, and 
     await openControls(page, "autocorrect");
     await item(page, "because").click();
     await expect(chips(page)).toHaveText(["beacuse", "becasue", "becuase"]);
-    await expect(editor(page).locator(".ac-inputs ~ .note").first()).toHaveText("Add * where other letters may go: recieve* also fixes recieved and recieving.");
+    // How an input is written is behind the Inputs heading's info mark: hovering it, or reaching it by the keyboard, shows it; Escape shuts it.
+    const info = editor(page).locator("[data-info-mark]:has(#ac-info-inputs)");
+    const list = info.locator("#ac-info-inputs");
+    await expect(info.locator(".info-button")).toHaveAttribute("aria-label", "How inputs are written");
+    await expect(list).toBeHidden();
+    await info.locator(".info-button").hover();
+    await expect(list).toBeVisible();
+    await expect(list.locator("dt")).toHaveText(["teh", "recieve*", "*mnet", "*tihng*", "Capitals", "Characters", "Overlaps", "Macros"]);
+    await expect(list).toContainText("The start of a word: also recieved, recieving.");
+    await page.keyboard.press("Escape");
+    await expect(list).toBeHidden();
+    await page.mouse.move(0, 0);
     const add = editor(page).locator('[data-act="ac-more"]');
     await expect(add).toHaveText("+ Input");
     await add.click();
@@ -345,11 +367,10 @@ test("a replacement that plays a macro is named by its macro, told apart, and ed
     await expect(editor(page).locator(".title-name-text")).toHaveText("Sign-off");
     await expect(editor(page).locator("[data-ac-kind]")).toHaveText("Macro");
     await expect(editor(page).locator('[data-f$=":kind:macro"]')).toBeChecked();
-    await expect(editor(page).locator('.pd-key[data-act="ac-pick"]')).toHaveText("▶ Sign-off");
-    await expect(editor(page).locator('[data-act="ac-edit-macro"]')).toBeVisible();
-    // A macro is for whole words, said once; the * hint is not.
-    await expect(editor(page).locator(".card-b > .note").first()).toContainText("A macro plays for the whole word only");
-    await expect(editor(page)).not.toContainText("Add * where other letters may go");
+    await expect(editor(page).locator("input[data-ac-macro]")).toHaveValue("▶ Sign-off");
+    await expect(editor(page).locator('.card-h [data-act="ac-edit-macro"]')).toBeVisible();
+    // Nothing is written under the sections: how they work is behind their info marks.
+    await expect(editor(page).locator(".card-b > .note:not(.warn)")).toHaveCount(0);
     // One whose macro is empty says so in the bank and in its editor, as a pointing mode that runs an empty macro is said.
     const empty = bank(page).locator('[data-ac-entry$="macro:6"]');
     await expect(empty).toHaveClass(/caution/);
@@ -407,7 +428,8 @@ test("no control that removes something is a bare ×: each is written out", asyn
     for (const open of [() => item(page, "because").click(), () => editor(page).locator('[data-ac-chip="becasue"]').click(), () => bank(page).locator('[data-act="ac-add"]').click(),
         () => bank(page).locator('[data-act="ac-export-menu"]').click()]) {
         await open();
-        expect(await page.locator(".pad.autocorrect button").evaluateAll((buttons) => buttons.filter((button) => /^[×✕x]?$/i.test((button.textContent || "").trim())).length)).toBe(0);
+        // The info marks are the only buttons drawn without words: each is named, and removes nothing.
+        expect(await page.locator(".pad.autocorrect button:not(.info-button)").evaluateAll((buttons) => buttons.filter((button) => /^[×✕x]?$/i.test((button.textContent || "").trim())).length)).toBe(0);
     }
 });
 
@@ -427,12 +449,12 @@ test("every control of the screen has a name, and the keyboard reaches them in r
     const order = [];
     for (let step = 0; step < 40; step++) {
         await page.keyboard.press("Tab");
-        const at = await page.evaluate(() => { const node = document.activeElement; return node?.closest(".pad.autocorrect") ? node.dataset.act || node.dataset.f || (node.dataset.acEntry !== undefined ? "item" : node.tagName) : null; });
+        const at = await page.evaluate(() => { const node = document.activeElement; return node?.closest(".pad.autocorrect") ? node.dataset.act || node.dataset.f || (node.classList.contains("info-button") ? `ⓘ ${node.getAttribute("aria-label")}` : node.dataset.acEntry !== undefined ? "item" : node.tagName) : null; });
         if (!at) break;
         if (order.at(-1) !== at) order.push(at);
     }
-    expect(order.map((name) => name.replace(/^autocorrect:entry:because:/, ""))).toEqual(["item", "ac-add", "ac-import", "ac-export-menu", "ac-delete", "kind:text", "replacement", "ac-chip", "input:becasue", "ac-remove-input", "ac-chip", "ac-more",
-        "ac-try-clear", "autocorrect:try:text", "autocorrect:try:caps"]);
+    expect(order.map((name) => name.replace(/^autocorrect:entry:because:/, ""))).toEqual(["item", "ac-add", "ac-import", "ac-export-menu", "ac-delete", "ⓘ How a replacement works", "kind:text", "replacement",
+        "ⓘ How inputs are written", "ac-chip", "input:becasue", "ac-remove-input", "ac-chip", "ac-more", "ⓘ About the preview", "ac-try-clear", "autocorrect:try:text", "autocorrect:try:caps"]);
 });
 
 // ── the switch is a Host setting (D-L87) ───────────────────────────────
@@ -487,7 +509,8 @@ test("Try it closes the editor: its box is never changed, and the preview under 
     const section = editor(page).locator("[data-ac-try]"), box = page.locator('[data-f="autocorrect:try:text"]'), preview = page.locator("[data-ac-try-preview]");
     // The last section of the editor card, as Record is a macro's.
     await expect(editor(page).locator("> .card-b > :last-child")).toHaveAttribute("data-ac-try", "");
-    await expect(section.locator(".field > span")).toHaveText("Preview with this draft: what your keyboard would type after you Apply.");
+    await expect(section.locator(".field > span")).toHaveText("Your keyboard would type");
+    await expect(section.locator("#ac-info-try")).toContainText("What your keyboard would type with this draft, once you Apply");
     await expect(section.locator(".sw .txt")).toHaveText("Preview with Caps Lock on");
     await expect(preview).toHaveText("Nothing typed yet.");
     // No keyboard is replacing here, so nothing says one is.
@@ -797,12 +820,12 @@ test("in the demo a replacement is made to play a macro, Try it says which, and 
     const fresh = page.locator("[data-ac-new]");
     await fresh.locator(".seg label", {hasText: "Macro"}).click();
     await fresh.locator('.btn[data-act="ac-pick"]', {hasText: "Pick…"}).click();
-    // The demo's macros by their names; the first of them plays keys.
+    // The demo's macros that have steps, by their names; the first of them plays keys.
     const picker = page.locator(".sheet.picker");
     await expect(picker.locator(".pk-label").first()).toHaveText("In use");
     const name = (await picker.locator('[data-pick="MACRO_0"] .l').innerText()).trim();
     await pickMacro(page, "MACRO_0");
-    await expect(fresh.locator('.pd-key[data-act="ac-pick"]')).toHaveText(`▶ ${name}`);
+    await expect(fresh.locator("input[data-ac-macro]")).toHaveValue(`▶ ${name}`);
     // A * is refused for a macro, in plain words.
     const first = fresh.locator("[data-ac-first]");
     await first.fill("spot*");

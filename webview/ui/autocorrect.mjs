@@ -48,6 +48,7 @@ import {choiceField} from "./segmented.mjs";
 import {topbar} from "./frame.mjs";
 import {dialogFoot} from "./dialog-foot.mjs";
 import {openPicker} from "./picker.mjs";
+import {attachInfoMarks, infoMark} from "./info-mark.mjs";
 import {titleText} from "./title-name.mjs";
 import {settingOffBanner} from "./participation.mjs";
 import {getModel, post, render, state} from "../store.mjs";
@@ -60,9 +61,26 @@ import {LIST_FILE_FORMATS, LIST_FILE_MAX_BYTES, LIST_FILE_TOO_LARGE, addedReplac
 import * as edits from "../view/edits.mjs";
 import * as controls from "../view/controls.mjs";
 
-// The one line that says how an input is written, and what a macro changes.
-const STAR_HINT = "Add * where other letters may go: recieve* also fixes recieved and recieving.";
-const MACRO_HINT = "A macro plays for the whole word only: its inputs take no *, and Backspace does not take it back.";
+// How it works, behind each section's info mark rather than written under
+// it: what a replacement does and when, how an input is written, and what
+// the preview can and cannot show.
+const REPLACEMENT_INFO = infoMark({id: "ac-info-replacement", label: "How a replacement works", heading: "How a replacement works", rows: [
+    {term: "When", says: "As you finish a word with a space, punctuation, Enter or Tab. A word you are still typing is never touched."},
+    {term: "Capitals", says: "Follow what you typed: Teh becomes The, TEH becomes THE. A replacement written with capitals keeps them."},
+    {term: "Backspace", says: "Right after a replacement, Backspace puts back what you typed. Not after Enter or Tab."},
+    {term: "Text", says: "One line, up to 128 bytes: a word, a phone number, an address."},
+    {term: "Macro", says: "For anything longer or on several lines. It plays for whole-word inputs only, keeps no capitals rule, and Backspace does not take it back."},
+    {term: "Starting over", says: "A click, a shortcut or an arrow key starts a new word. The keyboard cannot see a password field or a terminal: turn text replacement off there."},
+    {term: "On and off", says: "Settings → Host, or a key set to Text replacement on, off or toggle."}]});
+const INPUTS_INFO = infoMark({id: "ac-info-inputs", label: "How inputs are written", heading: "How inputs are written", rows: [
+    {term: "teh", mono: true, says: "The whole word only."},
+    {term: "recieve*", mono: true, says: "The start of a word: also recieved, recieving."},
+    {term: "*mnet", mono: true, says: "The end of a word: also developmnet, managemnet."},
+    {term: "*tihng*", mono: true, says: "Anywhere in a word: also anytihng, tihngs."},
+    {term: "Capitals", says: "Do not matter: teh also catches Teh and TEH."},
+    {term: "Characters", says: "Letters, digits and apostrophes, up to 32 bytes."},
+    {term: "Overlaps", says: "The longest input wins, and a whole word beats one with *."},
+    {term: "Macros", says: "A replacement that plays a macro takes whole words only, without *."}]});
 // A macro's mark before its name, where a replacement is named in one line.
 const PLAYS = "▶";
 
@@ -79,9 +97,16 @@ const taken = (input, value) => { input.value = value; input.defaultValue = valu
 const keep = (edit) => { state.error = ""; state.autocorrectCheck = null; post(edit); };
 /** @param {Event} event */
 const pressed = (event) => {
-    const button = /** @type {HTMLButtonElement | null} */ (/** @type {HTMLElement} */ (event.target).closest("button[data-act]"));
+    const target = /** @type {HTMLElement} */ (event.target);
+    // The read-only field naming a replacement's macro picks, as Pick… beside it does.
+    const field = /** @type {HTMLInputElement | null} */ (target.closest("input[data-ac-macro]"));
+    const button = /** @type {HTMLButtonElement | null} */ (field && !field.disabled ? field.parentElement?.querySelector('[data-act="ac-pick"]') : target.closest("button[data-act]"));
     return button && !button.disabled ? button : null;
 };
+// Opens a replacement's macro in Macros, from its editor's header as a
+// macro's Place on a key → is.
+/** @param {string | null} name */
+const editMacroLink = (name) => name ? `<button class="btn tiny link" data-act="ac-edit-macro" data-tip="Open this macro in Macros, to see or change its steps.">Edit in Macros →</button>` : "";
 
 // ── checking what is typed ──────────────────────────────────────────────
 
@@ -320,8 +345,10 @@ function item(model, {entry, found}, open, changed) {
 const ICON = `<span class="mark-lg"><span class="kind-icon plain" aria-hidden="true">${SCREENS.autocorrect.icon}</span></span>`;
 
 // What a replacement is: Text or Macro, then its text with the bytes it may
-// hold, or its macro as a key with Pick…, which opens the keycode picker on
-// the macros alone. `f` names the fields' form identities.
+// hold, or its macro named in a read-only field with Pick… beside it, as a
+// custom key's shortcut is: the keycode picker on the macros alone. Opening
+// the macro in Macros is the header's link. `f` names the fields' form
+// identities.
 /** @param {Model} model @param {string} f @param {Named} value @param {boolean} canEdit @param {number} most */
 function replacementControls(model, f, value, canEdit, most) {
     const off = canEdit ? "" : "disabled", macros = model?.macros || [];
@@ -330,10 +357,10 @@ function replacementControls(model, f, value, canEdit, most) {
     return `<div class="ac-replacement">${choiceField({label: "Replacement is", f: `${f}:kind`, hideLabel: true, disabled: !canEdit, choices: [["text", "Text"], ["macro", "Macro"]], current: value.kind,
         tip: "Text is one line the keyboard types. A macro is for anything longer, or of more than one line."})}
         ${value.kind === "macro" ? `<div class="input-row ac-macro">
-                <button type="button" class="pd-key ${name ? "" : "unset"}" data-act="ac-pick" data-ac-macro="${esc(value.macro ?? "")}" ${off} aria-label="${esc(name ? `Macro: ${name}. Change it` : "Pick a macro")}"
-                    data-tip="${esc(name ? `Plays the macro “${name}”. Click to change it.` : "Pick the macro this replacement plays.")}">${esc(name ? `${PLAYS} ${name}` : "+ Macro")}</button>
-                <button type="button" class="btn" data-act="ac-pick" ${off}>Pick…</button>
-                ${name ? `<button type="button" class="btn tiny link" data-act="ac-edit-macro" data-tip="Open this macro in Macros, to see or change its steps.">Edit in Macros →</button>` : ""}</div>`
+                <input class="input" data-ac-macro="${esc(value.macro ?? "")}" aria-label="Macro" value="${esc(name ? `${PLAYS} ${name}` : "")}" placeholder="No macro yet" readonly ${off}
+                    data-tip="${esc(name ? `Plays the macro “${name}”.` : "Pick the macro this replacement plays.")}">
+                <button type="button" class="btn" data-act="ac-pick" ${canEdit && (value.macro !== null || macros.some((macro) => !macro.empty)) ? "" : "disabled"}>Pick…</button></div>
+            ${value.macro === null && !macros.some((macro) => !macro.empty) ? `<p class="note ac-macro-none">No macro has steps yet. <button type="button" class="btn tiny link" data-act="ac-macros">Make one in Macros →</button></p>` : ""}`
         : `<label class="field ac-text"><span class="sr">Replacement text</span>
             <input class="input" data-f="${esc(f)}:replacement" data-ac-text autocomplete="off" spellcheck="false" placeholder="because, or +31 6 1234 5678" value="${esc(value.text)}" ${off}
                 data-tip="One line of up to ${esc(most)} bytes: a word, a phone number, a sign-off.">
@@ -353,12 +380,13 @@ function countsBytes(card, most) {
 }
 
 // Pick… for a replacement's macro: the keycode picker, offering the macros
-// and nothing else, each by its name, the empty ones apart.
+// that have steps and nothing else, each by its name; an empty macro would
+// play nothing. The one already picked stays offered.
 /** @param {Model} model @param {number | null} slot @param {string} context @param {(slot: number) => void} then */
 function pickMacro(model, slot, context, then) {
     const macros = model?.macros || [];
     openPicker({title: "Replacement", context, seed: slot === null || !macros[slot] ? [] : [macros[slot].keycode], mode: "list", maxKeys: 1,
-        allowedKeys: macros.map((macro) => macro.keycode),
+        allowedKeys: macros.filter((macro, at) => !macro.empty || at === slot).map((macro) => macro.keycode),
         onPick: (expression) => {
             const now = getModel()?.macros || [];
             const picked = now.findIndex((macro) => macro.keycode === expression || keyIdentity(getModel(), macro.keycode).name === expression);
@@ -383,19 +411,18 @@ function entryEditor(model, list, entry, canEdit) {
     const kind = editing?.kind ?? stored;
     // Text or Macro picked and not yet kept shows that kind's field empty.
     const value = {kind, text: kind === stored ? entry.correction : "", macro: kind === stored ? entry.macro ?? null : null};
-    const plays = kind === "macro";
     const card = el(`<div class="card ac-editor" data-ac-editor="${esc(entry.id)}">
         <div class="card-h name-titlebar">${ICON}${titleText(label)}
             <span class="tag" data-ac-kind>${entry.macro === undefined ? "Text" : "Macro"}</span>
             <span class="right row actions">
+                ${editMacroLink(kind === "macro" && value.macro !== null ? macroLabel(model?.macros || [], value.macro) : null)}
                 <button class="btn tiny ghost destructive" data-act="ac-delete" ${off} data-tip="Delete this replacement and its inputs. Undo takes it back.">Delete replacement</button></span></div>
         <div class="card-b stack">
-            <div class="macro-sequence-heading"><h4>Replacement</h4></div>
+            <div class="macro-sequence-heading"><h4>Replacement</h4>${REPLACEMENT_INFO}</div>
             ${replacementControls(model, `autocorrect:entry:${entry.id}`, value, canEdit, list.usage.correctionMax)}
-            ${plays ? `<p class="note">${esc(MACRO_HINT)}</p>` : ""}
             ${entry.warnings.map((warning) => `<p class="note warn" data-ac-warning>${esc(warning)}</p>`).join("")}
             <div data-ac-feedback="replacement" hidden></div>
-            <div class="macro-sequence-heading"><h4>Inputs</h4></div>
+            <div class="macro-sequence-heading"><h4>Inputs</h4>${INPUTS_INFO}</div>
             <div class="ac-inputs" role="list" aria-label="Inputs">
                 ${entry.typos.map((typo) => editing?.part === "input" && editing.typo === typo.typo
                     ? `<span class="ac-chip-edit" role="listitem" data-ac-open data-ac-chip-edit="${esc(typo.typo)}">
@@ -410,11 +437,11 @@ function entryEditor(model, list, entry, canEdit) {
                         autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="type it, then Enter" value="" ${off}>`
                     : `<button type="button" class="chip ac-more" data-act="ac-more" ${off} data-tip="Something else you type for this replacement.">+ Input</button>`}
             </div>
-            ${plays ? "" : `<p class="note">${esc(STAR_HINT)}</p>`}
             ${entry.typos.map((typo) => typo.warnings.map((warning) => `<p class="note warn" data-ac-warning="${esc(typo.typo)}"><span class="mono">${esc(typo.input)}</span> ${esc(warning)}</p>`).join("")).join("")}
             <div data-ac-feedback="input" hidden></div>
         </div></div>`);
     /** @type {HTMLElement} */ (card.querySelector(".card-b")).appendChild(trySection(model, list));
+    attachInfoMarks(card);
     countsBytes(card, list.usage.correctionMax);
     const identity = () => identityOf(getModel());
     const target = replacementOf(entry);
@@ -452,7 +479,7 @@ function entryEditor(model, list, entry, canEdit) {
         if (input.matches('[type=radio][name$=":kind"]')) {
             const picked = input.value === "macro" ? "macro" : "text";
             if (picked === stored) close(); else open("kind", {kind: picked});
-            focusLater(`[data-ac-editor] [data-ac-text], [data-ac-editor] .pd-key[data-act="ac-pick"]`);
+            focusLater(`[data-ac-editor] [data-ac-text], [data-ac-editor] [data-act="ac-pick"]`);
             return;
         }
         if (!input.matches("[data-ac-text], [data-ac-more], [data-ac-input-text]") || removing) return;
@@ -492,6 +519,7 @@ function entryEditor(model, list, entry, canEdit) {
             send(edits.changeAutocorrectReplacement(target, {macro: slot}, identity()), {kind: "macro", text: "", macro: slot});
         });
         else if (act === "ac-edit-macro" && value.macro !== null) showMacro(model, value.macro);
+        else if (act === "ac-macros") showMacro(model, -1);
         else if (act === "ac-more") { open("more"); focusLater("[data-ac-more]"); }
         else if (act === "ac-chip") { open("input", {typo: button.dataset.acChip || ""}); focusLater("[data-ac-input-text]"); }
         else if (act === "ac-remove-input" && typed) { state.autocorrectEdit = null; keep(edits.deleteAutocorrectTypo(typed.typo, identity())); }
@@ -512,24 +540,25 @@ function newEditor(model, list, fresh, canEdit) {
         <div class="card-h name-titlebar">${ICON}${titleText("New replacement")}
             <span class="tag">Not on your list yet</span>
             <span class="right row actions">
+                ${editMacroLink(fresh.kind === "macro" && fresh.macro !== null ? macroLabel(model?.macros || [], fresh.macro) : null)}
                 <button class="btn tiny ghost destructive" data-act="ac-discard" data-tip="Let this new replacement go. Nothing was added to your list.">Discard</button></span></div>
         <div class="card-b stack">
-            <div class="macro-sequence-heading"><h4>Replacement</h4></div>
+            <div class="macro-sequence-heading"><h4>Replacement</h4>${REPLACEMENT_INFO}</div>
             ${replacementControls(model, "autocorrect:new", fresh, canEdit, list.usage.correctionMax)}
-            ${fresh.kind === "macro" ? `<p class="note">${esc(MACRO_HINT)}</p>` : ""}
             ${empty ? `<p class="note warn" data-ac-warning>“${esc(macroLabel(model?.macros, /** @type {number} */ (fresh.macro)))}” has no steps, so this replacement would do nothing yet. Add steps in Macros, or pick another macro.</p>` : ""}
             <div data-ac-feedback="replacement" hidden></div>
             ${joins ? `<div class="callout ac-joins" data-ac-joins><span>${esc(fresh.kind === "macro" ? `The macro “${replacementLabel(joins, model?.macros)}”` : `“${replacementLabel(joins, model?.macros)}”`)} is already on your list. Add inputs to it there.</span>
                     <button type="button" class="btn tiny" data-act="ac-open-joined">Open it</button></div>` : `
-            <div class="macro-sequence-heading"><h4>Inputs</h4></div>
+            <div class="macro-sequence-heading"><h4>Inputs</h4>${INPUTS_INFO}</div>
             <div class="pd-chips ac-inputs">
                 <input class="input mono ac-chip-input" data-f="autocorrect:new:input" data-ac-first aria-label="What you type for it" autocomplete="off" autocapitalize="off" spellcheck="false"
                     placeholder="${fresh.kind === "macro" ? "sig, then Enter" : "becuase becasue, then Enter"}" value="" ${canEdit && named ? "" : "disabled"}>
             </div>
-            <p class="note">${fresh.kind === "macro" ? "" : `${esc(STAR_HINT)} `}It joins your list with its first input.</p>
+            <p class="note">It joins your list with its first input.</p>
             <div data-ac-feedback="input" hidden></div>`}
         </div></div>`);
     /** @type {HTMLElement} */ (card.querySelector(".card-b")).appendChild(trySection(model, list));
+    attachInfoMarks(card);
     countsBytes(card, list.usage.correctionMax);
     const first = /** @type {HTMLInputElement | null} */ (card.querySelector("[data-ac-first]"));
     // The edit the editor would post as it stands, or null while it lacks a part.
@@ -557,7 +586,7 @@ function newEditor(model, list, fresh, canEdit) {
         state.autocorrectNew = {...current(), kind: input.value === "macro" ? "macro" : "text"};
         state.autocorrectCheck = null;
         render();
-        focusLater(`[data-ac-new] [data-ac-text], [data-ac-new] .pd-key[data-act="ac-pick"]`);
+        focusLater(`[data-ac-new] [data-ac-text], [data-ac-new] [data-act="ac-pick"]`);
     });
     card.addEventListener("keydown", (event) => {
         const input = /** @type {HTMLInputElement} */ (event.target);
@@ -582,6 +611,7 @@ function newEditor(model, list, fresh, canEdit) {
             focusLater("[data-ac-first], [data-act=\"ac-open-joined\"]");
         });
         else if (act === "ac-edit-macro" && fresh.macro !== null) showMacro(model, fresh.macro);
+        else if (act === "ac-macros") showMacro(model, -1);
         else if (act === "ac-open-joined" && joins) { state.autocorrectNew = null; openInEditor(joins.id); focusLater('[data-ac-editor] [data-act="ac-more"]'); }
         else if (act === "ac-discard") discard();
     });
@@ -678,13 +708,17 @@ function paintTry() {
 function trySection(model, list) {
     const tried = state.autocorrectTry;
     const card = el(`<div class="card editor-section" data-ac-try>
-        <div class="card-h"><h3>Try it</h3>
+        <div class="card-h"><h3>Try it</h3>${infoMark({id: "ac-info-try", label: "About the preview", heading: "About the preview", rows: [
+                {term: "Preview", says: `What your keyboard would type with this draft, once you Apply, typing through ${list.layoutName}.`},
+                {term: "Your text", says: "The box keeps what you type. Only the preview shows replacements."},
+                {term: "Not shown", says: "Clicks, shortcuts, arrow keys and held keys. On the keyboard they start a new word or pause replacing until the next one."},
+                {term: "Caps Lock", says: "Follows your own Caps Lock as you type here, or set it for the preview with the switch."}]})}
             <button class="btn tiny ghost destructive right" data-act="ac-try-clear" data-tip="Empty the box and its preview.">Clear</button></div>
         <div class="card-b stack">
             <textarea class="input ac-try-box" data-f="autocorrect:try:text" rows="2" aria-label="Type here to try your list" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Type here: teh, then a space.">${esc(tried.text)}</textarea>
             ${model?.autocorrectRunning ? `<p class="note" data-ac-try-running>Your keyboard is replacing as you type here too. The preview shows this draft.</p>` : ""}
-            <div class="field"><span id="ac-try-label">Preview with this draft: what your keyboard would type after you Apply.</span>
-                <div class="ac-try-preview" data-ac-try-preview role="status" aria-labelledby="ac-try-label" data-tip="Typing through ${esc(list.layoutName)}, by the keyboard's own rules."></div></div>
+            <div class="field"><span id="ac-try-label">Your keyboard would type</span>
+                <div class="ac-try-preview" data-ac-try-preview role="status" aria-labelledby="ac-try-label"></div></div>
             <div class="row ac-try-tools">
                 <label class="sw" data-tip="Whether the preview takes Caps Lock to be on at the computer. It follows your own Caps Lock as you type here."><input type="checkbox" data-f="autocorrect:try:caps" ${tried.capsLock ? "checked" : ""}><span class="track"></span><span class="txt">Preview with Caps Lock on</span></label>
                 <span class="note" data-ac-try-said aria-live="polite"></span>

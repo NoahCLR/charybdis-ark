@@ -29,6 +29,7 @@ import {historyOverlay} from "./ui/history.mjs";
 import {discardLayers} from "./ui/layers.mjs";
 import {escapeKeyboardMenu} from "./ui/keyboard-menu.mjs";
 import {escapeBoardShortcuts} from "./ui/keys/board-card.mjs";
+import {escapeInfoMark} from "./ui/info-mark.mjs";
 import {screenLighting} from "./ui/lighting.mjs";
 import {screenBehaviours, screenCombos, screenHost, screenPointer} from "./ui/settings.mjs";
 import {screenPointing} from "./ui/pointing.mjs";
@@ -257,6 +258,7 @@ addEventListener("keydown", (event) => {
     }
     // Esc on a recovery copy's "Delete this copy?" is its Cancel.
     if (state.recoveryAsk !== null && state.screen === "profile") { state.recoveryAsk = null; render(); return; }
+    if (escapeInfoMark()) return;
     escapeBoardShortcuts();
 });
 // A resize lets the workbench find its height again at the new width, the

@@ -148,12 +148,19 @@ Choose **Text** and type it; a counter under the field says how many of its
 128 bytes it uses. Enter, or leaving the field, keeps it; Escape puts back
 what it was. Changing it to a replacement the list already has joins the two.
 
-Or choose **Macro**. The macro shows as a key with its name; **Pick…**, or
-the key itself, opens the same picker a key's keycode is picked in, here
-with only your macros in it, those in use first and the empty ones after.
-Pick one and choose **Use keycode**. **Edit in Macros →** goes to that macro
-to see or change its steps. Choosing Text or Macro changes nothing until you
-type the text or pick the macro.
+Or choose **Macro**. The macro's name shows in the field beside it;
+**Pick…**, or the field itself, opens the same picker a key's keycode is
+picked in, here with only your macros that have steps (an empty macro would
+play nothing). Pick one and choose **Use keycode**. With no macro that has
+steps yet, Pick… is off and **Make one in Macros →** goes there.
+**Edit in Macros →**, in the editor's header, goes to the picked macro to see
+or change its steps. Choosing Text or Macro changes nothing until you type
+the text or pick the macro.
+
+The ⓘ beside **Replacement**, **Inputs** and **Try it** sums up how each
+works: when the keyboard replaces, capitals, Backspace and macros; how an
+input is written with `*`; and what the preview can and cannot show. Hover
+it, or reach it with Tab; Escape closes it.
 
 ### Inputs
 
@@ -211,7 +218,7 @@ each.
 list, whichever replacement is open.
 
 Type in its box as you would anywhere. Ark never changes what you type
-there. Under the box, **Preview with this draft** shows the same text as
+there. Under the box, **Your keyboard would type** shows the same text as
 your keyboard would type it once you [Apply](review-and-save.md) the draft:
 type `teh` and a space, and the box still reads "teh " while the preview
 reads "the ". Each replaced part is marked in the preview, and hovering it

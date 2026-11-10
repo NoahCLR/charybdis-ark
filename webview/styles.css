@@ -793,6 +793,23 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 .shortcuts-pop dl { display: grid; grid-template-columns: auto 1fr; gap: var(--sp-2) var(--sp-4); margin: 0; font-size: var(--fs-md); }
 .shortcuts-pop dt { color: var(--text); font-weight: var(--fw-regular); white-space: nowrap; }
 .shortcuts-pop dd { margin: 0; color: var(--text-2); }
+/* An info mark beside a heading (ui/info-mark.mjs): the board's mark, made
+   smaller to sit with the small capitals, its list opening under it toward
+   the right. */
+.info-mark { position: relative; z-index: var(--z-popover); display: inline-flex; vertical-align: middle; }
+.info-button {
+  display: grid; place-items: center; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%;
+  background: transparent; color: var(--text-3); cursor: help; transition: color .12s ease, background .12s ease;
+}
+.info-button svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; }
+.info-button svg .dot { fill: currentColor; stroke-width: 1; }
+.info-mark:hover .info-button, .info-button:focus-visible { color: var(--text); background: var(--surface-3); }
+.info-mark .info-pop { display: none; top: calc(100% + 6px); left: -6px; right: auto; width: max-content; max-width: min(420px, calc(100vw - 2 * var(--window-room))); }
+.info-mark:is(:hover, :has(.info-button:focus-visible)):not([data-shut]) .info-pop { display: block; }
+/* The open mark rides over the marks after it. */
+.info-mark:is(:hover, :focus-within) { z-index: calc(var(--z-popover) + 1); }
+.info-pop dt.mono { font-family: var(--mono); font-size: var(--fs-sm); }
+.info-pop dl { font-size: var(--fs-sm); }
 
 /* ── sections ────────────────────────────────────────────────────────── */
 .sect { border-bottom: 1px solid var(--line); padding: var(--sp-4) var(--sp-4); }
@@ -2314,9 +2331,13 @@ details > summary { list-style: none; }
 .ac-export { position: relative; }
 .ac-menu.rail-menu { left: 0; right: auto; min-width: 150px; }
 .ac-notice { color: var(--warning); }
-.ac-replacement { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--sp-3); }
-.ac-replacement > .ac-text { flex: 1 1 260px; min-width: 0; }
-.ac-replacement > .ac-macro { flex: 1 1 260px; flex-wrap: wrap; }
+.ac-editor .macro-sequence-heading { justify-content: flex-start; gap: var(--sp-1); }
+.ac-replacement { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--sp-2) var(--sp-3); }
+.ac-replacement > .field.segmented { flex: none; }
+.ac-replacement > .ac-text, .ac-replacement > .ac-macro { flex: 1 1 280px; min-width: 0; }
+.ac-macro .input[readonly] { cursor: pointer; }
+.ac-macro-none { flex-basis: 100%; }
+.ac-editor .editor-section .card-h { gap: var(--sp-1); }
 .ac-bytes { font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
 .ac-inputs { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; min-height: var(--h-compact); }
 .ac-chip { color: var(--text); }
