@@ -168,7 +168,8 @@ misspelling or an abbreviation such as `pnumber`. A replacement has one or
 more. A heading, a count and a label read **Inputs** ("15 of 1,024 inputs",
 "+ Input"), a sentence says "an input" or "its inputs", and a list file names
 them `inputs`. It belongs to one replacement. The firmware and Ark's code
-call it a `typo`, on the wire as in the identifiers.
+call it a `typo`, on the wire as in the identifiers, and the firmware's own
+documents a "typed form" (`upstream/firmware/GLOSSARY.md`): the same thing.
 _Avoid_: typed, typed form, what is typed for it (Ark's words before; a file
 that says `typed` is still read), typo (as the term; a misspelling is still a
 typo, and "common typo fixes" says so), variation, trigger, abbreviation (as
