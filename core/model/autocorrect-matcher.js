@@ -9,7 +9,7 @@
 // behaviour fixture holds it to the keyboard (tests/model). What needs a key,
 // a timing or a setting (shortcuts, held keys, macro keys, the queue) has no
 // form in text and is not here. A replacement that plays a macro is: the
-// typed form goes and the macro's text, when it is only text, takes its
+// input goes and the macro's text, when it is only text, takes its
 // place.
 
 const {AUTOCORRECT_DOMAIN_V1, AUTOCORRECT_MATCH, entryKey, playsMacro} = require("../schema/autocorrect-domain-v1");
@@ -25,7 +25,8 @@ const {hostLayout} = require("../data/host-layouts");
  * @typedef {{whole: Map<string, Listed>, parts: Listed[]}} Index a list's whole-word typos by their text, and its part-of-word typos in the domain's byte order
  * @typedef {{entry: Entry, typo: Typo, start: number, end: number}} Fired the typo that fires on a word, and the characters of the word it matched
  * @typedef {(slot: number) => {text: string | null} | null} Macros what a macro slot plays: its text when it types only text, `text: null` when it does more, and null for a slot that is empty or cannot play
- * @typedef {{entry: string, correction: string, typo: string, macro?: number}} Replaced a replacement that fired: its entry's key, its text ("" for a macro), the typed form, and the macro slot it played
+ * @typedef {Replaced & {start: number, end: number}} Mark where a standing replacement's text is in the text tried, by its offsets
+ * @typedef {{entry: string, correction: string, typo: string, macro?: number}} Replaced a replacement that fired: its entry's key, its text ("" for a macro), the input, and the macro slot it played
  */
 
 // The keyboard follows this many characters of a word, and types no
@@ -150,13 +151,15 @@ function formOf(matched, correction) {
 
 // What the keyboard shows for the characters a computer would show with
 // autocorrect off, `\b` for Backspace: the text it ends with, the corrections
-// that fired and still stand, in order, and whether the last key undid one.
+// that fired and still stand, in order, where what each typed stands in that
+// text (`marks`, in the text's own offsets; a part deleted since is no longer
+// marked), and whether the last key undid one.
 // `before` is text already there that the keyboard did not see typed: the
 // first character starts a word after it, and a Backspace into it deletes
 // what the keyboard does not know, as on the keyboard.
 // `macros` says what each macro slot plays; without it every macro
 // replacement is passed over, as one with an empty slot is.
-/** @param {AutocorrectList} list @param {Host} host @param {boolean} capsLock @param {string} screen @param {string} [before] @param {Macros} [macros] @returns {{text: string, fired: Replaced[], undone: boolean}} */
+/** @param {AutocorrectList} list @param {Host} host @param {boolean} capsLock @param {string} screen @param {string} [before] @param {Macros} [macros] @returns {{text: string, fired: Replaced[], marks: Mark[], undone: boolean}} */
 function typedText(list, host, capsLock, screen, before = "", macros = () => null) {
     const index = indexed(list), layout = hostLayout(host.layout);
     const macos = host.macos ?? layout?.os === "macos";
@@ -166,6 +169,15 @@ function typedText(list, host, capsLock, screen, before = "", macros = () => nul
     const out = [...before];
     /** @type {Replaced[]} */
     const fired = [];
+    // What each standing replacement typed, as characters of `out`.
+    /** @type {(Replaced & {at: number, length: number})[]} */
+    let marked = [];
+    // Characters taken off the end take the marks over them along.
+    /** @param {number} count */
+    const cut = count => {
+        out.length -= count;
+        marked = marked.flatMap(mark => mark.at >= out.length ? [] : [{...mark, length: Math.min(mark.length, out.length - mark.at)}]);
+    };
     /** @type {string[]} */
     let word = [];
     let suspended = false, leftAlone = false, undone = false;
@@ -214,18 +226,23 @@ function typedText(list, host, capsLock, screen, before = "", macros = () => nul
         const plays = candidate => candidate.start === 0 && candidate.end === end - first && end === word.length ? macros(/** @type {number} */ (candidate.entry.macro)) : null;
         const choice = choose(index, word.slice(first, end).map(folded), candidate => playsMacro(candidate.entry) ? plays(candidate) !== null : corrected(inWord(candidate)) !== null);
         if (choice && playsMacro(choice.entry)) {
-            // The typed form goes and the macro plays; there is no undo.
-            out.length -= word.length - first;
-            out.push(...(plays(choice)?.text ?? ""));
-            fired.push({entry: entryKey(choice.entry), correction: "", typo: choice.typo.typo, macro: choice.entry.macro});
+            // The input goes and the macro plays; there is no undo.
+            cut(word.length - first);
+            const played = [...(plays(choice)?.text ?? "")], macro = {entry: entryKey(choice.entry), correction: "", typo: choice.typo.typo, macro: choice.entry.macro};
+            if (played.length) marked.push({...macro, at: out.length, length: played.length});
+            out.push(...played);
+            fired.push(macro);
             return null;
         }
         const result = choice && corrected(inWord(choice));
         // A word that already reads as the correction would leave it stays.
         if (!choice || !result || (result.kept === result.text.length && result.kept === word.length)) return null;
-        out.length -= word.length - result.kept;
+        cut(word.length - result.kept);
         out.push(...result.text.slice(result.kept));
-        fired.push({entry: entryKey(choice.entry), correction: choice.entry.correction, typo: choice.typo.typo});
+        const replaced = {entry: entryKey(choice.entry), correction: choice.entry.correction, typo: choice.typo.typo};
+        // The word as the replacement leaves it is what is marked.
+        marked.push({...replaced, at: out.length - result.text.length, length: result.text.length});
+        fired.push(replaced);
         return {kept: result.kept, typed: result.text.length - result.kept};
     };
 
@@ -239,7 +256,8 @@ function typedText(list, host, capsLock, screen, before = "", macros = () => nul
                 const {kept, typed} = undo, back = word.slice(kept);
                 undo = null;
                 if (back.every(strokes)) {
-                    out.length -= typed + 1;
+                    cut(typed + 1);
+                    marked.pop();
                     out.push(...back);
                     fired.pop();
                     leftAlone = undone = true;
@@ -252,7 +270,7 @@ function typedText(list, host, capsLock, screen, before = "", macros = () => nul
             if (!suspended) {
                 if (word.length) word.pop(); else forget(true);
             }
-            out.pop();
+            if (out.length) cut(1);
             continue;
         }
         if (undo) forget(false);
@@ -267,7 +285,12 @@ function typedText(list, host, capsLock, screen, before = "", macros = () => nul
         if (correction && !ENDS_WITHOUT_UNDO.has(character)) undo = correction; else forget(false);
         out.push(character);
     }
-    return {text: out.join(""), fired, undone};
+    // Marks in the text's own offsets, which count a character outside the
+    // basic plane as two.
+    /** @param {number} characters */
+    const offset = characters => out.slice(0, characters).join("").length;
+    const marks = marked.map(({at, length, ...replaced}) => ({...replaced, start: offset(at), end: offset(at + length)}));
+    return {text: out.join(""), fired, marks, undone};
 }
 
 module.exports = {firingTypo, typedText, wordsOf};

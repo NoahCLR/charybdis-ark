@@ -5,8 +5,8 @@
 // makes: the list as entries with what will misbehave marked on each, the
 // counts and bytes against what the keyboard holds, and one handler for every
 // edit the screen posts. The list's own rules are autocorrect-list.js's. The
-// code keeps the firmware's names: a replacement is a correction, a typed
-// form a typo.
+// code keeps the firmware's names: a replacement is a correction, an input
+// a typo.
 
 const {decodedOf, editProfileDomains, autocorrectCeilings} = require("./portable-profile");
 const {AUTOCORRECT_DOMAIN_V1, entryKey, isMacroSlot} = require("../schema/autocorrect-domain-v1");
@@ -16,7 +16,7 @@ const {PROFILE_BLOB_V1} = require("../schema/profile-blob-v1");
 const {MACOS, hostSettings} = require("../schema/host-settings");
 const {hostLayout} = require("../data/host-layouts");
 const {typedText} = require("./autocorrect-matcher");
-const {WARNING, addTypos, changeReplacement, changeTypo, findEntry, listUsage, listWarnings, removeEntry, removeTypo, typedForm} = require("./autocorrect-list");
+const {WARNING, addTypos, changeReplacement, changeTypo, findEntry, listUsage, listWarnings, removeEntry, removeTypo, inputForm} = require("./autocorrect-list");
 const {exportAutocorrect, planImport, previewImport, rowsOf} = require("./autocorrect-import");
 const {VOCABULARY, word} = require("./vocabulary");
 
@@ -56,7 +56,7 @@ function hostOf(decoded, hostOs) {
         macroNames: decoded.settings.macroNames || [], emptyMacros: new Set(plays.flatMap((macro, slot) => macro ? [] : [slot])), plays};
 }
 
-// How many replacements and typed forms the chosen layout leaves unable to
+// How many replacements and inputs the chosen layout leaves unable to
 // fire, said once for the whole list; nothing when it types them all.
 /** @param {import("./autocorrect-list.js").Warning[]} warnings @param {string} layoutName */
 function untypableNotice(warnings, layoutName) {
@@ -64,7 +64,7 @@ function untypableNotice(warnings, layoutName) {
     const entries = untypable.filter(warning => warning.typo === undefined).length, typos = untypable.length - entries;
     /** @param {number} count @param {string} one @param {string} many */
     const counted = (count, one, many) => `${count} ${count === 1 ? one : many}`;
-    const parts = [...(entries ? [counted(entries, "replacement", "replacements")] : []), ...(typos ? [counted(typos, "typed form", "typed forms")] : [])];
+    const parts = [...(entries ? [counted(entries, "replacement", "replacements")] : []), ...(typos ? [counted(typos, "input", "inputs")] : [])];
     return parts.length ? `${parts.join(" and ")} will not fire on ${layoutName}.` : "";
 }
 
@@ -82,7 +82,7 @@ function autocorrectEditorView(snapshot, capabilities) {
     const notice = untypableNotice(warnings, host.layoutName);
     return {identity: snapshot.fingerprint,
         entries: list.entries.map(entry => ({id: entryKey(entry), correction: entry.correction, ...(entry.macro === undefined ? {} : {macro: entry.macro}), warnings: said(entryKey(entry)),
-            typos: entry.typos.map(typo => ({typo: typo.typo, typed: typedForm(typo), match: typo.match, warnings: said(entryKey(entry), typo.typo)}))})),
+            typos: entry.typos.map(typo => ({typo: typo.typo, input: inputForm(typo), match: typo.match, warnings: said(entryKey(entry), typo.typo)}))})),
         usage: {corrections: used.corrections, maxCorrections: ceilings.maxCorrections, typos: used.typos, maxTypos: ceilings.maxTypos,
             textBytes: used.textBytes, maxTextBytes: ceilings.maxTextBytes, bytes: used.bytes, capacity,
             free: Math.max(0, Math.min(capacity - used.bytes, sharedFree)), textMax: capabilities?.autocorrectTextMax ?? AUTOCORRECT_DOMAIN_V1.TEXT_MAX,
@@ -169,11 +169,11 @@ function exportedList(snapshot, format, now = new Date()) {
 }
 
 // What a staged addAutocorrectTypos did, for its history step: a new
-// replacement, or something more typed for one the list had.
+// replacement, or one more input for one the list had.
 /** @param {import("../../contracts/edits.js").EditOf<"addAutocorrectTypos">} message @param {import("./types.js").PortableDocument} document */
 function addLabel(message, document) {
     const named = isMacroSlot(message.macro) ? {macro: message.macro} : {correction: typeof message.correction === "string" ? message.correction.trim() : ""};
-    return findEntry(decodedOf({document}).autocorrect, named) ? "Added a typed form to a replacement" : "Added a replacement";
+    return findEntry(decodedOf({document}).autocorrect, named) ? "Added an input to a replacement" : "Added a replacement";
 }
 
 module.exports = {TRY_TEXT_MAX, addLabel, autocorrectEditorView, editAutocorrect, exportedList, importPreview, newWarnings, tryText};

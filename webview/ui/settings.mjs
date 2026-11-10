@@ -16,7 +16,6 @@ import {getModel, layers, post, render, state} from "../store.mjs";
 import {editGate} from "../view/edit-gate.mjs";
 import {layerCalled} from "../view/vocabulary.mjs";
 import {topbar} from "./frame.mjs";
-import {isScreenId} from "../view/screens.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
 import {layerMarked, marked, phraseMarked} from "./marks.mjs";
 import {githubMark} from "../view/shell-panel.mjs";
@@ -166,15 +165,9 @@ export function sectionCard(model, section, canEdit, {extra} = {}) {
         ${section.description ? `<div class="card-b settings-intro"><p class="note">${esc(section.description)}</p></div>` : ""}
         <div class="rows"></div>
         ${section.warning ? `<div class="card-b"><div class="callout warn" role="note">${esc(section.warning)}</div></div>` : ""}
-        ${section.screenLink ? `<div class="card-b settings-link"><button type="button" class="btn tiny ghost" data-act="section-screen" data-to="${esc(section.screenLink.screen)}">${esc(section.screenLink.label)} →</button></div>` : ""}
         ${section.githubLink ? `<div class="card-b"><a class="btn tiny ghost" href="${esc(section.githubLink.url)}" target="_blank" rel="noopener">${githubMark("settings-help-mark")}<span>${esc(section.githubLink.label)}</span></a></div>` : ""}
     </section>`);
     const rows = /** @type {HTMLElement} */ (node.querySelector(".rows"));
-    // A section whose switch turns on what another screen edits links to it.
-    node.querySelector('[data-act="section-screen"]')?.addEventListener("click", (event) => {
-        const to = /** @type {HTMLElement} */ (event.currentTarget).dataset.to;
-        if (isScreenId(to)) { state.screen = to; render(); }
-    });
 
     // A section is saved whole: the core validates the complete set, so every
     // field travels together and one changed value cannot half-write a section.

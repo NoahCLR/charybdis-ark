@@ -95,6 +95,14 @@ function switchesOffByKey(runtime, committed, settings) {
     const autocorrect = {master: Boolean(stored && "enabled" in stored && stored.enabled), override: runtime.autocorrect.override};
     return {combo: turnedOffByKey(runtime.combos), behaviour: turnedOffByKey(runtime.behaviours), autoMouse: turnedOffByKey(autoMouse), autocorrect: turnedOffByKey(autocorrect)};
 }
+// Whether the keyboard is replacing text now, as it reports it: its stored
+// switch on, read with its settings, and no key holding it off. Try it says
+// so beside its box, where the keyboard then replaces what is typed too.
+/** @param {import("../protocol/types.js").RuntimeRead} runtime @param {State["settingsView"]} settings */
+function replacingNow(runtime, settings) {
+    const stored = settings?.sections.flatMap(section => section.fields).find(field => field.offSwitch === "autocorrect");
+    return Boolean(stored && "enabled" in stored && stored.enabled) && runtime.autocorrect.override;
+}
 
 /** @param {Session} session @param {State} state @param {Snapshot | undefined} snapshot */
 function discardDraftForDevice(session, state, snapshot) {
@@ -156,6 +164,7 @@ function buildPanelModel(session, state) {
     const proposal = session.liveProposal && session.draft && session.liveProposal.draftId === session.draft.id && session.liveProposal.revision === session.draft.revision
         ? {id: session.liveProposal.id, label: session.liveProposal.target.label, checks: session.liveProposal.checks} : null;
     const offByKey = state.connected && state.runtime ? switchesOffByKey(state.runtime, state.committed, state.settingsView) : null;
+    const autocorrectRunning = Boolean(state.connected && state.runtime && !session.demo && replacingNow(state.runtime, state.settingsView));
     // The last Apply's steps: live while it runs, kept when it failed. A
     // successful one lasts only until its readback ends, so a later busy
     // operation is not drawn as reading back an Apply.
@@ -207,7 +216,7 @@ function buildPanelModel(session, state) {
     };
     // What the firmware says about itself and its ceilings (Keyboard, Settings).
     const firmware = firmwareView(state.capabilities);
-    return {...model, devices, selectedDeviceId, ...(draft ? {draft} : {}), demo, apply, postApplyRead, portable, shell, load, reconnecting, firmware, editMode, liveProposal: proposal, liveWait, offByKey};
+    return {...model, devices, selectedDeviceId, ...(draft ? {draft} : {}), demo, apply, postApplyRead, portable, shell, load, reconnecting, firmware, editMode, liveProposal: proposal, liveWait, offByKey, autocorrectRunning};
 }
 
 // How full the profile is: the draft's, when one is open for this keyboard,

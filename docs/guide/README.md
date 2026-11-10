@@ -16,7 +16,7 @@ page for whatever you want to change.
    and your computer's keyboard layout.
 7. [Text replacement](text-replacement.md): what the keyboard replaces as
    you type (its autocorrect): typo fixes, longer text and macros, each
-   replacement with what you type for it, the common typo fixes, and
+   replacement with its inputs, the common typo fixes, and
    importing and exporting a list.
 8. [Pointing](pointing.md): the trackball's speed, sniping and auto-mouse,
    and the 32 pointing modes.

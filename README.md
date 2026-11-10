@@ -147,16 +147,16 @@ character it can't type says which one and isn't kept.
 
 The keyboard replaces what you type as you finish a word, on any computer:
 it fixes a typo, types longer text for you, or plays a macro. A replacement
-is written once with everything you type for it, so "because" stands for
+is written once with its inputs, what you type to get it, so "because" stands for
 `becuase`, `becasue` and `beacuse`, and `pnumber` types your phone number.
-What you type is a whole word unless you add `*` where other letters may go:
+An input is a whole word unless you add `*` where other letters may go:
 `recieve*` also fixes "recieved". A replacement is a line of text up to 128
 bytes, or one of your macros for anything longer. Ark checks each entry as
 it is typed, refuses one the computer's layout can't type, and marks the
 ones that would misfire. Fixes for common English typos are one click away,
 and a list comes in from, and goes out to, QMK's autocorrect format, a
-spreadsheet's CSV or JSON. **Try it** shows what the keyboard would do with a
-sentence before anything is saved, and a key on the keyboard switches it off
+spreadsheet's CSV or JSON. **Try it** previews what the keyboard would type
+for a sentence before anything is saved, and a key on the keyboard switches it off
 for a password or a terminal.
 
 ### Pointing modes

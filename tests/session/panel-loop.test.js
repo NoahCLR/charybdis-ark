@@ -459,9 +459,9 @@ test("an autocorrect edit is checked against the draft without staging it: its r
     assert.deepEqual(last(shell), {type: "autocorrectValidation", requestId: 41, draftId: draft.id, draftRevision: revision, validation: {error: "", code: "", warnings: []}});
     await ask({type: "addAutocorrectTypos", correction: "no", typos: [{typo: "*on"}]});
     assert.equal(last(shell).validation.error, "");
-    assert.deepEqual(last(shell).validation.warnings, ["“*on” is a short typed form with *, so it fires inside many words."]);
+    assert.deepEqual(last(shell).validation.warnings, ["“*on” is a short input with *, so it fires inside many words."]);
     await ask({type: "addAutocorrectTypos", correction: "ten", typos: [{typo: "teh"}]});
-    assert.deepEqual(last(shell).validation, {error: "“teh” is already typed for “the”.", code: "AUTOCORRECT_EDIT_REFUSED", warnings: []});
+    assert.deepEqual(last(shell).validation, {error: "“teh” is already an input for “the”.", code: "AUTOCORRECT_EDIT_REFUSED", warnings: []});
     await ask({type: "addAutocorrectTypos", correction: "then", typos: [{typo: "te*hn"}]});
     assert.match(last(shell).validation.error, /has \* where it cannot go/);
     await ask({type: "addAutocorrectTypos", macro: 5, typos: [{typo: "sig"}]});
@@ -485,9 +485,9 @@ test("text is tried against the draft's autocorrect list without staging anythin
     const draft = loop.session.draft, before = structuredClone(draft.document), revision = draft.revision;
     const bound = {draftId: draft.id, draftRevision: revision};
     await loop.handleMessage({type: "tryAutocorrect", requestId: 9, before: "", typed: "Teh ", capsLock: false, ...bound});
-    assert.deepEqual(last(shell), {type: "autocorrectTry", requestId: 9, ...bound, result: {text: "The ", fired: [{entry: "the", correction: "the", typo: "teh"}], undone: false}});
+    assert.deepEqual(last(shell), {type: "autocorrectTry", requestId: 9, ...bound, result: {text: "The ", fired: [{entry: "the", correction: "the", typo: "teh"}], marks: [{entry: "the", correction: "the", typo: "teh", start: 0, end: 3}], undone: false}});
     await loop.handleMessage({type: "tryAutocorrect", requestId: 10, before: "", typed: "Teh \b", capsLock: false, ...bound});
-    assert.deepEqual(last(shell).result, {text: "Teh", fired: [], undone: true});
+    assert.deepEqual(last(shell).result, {text: "Teh", fired: [], marks: [], undone: true});
     await loop.handleMessage({type: "tryAutocorrect", requestId: 11, before: "", typed: 7, capsLock: false, ...bound});
     assert.deepEqual([last(shell).requestId, last(shell).result, typeof last(shell).error], [11, undefined, "string"]);
     await loop.handleMessage({type: "tryAutocorrect", requestId: 12, before: "", typed: "teh ", capsLock: false, draftId: "old", draftRevision: revision});
@@ -508,11 +508,11 @@ test("an autocorrect list file is read and judged against the draft without stag
     assert.deepEqual({type: reply.type, requestId: reply.requestId, name: reply.name, draftId: reply.draftId, draftRevision: reply.draftRevision, error: reply.error},
         {type: "autocorrectImportPreview", requestId: 5, name: "mine.txt", ...bound, error: undefined});
     assert.equal(reply.preview.format, "txt");
-    assert.deepEqual(reply.preview.add.newReplacements, [{label: "then", typed: ["tehn"]}]);
-    assert.deepEqual(reply.preview.add.refused.map(row => row.reason), ["It has no “->” between what is typed and its replacement.", "“teh” is already typed for “the”."]);
+    assert.deepEqual(reply.preview.add.newReplacements, [{label: "then", inputs: ["tehn"]}]);
+    assert.deepEqual(reply.preview.add.refused.map(row => row.reason), ["It has no “->” between the input and its replacement.", "“teh” is already an input for “the”."]);
     assert.equal(reply.preview.replace.replacements, 2);
     // The chooser's file, as the shell hands it over; none chosen answers with no preview.
-    chosen = {text: "replacement,typed\nthen,tehn then*\n", name: "sheet.csv"};
+    chosen = {text: "replacement,inputs\nthen,tehn then*\n", name: "sheet.csv"};
     await loop.handleMessage({type: "chooseAutocorrectFile", requestId: 6, ...bound});
     assert.deepEqual([last(shell).name, last(shell).preview.format, last(shell).preview.entries], ["sheet.csv", "csv", [{correction: "then", typos: [{typo: "tehn"}, {typo: "then*"}]}]]);
     chosen = undefined;

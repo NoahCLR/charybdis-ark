@@ -78,7 +78,7 @@ function profileUsage(snapshot, capabilities) {
         ["macros", macroSlots.length - macros.empty, macroSlots.length, macros.outOfRoom.size],
         // Text replacement, the screen after Macros: what is typed is the
         // count the keyboard caps first, each replacement having at least one.
-        ["autocorrectTyped", (decoded.autocorrect?.entries || []).reduce((total, entry) => total + entry.typos.length, 0), capabilities.maxAutocorrectTypos],
+        ["autocorrectInputs", (decoded.autocorrect?.entries || []).reduce((total, entry) => total + entry.typos.length, 0), capabilities.maxAutocorrectTypos],
         ["customKeys", customKeys, settings.customKeyNames.length],
         ["pointingModes", pdModes.filter(slot => slot.kind).length, pdModes.length],
         ["lightingGroups", lighting[4], capabilities.maxReusableRgbGroups],

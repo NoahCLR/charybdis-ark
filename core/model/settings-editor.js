@@ -150,7 +150,7 @@ const optionLabels = [
     ["swapRightControlGui", "Swap right Control and GUI", "Exchange the right Control and GUI modifier actions across all layers.", "Modifiers"],
     ["oneshot", "One-shot modifiers and layers", "Allow one-shot modifier and layer keys to affect the next key after they are released.", "Typing"],
     ["swapEscapeCaps", "Swap Escape and Caps Lock", "Exchange the Escape and Caps Lock key actions across all layers.", "Keys"],
-    ["autocorrect", "Enabled", "The keyboard fixes typos and types your replacements when you finish a word. Off, it types every word as you typed it and keeps your list.", "Typing"],
+    ["autocorrect", "Enabled", "Off, the keyboard types every word as you typed it and keeps your list. Replacements and their inputs are in Text replacement.", "Typing"],
 ];
 // Text replacement's switch (autocorrect, in the keyboard's names) is a key
 // option the keyboard stores with the others (option 12, firmware
@@ -270,7 +270,7 @@ function settingsSections(snapshot, settings) {
         keyOptions.filter(field => field.macro !== AUTOCORRECT_SWITCH)});
     // Its switch keys override it until the keyboard restarts (switchedByKeys),
     // so it is no longer a "Typing" option among the swaps.
-    result.push({id: "autocorrect", area: AREA.settings, label: SECTION.autocorrect, screenLink: {label: "Edit replacements", screen: "autocorrect"}, fields:
+    result.push({id: "autocorrect", area: AREA.settings, label: SECTION.autocorrect, fields:
         keyOptions.filter(field => field.macro === AUTOCORRECT_SWITCH).map(({part, tooltip, ...field}) => switchedByKeys({...field, hint: field.hint || tooltip}, "autocorrect"))});
     /** @param {number} id */
     const label = id => VOCABULARY.hostOs.find(([value]) => value === id)?.[1] || "Unknown";

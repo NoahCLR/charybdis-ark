@@ -6,9 +6,9 @@ const {AUTOCORRECT_APOSTROPHE, foldWordCharacter} = require("../data/autocorrect
 // Autocorrect list domain 0x80, version 1 (firmware
 // profile-wire-v1/autocorrect-domain.md): what the keyboard replaces as it is
 // typed, and with what. An entry is one replacement, stored once, with every
-// typed form that produces it; each typed form says where it matches a word.
+// input that produces it; each input says where it matches a word.
 // The bytes, the firmware and this codec call a replacement a correction and
-// a typed form a typo (GLOSSARY.md, "Text replacement"). A correction is
+// an input a typo (GLOSSARY.md, "Text replacement"). A correction is
 // text, or a macro slot the keyboard plays: an entry with `macro` set, whose
 // `correction` is empty.
 //
@@ -166,25 +166,25 @@ function encodeAutocorrectDomain(list, {maxCorrections = AUTOCORRECT_DOMAIN_V1.M
         if (macro && entry.correction) throw refuse("INVALID_TEXT_LENGTH", `Replacement ${index} is a macro and text at once.`, TABLE.CORRECTIONS, index);
         const problem = macro ? null : correctionProblem(entry?.correction);
         if (problem) throw refuse(problem.code, `Replacement ${index} ${problem.reason}.`, TABLE.CORRECTIONS, index);
-        if (!Array.isArray(entry.typos) || !entry.typos.length) throw refuse("FIRST_TYPO", `The replacement ${macro ? `for macro ${entry.macro}` : `“${entry.correction}”`} has no typed form.`, TABLE.CORRECTIONS, index);
+        if (!Array.isArray(entry.typos) || !entry.typos.length) throw refuse("FIRST_TYPO", `The replacement ${macro ? `for macro ${entry.macro}` : `“${entry.correction}”`} has no input.`, TABLE.CORRECTIONS, index);
         return {bytes: Buffer.from(macro ? "" : entry.correction, "utf8"), entry, macro: macro ? /** @type {number} */ (entry.macro) : -1};
     }).sort((a, b) => (a.macro < 0 ? 0 : 1) - (b.macro < 0 ? 0 : 1) || a.macro - b.macro || Buffer.compare(a.bytes, b.bytes));
     if (corrections.length > maxCorrections) throw full("autocorrectCorrections", corrections.length, maxCorrections, "replacements");
     const typos = corrections.flatMap(({bytes: correction, entry, macro}, correctionIndex) => entry.typos.map(typo => {
         const problem = typoProblem(typo?.typo);
-        if (problem) throw refuse(problem.code, `A typed form ${problem.reason}.`, TABLE.TYPOS);
-        if (!Number.isInteger(typo.match) || typo.match < AUTOCORRECT_MATCH.WHOLE_WORD || typo.match > AUTOCORRECT_MATCH.ANYWHERE) throw refuse("INVALID_MATCH", `The typed form “${typo.typo}” has no such match.`, TABLE.TYPOS);
-        if (macro >= 0 && typo.match !== AUTOCORRECT_MATCH.WHOLE_WORD) throw refuse("INVALID_MATCH", `The typed form “${typo.typo}” plays a macro, so it matches the whole word only.`, TABLE.TYPOS);
+        if (problem) throw refuse(problem.code, `An input ${problem.reason}.`, TABLE.TYPOS);
+        if (!Number.isInteger(typo.match) || typo.match < AUTOCORRECT_MATCH.WHOLE_WORD || typo.match > AUTOCORRECT_MATCH.ANYWHERE) throw refuse("INVALID_MATCH", `The input “${typo.typo}” has no such match.`, TABLE.TYPOS);
+        if (macro >= 0 && typo.match !== AUTOCORRECT_MATCH.WHOLE_WORD) throw refuse("INVALID_MATCH", `The input “${typo.typo}” plays a macro, so it matches the whole word only.`, TABLE.TYPOS);
         const bytes = Buffer.from(typo.typo, "utf8");
-        if (macro < 0 && bytes.equals(correction)) throw refuse("TYPO_IS_CORRECTION", `The typed form “${typo.typo}” is its own replacement.`, TABLE.TYPOS);
+        if (macro < 0 && bytes.equals(correction)) throw refuse("TYPO_IS_CORRECTION", `The input “${typo.typo}” is its own replacement.`, TABLE.TYPOS);
         return {bytes, match: typo.match, correction: correctionIndex};
     })).sort((a, b) => Buffer.compare(a.bytes, b.bytes));
-    if (typos.length > maxTypos) throw full("autocorrectTypos", typos.length, maxTypos, "typed forms");
+    if (typos.length > maxTypos) throw full("autocorrectTypos", typos.length, maxTypos, "inputs");
     corrections.forEach((row, index) => {
         const before = corrections[index - 1];
         if (index && (row.macro < 0 ? before.macro < 0 && row.bytes.equals(before.bytes) : row.macro === before.macro)) throw refuse("ORDER", `The replacement ${row.macro < 0 ? `“${row.entry.correction}”` : `for macro ${row.macro}`} is in the list twice.`, TABLE.CORRECTIONS, index);
     });
-    typos.forEach((row, index) => {if (index && row.bytes.equals(typos[index - 1].bytes)) throw refuse("ORDER", `The typed form “${row.bytes.toString("utf8")}” is in the list twice.`, TABLE.TYPOS, index);});
+    typos.forEach((row, index) => {if (index && row.bytes.equals(typos[index - 1].bytes)) throw refuse("ORDER", `The input “${row.bytes.toString("utf8")}” is in the list twice.`, TABLE.TYPOS, index);});
     const textBytes = corrections.reduce((total, row) => total + row.bytes.length, 0) + typos.reduce((total, row) => total + row.bytes.length, 0);
     if (textBytes > maxTextBytes) throw full("autocorrectText", textBytes, maxTextBytes, "bytes of text");
     const parts = typos.flatMap((row, index) => row.match === AUTOCORRECT_MATCH.WHOLE_WORD ? [] : [index]);

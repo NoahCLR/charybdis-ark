@@ -78,11 +78,11 @@ export interface PdConfig {
 }
 /** Where a typo matches a word, as the keyboard stores it: 0 the whole word, 1 its start, 2 its end, 3 anywhere in it. */
 export type AutocorrectMatch = 0 | 1 | 2 | 3;
-/** A typed form as an edit names it (the firmware's and this contract's name for one is a typo): written as a person writes it, a whole word or with `*` where other letters may go (`recieve*`, `*mnet`, `*tihng*`). `match` is only an older list file's, for one written without `*`. */
+/** An input as an edit names it (the firmware's and this contract's name for one is a typo): written as a person writes it, a whole word or with `*` where other letters may go (`recieve*`, `*mnet`, `*tihng*`). `match` is only an older list file's, for one written without `*`. */
 export interface AutocorrectTypoEdit {typo: string; match?: AutocorrectMatch}
 /** What an edit names as a replacement (a correction, in the firmware's and this contract's names): its text, or the number of the macro slot it plays. One of the two. */
 export type AutocorrectReplacement = {correction: string; macro?: undefined} | {macro: number; correction?: undefined};
-/** A replacement with what is typed for it, as a file or the starter list gives one. */
+/** A replacement with its inputs, as a file or the starter list gives one. */
 export type AutocorrectEntryEdit = AutocorrectReplacement & {typos: AutocorrectTypoEdit[]};
 export interface SettingEdit {macro: string; enabled?: boolean; value?: Scalar | boolean}
 
@@ -115,13 +115,13 @@ export interface EditPayloads {
         | {protection: 'auto' | 'on' | 'off'; payload?: string; name?: string}
     );
     validateMacro: {keycode: string; payload: string; requestId: number};
-    /** Typed forms for a replacement: the entry is made when the list has none of that exact text or macro, otherwise they are added to it. */
+    /** Inputs for a replacement: the entry is made when the list has none of that exact text or macro, otherwise they are added to it. */
     addAutocorrectTypos: AutocorrectReplacement & {typos: AutocorrectTypoEdit[]; expectedFingerprint?: string};
-    /** A replacement changed where it stands: its text respelled (`to`), or made to play a macro (`toMacro`). Changed to one the list already has, what is typed for it joins that one. */
+    /** A replacement changed where it stands: its text respelled (`to`), or made to play a macro (`toMacro`). Changed to one the list already has, its inputs joins that one. */
     updateAutocorrectCorrection: AutocorrectReplacement & ({to: string; toMacro?: undefined} | {toMacro: number; to?: undefined}) & {expectedFingerprint?: string};
-    /** One typed form, named by its stored letters, written anew (`to`, with its `*`), or moved to another replacement (`correction` or `macro`), made when the list has none such. */
+    /** One input, named by its stored letters, written anew (`to`, with its `*`), or moved to another replacement (`correction` or `macro`), made when the list has none such. */
     updateAutocorrectTypo: {typo: string; to?: string; correction?: string; macro?: number; expectedFingerprint?: string};
-    /** A typed form removed; a replacement's last one takes its entry with it. */
+    /** An input removed; a replacement's last one takes its entry with it. */
     deleteAutocorrectTypo: {typo: string; expectedFingerprint?: string};
     deleteAutocorrectEntry: AutocorrectReplacement & {expectedFingerprint?: string};
     /** A file's entries, or the starter list's, added to the list or replacing it. What the list cannot take of them is left out, as the import's preview said it would be. */

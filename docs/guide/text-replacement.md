@@ -13,25 +13,25 @@ its switch is a setting, on **Host**.
 
 ## How the keyboard uses the list
 
-An entry is one **replacement** and everything **typed** for it:
-`because` for `becuase`, `becasue` and `beacuse`; `+31 6 1234 5678` for
-`pnumber`. The replacement is written once, and each typed form belongs to
-one replacement.
+An entry is one **replacement** and its **inputs**, what you type to get
+it: `because` for `becuase`, `becasue` and `beacuse`; `+31 6 1234 5678` for
+`pnumber`. The replacement is written once, and each input belongs to one
+replacement.
 
-The keyboard replaces a typed form when you finish the word, with a space,
+The keyboard replaces an input when you finish the word, with a space,
 Enter, Tab or punctuation. It erases only the part that differs and types the
 rest, then sends the key that ended the word, so Enter in a chat box sends
 the replaced text. A word you are still typing is never touched.
 
-A word is letters and digits, with apostrophes between them, so what you
-type for a replacement is always one word: `pnumber`, `myemail`, `sig2`,
+A word is letters and digits, with apostrophes between them, so an input is
+always one word: `pnumber`, `myemail`, `sig2`,
 `dosen't`. Apostrophes before or after it stay as typed and aren't part of
 it: `'teh'` is fixed as "teh". The keyboard follows a word up to 32
 characters and leaves a longer one alone.
 
 ### Part of a word, with `*`
 
-A typed form is the whole word unless you write it with `*` where other
+An input is the whole word unless you write it with `*` where other
 letters may go:
 
 | You write | It matches | So it also fixes |
@@ -42,8 +42,8 @@ letters may go:
 | `*tihng*` | anywhere in a word | "sometihng", "tihngs" |
 
 A `*` goes at the start, at the end, or both; nowhere else. Only the matched
-part is replaced, and the rest of the word stays. When more than one typed
-form matches, one that is the whole word wins, then the longest; of two as
+part is replaced, and the rest of the word stays. When more than one input
+matches, one that is the whole word wins, then the longest; of two as
 long, the first in alphabetical order.
 
 ### A replacement is text or a macro
@@ -55,11 +55,11 @@ more bytes each.
 
 **A macro** is for anything longer, anything of more than one line, or
 anything that is more than text. Choose **Macro** and pick one of your
-[macros](macros.md) by name. When you finish the typed form, the keyboard
+[macros](macros.md) by name, [as below](#replacement). When you finish the input, the keyboard
 erases it, plays the macro, then sends the key you ended the word with. A
 macro replacement differs from text:
 
-- it replaces a whole word only, so what you type for it has no `*`;
+- it replaces a whole word only, so its inputs have no `*`;
 - it plays as it is stored, whatever capitals you typed;
 - Backspace does not take it back, since what a macro did can't be undone by
   erasing;
@@ -68,7 +68,7 @@ macro replacement differs from text:
 
 ### Capitals
 
-Typed forms match whatever their case, so one is stored in small letters. A
+Inputs match whatever their case, so one is stored in small letters. A
 text replacement takes the case of the part it replaces, as the computer
 shows it, Caps Lock included: "Teh" becomes "The", "TEH" becomes "THE", and
 anything else, such as "tEh", gives the replacement as written. A replacement
@@ -107,9 +107,8 @@ on or off for the whole keyboard. It is there because replacements are typed
 through the host layout chosen above it, and because every such switch is a
 Settings screen's: Behaviours, Combos and Pointer have theirs. It is saved
 with the profile like any other setting. Off, the keyboard types every word
-as you typed it and keeps your list. **Edit replacements →** under it goes to
-the list, and while it is off the Text replacement screen says so across its
-top, with the way back to the switch.
+as you typed it and keeps your list. While it is off the Text replacement
+screen says so across its top, with the way back to the switch.
 
 The keyboard can't see where you are typing. In a password field or a
 terminal a replacement is wrong, so put a key on the keyboard to switch it
@@ -119,96 +118,135 @@ it back. They are [switch keys](behaviours.md#switch-keys): they work until
 the keyboard restarts, save nothing, and can't turn on what is off in Host.
 That is why the switch says **↺ keyboard keys change this too**, and
 **turned off by key** while a key has it off. The picker lists them under
-**Other QMK**, in **Switch keys**; searching it for "autocorrect" finds them
-too.
+**Other QMK**, in **Switch keys**, beside those for combos, behaviours and
+auto-mouse; searching it for "autocorrect" finds them too.
 
-## The list
+## The replacements
 
-Each row is a replacement, then what is typed for it as chips, each written
-as you wrote it, with its `*`. A replacement that plays a macro is marked
-**Macro** and shows the macro's name.
+The screen works as [Macros](macros.md) does: the list of **Replacements**
+at the left, and the one you pick open beside it.
 
-**Search** finds replacements by their text, by a macro's name, or by
-something typed, and marks what it found. **A to Z** and **Most typed** set
-the order.
+Each replacement is on one line, text as it is and a macro as **▶** and its
+name, with its inputs under it, each written as you wrote it, with its `*`.
+The first is open until you pick another, and the one you picked stays open
+when you come back to the screen. A dot marks one changed in your draft.
 
-### Adding a replacement
+**Search** finds replacements by their text, by a macro's name or by an
+input, and marks the inputs it found. The heading counts your inputs against
+what the keyboard holds, and under the list are **+ New replacement**,
+**Import…** and **Export**, and the list's [memory](#memory).
 
-**Add replacement** opens a row at the top of the list.
+## Writing a replacement
 
-1. Choose **Text** and type the replacement, or choose **Macro** and pick a
-   macro. **New macro…** goes to Macros to make one.
-2. Press Enter to move on, and type what you would type for it. A space or
-   Enter turns each into a chip, so several can be typed in a row;
-   Backspace in the empty field takes the last chip back, and its × removes
-   it.
-3. Press Enter in the empty field, or choose **Add**.
+The replacement open at the right has its name across the top, **Text** or
+**Macro** beside it, and **Delete replacement**, which removes it with its
+inputs. Under that are its three parts.
 
-A replacement the list already has is added to, and the row says so before
-you add: the list never holds the same replacement twice.
+### Replacement
 
-Ark checks what you type as you type it, and says under the row why it can't
-be added:
+Choose **Text** and type it; a counter under the field says how many of its
+128 bytes it uses. Enter, or leaving the field, keeps it; Escape puts back
+what it was. Changing it to a replacement the list already has joins the two.
 
-- something typed is the replacement itself;
-- something typed already belongs to another replacement ("“teh” is already
-  typed for “the”."); move it instead, as below;
-- something typed holds more than letters and digits. An apostrophe is
-  allowed between two of them, as in `dosen't`;
+Or choose **Macro**. The macro shows as a key with its name; **Pick…**, or
+the key itself, opens the same picker a key's keycode is picked in, here
+with only your macros in it, those in use first and the empty ones after.
+Pick one and choose **Use keycode**. **Edit in Macros →** goes to that macro
+to see or change its steps. Choosing Text or Macro changes nothing until you
+type the text or pick the macro.
+
+### Inputs
+
+The inputs are chips.
+
+- **+ Input** opens a field: type an input and press Enter. Several with
+  spaces between them are each added. The field stays for the next; Enter in
+  it empty, or Escape, closes it.
+- **A chip** opens in place when you click it: change how it is written,
+  with or without `*`, and press Enter, or choose **Remove** beside it.
+  Escape leaves it as it was. Removing a replacement's last input deletes
+  the replacement.
+
+To give an input to another replacement, remove it here and add it there.
+
+### A new replacement
+
+**+ New replacement** opens an empty one, with its text ready to type.
+
+1. Type the replacement, or choose **Macro** and pick one.
+2. Press Enter, type its first input, and press Enter again. Several inputs
+   with spaces between them are all added.
+
+It joins your list with that first input, and stays open for more. Until
+then it waits at the top of the list as **not on your list yet**, and
+**Discard** lets it go.
+
+If the list already has that replacement, Ark says so and offers **Open it**
+instead: the list never holds the same replacement twice.
+
+### What Ark checks
+
+Ark checks what you type as you type it, and says under the field why it
+can't be kept:
+
+- an input is the replacement itself;
+- an input already belongs to another replacement ("“teh” is already an
+  input for “the”.");
+- an input holds more than letters and digits. An apostrophe is allowed
+  between two of them, as in `dosen't`;
 - a `*` is somewhere other than the start or the end;
-- a `*` is in something typed for a macro, which plays for a whole word;
+- a `*` is in an input of a macro, which plays for a whole word;
 - the replacement is longer than 128 bytes or more than one line: use a
-  macro for that. What you type is at most 32 bytes;
+  macro for that. An input is at most 32 bytes;
 - the list is full;
 - your [host layout](macros.md#your-computer) can't type a character in it,
   so the keyboard could not type the replacement.
-
-### Changing a row
-
-- **The replacement**: click it to change it where it stands, to other text
-  or, with **Macro**, to a macro. Enter keeps it; Escape leaves it. Changing
-  it to a replacement the list already has joins the two.
-- **+ typed**, at the end of a row's chips: type one more thing and press
-  Enter. The field stays for the next; Escape closes it.
-- **A chip** opens a small panel for that typed form: how it is **Typed**,
-  with or without `*`; **Move to**, which takes the replacement it should
-  belong to instead, and makes one the list doesn't have yet; and
-  **Remove**. Removing a replacement's last typed form removes the
-  replacement.
-- **×**, at the end of a row: deletes the replacement and everything typed
-  for it. Undo takes it back.
 
 Everything is one step of the draft, so [Undo](review-and-save.md) works on
 each.
 
 ## Try it
 
-**Try it**, beside the list, is a box to type in as you would on the
-keyboard. It shows what the computer would end with, using the list as it
-stands in the draft and your host layout: type `teh` and a space, and the box
-reads "the ". The line under it says what was replaced, and that replacement
-and its chip are marked in the list. Backspace straight after puts the word
-back, as on the keyboard. **Caps Lock** follows your own Caps Lock while you
-type there, and can be set by hand.
+**Try it**, the last part of every replacement's editor, tries your whole
+list, whichever replacement is open.
+
+Type in its box as you would anywhere. Ark never changes what you type
+there. Under the box, **Preview with this draft** shows the same text as
+your keyboard would type it once you [Apply](review-and-save.md) the draft:
+type `teh` and a space, and the box still reads "teh " while the preview
+reads "the ". Each replaced part is marked in the preview, and hovering it
+says what it replaced. The line beside it says what was replaced last, and
+that replacement is marked in the list; **Show it →** opens it.
+
+Backspace straight after a replacement puts the word back in the preview, as
+it would on the keyboard. **Preview with Caps Lock on** says whether the
+preview takes Caps Lock to be on; it follows your own Caps Lock while you
+type there, and can be set by hand. **Clear** empties the box and the
+preview.
+
+With a keyboard connected and text replacement on, the keyboard replaces as
+you type in the box too, by the list that is already applied, and the box
+shows that as it shows anything typed. Ark then says so under the box: "Your
+keyboard is replacing as you type here too. The preview shows this draft."
+The preview is always the draft's list, so the two differ exactly where your
+draft does.
 
 For a replacement that plays a macro, the line says which: "“sig” plays
-macro “Sign-off”." The box shows the macro's text when the macro is only
-text; for a macro of keys and waits it shows what you typed gone, since Ark
-does not play macros.
+macro “Sign-off”." The preview shows the macro's text when the macro is only
+text; for a macro of keys and waits it shows the input gone, since Ark does
+not play macros.
 
-Try it reads text, so it can't show what depends on keys and time: a
-shortcut, a cursor key, a held key, a macro key, or keys pressed while a
+Try it reads text, so its preview can't show what depends on keys and time:
+a shortcut, a cursor key, a held key, a macro key, or keys pressed while a
 replacement is typed. An edit in the middle of the box counts as a click
 would: the text stays and the next key starts a new word. Try it works
-whether text replacement is on or off. On a narrow window it folds under the
-list.
+whether text replacement is on or off.
 
 ## Common typo fixes
 
 An empty list offers **Add common typo fixes**: about 200 common English
-words with the ways they are usually mistyped, some 400 typed forms, each a
-whole word. It is written for Ark, and nothing typed in it is an English
-word. It is added like a file: Ark first shows what it would do, as below.
+words with the ways they are usually mistyped, some 400 inputs, each a
+whole word. It is written for Ark, and no input in it is an English word. It is added like a file: Ark first shows what it would do, as below.
 
 ## Importing a list
 
@@ -216,19 +254,20 @@ word. It is added like a file: Ark first shows what it would do, as below.
 screen. Ark reads three formats, by the file's extension:
 
 - **`.json`**, Ark's own format, as **Export** writes it.
-- **`.csv`**, a spreadsheet: columns `replacement` and `typed` under a
-  header row, in any order. The typed cell can hold several typed forms with
+- **`.csv`**, a spreadsheet: columns `replacement` and `inputs` under a
+  header row, in any order. The inputs cell can hold several inputs with
   spaces between them, each with its own `*`. A row that plays a macro has
   the macro's number in a `macro` column and no replacement. Files as Excel,
   Numbers and Google Sheets save them all work: commas or semicolons, quoted
   cells.
-- **`.txt`**, QMK's autocorrect dictionary: a line for each typed form,
+- **`.txt`**, QMK's autocorrect dictionary: a line for each input,
   `typo -> correction`. QMK writes where it matches with colons, which Ark
   reads as its `*`: `:teh:` is `teh`, `:recieve` is `recieve*`, `mnet:` is
   `*mnet`, and with no colons `tihng` is `*tihng*`. Lines that start with
   `#` and blank lines are skipped.
 
-Files written before, by Ark or by hand, still read: a spreadsheet whose
+Files written before, by Ark or by hand, still read: a list that says
+`typed` where it now says `inputs`, a spreadsheet whose
 columns are `typos`, `correction` and `match` (`whole word`, `start`, `end`
 or `anywhere`), with or without its header row, and JSON with `entries`,
 `correction` and `typos`.
@@ -236,14 +275,16 @@ or `anywhere`), with or without its header row, and JSON with `entries`,
 In every format, lines and rows with the same replacement, spelled exactly
 alike, become one entry.
 
-Before anything changes, Ark shows what the file would do, for each choice:
+Before anything changes, a sheet over the screen shows what the file would
+do, for each choice, as a [backup](backups.md) is compared before it is
+used:
 
-- the new replacements it makes, and what is typed for them;
+- the new replacements it makes, and their inputs;
 - what it adds to replacements you already have;
 - what is already in your list, which is skipped;
 - the lines it refuses, each with its line or row number and the reason: the
-  same checks as when you [add a replacement](#adding-a-replacement).
-  Something typed that your list already has for another replacement is
+  same checks as when you [write a replacement](#what-ark-checks).
+  An input that your list already has for another replacement is
   refused and named;
 - how many don't fit, when the file holds more than the keyboard does.
 
@@ -253,14 +294,14 @@ draft, so Undo takes all of it back.
 
 ## Exporting your list
 
-**Export** saves the list as it is on screen, to your downloads, in the
-format you pick from its menu:
+**Export** saves the whole list to your downloads, in the format you pick
+from its menu:
 
-- **Text (QMK)**: QMK's form, a line for each typed form, with its colons.
+- **Text (QMK)**: QMK's form, a line for each input, with its colons.
   It has no way to say a macro, so a replacement that plays one is left out,
   and the file's first line says how many were.
-- **CSV**: a header row `replacement,typed`, then a row for each
-  replacement with everything typed for it in one cell. With a replacement
+- **CSV**: a header row `replacement,inputs`, then a row for each
+  replacement with all its inputs in one cell. With a replacement
   that plays a macro in the list, a third column, `macro`, holds the macro's
   number.
 - **JSON**: Ark's format, version 1:
@@ -269,9 +310,9 @@ format you pick from its menu:
   {
     "version": 1,
     "replacements": [
-      {"replacement": "because", "typed": ["becuase", "becasue"]},
-      {"replacement": "receive", "typed": ["recieve*"]},
-      {"macro": 5, "typed": ["sig"]}
+      {"replacement": "because", "inputs": ["becuase", "becasue"]},
+      {"replacement": "receive", "inputs": ["recieve*"]},
+      {"macro": 5, "inputs": ["sig"]}
     ]
   }
   ```
@@ -284,8 +325,8 @@ number, so a list with one fits the keyboard it came from.
 
 ## Warnings
 
-A warning marks a replacement or a chip in amber, with its reason on the row
-or in the chip's panel. It never stops you saving.
+A warning marks a replacement in the list and a chip in its editor in amber,
+with its reason in a line under what it is about. It never stops you saving.
 
 - **It will not fire on your host layout.** After you change the host
   layout, the top of the screen says how many replacements the new layout
@@ -295,29 +336,29 @@ or in the chip's panel. It never stops you saving.
 - **Its macro is empty.** The keyboard leaves what you typed. Add steps in
   Macros or choose another replacement. Review lists it too, as it lists a
   pointing mode that runs an empty macro.
-- **A replacement is itself typed for another.** With `a` for `b` and `b`
+- **A replacement is itself an input for another.** With `a` for `b` and `b`
   for `c`, typing "b" yourself gives "c". Two entries that replace each
   other are marked as a loop.
-- **A short typed form with `*`.** Under four letters, it fires inside many
+- **A short input with `*`.** Under four letters, it fires inside many
   words you meant.
-- **A typed form that matches inside a replacement.** Typing that
+- **An input that matches inside a replacement.** Typing that
   replacement would change it.
 
 ## Memory
 
-The heading counts your replacements and everything typed for them. Under
-the list, a bar shows the list's memory, with what it uses of what the
-keyboard holds: 1,024 typed forms and 34,824 bytes on current firmware. The
-list also shares the profile's memory with everything else; the
-[Keyboard screen](connecting.md#the-keyboard-screen)'s **Memory** panel shows both, with
-**Text replacement typed** among the counts and **Text replacement memory**
-after Macro memory.
+The list's heading counts your inputs against what the keyboard holds: 1,024
+on current firmware. Under the list, **Text replacement memory** shows the
+bytes the list uses of its 34,824, with a bar, and counts your replacements
+and inputs. The list also shares the profile's memory with everything else;
+the [Keyboard screen](connecting.md#the-keyboard-screen)'s **Memory** panel
+shows both, with **Text replacement inputs** among the counts and **Text
+replacement memory** after Macro memory.
 
 ## Review and backups
 
 Review lists each changed entry once, under **Text replacement**: added,
-removed, or with another replacement, and what was typed for it added,
-removed, moved or written anew, each as it is written. **Discard** puts one
+removed, or with another replacement, and each input added, removed or
+written anew, as it is written. **Discard** puts one
 entry back. The switch is a setting, reviewed under **Settings**. See
 [Review and save](review-and-save.md#review).
 

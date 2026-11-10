@@ -184,8 +184,8 @@ const PROFILE_FULL_WORDS = Object.freeze({
         behaviours: (most) => `The keyboard holds at most ${most} behaviours. Remove one before adding another.`,
         behaviourSteps: (most) => `The keyboard holds at most ${most} behaviour tap counts, added up across all behaviours. Remove a tap count or a behaviour first.`,
         autocorrectCorrections: (most) => `The keyboard holds at most ${most.toLocaleString("en-US")} text replacements. Remove one before adding another.`,
-        autocorrectTypos: (most) => `The keyboard holds at most ${most.toLocaleString("en-US")} typed forms across all text replacements. Remove one before adding another.`,
-        autocorrectText: (most) => `The text replacement list holds at most ${most.toLocaleString("en-US")} bytes of text across its replacements and what is typed for them. Remove a replacement first.`,
+        autocorrectTypos: (most) => `The keyboard holds at most ${most.toLocaleString("en-US")} inputs across all text replacements. Remove one before adding another.`,
+        autocorrectText: (most) => `The text replacement list holds at most ${most.toLocaleString("en-US")} bytes of text across its replacements and their inputs. Remove a replacement first.`,
     }),
     profile: "This change does not fit: the keyboard's profile is full. Remove an accent, a behaviour, a combo or a macro first.",
     name: "The keyboard's profile is full, so this name does not fit. Shorten another name, or remove a behaviour or combo.",
@@ -347,13 +347,10 @@ const THRESHOLDS = Object.freeze({tapHoldTerm: "tap / hold", longHoldTerm: "long
 const word = (list, key) => (list.find(([id]) => id === key)?.[1] ?? String(key ?? ""));
 
 // QMK's switch keys for autocorrect, which is text replacement here
-// (GLOSSARY.md): each key's words, and what it does. The help says
-// "autocorrect" too, so a search for the keys' own name finds them.
-const TEXT_REPLACEMENT_KEYS = Object.freeze({
-    QK_AUTOCORRECT_ON: {label: "Text replacement On", tip: "Turns text replacement (autocorrect) on until the keyboard restarts. It does not change the switch in Host settings, and cannot turn on what is off there."},
-    QK_AUTOCORRECT_OFF: {label: "Text replacement Off", tip: "Turns text replacement (autocorrect) off until the keyboard restarts: for a password field or a terminal. It does not change the switch in Host settings."},
-    QK_AUTOCORRECT_TOGGLE: {label: "Toggle Text replacement", tip: "Turns text replacement (autocorrect) off or back on until the keyboard restarts. It does not change the switch in Host settings."},
-});
+// (GLOSSARY.md): each key's words, as the switch keys for combos, behaviours
+// and auto-mouse are worded (Combo On, Combo Off, Toggle Combo). QMK's own
+// words stay among a key's search terms, so either name finds it.
+const TEXT_REPLACEMENT_KEYS = Object.freeze({QK_AUTOCORRECT_ON: "Text replacement On", QK_AUTOCORRECT_OFF: "Text replacement Off", QK_AUTOCORRECT_TOGGLE: "Toggle Text replacement"});
 // How a macro plays: whether it is uninterruptible, chosen or automatic.
 /** @type {import("../../contracts/model.js").WordList<"auto" | "on" | "off">} */
 const MACRO_PROTECTION = [["auto", "Automatic"], ["on", "On"], ["off", "Off"]];
@@ -640,7 +637,7 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
         behaviourSteps: {label: "Behaviour tap counts", what: "Each behaviour's tap counts, up to the deepest one it sets, added up across all behaviours."},
         combos: {label: "Combos", what: "Combos on any layer."},
         macros: {label: "Macros", what: "Macro slots with steps."},
-        autocorrectTyped: {label: "Text replacement typed", what: "Everything typed for a text replacement, added up across the list."},
+        autocorrectInputs: {label: "Text replacement inputs", what: "Every input of every text replacement, added up across the list."},
         customKeys: {label: "Custom keys", what: "Custom keys with a name, a shortcut or a behaviour."},
         pointingModes: {label: "Pointing modes", what: "Slots that hold a pointing mode."},
         lightingGroups: {label: "LED sets", what: "The different sets of LEDs accents light; accents that light the same LEDs share one."},

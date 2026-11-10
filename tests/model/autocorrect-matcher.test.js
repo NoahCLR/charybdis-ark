@@ -60,14 +60,30 @@ test("what fired is reported in order, and an undone correction is not", () => {
     assert.equal(typedText(value, US, false, "teh hte \bx").undone, false, "only while the word stands as it was put back");
 });
 
+// Try it's preview marks what each standing replacement typed (D-L86).
+test("each standing replacement is marked where its text is, in the text's own offsets, and a part deleted since is not", () => {
+    const value = {entries: [{correction: "the", typos: [{typo: "teh", match: MATCH.WHOLE_WORD}, {typo: "hte", match: MATCH.WHOLE_WORD}]}, {correction: "thing", typos: [{typo: "tihng", match: MATCH.ANYWHERE}]},
+        {correction: "", macro: 5, typos: [{typo: "sig", match: MATCH.WHOLE_WORD}]}]};
+    const marks = (screen, before = "", macros) => { const tried = typedText(value, US, false, screen, before, macros); return tried.marks.map(mark => [tried.text.slice(mark.start, mark.end), mark.typo, mark.start]); };
+    assert.deepEqual(marks("Teh sometihng hte."), [["The", "teh", 0], ["something", "tihng", 4], ["the", "hte", 14]], "the word as the replacement leaves it");
+    assert.deepEqual(marks("teh ", "😀 "), [["the", "teh", 3]], "offsets count as the text does, an emoji as two");
+    assert.deepEqual(marks("teh \b"), [], "an undone replacement is not marked");
+    assert.deepEqual(marks("teh \bx \b\b\b\b"), [], "nor is the word put back");
+    assert.deepEqual(marks("teh x\b\b\b"), [["th", "teh", 0]], "what Backspace took of a replacement is gone from its mark");
+    assert.deepEqual(marks("teh x\b\b\b\b\bab"), [], "and text typed where one stood is not marked");
+    assert.deepEqual(marks("sig teh ", "", slot => slot === 5 ? {text: "Kind regards"} : null), [["Kind regards", "sig", 0], ["the", "teh", 13]], "a macro's text is marked as its replacement");
+    assert.deepEqual(marks("sig ", "", () => ({text: null})), [], "a macro of keys leaves nothing to mark");
+    assert.deepEqual(typedText(value, US, false, "teh ").marks, [{entry: "the", correction: "the", typo: "teh", start: 0, end: 3}]);
+});
+
 test("a macro replacement names its slot, plays only what can play, and shows nothing for a macro that is more than text", () => {
     const value = {entries: [{correction: "", macro: 5, typos: [{typo: "sig", match: MATCH.WHOLE_WORD}]}, {correction: "the", typos: [{typo: "teh", match: MATCH.WHOLE_WORD}]}]};
     const typed = typedText(value, US, false, "sig teh ", "", slot => slot === 5 ? {text: "Kind regards"} : null);
     assert.equal(typed.text, "Kind regards the ");
     assert.deepEqual(typed.fired, [{entry: "\u0001macro:5", correction: "", typo: "sig", macro: 5}, {entry: "the", correction: "the", typo: "teh"}]);
-    // A macro of keys and waits has no text to show: the typed form goes.
+    // A macro of keys and waits has no text to show: the input goes.
     assert.equal(typedText(value, US, false, "sig ", "", () => ({text: null})).text, " ");
-    // Without its macro, and by default, the typed form stays.
+    // Without its macro, and by default, the input stays.
     assert.equal(typedText(value, US, false, "sig ", "", () => null).text, "sig ");
     assert.equal(typedText(value, US, false, "sig ").text, "sig ");
     // No undo: Backspace takes the ending character only.

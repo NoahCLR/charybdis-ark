@@ -44,11 +44,11 @@ export const SCREENS = Object.freeze({
         available: configureReady, render: renderers => renderers.screenMacros(),
     }),
     // Text replacement (its id stays the keyboard's name for it,
-    // autocorrect). A word struck through and set right: a line of text, a
-    // stroke across it and a tick beside it.
+    // autocorrect). A field of text set right: one closed shape with its
+    // mark inside, as the icons around it are, a dash of text and a tick.
     autocorrect: screen({
         label: "Text replacement", group: "Configure", keepOnPublish: true,
-        icon: '<svg viewBox="0 0 16 16" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5.5h8M2 10.5h5.5M3.5 3.5l5 4"/><path d="M9.5 10.8l1.8 1.8 3.2-4"/></svg>',
+        icon: '<svg viewBox="0 0 16 16"><rect x="1.5" y="4" width="13" height="8" rx="2"/><path d="M4.2 8h3M9 8.1l1.3 1.3 2.3-2.8"/></svg>',
         available: configureReady, render: renderers => renderers.screenAutocorrect(),
     }),
     customKeys: screen({

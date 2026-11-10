@@ -15,7 +15,7 @@ const {hostLayouts} = require("../../core/data/host-layouts");
 // English words from SCOWL (tests/fixtures/english-words/README.md says which
 // and under what licence), in small letters.
 const WORDS = new Set(zlib.gunzipSync(fs.readFileSync(path.join(__dirname, "../fixtures/english-words/words.txt.gz"))).toString("utf8").split("\n").filter(Boolean));
-const typos = AUTOCORRECT_STARTER.replacements.flatMap(entry => entry.typed.map(typo => ({typo, correction: entry.replacement})));
+const typos = AUTOCORRECT_STARTER.replacements.flatMap(entry => entry.inputs.map(typo => ({typo, correction: entry.replacement})));
 
 test("the word list is the one its README describes", () => {
     assert.equal(WORDS.size, 166444);
@@ -28,11 +28,11 @@ test("the word list is the one its README describes", () => {
 
 test("the starter list is a few hundred whole-word typos, grouped by the word each should be, in Ark's own list format", () => {
     assert.equal(AUTOCORRECT_STARTER.version, 1);
-    assert.ok(typos.length >= 300 && typos.length <= 1024, `${typos.length} typed forms`);
+    assert.ok(typos.length >= 300 && typos.length <= 1024, `${typos.length} inputs`);
     assert.ok(AUTOCORRECT_STARTER.replacements.length >= 150, `${AUTOCORRECT_STARTER.replacements.length} replacements`);
     assert.ok(typos.every(typo => !typo.typo.includes("*")), "whole word only: none is written with *");
     assert.equal(new Set(AUTOCORRECT_STARTER.replacements.map(entry => entry.replacement)).size, AUTOCORRECT_STARTER.replacements.length, "each replacement once");
-    assert.ok(AUTOCORRECT_STARTER.replacements.every(entry => entry.typed.length >= 1 && entry.macro === undefined), "each a word with something typed for it, none a macro");
+    assert.ok(AUTOCORRECT_STARTER.replacements.every(entry => entry.inputs.length >= 1 && entry.macro === undefined), "each a word with something typed for it, none a macro");
 });
 
 test("no typo in the starter list is an English word, and every correction is made of them", () => {

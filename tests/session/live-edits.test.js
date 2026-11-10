@@ -688,6 +688,10 @@ test("autocorrect a key turned off is published beside its stored switch, not as
     const stored = editDomain(document(), "settings", settings => {settings.values[SETTING.KEYMAP_OPTIONS] &= ~0x1000;});
     const off = await openLoop(t, {keyboard: liveKeyboard({document: stored, autocorrectOverride: false})});
     assert.equal(lastModel(off.shell).offByKey.autocorrect, false, "a key cannot turn off what is stored off");
+    // Whether the keyboard is replacing now, for Try it's note: only what it reports, its stored switch on and no key holding it off.
+    assert.deepEqual([lastModel(shell).autocorrectRunning, lastModel(allowed.shell).autocorrectRunning, lastModel(off.shell).autocorrectRunning], [false, true, false]);
+    const unset = await openLoop(t, {keyboard: liveKeyboard({document: stored})});
+    assert.equal(lastModel(unset.shell).autocorrectRunning, false, "stored off, it replaces nothing, whatever its keys last said");
 });
 
 test("in Apply a toggle a key turned off is shown too", async t => {

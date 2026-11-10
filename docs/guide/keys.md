@@ -234,8 +234,8 @@ keyboard-wide options that apply on every layer:
 - **Typing**: one-shot modifiers and layers, and more than six keys at once.
 
 **Text replacement**, the card above these on Host, has the switch for
-[text replacement](text-replacement.md#turning-it-on-and-off): **Enabled**,
-with **Edit replacements →** to its list. It sits under **Your computer**
+[text replacement](text-replacement.md#turning-it-on-and-off): **Enabled**.
+It sits under **Your computer**
 because replacements are typed through the layout chosen there.
 
 An option this firmware was built without says **Not in this firmware** and

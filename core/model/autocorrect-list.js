@@ -2,13 +2,13 @@
 "use strict";
 
 // The text replacement list as a person edits it: entries, each one
-// replacement with the typed forms that produce it (firmware
-// autocorrect-domain.md, where a replacement is a correction and a typed form
+// replacement with the inputs that produce it (firmware
+// autocorrect-domain.md, where a replacement is a correction and an input
 // a typo; the code here keeps those names). Every function works on the
 // domain's own model, the list the codec decodes and encodes, so an edit
 // changes it in place and the codec writes the canonical order.
 //
-// A typed form is written as a person types it: a whole word, or with `*`
+// An input is written as a person types it: a whole word, or with `*`
 // where other letters may go (`recieve*` the start of a word, `*mnet` the
 // end, `*tihng*` anywhere). The `*` is notation: the list stores the letters
 // and where they match (D-L84).
@@ -16,7 +16,7 @@
 // An edit that would make a list the keyboard refuses, or an entry the chosen
 // host layout cannot type, is refused here in plain words. What only
 // misbehaves (an entry a layout change left untypable, a replacement another
-// entry changes again, a short typed form with `*`, a macro that is empty) is
+// entry changes again, a short input with `*`, a macro that is empty) is
 // a warning: found on the list, never a refusal.
 
 const {AUTOCORRECT_DOMAIN_V1, AUTOCORRECT_MATCH, autocorrectDomainSize, correctionProblem, entryKey, entryOfKey, foldTypo, isMacroSlot, playsMacro, typoProblem} = require("../schema/autocorrect-domain-v1");
@@ -31,7 +31,7 @@ const {macroDefaultName} = require("./vocabulary");
  * @typedef {Entry["typos"][number]} Typo
  * @typedef {{correction: string, macro?: undefined} | {macro: number, correction?: undefined}} Target what names an entry: its text, or the macro slot it plays
  * @typedef {{layout: number, layoutName?: string, macroNames?: readonly (string | undefined)[], emptyMacros?: ReadonlySet<number>}} Host the host layout the keyboard types through and its name; the macros' names, and the slots that hold none
- * @typedef {{kind: typeof WARNING[keyof typeof WARNING], entry: string, typo?: string, text: string}} Warning what misbehaves, on the entry of that key and, when it is one typed form's, that typo
+ * @typedef {{kind: typeof WARNING[keyof typeof WARNING], entry: string, typo?: string, text: string}} Warning what misbehaves, on the entry of that key and, when it is one input's, that typo
  */
 
 /** @param {string} message */
@@ -39,9 +39,9 @@ const refuse = message => Object.assign(new Error(message), {code: "AUTOCORRECT_
 /** @param {string} text */
 const quoted = text => `“${text}”`;
 const BYTES = "accented letters take two or more each";
-// A typed form with `*` and fewer letters than this is warned about.
+// An input with `*` and fewer letters than this is warned about.
 const SHORT_PART_LETTERS = 4;
-// Where other letters may go, in a typed form as it is written.
+// Where other letters may go, in an input as it is written.
 const STAR = "*";
 const STAR_HINT = `Put ${STAR} only at the start or the end, where other letters may go.`;
 
@@ -87,11 +87,11 @@ function targetOf(named) {
     return {correction: correctionOf(named?.correction)};
 }
 
-// A typed form as it is written, read: its letters as they are stored,
+// An input as it is written, read: its letters as they are stored,
 // trimmed and folded with the firmware's table, and where it matches, from
 // the `*` at its start, its end or both.
 /** @param {unknown} text @returns {Typo} */
-function typedOf(text) {
+function inputOf(text) {
     const written = typeof text === "string" ? text.trim() : "";
     if (!written) throw refuse("Type what you would type for it.");
     const start = written.endsWith(STAR), end = written.startsWith(STAR);
@@ -106,21 +106,21 @@ function typedOf(text) {
     if (problem) throw refuse("What you type may hold an apostrophe only between two letters or digits.");
     return {typo, match: start && end ? AUTOCORRECT_MATCH.ANYWHERE : start ? AUTOCORRECT_MATCH.START : end ? AUTOCORRECT_MATCH.END : AUTOCORRECT_MATCH.WHOLE_WORD};
 }
-// A stored typed form as it is written, with its `*`.
+// A stored input as it is written, with its `*`.
 /** @param {{typo: string, match: number}} typo */
-const typedForm = typo => `${typo.match === AUTOCORRECT_MATCH.END || typo.match === AUTOCORRECT_MATCH.ANYWHERE ? STAR : ""}${typo.typo}${typo.match === AUTOCORRECT_MATCH.START || typo.match === AUTOCORRECT_MATCH.ANYWHERE ? STAR : ""}`;
+const inputForm = typo => `${typo.match === AUTOCORRECT_MATCH.END || typo.match === AUTOCORRECT_MATCH.ANYWHERE ? STAR : ""}${typo.typo}${typo.match === AUTOCORRECT_MATCH.START || typo.match === AUTOCORRECT_MATCH.ANYWHERE ? STAR : ""}`;
 
-// A typed form an edit or a file gives: written with its `*`, or its letters
+// An input an edit or a file gives: written with its `*`, or its letters
 // with the match a file's older form stored beside them.
 /** @param {{typo?: unknown, match?: unknown} | null | undefined} row @returns {Typo} */
 function typoOf(row) {
-    const typed = typedOf(row?.typo);
+    const typed = inputOf(row?.typo);
     if (row?.match === undefined || typed.match !== AUTOCORRECT_MATCH.WHOLE_WORD) return typed;
     if (!Number.isInteger(row.match) || /** @type {number} */ (row.match) < AUTOCORRECT_MATCH.WHOLE_WORD || /** @type {number} */ (row.match) > AUTOCORRECT_MATCH.ANYWHERE) throw refuse(`${quoted(typed.typo)} has no such match. ${STAR_HINT}`);
     return {typo: typed.typo, match: /** @type {number} */ (row.match)};
 }
 
-// The entry and typo a typed form is stored under, whatever its case and
+// The entry and typo an input is stored under, whatever its case and
 // whatever `*` it is written with; undefined when the list does not hold it.
 /** @param {AutocorrectList} list @param {string} typo @returns {{entry: Entry, typo: Typo} | undefined} */
 function findTypo(list, typo) {
@@ -149,15 +149,15 @@ function storedEntry(list, target, host) {
     if (!entry) throw refuse(`The replacement ${called(target, host)} is no longer in the list.`);
     return entry;
 }
-// A typed form may be put under a replacement only when it is not that text,
+// An input may be put under a replacement only when it is not that text,
 // no other replacement has it, and for a macro it is a whole word.
 /** @param {AutocorrectList} list @param {Typo} typo @param {Target} target @param {Host} host @param {Typo} [self] the typo being changed, which may keep its own spelling */
 function requireFree(list, typo, target, host, self) {
-    if (target.macro !== undefined && typo.match !== AUTOCORRECT_MATCH.WHOLE_WORD) throw refuse(`A macro plays for a whole word only: take the ${STAR} out of ${quoted(typedForm(typo))}.`);
+    if (target.macro !== undefined && typo.match !== AUTOCORRECT_MATCH.WHOLE_WORD) throw refuse(`A macro plays for a whole word only: take the ${STAR} out of ${quoted(inputForm(typo))}.`);
     if (typo.typo === target.correction) throw refuse(`${quoted(typo.typo)} is the replacement itself.`);
     const held = findTypo(list, typo.typo);
     if (!held || held.typo === self) return;
-    throw refuse(entryKey(held.entry) === entryKey(target) ? `${quoted(typo.typo)} is already typed for ${called(target, host)}.` : `${quoted(typo.typo)} is already typed for ${called(targetOfEntry(held.entry), host)}.`);
+    throw refuse(entryKey(held.entry) === entryKey(target) ? `${quoted(typo.typo)} is already an input for ${called(target, host)}.` : `${quoted(typo.typo)} is already an input for ${called(targetOfEntry(held.entry), host)}.`);
 }
 /** @param {Entry} entry @returns {Target} */
 const targetOfEntry = entry => entry.macro === undefined ? {correction: entry.correction} : {macro: entry.macro};
@@ -168,7 +168,7 @@ function dropIfEmpty(list, entry) {
     if (!entry.typos.length) list.entries.splice(list.entries.indexOf(entry), 1);
 }
 
-// Adds typed forms to a replacement, making the entry when the list has none
+// Adds inputs to a replacement, making the entry when the list has none
 // of that exact text or macro. All of it is checked before anything changes.
 /** @param {AutocorrectList} list @param {{correction?: unknown, macro?: unknown}} named @param {readonly {typo: unknown, match?: unknown}[]} typos @param {Host} host */
 function addTypos(list, named, typos, host) {
@@ -182,7 +182,7 @@ function addTypos(list, named, typos, host) {
         const typo = typoOf(row);
         if (added.some(other => other.typo === typo.typo)) throw refuse(`${quoted(typo.typo)} is there twice.`);
         requireFree(list, typo, target, host);
-        requireTypable(typo.typo, host, "see this typed");
+        requireTypable(typo.typo, host, "see this input");
         added.push(typo);
     }
     if (existing) existing.typos.push(...added);
@@ -191,15 +191,15 @@ function addTypos(list, named, typos, host) {
 
 // Changes a replacement where it stands: its text respelled, text made a
 // macro, or a macro made text. Changing it to a replacement the list already
-// has joins the two: its typed forms go to that one.
+// has joins the two: its inputs go to that one.
 /** @param {AutocorrectList} list @param {{correction?: unknown, macro?: unknown}} from @param {{correction?: unknown, macro?: unknown}} to @param {Host} host */
 function changeReplacement(list, from, to, host) {
     const source = from?.macro !== undefined ? targetOf(from) : /** @type {Target} */ ({correction: String(from?.correction ?? "")});
     const entry = storedEntry(list, source, host), next = targetOf(to);
     if (entryKey(next) === entryKey(entry)) return;
     for (const typo of entry.typos) {
-        if (next.macro !== undefined && typo.match !== AUTOCORRECT_MATCH.WHOLE_WORD) throw refuse(`A macro plays for a whole word only: take the ${STAR} out of ${quoted(typedForm(typo))} first.`);
-        if (typo.typo === next.correction) throw refuse(`${quoted(typo.typo)} is typed for it; what you type cannot be its own replacement.`);
+        if (next.macro !== undefined && typo.match !== AUTOCORRECT_MATCH.WHOLE_WORD) throw refuse(`A macro plays for a whole word only: take the ${STAR} out of ${quoted(inputForm(typo))} first.`);
+        if (typo.typo === next.correction) throw refuse(`${quoted(typo.typo)} is one of its inputs; an input cannot be its own replacement.`);
     }
     const target = findEntry(list, next);
     if (!target) {
@@ -213,17 +213,17 @@ function changeReplacement(list, from, to, host) {
     list.entries.splice(list.entries.indexOf(entry), 1);
 }
 
-// Changes one typed form: how it is written (its letters and its `*`), or the
+// Changes one input: how it is written (its letters and its `*`), or the
 // replacement it belongs to (made when the list has none such). A
-// replacement left with nothing typed for it goes.
+// replacement left with no input goes.
 /** @param {AutocorrectList} list @param {string} typoText @param {{to?: unknown, correction?: unknown, macro?: unknown}} change @param {Host} host */
 function changeTypo(list, typoText, change, host) {
     const {entry, typo} = storedTypo(list, typoText);
     const moves = change.correction !== undefined || change.macro !== undefined;
     const target = moves ? targetOf(change) : targetOfEntry(entry);
-    const next = change.to === undefined ? {...typo} : typedOf(change.to);
+    const next = change.to === undefined ? {...typo} : inputOf(change.to);
     const held = findEntry(list, target);
-    if (next.typo !== typo.typo) requireTypable(next.typo, host, "see this typed");
+    if (next.typo !== typo.typo) requireTypable(next.typo, host, "see this input");
     if (!held && target.macro === undefined) requireTypable(target.correction, host, "type this replacement");
     requireFree(list, next, target, host, typo);
     typo.typo = next.typo;
@@ -263,7 +263,7 @@ function listUsage(list) {
 function listWarnings(list, host) {
     const layout = host.layoutName || "The chosen host layout";
     // What fires on each text replacement's own words: a replacement that is
-    // itself replaced, and the typed forms with `*` that match inside one.
+    // itself replaced, and the inputs with `*` that match inside one.
     /** @type {Map<Entry, Entry>} */
     const corrected = new Map();
     /** @type {Map<Typo, string>} */
@@ -271,7 +271,7 @@ function listWarnings(list, host) {
     for (const entry of list.entries) for (const word of playsMacro(entry) ? [] : wordsOf(entry.correction)) {
         const fired = firingTypo(list, word);
         if (!fired) continue;
-        // A typed form that is its own replacement in other capitals (iphone
+        // An input that is its own replacement in other capitals (iphone
         // for iPhone) leaves the word as it is typed.
         if (fired.end - fired.start === [...word].length) {if (fired.entry !== entry && !corrected.has(entry)) corrected.set(entry, fired.entry);}
         else if (!inside.has(fired.typo)) inside.set(fired.typo, entry.correction);
@@ -287,14 +287,14 @@ function listWarnings(list, host) {
         if (entry.macro !== undefined && host.emptyMacros?.has(entry.macro)) warnings.push({kind: WARNING.EMPTY_MACRO, entry: key, text: `${quoted(macroCalled(entry.macro, host))} has no steps, so this replacement does nothing yet. Add steps in Macros, or choose another replacement.`});
         const next = corrected.get(entry);
         if (next && corrected.get(next) === entry) warnings.push({kind: WARNING.LOOP, entry: key, text: `${named(next)} and ${named(entry)} replace each other.`});
-        else if (next) warnings.push({kind: WARNING.CHAIN, entry: key, text: `${named(entry)} is itself typed for ${named(next)}: typing it gives ${named(next)}.`});
+        else if (next) warnings.push({kind: WARNING.CHAIN, entry: key, text: `${named(entry)} is itself an input for ${named(next)}: typing it gives ${named(next)}.`});
         for (const typo of entry.typos) {
             const unseen = missing.length ? [] : untypable(typo.typo, host);
-            if (unseen.length) warnings.push({kind: WARNING.UNTYPABLE, entry: key, typo: typo.typo, text: `${layout} cannot type ${unseen.map(quoted).join(", ")}, so this will never be seen typed.`});
+            if (unseen.length) warnings.push({kind: WARNING.UNTYPABLE, entry: key, typo: typo.typo, text: `${layout} cannot type ${unseen.map(quoted).join(", ")}, so this input will never be seen.`});
             if (typo.match === AUTOCORRECT_MATCH.WHOLE_WORD) continue;
-            if ([...typo.typo].length < SHORT_PART_LETTERS) warnings.push({kind: WARNING.SHORT_PART, entry: key, typo: typo.typo, text: `${quoted(typedForm(typo))} is a short typed form with ${STAR}, so it fires inside many words.`});
+            if ([...typo.typo].length < SHORT_PART_LETTERS) warnings.push({kind: WARNING.SHORT_PART, entry: key, typo: typo.typo, text: `${quoted(inputForm(typo))} is a short input with ${STAR}, so it fires inside many words.`});
             const within = inside.get(typo);
-            if (within !== undefined) warnings.push({kind: WARNING.INSIDE_CORRECTION, entry: key, typo: typo.typo, text: `${quoted(typedForm(typo))} also matches inside the replacement ${quoted(within)}, so typing that changes it.`});
+            if (within !== undefined) warnings.push({kind: WARNING.INSIDE_CORRECTION, entry: key, typo: typo.typo, text: `${quoted(inputForm(typo))} also matches inside the replacement ${quoted(within)}, so typing that changes it.`});
         }
     }
     return warnings;
@@ -302,7 +302,7 @@ function listWarnings(list, host) {
 
 // The entries of two lists side by side, for a review of one against the
 // other: an entry with the same replacement in both; an entry only the first
-// has beside the one only the second has that took most of its typed forms
+// has beside the one only the second has that took most of its inputs
 // (the same entry, with another replacement); then what is left of either
 // alone.
 /** @param {AutocorrectList} before @param {AutocorrectList} after @returns {{before?: Entry, after?: Entry}[]} */
@@ -327,7 +327,7 @@ function pairEntries(before, after) {
 // Puts one entry of `mine` back to what `theirs` holds. The entry is named
 // by its key, and by both keys when one list changed its replacement:
 // whichever of them `mine` has goes, and whichever `theirs` has comes back
-// with its typed forms, each taken from the entry of `mine` that has it now.
+// with its inputs, each taken from the entry of `mine` that has it now.
 /** @param {AutocorrectList} mine @param {AutocorrectList} theirs @param {string} key @param {string} [respelled] */
 function restoreEntry(mine, theirs, key, respelled) {
     mine.entries = mine.entries.filter(entry => entryKey(entry) !== key && entryKey(entry) !== respelled);
@@ -344,4 +344,4 @@ function restoreEntry(mine, theirs, key, respelled) {
     }
 }
 
-module.exports = {WARNING, addTypos, changeReplacement, changeTypo, correctionOf, entryOfKey, findEntry, findTypo, listUsage, listWarnings, macroCalled, pairEntries, removeEntry, removeTypo, restoreEntry, targetOf, typedForm, typedOf, typoOf};
+module.exports = {WARNING, addTypos, changeReplacement, changeTypo, correctionOf, entryOfKey, findEntry, findTypo, listUsage, listWarnings, macroCalled, pairEntries, removeEntry, removeTypo, restoreEntry, targetOf, inputForm, inputOf, typoOf};

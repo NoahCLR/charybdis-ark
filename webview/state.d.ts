@@ -33,19 +33,20 @@ export interface PanelState {
     railMenu: boolean; stage: string; layersOpen: boolean; layersAsked: boolean; layerGripFocus?: number; pointingSlot: number; pointingSearch: string; pdKind: {slot: number; kind: number} | null;
     pdTaps: {slot: number; rows: Record<string, PdTap>} | null;
     pdAdvanced: boolean; applyDismissed: number; recoveryAsk: string | null; feedbackRow: string | undefined; comboPreview: {id: number; keys: number[]} | null; lightingGroupsShut: string[];
-    autocorrectSearch: string; autocorrectSort: 'replacement' | 'typed';
-    /** The row a replacement is being added in, or null: its kind, its text or macro slot, the typed forms made into chips and what is still in their field; `sent` once it is posted, the list it was posted against. */
-    autocorrectAdding: {kind: 'text' | 'macro'; text: string; macro: number | null; typed: string[]; draft: string; sent?: string} | null;
-    /** The part of an entry open for editing, by the entry's id: its replacement (`kind` once Text or Macro is picked there), the field for more typed forms, or one typed form's panel (`typo`, its stored letters); `sent` once an edit from it is posted, the list it was posted against. */
-    autocorrectEdit: {entry: string; part: 'replacement' | 'more' | 'typed'; typo?: string; kind?: 'text' | 'macro'; sent?: string} | null;
-    /** Whether the Export menu is open, and whether Try it is unfolded where the screen is too narrow to keep it beside the list. */
-    autocorrectExport: boolean; autocorrectTryOpen: boolean;
-    /** The core's answer to the text replacement edit being typed, for the form it is in ("add" or "entry"). */
+    /** The Text replacement screen's search, and the entry open in its editor, by its id (null: the first shown). */
+    autocorrectSearch: string; autocorrectEntry: string | null;
+    /** A replacement being made, or null: its kind and its text or macro slot. It joins the list with its first input; `sent` once that is posted, the list it was posted against. `shown` while its editor is the one open. */
+    autocorrectNew: {kind: 'text' | 'macro'; text: string; macro: number | null; shown: boolean; sent?: string} | null;
+    /** What is open in the editor of the entry with this id: Text or Macro picked there and not yet kept (`kind`), the field that adds inputs (`more`), or one input being written anew (`input`, with `typo`, its stored letters); `sent` once an edit from it is posted, the list it was posted against, and `follow`, the replacement the entry is then found under. */
+    autocorrectEdit: {entry: string; part: 'kind' | 'more' | 'input'; typo?: string; kind?: 'text' | 'macro'; sent?: string; follow?: {kind: 'text' | 'macro'; text: string; macro: number | null}} | null;
+    /** Whether the Export menu is open. */
+    autocorrectExport: boolean;
+    /** The core's answer to the text replacement edit being typed, for the field it is in ("replacement" or "input"). */
     autocorrectCheck: {form: string; requestId: number; error: string; warnings: string[]} | null;
     /** A list file being read, or read and waiting on Add or Replace: the request it answers, the file's name ('' for the starter list), and core's preview or why it could not be read. */
     autocorrectImport: {requestId: number; pending: boolean; name: string; starter: boolean; preview?: import('../contracts/messages.js').AutocorrectImportPreview; error?: string} | null;
-    /** The Try it box: the text that was there (`before`) and the keys typed since (`typed`, `\b` for Backspace), the Caps Lock it is tried under, and the core's last answer: the text the keyboard would leave, what fired, whether the last key undid a correction, the draft it was tried against and why it could not be. */
-    autocorrectTry: {before: string; typed: string; capsLock: boolean; text: string; fired: {entry: string; correction: string; typo: string; macro?: number}[]; undone: boolean; error: string; requestId: number; draft: string};
+    /** Try it: what its box holds (`text`, never changed by Ark), read as the text that was there (`before`) and the keys typed since (`typed`, `\b` for Backspace), the Caps Lock the preview is made under, and the core's last answer: the text the keyboard would leave (`shown`), what fired, where each replacement stands in it (`marks`), whether the last key undid one, the draft it was tried against and why it could not be. */
+    autocorrectTry: {before: string; typed: string; capsLock: boolean; text: string; shown: string; fired: import('../contracts/messages.js').AutocorrectTryResult['fired']; marks: import('../contracts/messages.js').AutocorrectTryResult['marks']; undone: boolean; error: string; requestId: number; draft: string};
     macroSlot: string | null; macroSearch: string; customKey: string | null; customKeySearch: string; macroForms: Record<string, MacroForm>;
     /** The slot tile held for a keyboard swap (D-L81): its bank and the key its screen picks it by. */
     heldSlot: {bank: string; key: string} | null;

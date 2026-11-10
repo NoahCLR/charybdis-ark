@@ -12,6 +12,7 @@ import {entriesForPickerSection, pickable, pickerSections} from "./picker-sectio
 import {shortcutModifiers, shortcutPick, shortcutPickDrop, shortcutPickKey, shortcutPickChord, shortcutPickModifier, shortcutPickMods, shortcutPickProblem} from "./custom-key.mjs";
 import {catalogEntry, keyIdentity, sameKey} from "./key-identity.mjs";
 import {vocabulary} from "./vocabulary.mjs";
+import {PICKER_BOARD} from "./picker-board.mjs";
 
 /**
  * @typedef {import("../../contracts/panel.js").PublishedModel | null} Model
@@ -88,10 +89,11 @@ export const dropKey = (picker, index) => picker.shortcut ? shortcutPickDrop(pic
     : {keys: picker.keys.filter((_, at) => at !== index)};
 
 // The sections a field offers: all of them, or, for one limited to some keys,
-// the keyboard and the sections holding one of them. A shortcut's Layers
+// the sections holding one of them, the keyboard among them (a field that
+// takes only macros opens on Macros). A shortcut's Layers
 // section holds its layer switches, not layer keycodes.
 /** @param {Model} model @param {Picker} picker */
-export const offeredSections = (model, picker) => pickerSections().filter(section => !picker.allowedKeys || section.kind === "board"
+export const offeredSections = (model, picker) => pickerSections().filter(section => !picker.allowedKeys || (section.kind === "board" && PICKER_BOARD.keys.some(key => pickAllowed(model, picker, key.value)))
     || (section.kind === "layers" && Boolean(picker.shortcut))
     || (section.kind === "macros" && (model?.macros || []).some(slot => pickAllowed(model, picker, slot.keycode)))
     || entriesForPickerSection(model?.qmkKeycodes || [], section).some(entry => pickAllowed(model, picker, entry.value)));

@@ -153,7 +153,7 @@ same saved settings.
 replacements, custom keys, pointing modes, lighting, settings and names share
 one space. **In use** counts what you have set up against what the keyboard
 holds, in the order of the rail's Configure screens and then Lighting:
-behaviours, tap counts, combos, macros, what is typed for text replacements,
+behaviours, tap counts, combos, macros, the inputs of text replacements,
 custom keys, pointing modes, LED sets and accents. Macro steps live in the
 same space, within a limit of their own, shown as **Macro memory**, and so
 does the text replacement list, shown as **Text replacement memory**. The bar turns orange from 90%, when the next edit may not

@@ -107,16 +107,16 @@ export type ReadProgress = ({source: 'layout' | 'profile'; progress: CountedProg
 export type MacroValidation = MacroInspection | {error: string; code: string};
 /** What an autocorrect edit would be refused for (`error`, '' when it would be taken) and what it would newly warn about. */
 export interface AutocorrectValidation {error: string; code: string; warnings: string[]}
-/** What the keyboard would leave on screen for a try: the text, the replacements that fired and still stand, in order (each its entry's id, its text or '' with the macro slot it played, and the typed form's stored letters), and whether the last key undid one. */
-export interface AutocorrectTryResult {text: string; fired: {entry: string; correction: string; typo: string; macro?: number}[]; undone: boolean}
+/** What the keyboard would leave on screen for a try: the text, the replacements that fired and still stand, in order (each its entry's id, its text or '' with the macro slot it played, and the input's stored letters), where each of those stands in the text (`marks`, by its offsets; a part deleted since is no longer marked), and whether the last key undid one. */
+export interface AutocorrectTryResult {text: string; fired: {entry: string; correction: string; typo: string; macro?: number}[]; marks: {entry: string; correction: string; typo: string; macro?: number; start: number; end: number}[]; undone: boolean}
 export type AutocorrectFileFormat = 'txt' | 'csv' | 'json';
 /** A line a list file or the list refused, and why; `line` is the file's line, row or entry number. */
 export interface AutocorrectImportRefused {line: number | null; text: string; reason: string}
-/** What importing a file one way would do: the list's size after it, the replacements it makes and the typed forms it adds to replacements the list has (each by its label, its text or its macro's name, with what is typed for it as written), how many typed forms it skips as already there, what it refuses, how many typed forms do not fit what the keyboard holds, and how many entries replacing takes away. */
+/** What importing a file one way would do: the list's size after it, the replacements it makes and the inputs it adds to replacements the list has (each by its label, its text or its macro's name, with its inputs as written), how many inputs it skips as already there, what it refuses, how many inputs do not fit what the keyboard holds, and how many entries replacing takes away. */
 export interface AutocorrectImportOutcome {
-    replacements: number; typed: number;
-    newReplacements: {label: string; typed: string[]}[];
-    addedTyped: {label: string; typed: string[]}[];
+    replacements: number; inputs: number;
+    newReplacements: {label: string; inputs: string[]}[];
+    addedInputs: {label: string; inputs: string[]}[];
     duplicates: number; refused: AutocorrectImportRefused[]; unfit: number; removed: number;
 }
 /** A list file read and judged both ways (core/model/autocorrect-import.js): what it holds, and what Add and Replace would each do. */

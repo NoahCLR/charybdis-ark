@@ -9,7 +9,7 @@ const {SETTING, shortcutIdentity, shortcutPresent} = require("../schema/settings
 const {decodedOf} = require("./portable-profile");
 const {settingsEditorView, COMBO_TIMING} = require("./settings-editor");
 const {macroEditorView} = require("./macro-editor");
-const {findTypo, macroCalled, pairEntries, typedForm} = require("./autocorrect-list");
+const {findTypo, macroCalled, pairEntries, inputForm} = require("./autocorrect-list");
 const {entryKey} = require("../schema/autocorrect-domain-v1");
 const {inspectMacroPlayback} = require("./macro-input");
 const {hostLayout} = require("../data/host-layouts");
@@ -459,7 +459,7 @@ function profileReview(before, after, capabilities) {
         item(AREA.macros, UNIT.macro(i), `${macroDefaultName(i)}${(next.name || old.name) ? ` · ${next.name || old.name}` : ""}`, fields(old), fields(next), {kind: "macro", index: i, keycode: macroName(i)}, [has(old), has(next)]);
     });
     // The text replacement list, an entry an item: its replacement, and each
-    // typed form as it is written. One that changed entries says where it
+    // input as it is written. One that changed entries says where it
     // went or came from; an entry whose replacement changed is one item, old
     // to new.
     for (const pair of pairEntries(a.autocorrect, b.autocorrect)) {
@@ -469,8 +469,8 @@ function profileReview(before, after, capabilities) {
         const fields = (entry, mine, theirs, twin, moved) => new Map(/** @type {[string, Field][]} */ (!entry ? [] : [["Replacement", replacement(entry, mine)],
             ...entry.typos.map(typo => {
                 const elsewhere = twin?.typos.some(row => row.typo === typo.typo) ? undefined : findTypo(theirs.autocorrect, typo.typo)?.entry;
-                return [`typo:${typo.typo}`, {label: "Typed", key: typo.match,
-                    text: `${typedForm(typo)}${elsewhere === undefined ? "" : ` · ${moved} “${replacement(elsewhere, theirs)}”`}`}];
+                return [`typo:${typo.typo}`, {label: "Input", key: typo.match,
+                    text: `${inputForm(typo)}${elsewhere === undefined ? "" : ` · ${moved} “${replacement(elsewhere, theirs)}”`}`}];
             })]));
         const old = pair.before, next = pair.after;
         const shown = next ? replacement(next, b) : replacement(/** @type {import("../schema/autocorrect-domain-v1.js").Entry} */ (old), a);

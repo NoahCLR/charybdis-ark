@@ -232,25 +232,25 @@ export const macroMessage = (keycode, payload, identity, fields) => ({type: "upd
 /** @param {string} keycode @param {string} payload @param {number} requestId @returns {import("../../contracts/edits.js").EditOf<'validateMacro'>} */
 export const macroValidationMessage = (keycode, payload, requestId) => ({type: "validateMacro", keycode, payload, requestId});
 // The text replacement list (firmware D-F68, where a replacement is a
-// correction and a typed form a typo; the edits keep those names). A
-// replacement is named by its text or by the macro slot it plays; a typed
-// form is posted as it is written, with `*` where other letters may go. Core
+// correction and an input a typo; the edits keep those names). A
+// replacement is named by its text or by the macro slot it plays; an input
+// is posted as it is written, with `*` where other letters may go. Core
 // trims and folds what is typed, reads the `*`, and judges every edit; a
 // refusal comes back in words.
 /** @typedef {import("../../contracts/edits.js").AutocorrectReplacement} AutocorrectReplacement */
-// Typed forms for a replacement: the entry is made when the list has none of
+// Inputs for a replacement: the entry is made when the list has none of
 // that text or macro, else they are added to it.
 /** @param {AutocorrectReplacement} replacement @param {readonly string[]} typed @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'addAutocorrectTypos'>} */
-export const addAutocorrectTyped = (replacement, typed, identity) => ({type: "addAutocorrectTypos", ...replacement,
+export const addAutocorrectInputs = (replacement, typed, identity) => ({type: "addAutocorrectTypos", ...replacement,
     typos: typed.map((typo) => ({typo})), expectedFingerprint: identity});
 // A replacement changed where it stands: to other text, or to a macro.
 /** @param {AutocorrectReplacement} replacement @param {AutocorrectReplacement} to @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'updateAutocorrectCorrection'>} */
 export const changeAutocorrectReplacement = (replacement, to, identity) => ({type: "updateAutocorrectCorrection", ...replacement,
     ...(to.macro === undefined ? {to: to.correction} : {toMacro: to.macro}), expectedFingerprint: identity});
-// One typed form, named by its stored letters: written anew, or moved to
+// One input, named by its stored letters: written anew, or moved to
 // another replacement, made when the list has none such.
 /** @param {string} typo @param {{to?: string, replacement?: AutocorrectReplacement}} change @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'updateAutocorrectTypo'>} */
-export const changeAutocorrectTyped = (typo, change, identity) => ({type: "updateAutocorrectTypo", typo,
+export const changeAutocorrectInput = (typo, change, identity) => ({type: "updateAutocorrectTypo", typo,
     ...(change.to === undefined ? {} : {to: change.to}), ...(change.replacement ?? {}), expectedFingerprint: identity});
 /** @param {string} typo @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'deleteAutocorrectTypo'>} */
 export const deleteAutocorrectTypo = (typo, identity) => ({type: "deleteAutocorrectTypo", typo, expectedFingerprint: identity});

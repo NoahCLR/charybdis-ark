@@ -374,13 +374,13 @@ test("the behaviour, combo and auto-mouse switches say keyboard keys change them
 // stored with the swaps (firmware settings-domain.md) and drawn on the Host
 // screen as a section of its own (D-L87), edited through the keyboard's own
 // mask.
-test("the text replacement switch is a Settings section of its own, linked to the screen that holds its list, and edits only its key option", () => {
+test("the text replacement switch is a Settings section of its own, saying where its list is as the combo switch does, and edits only its key option", () => {
     const current = withSettings(settings => {settings.values[24] = 0x0004;});
     const sections = settingsEditorView(current).sections;
     const section = sections.find(({id}) => id === "autocorrect");
-    assert.deepEqual([section.area, section.label, section.screenLink], ["Settings", "Text replacement", {label: "Edit replacements", screen: "autocorrect"}]);
+    assert.deepEqual([section.area, section.label], ["Settings", "Text replacement"]);
     assert.deepEqual(section.fields.map(field => [field.macro, field.kind, field.label, field.enabled, Boolean(field.readOnly)]), [["autocorrect", "toggle", "Enabled", false, false]]);
-    assert.match(section.fields[0].hint, /fixes typos and types your replacements when you finish a word/);
+    assert.equal(section.fields[0].hint, "Off, the keyboard types every word as you typed it and keeps your list. Replacements and their inputs are in Text replacement.");
     // AC_ON, AC_OFF and AC_TOGG override it until the keyboard restarts
     // (firmware D-F66), so it says so and names its switch.
     assert.deepEqual([section.fields[0].keyboardKeys, section.fields[0].offSwitch], [true, "autocorrect"]);

@@ -168,6 +168,6 @@ function usageCard(usage) {
             ${usage.replacements ? `<div data-usage="replacements"><div class="sect-h"><h4>Text replacement memory</h4>
                 <span class="right note">${esc(bytes(usage.replacements.used))} of ${esc(bytes(usage.replacements.capacity))} bytes used</span></div>
                 <div class="meter">${meterFill(usage.replacements.share * 100)}</div>
-                <p class="note meter-note">Replacements and what is typed for them are part of the profile above, within their own limit, and listed on Text replacement.</p></div>` : ""}
+                <p class="note meter-note">Replacements and their inputs are part of the profile above, within their own limit, and listed on Text replacement.</p></div>` : ""}
         </div></div>`;
 }

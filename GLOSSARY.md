@@ -150,28 +150,32 @@ typo fixed, longer text typed, a macro played. It is the name on the rail,
 the screen, the Host card, the Memory panel, the picker and every message.
 The keyboard, its firmware and its keys call it **autocorrect**, and Ark's
 code, contracts, screen id, domain name and files keep that name
-(`autocorrect`, `AC_ON`, `core/model/autocorrect-*.js`); the picker's help
-and the guide say "autocorrect" once, so a search for it finds the feature.
+(`autocorrect`, `AC_ON`, `core/model/autocorrect-*.js`); the guide says
+"autocorrect" once, and the picker's search keeps QMK's words for its keys,
+so a search for it finds the feature.
 _Avoid_: autocorrect (in anything a person reads, but for that one mention),
 text expansion, snippets, shortcut (a custom key's)
 
 **Replacement**:
-What an entry of the text replacement list puts in place of what was typed:
+What an entry of the text replacement list puts in place of its input:
 a line of text of up to 128 bytes, or a macro, named by its slot and shown by
 its name. Stored once. The firmware and Ark's code call it a `correction`.
 _Avoid_: correction (in anything a person reads), word, expansion, output
 
-**Typed** (a typed form):
+**Input**:
 What is typed to get a replacement: one word of letters and digits, a
-misspelling or an abbreviation such as `pnumber`. A column, a count and a
-label read **Typed** ("12 typed"); a sentence says "a typed form" or "what is
-typed for it". It belongs to one replacement. The firmware and Ark's code
-call it a `typo`.
-_Avoid_: typo (as the term; a misspelling is still a typo, and "common typo
-fixes" says so), variation, trigger, abbreviation (as the term), pattern
+misspelling or an abbreviation such as `pnumber`. A replacement has one or
+more. A heading, a count and a label read **Inputs** ("15 of 1,024 inputs",
+"+ Input"), a sentence says "an input" or "its inputs", and a list file names
+them `inputs`. It belongs to one replacement. The firmware and Ark's code
+call it a `typo`, on the wire as in the identifiers.
+_Avoid_: typed, typed form, what is typed for it (Ark's words before; a file
+that says `typed` is still read), typo (as the term; a misspelling is still a
+typo, and "common typo fixes" says so), variation, trigger, abbreviation (as
+the term), pattern
 
-**`*`** (in a typed form):
-Where other letters may go. A typed form is the whole word unless it is
+**`*`** (in an input):
+Where other letters may go. An input is the whole word unless it is
 written with one: `recieve*` the start of a word, `*mnet` the end, `*tihng*`
 anywhere in one (D-L84). It is how Ark writes, shows and takes the four
 matches the keyboard stores; no control, label or message names a match.
@@ -179,13 +183,16 @@ _Avoid_: whole word, start of word, end of word, anywhere (as a choice or a
 label), match type, wildcard, boundary
 
 **Try it**:
-The box on the Text replacement screen that is typed in as on the keyboard
-and shows what the computer would end with, under the draft's list and host
-layout. It runs the keyboard's own rules over text (D-L86), so it shows the
-replacements and the undo, and nothing that needs a key or a timing: a
-shortcut, a cursor key, a held key, a macro key. For a replacement that plays
-a macro it says which, and shows the macro's text when that is all it is.
-_Avoid_: preview (for this), simulator, test box
+The last section of a replacement's editor on the Text replacement screen: a
+box to type in, which Ark never changes, and under it the **preview**, that
+text as the keyboard would type it once the draft is applied, under the
+draft's list and host layout, each replaced part marked. It runs the
+keyboard's own rules over text (D-L86), so the preview shows the replacements
+and the undo, and nothing that needs a key or a timing: a shortcut, a cursor
+key, a held key, a macro key. For a replacement that plays a macro it says
+which, and shows the macro's text when that is all it is.
+_Avoid_: simulator, test box; preview (for the section: the preview is the
+line under its box)
 
 **Area**:
 The part of the profile Review groups its changes under, mostly one screen's,

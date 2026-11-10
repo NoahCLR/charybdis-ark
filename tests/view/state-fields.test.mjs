@@ -41,13 +41,13 @@ test("a draft change resets forms, applies each field's rule to the state before
 
 // Every field of the panel's state, by what a draft change does to it. A new
 // field joins one of these lists, so its decision is made in review.
-const RESETS = ["retarget", "timingRefusal", "pdKind", "pdTaps", "lastTake", "accent", "accentShown", "heldSlot", "autocorrectAdding", "autocorrectEdit", "autocorrectCheck", "autocorrectImport"];
+const RESETS = ["retarget", "timingRefusal", "pdKind", "pdTaps", "lastTake", "accent", "accentShown", "heldSlot", "autocorrectNew", "autocorrectEdit", "autocorrectCheck", "autocorrectImport"];
 const CUSTOM = ["combo", "macroForms"];
 const KEPT = [
     "screen", "layer", "layersOn", "layerGripFocus", "selected", "tab", "behaviourRow", "behaviourRowShown", "behaviourRoute",
     "reachGroups", "resetBenchHeight", "reachRow", "cell", "cellRow", "reveal", "pickCombo", "settingsOpen", "flashPausesAsked", "foldsOpen", "emptyLayersShown", "allSlotsShown", "checkGroupsOpen", "cellHow", "placement",
     "macroClipboard", "keyClipboard", "stage", "railMenu", "layersOpen", "layersAsked", "pointingSlot", "pointingSearch", "pdAdvanced", "applyDismissed", "recoveryAsk", "feedbackRow", "comboPreview", "lightingGroupsShut",
-    "macroSlot", "macroSearch", "autocorrectSearch", "autocorrectSort", "autocorrectTry", "autocorrectTryOpen", "autocorrectExport", "customKey", "customKeySearch", "recording", "recordDelays", "recordPreserveHoldTiming", "recordDelayThreshold",
+    "macroSlot", "macroSearch", "autocorrectSearch", "autocorrectEntry", "autocorrectTry", "autocorrectExport", "customKey", "customKeySearch", "recording", "recordDelays", "recordPreserveHoldTiming", "recordDelayThreshold",
     "recordDelayRound", "overlay", "leaveDemo", "modeAsk", "confirmChecks",
     "picker", "notice", "error", "settingsDurationUnits",
 ];
@@ -80,8 +80,8 @@ test("a draft change resets the existing forms and preserves historically kept p
         accent: {stage: "layers", target: "layer", every: false, index: 0, leds: [1, 4], adding: true, colour: {h: 10, s: 20, v: 30}, stageColour: false},
         accentShown: {stage: "layers", key: "layer:0"},
         macroForms: {MACRO_0: {draft: "unstaged", stepError: "bad"}},
-        autocorrectEdit: {entry: "the", part: "typed", typo: "teh"}, autocorrectAdding: {kind: "text", text: "then", macro: null, typed: ["tehn"], draft: "thn"},
-        autocorrectCheck: {form: "add", requestId: 3, error: "", warnings: []},
+        autocorrectEdit: {entry: "the", part: "input", typo: "teh"}, autocorrectNew: {kind: "text", text: "then", macro: null, shown: true},
+        autocorrectCheck: {form: "input", requestId: 3, error: "", warnings: []},
     });
     openComboBuilder({id: 4, inputs: ["KC_A", "KC_B"], output: "KC_C", termMs: 40, followsDefault: false, enabled: true, allowedLayers: 1});
     state.combo.picking = true;
@@ -92,7 +92,7 @@ test("a draft change resets the existing forms and preserves historically kept p
     for (const name of Object.keys(standing)) assert.equal(state[name], references[name], `${name} is kept as it was`);
     for (const name of RESETS) assert.equal(state[name], null, `${name} starts again`);
     assert.deepEqual(state.macroForms, {});
-    assert.equal(state.autocorrectAdding, null, "the row being added closes");
+    assert.equal(state.autocorrectNew, null, "the replacement being made is let go");
     assert.equal(state.combo.open, false, "the combo builder closes");
     assert.equal(state.combo.picking, false);
     assert.equal(state.combo.form.allowedLayers, 0b111, "and starts again on every layer of the keyboard");

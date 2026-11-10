@@ -107,10 +107,10 @@ test("the switch keys for behaviours and auto-mouse are offered beside those for
     assert.deepEqual(switches.entries.slice(6).map((entry) => entry.keycode), [0x7ee0, 0x7ee1, 0x7ee2, 0x7ef0, 0x7ef1, 0x7ef2]);
     assert.ok(switches.entries.every(pickable));
     // QMK's keys for autocorrect are worded as the feature is here, and a
-    // search for either name finds them: their own name is in their help.
+    // search for either name finds them: QMK's own words stay search terms.
     const replacement = switches.entries.slice(3, 6);
-    assert.ok(replacement.every((entry) => /text replacement \(autocorrect\)/.test(entry.tip) && entry.search.includes("autocorrect") && entry.search.includes("text replacement") && entry.aliases.some((alias) => alias.startsWith("AC_"))));
-    assert.deepEqual(switches.entries.slice(0, 3).map((entry) => entry.tip), [undefined, undefined, undefined], "the combo keys keep QMK's words");
+    assert.ok(replacement.every((entry) => entry.search.includes("autocorrect") && entry.search.includes("text replacement") && entry.aliases.some((alias) => alias.startsWith("AC_"))));
+    assert.deepEqual(switches.entries.map((entry) => entry.tip), Array(12).fill(undefined), "no switch key has help of its own: each tile says its keycode, as every catalogue key's does");
 });
 
 test("a section's groups tell its keys apart by keycode, and a custom key by whether it has a name", () => {

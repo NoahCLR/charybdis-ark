@@ -9,7 +9,7 @@ export type TimingSource = 'tappingTerm' | TimingTerm;
 /** A macro step's kind (glossary "Macro step"). */
 export type MacroStepKind = 'text' | 'tap' | 'delay' | 'press' | 'release';
 /** What a profile holds that the keyboard counts against a limit (core/model/profile-usage.js). */
-export type UsageCountId = 'behaviours' | 'behaviourSteps' | 'combos' | 'lightingGroups' | 'lightingGroupRows' | 'macros' | 'autocorrectTyped' | 'customKeys' | 'pointingModes';
+export type UsageCountId = 'behaviours' | 'behaviourSteps' | 'combos' | 'lightingGroups' | 'lightingGroupRows' | 'macros' | 'autocorrectInputs' | 'customKeys' | 'pointingModes';
 
 /** Device operation identity is stable when presentation words change. */
 export type PhaseId = 'idle' | 'available' | 'empty' | 'connected' | 'demo' | 'enumerate' | 'connect' | 'refresh' | 'starting' | 'read-layout' | 'read-profile' | 'read-complete' | 'restore-complete' | 'disconnect' | 'read-combos' | 'read-base-rgb' | 'live-edit' | 'live-save' | 'live-revert' | 'edit-mode' | 'restart';
@@ -411,8 +411,6 @@ export interface SettingsSection {
     description?: string;
     warning?: string;
     githubLink?: {label: string; url: string};
-    /** A screen that edits what the section switches, by its id, and the words of the link to it. */
-    screenLink?: {label: string; screen: string};
     /** The words for the section's one-per-layer switches, shown together as one row of layers. */
     layerGroup?: {label: string; hint: string};
     fields: SettingField[];

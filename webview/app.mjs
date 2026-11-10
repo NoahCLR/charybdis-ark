@@ -34,7 +34,7 @@ import {screenBehaviours, screenCombos, screenHost, screenPointer} from "./ui/se
 import {screenPointing} from "./ui/pointing.mjs";
 import {screenMacros} from "./ui/macros.mjs";
 import {receiveMacroValidation} from "./ui/macros/validation.mjs";
-import {receiveAutocorrectImport, receiveAutocorrectTry, receiveAutocorrectValidation, screenAutocorrect} from "./ui/autocorrect.mjs";
+import {closeAutocorrectImport, receiveAutocorrectImport, receiveAutocorrectTry, receiveAutocorrectValidation, screenAutocorrect} from "./ui/autocorrect.mjs";
 import {reconcileRecording} from "./ui/macros/recorder.mjs";
 import {macroClipboardShortcut, macroHistoryShortcut} from './ui/macros/history.mjs';
 import {macroStepShortcut} from "./ui/macros/steps.mjs";
@@ -247,6 +247,8 @@ addEventListener("keydown", (event) => {
     // sits over everything below, so it answers before any of them.
     const proposal = getModel()?.liveProposal;
     if (proposal) { post(controls.cancelLiveEdit(proposal.id)); return; }
+    // Esc on a list file's summary is its Cancel.
+    if (state.screen === "autocorrect" && closeAutocorrectImport()) return;
     // Esc on the backup's comparison is its Cancel, unless it is busy.
     const portable = getModel()?.portable;
     if (portable?.review && state.screen === "profile") {

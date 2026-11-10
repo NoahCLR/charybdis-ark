@@ -521,12 +521,12 @@ function catalogViews() {
     const entries = [];
     /** @type {Record<string, string>} */
     const labels = {};
-    /** @type {Readonly<Record<string, {label: string, tip: string} | undefined>>} */
+    /** @type {Readonly<Record<string, string | undefined>>} */
     const reworded = TEXT_REPLACEMENT_KEYS;
     for (const entry of keycodeCatalog.entries()) {
         // A key Ark words its own way keeps QMK's words among its search
         // terms, so either name finds it.
-        const own = reworded[entry.name], label = own?.label ?? entry.label;
+        const own = reworded[entry.name], label = own ?? entry.label;
         const searchTerms = [entry.name, label, ...(own ? [entry.label] : []), ...entry.aliases].filter(Boolean);
         entries.push({
             value: entry.name,
@@ -538,7 +538,6 @@ function catalogViews() {
             searchTerms,
             search: searchTerms.join(" ").toLowerCase(),
             searchCompact: searchTerms.join("").toLowerCase(),
-            ...(own ? {tip: own.tip} : {}),
         });
         labels[entry.name] = label;
         for (const alias of entry.aliases) {

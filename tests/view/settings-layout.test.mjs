@@ -62,7 +62,6 @@ test("a section is edited on the screen that draws it", () => {
     // Settings screen's (D-L87): no section is edited anywhere else.
     assert.equal(screenOfSection("autocorrect"), "host");
     assert.equal(byId("autocorrect").area, "Settings", "core files it under Settings by the same id");
-    assert.deepEqual(byId("autocorrect").screenLink, {label: "Edit replacements", screen: "autocorrect"}, "and links to the screen that holds its list");
 });
 
 test("Key swaps & typing lists its fields under what they change", () => {
