@@ -679,7 +679,7 @@ function trySection(model, list) {
     const tried = state.autocorrectTry;
     const card = el(`<div class="card editor-section" data-ac-try>
         <div class="card-h"><h3>Try it</h3>
-            <button class="btn tiny ghost right" data-act="ac-try-clear">Clear</button></div>
+            <button class="btn tiny ghost destructive right" data-act="ac-try-clear" data-tip="Empty the box and its preview.">Clear</button></div>
         <div class="card-b stack">
             <textarea class="input ac-try-box" data-f="autocorrect:try:text" rows="2" aria-label="Type here to try your list" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Type here: teh, then a space.">${esc(tried.text)}</textarea>
             ${model?.autocorrectRunning ? `<p class="note" data-ac-try-running>Your keyboard is replacing as you type here too. The preview shows this draft.</p>` : ""}
