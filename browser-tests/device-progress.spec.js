@@ -66,7 +66,9 @@ for (const {screen, source, initial} of [
                 // Running compiled defaults: status must identify the bytes
                 // served below, including the check after the last chunk.
                 for (const offset of [4, 8, 12]) identity.writeUInt32LE(core.profileBlob.fnv1a32(bytes), offset);
-                const page = report[4];
+                // A page number is 16 bits (profile-wire-v1.js buildProfileGetRequest):
+                // the profile is past 255 pages of 25 bytes.
+                const page = report[4] | (report[5] << 8);
                 const payload = report[2] === 2 ? (page ? core.Buffer.alloc(25) : identity)
                     : page ? bytes.subarray((page - 1) * 25, page * 25) : metadata;
                 const response = core.Buffer.from(report); response.fill(0, 5);

@@ -48,10 +48,15 @@
 // A bare modifier key (KC_LEFT_CTRL to KC_RIGHT_GUI) is a plain key: it taps
 // itself, a lone tap included, and holds itself as a fallback.
 //
+// A pointing mode's lock key (PD_MODE_n_LOCK) and a switch key (CM_ON …
+// AM_TOGG, firmware D-F66) tap themselves too, so an empty Tap locks the mode
+// or switches, and hold nothing of their own, so held they act on release, as
+// a macro plays (action_kind_registry_list.h, DEFAULT_TAP_USES_ACTION_KEYCODE).
+//
 // The keyboard owns the gesture timing of authored LT(), MT() and OSM() rows
 // (physical gesture timing and runtime-owned tapping).
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
-const {keycodeAction} = require("../schema/actions");
+const {isSwitchKey, keycodeAction} = require("../schema/actions");
 const {customKeyOfCode} = require("../data/user-keycodes");
 const {pdModeKeyOfCode} = require("../data/pd-mode-keys");
 const {QK, inBlock, BASIC_KEYS, MOD_MASK, TRANSPARENT, keyOf, modsOf, layerFormLayer, layerTapLayer} = require("../../rules/qmk-keycodes.mjs");
@@ -112,6 +117,7 @@ function keyActions(target, {customKeyShortcuts = []} = {}) {
     if (target?.kind === ACTION.MACRO) return {tap: target, releaseTaps: true};
     if (target?.kind === ACTION.LAYER_MOMENTARY) return {hold: target, fromPress: true};
     if (target?.kind === ACTION.POINTING_MODE_MOMENTARY) return {hold: target, fromPress: true};
+    if (target?.kind === ACTION.POINTING_MODE_LOCK) return {tap: target, releaseTaps: true};
     if (target?.kind !== ACTION.QMK_KEYCODE || !Number.isInteger(target.operand)) return {};
     const code = target.operand;
     if (inBlock(code, QK.MACRO)) return {tap: keycodeAction(code), releaseTaps: true};
@@ -127,6 +133,7 @@ function keyActions(target, {customKeyShortcuts = []} = {}) {
     if (inBlock(code, QK.MOMENTARY)) return {hold: {kind: ACTION.LAYER_MOMENTARY, operand: layerFormLayer(code)}, fromPress: true};
     if (inBlock(code, QK.LAYER_MOD)) return {hold: keycodeAction(code), fromPress: true};
     if (pdModeKeyOfCode(code)?.locked === false) return {hold: keycodeAction(code), fromPress: true};
+    if (pdModeKeyOfCode(code)?.locked || isSwitchKey(code)) return {tap: keycodeAction(code), releaseTaps: true};
     if (inBlock(code, QK.ONE_SHOT_MOD)) {
         return {tap: keycodeAction(code), hold: keycodeAction((code & MOD_MASK) << 8)};
     }

@@ -12,6 +12,18 @@ const coversNumbers = (list, values, label) => assert.deepEqual(list.map(([id]) 
 
 test("every stored enum value has a word", () => {
     coversNumbers(VOCABULARY.macroProtection, require("../../core/schema/macro-payload").MACRO_PROTECTION, "macro protection");
+    // Where an input matches is written, not worded: with * where other
+    // letters may go, one way for each stored value.
+    assert.deepEqual(Object.values(require("../../core/schema/autocorrect-domain-v1").AUTOCORRECT_MATCH).map(match => require("../../core/model/autocorrect-list").inputForm({typo: "x", match})),
+        ["x", "x*", "*x", "*x*"], "where a text replacement's input matches");
+    // What a replacement is, text or a macro, has a word for each stored kind.
+    assert.deepEqual(VOCABULARY.replacementKinds.map(([id]) => id.toUpperCase()).sort(), Object.keys(require("../../core/schema/autocorrect-domain-v1").AUTOCORRECT_KIND).sort(), "replacement kinds");
+    // A list's file formats: the runtime list, the contract's union and the words agree.
+    const {contractUnion} = require("../fixtures/contract-unions");
+    const formats = [...require("../../core/model/autocorrect-import").AUTOCORRECT_FILE_FORMATS];
+    assert.deepEqual(VOCABULARY.listFileFormats.map(([id]) => id), formats, "list file formats, in the order Export offers them");
+    assert.deepEqual(contractUnion("messages.d.ts", "AutocorrectFileFormat"), formats);
+    assert.ok(VOCABULARY.listFileFormats.every(([, words]) => words && !/autocorrect/i.test(words)));
     covers(VOCABULARY.holdStyles.hold, KEY_BEHAVIOR_HOLD_STYLES, "hold styles under Hold");
     covers(VOCABULARY.holdStyles.long, KEY_BEHAVIOR_HOLD_STYLES, "hold styles under Long hold");
     covers(VOCABULARY.holdWithoutLongHold, KEY_BEHAVIOR_HOLD_STYLES, "holds without a long hold");
@@ -21,6 +33,7 @@ test("every stored enum value has a word", () => {
     covers(VOCABULARY.fadeModes, rgb.RGB_AUTOMOUSE_MODES, "auto-mouse fades");
     covers(VOCABULARY.tapCommit, rgb.RGB_TAP_COMMIT_MODES, "tap commit");
     covers(VOCABULARY.feedbackOwners, rgb.RGB_KEY_SEMANTICS, "feedback owners");
+    covers(VOCABULARY.replacementOwners, rgb.RGB_AUTOCORRECT_SEMANTICS, "what replacement feedback flashes for");
     assert.deepEqual(VOCABULARY.stages.filter((stage) => stage.bit).map((stage) => stage.bit).sort(), Object.values(rgb.RGB_STAGE_BITS).sort(), "stages");
     coversNumbers(VOCABULARY.pointing.kinds, pd.PD_KIND, "pointing kinds");
     coversNumbers(VOCABULARY.pointing.axes, pd.PD_AXIS, "axes");
@@ -32,6 +45,8 @@ test("every stored enum value has a word", () => {
     coversNumbers(VOCABULARY.pointing.scrollAxes, pd.PD_SCROLL_AXES, "scroll axes");
     coversNumbers(VOCABULARY.pointing.modifierPolicy, pd.PD_MODIFIERS, "modifier policy");
     coversNumbers(VOCABULARY.customKeys.layerKinds, require("../../core/schema/settings-domain-v1").SHORTCUT_LAYER_KINDS, "how a custom key's shortcut turns its layers on");
+    const {AUTO_MOUSE_SWITCH_KEYS, BEHAVIOR_SWITCH_KEYS} = require("../../core/data/user-keycodes");
+    assert.deepEqual(Object.keys(VOCABULARY.switchKeys), [...BEHAVIOR_SWITCH_KEYS, ...AUTO_MOUSE_SWITCH_KEYS], "each switch key for behaviours, then for auto-mouse, in its block's order");
     assert.deepEqual(VOCABULARY.pointing.directions.map(([id]) => id), pd.DIRECTIONS, "directions, in the record's order");
     assert.deepEqual(VOCABULARY.pointing.diagonals.map(([id]) => id), pd.DIAGONALS, "diagonals, in the record's order");
     coversNumbers(VOCABULARY.physicalHalves, require("../../core/protocol/flash-pauses-v1").FLASH_PAUSES_V1.PHYSICAL_HALVES, "physical halves");
@@ -76,15 +91,33 @@ test("Import's summary names only settings sections the keyboard's model publish
 });
 
 test("every accent table has its words, by the target its edits name, and an owner standing for all of it where it has one", () => {
-    const {RGB_EVERY_OWNER, RGB_KEY_SEMANTICS} = require("../../core/schema/rgb-domain-v1");
-    assert.deepEqual(Object.keys(VOCABULARY.accents), ["layer", "pdMode", "combo", "keyBehavior"]);
+    const {RGB_AUTOCORRECT_SEMANTICS, RGB_EVERY_OWNER, RGB_KEY_SEMANTICS} = require("../../core/schema/rgb-domain-v1");
+    assert.deepEqual(Object.keys(VOCABULARY.accents), ["layer", "pdMode", "combo", "keyBehavior", "autocorrect"]);
     for (const [target, {everyOwner, ...words}] of Object.entries(VOCABULARY.accents)) {
         assert.ok(words.when && words.stageColour && words.every, `${target} says when its accents light, what lighting for all of it is called and what the stage's colour is`);
         assert.equal(everyOwner, RGB_EVERY_OWNER[/** @type {keyof typeof RGB_EVERY_OWNER} */ (target)], "the owner core reads and writes for all of it, which combo's table has none of");
         assert.doesNotMatch(Object.values(words).join(" "), /group|override|row/i, "in the words a person uses (D-L77)");
     }
-    assert.ok(Object.hasOwn(RGB_KEY_SEMANTICS, RGB_EVERY_OWNER.keyBehavior), "every feedback state is the key semantic for all of them");
-    for (const owner of Object.values(VOCABULARY.feedbackColourOwners)) assert.ok(Object.hasOwn(RGB_KEY_SEMANTICS, owner), `${owner} is a key feedback state the keyboard knows`);
+    assert.ok(Object.hasOwn(RGB_KEY_SEMANTICS, RGB_EVERY_OWNER.keyBehavior), "every behaviour state is the key semantic for all of them");
+    for (const owner of Object.values(VOCABULARY.feedbackColourOwners)) assert.ok(Object.hasOwn(RGB_KEY_SEMANTICS, owner), `${owner} is a behaviour state the keyboard knows`);
+    assert.ok(Object.hasOwn(RGB_AUTOCORRECT_SEMANTICS, RGB_EVERY_OWNER.autocorrect), "every replacement flash is the replacement semantic for all of them");
+    // Replacement feedback's colours in the order the keyboard stores them,
+    // each naming its own case: every case but the one that is all of them.
+    assert.deepEqual(Object.keys(VOCABULARY.replacementColourOwners), ["textColor", "macroColor", "undoColor"]);
+    assert.deepEqual(Object.values(VOCABULARY.replacementColourOwners).map(owner => RGB_AUTOCORRECT_SEMANTICS[owner]), [0, 1, 2]);
+});
+
+test("replacement feedback is named for what a person calls the feature, and never autocorrect", () => {
+    const stage = VOCABULARY.stages.at(-1);
+    assert.deepEqual(stage, {id: "autocorrect", label: "Replacement feedback", bit: rgb.RGB_STAGE_BITS.AUTOCORRECT}, "the last stage painted, by the firmware's name for it in code and Ark's on screen");
+    assert.deepEqual(VOCABULARY.replacementOwners.map(([, words]) => words), ["Every replacement flash", "Replaced with text", "Replaced by a macro", "Replacement undone"]);
+    const read = [...VOCABULARY.replacementOwners.map(([, words]) => words), stage.label, ...Object.values(VOCABULARY.colourOff.autocorrect), ...Object.values(VOCABULARY.lightingLists.replacements),
+        VOCABULARY.accents.autocorrect.when, VOCABULARY.accents.autocorrect.every, VOCABULARY.accents.autocorrect.stageColour];
+    for (const words of read) assert.doesNotMatch(words, /autocorrect|typo|correction|typed form/i, words);
+    // Off is the colour editor's own word: a case switched off does not flash.
+    assert.equal(VOCABULARY.colourOff.autocorrect.offAction, undefined);
+    assert.equal(VOCABULARY.colourOff.autocorrect.offWord, undefined);
+    assert.match(VOCABULARY.colourOff.autocorrect.offNote, /does not flash/);
 });
 
 test("an accent's LEDs read by index, a run of three or more as a range", () => {
@@ -234,9 +267,9 @@ test("every layer key that acts on its layer alone has the words its name reads 
     assert.deepEqual([VOCABULARY.layerKeyVerbs.MO, VOCABULARY.layerKeyVerbs.TG, VOCABULARY.layerKeyVerbs.LOCK_LAYER], ["Hold", "Lock", "Lock"]);
 });
 
-test("each key feedback state a behaviour tier flashes for is marked with that tier", () => {
+test("each behaviour state a behaviour tier flashes for is marked with that tier", () => {
     const names = Object.keys(rgb.RGB_KEY_SEMANTICS);
-    assert.ok(Object.keys(VOCABULARY.feedbackTiers).every((name) => names.includes(name)), "only feedback states have a tier");
+    assert.ok(Object.keys(VOCABULARY.feedbackTiers).every((name) => names.includes(name)), "only behaviour states have a tier");
     assert.deepEqual(Object.values(VOCABULARY.feedbackTiers).sort(), Object.keys(VOCABULARY.tiers).sort(), "one state per tier");
     assert.deepEqual(VOCABULARY.feedbackTiers, {KEY_FEEDBACK_GROUP_TAP_COMMITTED: "tap", KEY_FEEDBACK_GROUP_HOLD_ACTIVE: "hold", KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE: "long"});
 });

@@ -146,6 +146,11 @@ them:
 - `scripts/generate-host-layouts.js` (`npm run host-layouts`) regenerates
   `core/data/host-layouts.json` from the pinned firmware fixture;
   `tests/data/host-layouts.test.js` checks it still reproduces.
+- `scripts/generate-autocorrect-words.js` (`npm run autocorrect-words`)
+  regenerates `core/data/autocorrect-words.json`, the characters an
+  autocorrect typo may hold and what each folds to, from the pinned firmware
+  fixture; `tests/data/autocorrect-words.test.js` checks it still reproduces.
+  `npm run upstream` runs both generators.
 
 node-hid is an optional dependency, so a native build that fails never stops
 the page's `npm ci`; without it the probe says so and stops. Which adapter
@@ -243,7 +248,10 @@ durability, split scheduling or a physical interruption. A successful
 Run `npm run preview`, serve the folder (`node scripts/serve.js . --port 8972`)
 and open `preview/index.html`. The page stands in for the web shell: it
 answers the panel's `ready` with one fixture model, turns the theme toggle,
-and logs every edit posted back. `?shell=` answers in other states (no
+and logs every edit posted back. It applies none of them. Two checks it does
+answer, by the production rules, since their screens wait on them: a macro's
+steps, and a text replacement edit, which the Text replacement screen posts
+only once its check has passed (`scripts/preview-macro-shell.mjs`). `?shell=` answers in other states (no
 keyboard, a browser without WebHID, the demo, a live keyboard; each is
 commented in `scripts/preview.js`), `?theme=light` starts in the light theme,
 and `?screen=lighting` opens a screen. `npm run preview -- --multiple` adds a
@@ -555,6 +563,6 @@ What can break Ark, and what checks it:
 | Stored profile format (blob, domains, settings, compiled defaults) | firmware `lib/profile/schema/` | schema version | the bridge's runners; agreement (fixtures equal) |
 | Action vocabulary and action-ABI digest | firmware, and BK keycode values | digest against `KNOWN_ACTION_ABIS` | agreement |
 | Keycode catalog and layout | BK | Ark's pinned BK inputs | agreement (files equal at firmware's BK pin); `npm run keycodes -- --check` |
-| Keymap and macro domains | firmware profile codecs and config | domain versions and capability capacities | golden codecs; candidate and macro-domain runners |
+| Keymap, macro and autocorrect domains | firmware profile codecs and config | domain versions and capability capacities | golden codecs; candidate, macro-domain and autocorrect-domain runners |
 | Keyboard options (RGB effects and order, LED flags) | BK's RGB matrix and firmware config | reported at runtime | `qmk_portable_editor` runner |
 | Behaviour on the keyboard | firmware | nothing | keyboard checks only |

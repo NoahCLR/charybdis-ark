@@ -21,7 +21,7 @@ export const LAYER_ORDER_UNIT = "layerOrder", OTHER_KEY_OPTIONS_UNIT = "settings
 // each named as its screen is: core's REVIEW_AREAS (core/model/vocabulary.js),
 // copied since the interface may not import core and pinned by
 // tests/view/enum-drift.test.mjs.
-export const AREAS = Object.freeze(["Keys", "Layers", "Behaviours", "Combos", "Custom keys", "Macros", "Pointer", "Pointing modes", "Lighting", "Settings", "Profile", "Recovery"]);
+export const AREAS = Object.freeze(["Keys", "Layers", "Behaviours", "Combos", "Custom keys", "Macros", "Text replacement", "Pointer", "Pointing modes", "Lighting", "Settings", "Profile", "Recovery"]);
 // An area's place in that order; one the rail does not list comes last.
 /** @param {string} area */
 export const areaRank = (area) => (AREAS.indexOf(area) + 1 || AREAS.length + 1);
@@ -80,15 +80,15 @@ export const statusBesideCount = (changes) => changes.every((change) => change.s
 // the lighting stages, in paint order, and the settings sections are named as
 // the vocabulary words them (`stages`, `fileSections`). Core words an
 // unnamed layer's name (ProfileSummary.names).
-const CATEGORIES = ["Keys", "Lighting", "Macros", "Pointer", "Pointing modes", "Other"];
+const CATEGORIES = ["Keys", "Lighting", "Macros", "Text replacement", "Pointer", "Pointing modes", "Other"];
 // A custom key's name is counted with the keys, where its behaviour is too.
 // Each settings section's category and its row's place there; its words are
 // the vocabulary's (tests/view/review.test.mjs holds the two to one set).
 /** @type {Readonly<Record<string, [string, number]>>} */
 export const SECTION_ROWS = {
     keyTiming: ["Keys", 32], startupLayers: ["Keys", 22], behaviorSettings: ["Keys", 31], comboSettings: ["Keys", 40], comboReferences: ["Keys", 41],
-    keyboardOptions: ["Keys", 50], lightingPower: ["Lighting", -1], rgbAppearance: ["Lighting", 1], lightingFeedback: ["Lighting", 15],
-    normalPointerSpeed: ["Pointer", 1], sniping: ["Pointer", 2], autoMouse: ["Pointer", 3],
+    keyboardOptions: ["Keys", 50], lightingPower: ["Lighting", -1], rgbAppearance: ["Lighting", 1], lightingFeedback: ["Lighting", 15], replacementFeedback: ["Lighting", 16],
+    normalPointerSpeed: ["Pointer", 1], sniping: ["Pointer", 2], autoMouse: ["Pointer", 3], autocorrect: ["Text replacement", 1],
 };
 /** @param {string} id @param {Readonly<Record<string, string>>} sections @returns {[string, string, number] | undefined} */
 function sectionRow(id, sections) {
@@ -106,6 +106,7 @@ function categoryOf(item, names, stages, sections) {
         case "behaviour": return ["Keys", "Behaviours", 30];
         case "combo": return ["Keys", "Combos", 40];
         case "macro": return ["Macros", "Macros", 0];
+        case "autocorrect": return ["Text replacement", "Replacements", 0];
         case "customKey": return ["Keys", "Custom keys", 35];
         case "pointing": return ["Pointing modes", "Pointing modes", 0];
         case "slots": return place.bank === "macros" ? ["Macros", "Macro order", 1] : place.bank === "customKeys" ? ["Keys", "Custom key order", 36] : ["Pointing modes", "Pointing mode order", 1];
@@ -176,6 +177,9 @@ export function placeState(place, layers = []) {
         // asked for by id and the tab picks it where it finds it.
         case "combo": return {screen: "keys", tab: "combos", pickCombo: place.index, reveal: '[data-reach][data-picked="true"]'};
         case "macro": return {screen: "macros", macroSlot: place.keycode};
+        // The entry is the one open in its editor, as a macro's Show opens the
+        // macro: whatever was open or being made gives way to it.
+        case "autocorrect": return {screen: "autocorrect", autocorrectEntry: place.entry, autocorrectNew: null, autocorrectEdit: null, autocorrectSearch: "", reveal: `[data-ac-entry="${place.entry.replace(/["\\]/g, "\\$&")}"]`};
         case "customKey": return {screen: "customKeys", customKey: place.keycode};
         case "pointing": return {screen: "pointing", pointingSlot: place.slot, pdKind: null, pdTaps: null};
         case "lighting": return place.stage ? {screen: "lighting", stage: place.stage} : {screen: "lighting"};
@@ -226,7 +230,7 @@ export function draftMarks(changes = []) {
 /** @param {readonly import("../../contracts/model.js").ReviewChange[]} changes @returns {import("./types.js").DraftMarks} */
 function computeMarks(changes) {
     /** @type {import("./types.js").DraftMarks} */
-    const marks = {keys: new Map(), layers: new Set(), behaviours: new Set(), combos: new Set(), macros: new Set(), customKeys: new Set(),
+    const marks = {keys: new Map(), layers: new Set(), behaviours: new Set(), combos: new Set(), macros: new Set(), autocorrect: new Set(), customKeys: new Set(),
         pointing: new Set(), lighting: new Set(), lightingLayers: new Set(), lightingSlots: new Set(), settings: new Set(), layerNames: false};
     for (const change of changes) {
         const {place} = change;
@@ -238,6 +242,7 @@ function computeMarks(changes) {
         } else if (place.kind === "behaviour") marks.behaviours.add(place.keycode);
         else if (place.kind === "combo") marks.combos.add(place.index);
         else if (place.kind === "macro") marks.macros.add(place.keycode);
+        else if (place.kind === "autocorrect") marks.autocorrect.add(place.entry);
         else if (place.kind === "customKey") marks.customKeys.add(place.keycode);
         else if (place.kind === "pointing") marks.pointing.add(place.slot);
         else if (place.kind === "lighting") {

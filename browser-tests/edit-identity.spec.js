@@ -104,8 +104,10 @@ const forms = [
         commit: page => page.locator('[data-f="setting:effectSpeed"]').evaluate(node => {
             /** @type {HTMLInputElement} */ (node).value = "77"; node.dispatchEvent(new Event("change", {bubbles: true}));
         }), type: "updateConfigDefaults", names: "fingerprint"},
-    {name: "key feedback flash", screen: "lighting", state: {stage: "key"}, shown: '[data-f="setting:feedbackFlash"]',
+    {name: "behaviour feedback flash", screen: "lighting", state: {stage: "key"}, shown: '[data-f="setting:feedbackFlash"]',
         commit: page => change(page.locator('[data-f="setting:feedbackFlash"]'), 77), type: "updateConfigDefaults", names: "fingerprint"},
+    {name: "replacement feedback flash", screen: "lighting", state: {stage: "autocorrect"}, shown: '[data-f="setting:replacementFlash"]',
+        commit: page => change(page.locator('[data-f="setting:replacementFlash"]'), 77), type: "updateConfigDefaults", names: "fingerprint"},
     {name: "auto-mouse hold", screen: "lighting", state: {stage: "auto"}, shown: '[data-f="lighting:auto:mouseFadeHold"]',
         commit: page => page.locator('[data-f="lighting:auto:mouseFadeHold"]').evaluate(node => {
             /** @type {HTMLInputElement} */ (node).value = "77"; node.dispatchEvent(new Event("change", {bubbles: true}));

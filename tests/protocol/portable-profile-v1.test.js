@@ -22,10 +22,10 @@ test("settings in another version than current firmware's are refused, older or 
         return {request: async request => {const page = request[4]; return response(request, page ? bytes.subarray((page-1)*25, page*25) : metadata);}};
     };
     // Settings v7: the current form without its 1,280-byte shortcut table.
-    const current = settings(), older = Buffer.concat([current.subarray(0, 404), current.subarray(1684)]);
+    const current = settings(), older = Buffer.concat([current.subarray(0, 408), current.subarray(1688)]);
     older[0] = 7; older[6] = 0;
     await assert.rejects(readSettings(keyboard(older), ids()), {code: "FIRMWARE_UPDATE_REQUIRED", message: /Ark supports only current firmware/});
-    const newer = Buffer.from(current); newer[0] = 12;
+    const newer = Buffer.from(current); newer[0] = 13;
     await assert.rejects(readSettings(keyboard(newer), ids()), {code: "FIRMWARE_UPDATE_REQUIRED"});
 });
 test("settings in the current version that do not decode are the keyboard's answer not reading, said as one", async () => {

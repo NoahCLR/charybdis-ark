@@ -20,7 +20,7 @@ test("no Keymap tab's list is wider than its pane", async ({page}) => {
 test("no Lighting stage's list is wider than its pane", async ({page}) => {
     await page.setViewportSize({width: 1280, height: 720});
     await page.goto("/preview/index.html?screen=lighting");
-    for (const stage of ["layers", "pd", "combo", "key", "accents"]) {
+    for (const stage of ["layers", "pd", "combo", "key", "autocorrect", "accents"]) {
         await page.locator(`[data-ltab="${stage}"]`).click();
         expect(await sideways(page), stage).toEqual([]);
     }

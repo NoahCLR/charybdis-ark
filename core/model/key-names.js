@@ -15,7 +15,7 @@
 
 const {VOCABULARY} = require("./vocabulary");
 const {PD_MODE_KEYS, pdModeKeyOfCode, pdModeKeyOfName} = require("../data/pd-mode-keys");
-const {CUSTOM_KEY_SLOTS, customKeyCode, customKeyName, customKeyOfCode, layerLockOfCode} = require("../data/user-keycodes");
+const {AUTO_MOUSE_SWITCH_KEYS, BEHAVIOR_SWITCH_KEYS, CUSTOM_KEY_SLOTS, autoMouseSwitchKeyCode, autoMouseSwitchKeyName, behaviorSwitchKeyCode, behaviorSwitchKeyName, customKeyCode, customKeyName, customKeyOfCode, layerLockOfCode} = require("../data/user-keycodes");
 const catalog = require("../data/keycode-catalog");
 const keycodes = require("../schema/keycodes");
 const {LAYER_FORMS, MODS, QK, inBlock, layerFormBase, wrapperOf} = require("../../rules/qmk-keycodes.mjs");
@@ -28,6 +28,10 @@ const {hostLayout, US_HOST_LAYOUT} = require("../data/host-layouts");
 const {LAYERS} = require("../data/charybdis-layout");
 const {shortcutPresent, shortcutSends} = require("../schema/settings-domain-v1");
 const {SHORTCUT_JOIN, shortcutLayerWords, shortcutSendWords, shortcutWords} = require("../../rules/shortcut-notation.mjs");
+
+// The keyboard's switch keys, family by family (firmware D-F66): the names
+// and the code of each, behaviours' then auto-mouse's.
+const SWITCH_KEY_FAMILIES = /** @type {const} */ ([[BEHAVIOR_SWITCH_KEYS, behaviorSwitchKeyCode], [AUTO_MOUSE_SWITCH_KEYS, autoMouseSwitchKeyCode]]);
 
 
 // A pointing key by its slot: "Dragscroll · hold", "Slot 6 · lock (empty)",
@@ -164,6 +168,14 @@ function profileKeyNames({hostOs = 0, hostLayout: layoutId = US_HOST_LAYOUT, mac
         aliases[native] = name;
         labels[native] = labels[name] = label;
         custom.push({name, native, code, label});
+    }
+    // The switch keys for behaviours and for auto-mouse, by the keyboard's
+    // names and their words (VOCABULARY.switchKeys): "Toggle Behaviours",
+    // "Toggle Auto-mouse".
+    for (const [names, codeOf] of SWITCH_KEY_FAMILIES) for (const name of names) {
+        const native = keycodes.resolve(/** @type {number} */ (codeOf(name))).name;
+        aliases[native] = name;
+        labels[native] = labels[name] = VOCABULARY.switchKeys[name];
     }
     // A behaviour row keyed by a semantic target names its keycode only where
     // the catalogue has nothing better than a bare user slot: LOCK_LAYER(2)
@@ -394,8 +406,9 @@ function unnamedKeyCount(layers, capabilities) {
     const ownBlocks = knownActionAbi(capabilities?.actionAbiDigest ?? 0);
     /** @param {{keycode: number, resolved: {known: boolean}}} key */
     const named = ({keycode, resolved}) => resolved.known
-        || ownBlocks && (customKeyOfCode(keycode) !== undefined || layerLockOfCode(keycode) !== undefined || pdModeKeyOfCode(keycode) !== undefined);
+        || ownBlocks && (customKeyOfCode(keycode) !== undefined || layerLockOfCode(keycode) !== undefined || pdModeKeyOfCode(keycode) !== undefined
+            || behaviorSwitchKeyName(keycode) !== undefined || autoMouseSwitchKeyName(keycode) !== undefined);
     return layers.flatMap((entry) => entry.keys).filter((key) => !named(key)).length;
 }
 
-module.exports = {compactKeyLabels, heldModifierWords, hostKeyVocabulary, hostKeyLabel, keyKind, keyLabel, keyLabelWithName, keyLayer, keyLayerForm, layerKeyLabel, layerModWords, layerTapWords, profileKeyNames, shortcutAct, shortcutKeys, shortcutLabel, shortcutLayerNames, unnamedKeyCount};
+module.exports = {SWITCH_KEY_FAMILIES, compactKeyLabels, heldModifierWords, hostKeyVocabulary, hostKeyLabel, keyKind, keyLabel, keyLabelWithName, keyLayer, keyLayerForm, layerKeyLabel, layerModWords, layerTapWords, profileKeyNames, shortcutAct, shortcutKeys, shortcutLabel, shortcutLayerNames, unnamedKeyCount};

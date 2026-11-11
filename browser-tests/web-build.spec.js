@@ -41,10 +41,10 @@ async function inputs() {
         supportedPdModeIds: Array.from({length: 32}, (_, id) => id).filter((id) => Number(rgb.get("codec.supported_pd_mode_mask")) & (1 << id)),
     };
     const behaviors = values(path.join(FIRMWARE_FIXTURES, "key_behavior_domain_v1.fixture"));
-    const rgbV4 = json("rgb_domain_v4.json"), pdV4 = json("pd_mode_domain_v4.json");
+    const rgbV5 = json("rgb_domain_v5.json"), pdV4 = json("pd_mode_domain_v4.json");
     const domains = [
         {name: "rgb_domain_v1 payload", kind: "rgb", hex: rgb.get("payload.hex"), options: rgbOptions},
-        ...[...rgbV4.valid, ...rgbV4.invalid].map((vector) => ({name: `rgb_domain_v4 ${vector.name}`, kind: "rgb", hex: vector.hex, options: {...rgbV4.limits, formatVersion: 4}})),
+        ...[...rgbV5.valid, ...rgbV5.invalid].map((vector) => ({name: `rgb_domain_v5 ${vector.name}`, kind: "rgb", hex: vector.hex, options: {...rgbV5.limits, formatVersion: 5}})),
         ...[...behaviors].filter(([key]) => key.startsWith("payload.")).map(([key, hex]) => ({name: `key_behavior_domain_v1 ${key}`, kind: "behaviors", hex})),
         ...[...behaviors].filter(([key]) => key.startsWith("envelope.")).map(([key, hex]) => ({name: `key_behavior_domain_v1 ${key}`, kind: "behaviorEnvelope", hex})),
         {name: "combo_domain_v3", kind: "combos", hex: fs.readFileSync(path.join(FIRMWARE_FIXTURES, "combo_domain_v3.fixture"), "utf8").trim(), options: {version: 3}},

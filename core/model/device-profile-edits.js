@@ -2,7 +2,7 @@
 "use strict";
 const {PROFILE_WIRE_DOMAINS} = require("../schema/profile-domains");
 const {pdTapProblem, isPdMacro, PD_DOMAIN} = require("../schema/pd-mode-domain-v1");
-const {RGB_DOMAIN_V1, RGB_EVERY_OWNER, RGB_LAYER_MODES, RGB_LOCALITIES, RGB_AUTOMOUSE_MODES, RGB_TAP_COMMIT_MODES, RGB_POINTING_MODE_IDS, RGB_KEY_SEMANTICS} = require("../schema/rgb-domain-v1");
+const {RGB_DOMAIN_V1, RGB_EVERY_OWNER, RGB_LAYER_MODES, RGB_LOCALITIES, RGB_AUTOMOUSE_MODES, RGB_TAP_COMMIT_MODES, RGB_POINTING_MODE_IDS, RGB_KEY_SEMANTICS, RGB_AUTOCORRECT_SEMANTICS, RGB_STAGE_MASK_ALL} = require("../schema/rgb-domain-v1");
 
 const catalog = require("../data/keycode-catalog");
 const keycodes = require("../schema/keycodes");
@@ -73,9 +73,9 @@ function groupFor(rgb, leds) {
     rgb.groups.push({id: rgb.groups.length, leds});
     return rgb.groups.length - 1;
 }
-// The four tables of accents, each row naming a group by id.
+// The five tables of accents, each row naming a group by id.
 /** @param {Rgb} rgb */
-const accentRows = rgb => [rgb.layerGroupRows, rgb.pdModeGroupRows, rgb.comboGroupRows, rgb.keyGroupRows].flat();
+const accentRows = rgb => [rgb.layerGroupRows, rgb.pdModeGroupRows, rgb.comboGroupRows, rgb.keyGroupRows, rgb.autocorrectGroupRows].flat();
 // A group no accent lights paints nothing but still takes one of the
 // keyboard's groups, so it goes. Group ids are positions, consecutive from
 // zero: the ones after it renumber, and every accent follows its group.
@@ -108,15 +108,18 @@ function placeAccent(rgb, group, color, index) {
         const selector = group.owner === RGB_EVERY_OWNER.pdMode ? RGB_DOMAIN_V1.SELECTOR_ALL : enumValue(group.owner, RGB_POINTING_MODE_IDS, "pointing mode");
         rgb.pdModeGroupRows.splice(index, 0, {color, groupId: groupFor(rgb, leds), selector});
     } else if (group.target === "keyBehavior") {
-        const semantic = enumValue(group.owner, RGB_KEY_SEMANTICS, "key feedback type");
+        const semantic = enumValue(group.owner, RGB_KEY_SEMANTICS, "behaviour state");
         rgb.keyGroupRows.splice(index, 0, {color, groupId: groupFor(rgb, leds), semantic});
+    } else if (group.target === "autocorrect") {
+        const semantic = enumValue(group.owner, RGB_AUTOCORRECT_SEMANTICS, "replacement flash");
+        rgb.autocorrectGroupRows.splice(index, 0, {color, groupId: groupFor(rgb, leds), semantic});
     } else if (group.target === "combo") rgb.comboGroupRows.splice(index, 0, {color, groupId: groupFor(rgb, leds)});
     else throw invalid("Unknown accent table.");
 }
 /** @param {Rgb} rgb @param {string} target */
 function groupRows(rgb, target) {
-    /** @type {Record<string, "layerGroupRows" | "pdModeGroupRows" | "comboGroupRows" | "keyGroupRows">} */
-    const tables = {layer: "layerGroupRows", pdMode: "pdModeGroupRows", combo: "comboGroupRows", keyBehavior: "keyGroupRows"};
+    /** @type {Record<string, "layerGroupRows" | "pdModeGroupRows" | "comboGroupRows" | "keyGroupRows" | "autocorrectGroupRows">} */
+    const tables = {layer: "layerGroupRows", pdMode: "pdModeGroupRows", combo: "comboGroupRows", keyBehavior: "keyGroupRows", autocorrect: "autocorrectGroupRows"};
     const table = tables[target];
     if (!table) throw invalid("Unknown accent table.");
     return rgb[table];
@@ -254,10 +257,18 @@ function editLighting(rgb, message, maximumBrightness) {
             const feedback = message.config;
             rgb.keyFeedback = {tapBranchColors: feedback.tapBranchColors.map(editColor), tapCommittedColor: editColor(feedback.tapCommittedColor), holdActiveColor: editColor(feedback.holdActiveColor), longHoldActiveColor: editColor(feedback.longHoldActiveColor), tapCommitMode: enumValue(feedback.tapCommitMode, RGB_TAP_COMMIT_MODES, "tap policy"), locality: enumValue(feedback.locality, RGB_LOCALITIES, "locality")}; break;
         }
-        case "updateRgbStages": rgb.stageEnableMask = integer(message.stageEnableMask, 31, "RGB stage mask"); break;
+        // The three colours of replacement feedback and where its flash
+        // paints, stored as one record like behaviour feedback's. A colour of
+        // HSV(0, 0, 0) switches its case off (firmware D-F70).
+        case "updateAutocorrectFeedback": {
+            const feedback = message.config;
+            rgb.autocorrectFeedback = {textColor: editColor(feedback.textColor), macroColor: editColor(feedback.macroColor), undoColor: editColor(feedback.undoColor), locality: enumValue(feedback.locality, RGB_LOCALITIES, "locality")}; break;
+        }
+        case "updateRgbStages": rgb.stageEnableMask = integer(message.stageEnableMask, RGB_STAGE_MASK_ALL, "RGB stage mask"); break;
         // An accent is added at its table's end, changed where it stands
         // (rows paint in stored order, so a later one wins where they
-        // overlap), or removed; each time, a group no accent lights any
+        // overlap; behaviour feedback's and replacement feedback's rows for every
+        // state or case paint first), or removed; each time, a group no accent lights any
         // more goes, before a new set takes a group of its own.
         case "addRgbLedGroup": {
             const rows = groupRows(rgb, message.group.target);

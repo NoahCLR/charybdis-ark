@@ -7,6 +7,7 @@ import {editGate} from "../../view/edit-gate.mjs";
 import {stageEnabled} from "../../view/lighting.mjs";
 import * as edits from "../../view/edits.mjs";
 import {colourEditor} from "../colour-editor.mjs";
+import {sectionsIn} from "../../view/settings-layout.mjs";
 
 /** @param {string} title @param {string} [extra] */
 export const section = (title, extra = "") => sectionMarked(esc(title), extra);
@@ -67,6 +68,29 @@ export function aboutStage(text) {
     return node;
 }
 
+// How long a feedback stage's flash lasts: Behaviour feedback's flash
+// interval (lightingFeedback) or Replacement feedback's flash length
+// (replacementFeedback), each a stored setting of its own. The keyboard keeps
+// them with its settings, so each saves as a settings section of one field,
+// drawn as a field of the stage's When and where.
+/** @param {import("../../../contracts/panel.js").PublishedModel} model @param {string} sectionId */
+export function flashSetting(model, sectionId) {
+    const flash = sectionsIn(model, "Lighting").find((entry) => entry.id === sectionId);
+    const field = flash?.fields[0];
+    if (!flash || !field) return el(`<span></span>`);
+    const editable = editGate(model, "settings").editable && !field.readOnly;
+    const label = field.unit ? field.label.replace(new RegExp(`\\s*\\(${field.unit}\\)$`), "") : field.label;
+    const node = el(`<label class="field" data-tip="${esc([field.tooltip, field.hint].filter(Boolean).join(" "))}"><span>${esc(label)}</span>
+        <span class="affix unit"><input class="input mono num" inputmode="numeric" data-macro="${esc(field.macro)}" data-f="setting:${esc(field.macro)}" value="${esc(field.value)}" ${editable ? "" : "disabled"}>${field.unit ? `<i>${esc(field.unit)}</i>` : ""}</span>
+        <span class="hint">${esc(field.hint || "")}</span></label>`);
+    /** @type {HTMLInputElement} */ (node.querySelector("input")).addEventListener("change", (event) => {
+        const written = /** @type {HTMLInputElement} */ (event.target).value.trim();
+        if (!written) { /** @type {HTMLInputElement} */ (event.target).value = field.value; return; }
+        if (written !== field.value) post(edits.settingsSection(flash, () => written, model.settingsEditing?.identity));
+    });
+    return node;
+}
+
 /** @param {...Node} nodes */
 export function stack(...nodes) {
     const box = el(`<div class="stack gap-12"></div>`);
@@ -80,5 +104,5 @@ export const localityLabel = value => word(vocabulary(getModel()).localities, va
 // Keep each colour editor's identity tied to the same stored owner as before.
 /** @param {import("../../../contracts/panel.js").PublishedModel} model @param {Omit<Parameters<typeof colourEditor>[0], "identity">} options */
 export function colourControl(model, options) {
-    return colourEditor({identity: `lighting:${state.stage}:${state.stage === "layers" ? currentLayer()?.index : state.stage === "pd" ? state.pointingSlot : state.stage === "key" ? state.feedbackRow : "stage"}`, maximumBrightness: model.rgb.maximumBrightness, ...options});
+    return colourEditor({identity: `lighting:${state.stage}:${state.stage === "layers" ? currentLayer()?.index : state.stage === "pd" ? state.pointingSlot : state.stage === "key" ? state.feedbackRow : state.stage === "autocorrect" ? state.replacementRow : "stage"}`, maximumBrightness: model.rgb.maximumBrightness, ...options});
 }

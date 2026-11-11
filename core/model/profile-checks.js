@@ -16,7 +16,8 @@ const {pointingMacros} = require("./pointing-taps");
 const {inertLinkLayers, inertLinkReason, linkNamed} = require("./pointing-links");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {actionName} = require("../schema/actions");
-const {REVIEW_AREAS, VOCABULARY, macroDefaultName, settingsPath, slotName} = require("./vocabulary");
+const {REVIEW_AREAS, VOCABULARY, macroDefaultName, settingsPath, slotName, word} = require("./vocabulary");
+const {WARNING, entryOfKey, listWarnings, replacementSaid, untypableFix} = require("./autocorrect-list");
 const {macroName} = require("../../rules/qmk-keycodes.mjs");
 
 // A behaviour step that sends a custom key sends only its shortcut (firmware
@@ -90,6 +91,32 @@ function profileFindings(decoded, destination = {}) {
                 detail: "This macro has no steps, so it does nothing yet and leaves a once-per-movement gesture available.",
                 fix: "Add steps in Macros, or choose another output.", place: where});
         }
+    }
+    // Text replacements the host layout cannot type (D-L84): the keyboard
+    // skips them, so they are carried and said once, however many there are.
+    // A layout changed on the Host screen is what leaves them so.
+    const layoutName = word(VOCABULARY.hostLayouts, host.layout);
+    const macroNames = decoded.settings.macroNames || [];
+    const listed = listWarnings(decoded.autocorrect || {entries: []}, {layout: host.layout, layoutName, macroNames, emptyMacros});
+    /** @param {string} key */
+    const calledEntry = key => replacementSaid(entryOfKey(key), macroNames);
+    const silent = listed.filter(warning => warning.kind === WARNING.UNTYPABLE);
+    if (silent.length) {
+        const named = [...new Set(silent.map(warning => warning.entry))];
+        findings.push({kind: "untypableAutocorrect", level: "warning", layers: [], identity: silent.map(warning => `${warning.entry}:${warning.typo ?? ""}`).join("|"), count: named.length,
+            title: `${layoutName} cannot type ${named.length} text replacement${named.length === 1 ? "" : "s"}`,
+            detail: `${layoutName} cannot type a character in ${named.slice(0, 8).map(calledEntry).join(", ")}${named.length > 8 ? ` and ${named.length - 8} more` : ""}. The keyboard stores them and skips them.`,
+            fix: untypableFix(" on the Text replacement screen"), place: {kind: "autocorrect", entry: named[0]}});
+    }
+    // A replacement that plays an empty macro, as a pointing mode that runs
+    // one is said: the keyboard accepts it and does nothing.
+    for (const warning of listed.filter(entry => entry.kind === WARNING.EMPTY_MACRO)) {
+        const named = entryOfKey(warning.entry);
+        if (!("macro" in named)) continue;
+        findings.push({kind: "inertAutocorrectMacro", level: "warning", layers: [], identity: String(named.macro),
+            title: `A text replacement plays empty macro ${named.macro}`,
+            detail: "This macro has no steps, so the keyboard leaves what you typed as it is.",
+            fix: "Add steps in Macros, or choose another replacement.", place: {kind: "autocorrect", entry: warning.entry}});
     }
     const lighting = baseLighting(decoded.settings.values);
     const max = destination.brightnessMax;

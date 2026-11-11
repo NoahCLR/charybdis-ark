@@ -54,6 +54,7 @@ export interface DeviceModelInput {
     baseRgb?: BaseRgbRead | null;
     settingsView?: null | ReturnType<typeof import('../model/settings-editor.js').settingsEditorView>;
     macroView?: null | ReturnType<typeof import('../model/macro-editor.js').macroEditorView>;
+    autocorrectView?: null | ReturnType<typeof import('../model/autocorrect-editor.js').autocorrectEditorView>;
     customKeyView?: null | ReturnType<typeof import('../model/custom-key-editor.js').customKeyEditorView>;
     device?: import('../transport/types.js').DeviceDescriptor;
     /** The keyboard's name as the connected keyboard stores it, '' for its built-in name; undefined until its profile is read. */
@@ -202,7 +203,7 @@ export interface PanelEnvelope {type: string; draftId?: string; draftRevision?: 
 export type PanelMessage = PanelEnvelope | (DraftEdit & {draftId?: string});
 export type PanelDraftView = ReturnType<NonNullable<DemoSession['draft']>['view']> & {busy: boolean; editable: boolean; reason: DraftBlock; steps?: import('../../contracts/model.js').HistoryStep[]};
 /** What the panel adds to the device model; the posted shape is the contract's. */
-export type PanelModelExtras = Pick<import('../../contracts/panel.js').PublishedModel, 'devices' | 'selectedDeviceId' | 'demo' | 'apply' | 'postApplyRead' | 'portable' | 'shell' | 'load' | 'reconnecting' | 'firmware' | 'editMode' | 'liveProposal' | 'liveWait' | 'runtime'> & {draft?: PanelDraftView};
+export type PanelModelExtras = Pick<import('../../contracts/panel.js').PublishedModel, 'devices' | 'selectedDeviceId' | 'demo' | 'apply' | 'postApplyRead' | 'portable' | 'shell' | 'load' | 'reconnecting' | 'firmware' | 'editMode' | 'liveProposal' | 'liveWait' | 'offByKey' | 'autocorrectRunning'> & {draft?: PanelDraftView};
 
 export type CompleteReadSnapshot = Extract<ReadSnapshot, import('../model/types.js').CompleteSnapshot>;
 /** Where the keyboard's working copy is (firmware D-F32), with the exact bytes a live edit is made against. */
@@ -346,6 +347,8 @@ export interface ExpectedReconnect {deviceId: string; serialNumber: string; name
 export interface ControlShell extends PanelShell {
     progress?: <T>(title: string, work: () => Promise<T>) => Promise<T>;
     saveRecovery?: ShellSaveRecovery;
+    /** Saves an exported file where the shell keeps them (a download on the web page); resolves to where, in words. */
+    saveExport?(file: import('../../contracts/messages.js').ExportedProfile): Promise<string | undefined>;
 }
 export interface LoopShell extends ControlShell {
     post(message: import('../../contracts/messages.js').PanelResponse): unknown;

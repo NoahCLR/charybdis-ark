@@ -56,7 +56,7 @@ function assertCode(code, callback) {
 
 function remapGroupIds(profile, mapping) {
     for (const group of profile.groups) group.id = mapping[group.id];
-    for (const table of [profile.layerGroupRows, profile.pdModeGroupRows, profile.comboGroupRows, profile.keyGroupRows]) {
+    for (const table of [profile.layerGroupRows, profile.pdModeGroupRows, profile.comboGroupRows, profile.keyGroupRows, profile.autocorrectGroupRows]) {
         for (const row of table) row.groupId = mapping[row.groupId];
     }
 }
@@ -67,14 +67,14 @@ test("representative RGB payload and whole-profile blob match the shared C/JavaS
     assert.equal(payload.toString("hex"), golden.payloadHex);
     assert.deepEqual(decodeRgbDomainV1(payload, golden.codecOptions), golden.profile);
 
-    const blob = encodeProfileBlob({schema: {major: 4, minor: 3}, domains: [createRgbDomainV1(golden.profile, golden.codecOptions)]});
+    const blob = encodeProfileBlob({schema: {major: 4, minor: 5}, domains: [createRgbDomainV1(golden.profile, golden.codecOptions)]});
     assert.equal(blob.toString("hex"), golden.blobHex);
     assert.equal(fnv1a32(blob), Number.parseInt(golden.fnv1a32, 16));
     assert.equal(crc32(blob), Number.parseInt(golden.crc32, 16));
     const decoded = decodeProfileBlob(blob);
     assert.equal(decoded.domains.length, 1);
     assert.equal(decoded.domains[0].id, PROFILE_DOMAIN_IDS.RGB);
-    assert.equal(decoded.domains[0].version, 4);
+    assert.equal(decoded.domains[0].version, 5);
     assert.deepEqual(decodeRgbDomainV1(decoded.domains[0].payload, golden.codecOptions), golden.profile);
 });
 
@@ -97,14 +97,19 @@ test("identity tables canonicalize while renderer row order stays authored", () 
 test("decoder rejects noncanonical headers, geometry, dictionary order, and bitmap bits", () => {
     const golden = fixture();
     const valid = encodeRgbDomainV1(golden.profile, golden.codecOptions);
-    for (const offset of [1, 14, 15]) {
+    // Byte 14 counts the replacement feedback rows (format 5); 1 and 15 stay reserved.
+    for (const offset of [1, 15]) {
         const reserved = Buffer.from(valid);
         reserved[offset] = 1;
         assertCode("RESERVED_BITS", () => decodeRgbDomainV1(reserved, golden.codecOptions));
     }
     const stageBit = Buffer.from(valid);
-    stageBit[2] |= 0x20;
+    stageBit[2] |= 0x40;
     assertCode("RESERVED_BITS", () => decodeRgbDomainV1(stageBit, golden.codecOptions));
+    // Bit 5 is replacement feedback, which this build does not compile.
+    const uncompiledStage = Buffer.from(valid);
+    uncompiledStage[2] |= 0x20;
+    assertCode("UNSUPPORTED_STAGE", () => decodeRgbDomainV1(uncompiledStage, golden.codecOptions));
     for (const [offset, value] of [[12, 57], [13, 7]]) {
         const geometry = Buffer.from(valid);
         geometry[offset] = value;
@@ -186,6 +191,8 @@ test("complete RGB surfaces and negotiated feature inclusion are enforced", () =
         locality: 0,
     };
     layerOnly.keyGroupRows = [];
+    layerOnly.autocorrectFeedback = {textColor: {h: 0, s: 0, v: 0}, macroColor: {h: 0, s: 0, v: 0}, undoColor: {h: 0, s: 0, v: 0}, locality: 0};
+    layerOnly.autocorrectGroupRows = [];
     const layerOptions = {...golden.codecOptions, compiledStageMask: RGB_STAGE_BITS.LAYER};
     assert.deepEqual(decodeRgbDomainV1(encodeRgbDomainV1(layerOnly, layerOptions), layerOptions), layerOnly);
 });

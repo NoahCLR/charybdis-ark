@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {createRequire} from "node:module";
 import {isOff} from "../../webview/lib/colour.mjs";
-import {baseColour, feedbackColours, inheritsStageColour, keyLed, layerPaints, keyLight, mappedKeyCount, offWording, ownLight, pdColourRow, stageEnabled, stageHeldOffBy, stageIdle, stageInEffect, trackballLed, trackballLight} from "../../webview/view/lighting.mjs";
+import {baseColour, feedbackColours, inheritsStageColour, keyLed, layerPaints, keyLight, mappedKeyCount, offWording, ownLight, pdColourRow, replacementPaints, replacementTrigger, stageEnabled, stageHeldOffBy, stageIdle, stageInEffect, trackballLed, trackballLight} from "../../webview/view/lighting.mjs";
 
 const colour = (h, s, v) => ({h: String(h), s: String(s), v: String(v)});
 const position = (layoutIndex, keycode) => ({layoutIndex, keycode});
@@ -33,7 +33,7 @@ function model(overrides = {}) {
                 {id: "auto", label: "Auto-mouse fade", enabled: true},
                 {id: "pd", label: "Pointing modes", enabled: true},
                 {id: "combo", label: "Combo feedback", enabled: false},
-                {id: "key", label: "Key feedback", enabled: true},
+                {id: "key", label: "Behaviour feedback", enabled: true},
             ],
             layerColors: [
                 {layer: "Layer 0", layerId: 0, color: colour(0, 0, 0), mode: "ALL_KEYS"},
@@ -64,7 +64,7 @@ test("stages report what the device said, and the base effect is its own read", 
     assert.equal(baseColour(animated), null, "an animated effect has no single colour");
 });
 
-test("combo and key feedback are in effect only while what they light can run", () => {
+test("combo and behaviour feedback are in effect only while what they light can run", () => {
     const switched = (/** @type {{behaviors?: string[], combos?: string[]}} */ reasons) => {
         const m = model();
         m.rgb.stages = m.rgb.stages.map((row) => ({...row, enabled: true}));
@@ -74,7 +74,7 @@ test("combo and key feedback are in effect only while what they light can run", 
     assert.match(stageIdle(combosOff, "combo"), /combos are off/i);
     assert.equal(stageInEffect(combosOff, "combo"), false);
     assert.equal(stageEnabled(combosOff, "combo"), true, "the stored switch is left as it is");
-    assert.equal(stageInEffect(combosOff, "key"), true, "key feedback does not depend on combos");
+    assert.equal(stageInEffect(combosOff, "key"), true, "behaviour feedback does not depend on combos");
     const behavioursOff = switched({behaviors: ["master"]});
     assert.match(stageIdle(behavioursOff, "key"), /behaviours are off/i);
     assert.equal(stageInEffect(behavioursOff, "combo"), true, "combo feedback does not depend on behaviours");
@@ -104,6 +104,29 @@ test("the auto-mouse fade is in effect only while auto-mouse is on", () => {
     stored.rgb.stages = stored.rgb.stages.map((row) => row.id === "auto" ? {...row, enabled: false} : row);
     assert.equal(stageIdle({...stored, configDefaults: off.configDefaults}, "auto"), null, "a stage switched off is off, not idle");
     assert.equal(stageInEffect(model(), "auto"), true, "without settings readback nothing is claimed");
+});
+
+// A replacement flashes only while the keyboard replaces, so with Text
+// replacement off in the draft the stage paints nothing, whatever its stored
+// switch says.
+test("replacement feedback is in effect only while Text replacement is on", () => {
+    const withSwitch = (enabled) => {
+        const m = model();
+        m.rgb.stages = [...m.rgb.stages, {id: "autocorrect", label: "Replacement feedback", bit: 32, enabled: true}];
+        return {...m, configDefaults: [{id: "autocorrect", area: "Settings", fields: [{macro: "autocorrect", kind: "toggle", value: enabled ? "1" : "0", enabled}]}]};
+    };
+    assert.equal(stageInEffect(withSwitch(true), "autocorrect"), true);
+    assert.equal(stageIdle(withSwitch(true), "autocorrect"), null);
+    const off = withSwitch(false);
+    assert.equal(stageEnabled(off, "autocorrect"), true, "the stored switch is left as it is");
+    assert.equal(stageInEffect(off, "autocorrect"), false);
+    assert.equal(stageHeldOffBy(off, "autocorrect"), "autocorrect");
+    assert.equal(stageIdle(off, "autocorrect"), "Text replacement is off. This stage paints nothing.");
+    assert.equal(stageInEffect(off, "key"), true, "behaviour feedback does not depend on text replacement");
+    const stored = {...off, rgb: {...off.rgb, stages: off.rgb.stages.map((row) => row.id === "autocorrect" ? {...row, enabled: false} : row)}};
+    assert.equal(stageIdle(stored, "autocorrect"), null, "a stage switched off is off, not idle");
+    const unread = withSwitch(true); delete unread.configDefaults;
+    assert.equal(stageInEffect(unread, "autocorrect"), true, "without settings readback nothing is claimed");
 });
 
 // QMK skips the hooks every stage paints from while its matrix is off, so
@@ -161,6 +184,7 @@ test("the trackball's light is the viewed layer's own unless it is seen through 
     assert.equal(ownLight(trackballLight(m, {index: 3}), 3), false, "above base, the base effect is seen through a mapped-keys-only layer");
     assert.equal(ownLight(trackballLight(m, {index: 3}, {held: [4]}), 3), false, "a lower layer's paint is seen through too");
     assert.equal(ownLight({source: "pointing", layer: null}, 3), true, "a previewed pointing mode is what is being shown");
+    assert.equal(ownLight({source: "replacement", layer: null}, 3), true, "and so is a previewed replacement flash, which paints over every layer");
 });
 
 test("an all-keys layer paints transparent positions too", () => {
@@ -343,6 +367,80 @@ test("Turn off says what black does: literal black for modes and feedback, nothi
     assert.deepEqual([offWording(words, "layers").offAction, offWording(words, "layers").offWord], ["Make passthrough", "Passthrough"]);
     for (const stage of ["auto", "pd", "combo", "key"]) assert.equal(offWording(words, stage).offWord, undefined, `${stage}: off is black, so it keeps Turn off and Off`);
     assert.deepEqual(offWording(words, "base"), {});
+});
+
+test("Turn off switches a replacement case off: it does not flash, and off keeps its own words", () => {
+    const {offTip, offNote, offAction, offWord} = offWording(words, "autocorrect");
+    assert.match(offTip, /does not flash for this case/);
+    assert.match(offNote, /This case is off.*other two cases still flash/);
+    for (const text of [offTip, offNote]) assert.doesNotMatch(text, /black|Stage on/, "off here is no black flash, and needs no stage switch");
+    assert.deepEqual([offAction, offWord], [undefined, undefined], "the colour editor's Turn off and Off");
+});
+
+test("a replacement flash paints its case's colour over everything, where its locality reaches against the key that caused it", () => {
+    const text = colour(106, 255, 200);
+    const base = model();
+    base.rgb = {...base.rgb, stages: [...base.rgb.stages.map((stage) => ({...stage, enabled: true})), {id: "autocorrect", label: "Replacement feedback", bit: 32, enabled: true}],
+        comboFeedback: {color: colour(190, 255, 200), locality: "RGB_BOTH_HALVES"}};
+    const layer = {index: 4};
+    const flash = (locality, ...key) => ({replacementActive: {owner: "AUTOCORRECT_FEEDBACK_GROUP_TEXT", color: text, locality, triggerIndex: key.length ? key[0] : 49}});
+    // Key 49 is a left thumb key; 7 is on the right half, 13 on the left.
+    assert.deepEqual(keyLight(base, layer, position(13, "KC_A"), flash("RGB_KEY_HALF")), {colour: text, source: "replacement", layer: null}, "the half of the key");
+    assert.notEqual(keyLight(base, layer, position(7, "KC_U"), flash("RGB_KEY_HALF")).source, "replacement", "and not the other half");
+    assert.equal(keyLight(base, layer, position(49, "KC_SPC"), flash("RGB_KEYS_ONLY")).source, "replacement", "only the key");
+    assert.notEqual(keyLight(base, layer, position(13, "KC_A"), flash("RGB_KEYS_ONLY")).source, "replacement");
+    for (const index of [7, 13]) assert.equal(keyLight(base, layer, position(index, "KC_A"), flash("RGB_BOTH_HALVES")).source, "replacement");
+    assert.equal(keyLight(base, layer, position(7, "KC_U"), flash("RGB_RIGHT_HALF")).source, "replacement");
+    assert.notEqual(keyLight(base, layer, position(13, "KC_A"), flash("RGB_RIGHT_HALF")).source, "replacement");
+    // With no known key it paints both halves, or every key, as the keyboard does.
+    for (const locality of ["RGB_KEY_HALF", "RGB_KEYS_ONLY"]) for (const index of [7, 13]) {
+        assert.equal(keyLight(base, layer, position(index, "KC_A"), flash(locality, undefined)).source, "replacement", `${locality} at ${index}`);
+    }
+    // The trackball is on the right half and is no key.
+    assert.equal(trackballLight(base, layer, flash("RGB_KEY_HALF", 51)).source, "replacement");
+    assert.notEqual(trackballLight(base, layer, flash("RGB_KEY_HALF", 49)).source, "replacement");
+    assert.notEqual(trackballLight(base, layer, flash("RGB_KEYS_ONLY", 51)).source, "replacement");
+    // It paints last: over a held combo's feedback too.
+    const held = {comboActive: {color: colour(190, 255, 200), locality: "RGB_BOTH_HALVES", inputs: [13]}};
+    assert.equal(keyLight(base, layer, position(13, "KC_A"), held).source, "combo");
+    assert.equal(keyLight(base, layer, position(13, "KC_A"), {...held, ...flash("RGB_BOTH_HALVES")}).source, "replacement");
+    const off = {...base, rgb: {...base.rgb, stages: base.rgb.stages.map((stage) => stage.id === "autocorrect" ? {...stage, enabled: false} : stage)}};
+    assert.notEqual(keyLight(off, layer, position(13, "KC_A"), flash("RGB_BOTH_HALVES")).source, "replacement", "with the stage off nothing of it paints");
+});
+
+test("a replacement flash's accents light for every case and then for its own; a case that is off paints only accents in a colour of their own", () => {
+    const text = colour(106, 255, 200), own = colour(20, 255, 200), narrower = colour(30, 255, 200);
+    const base = model();
+    // LED 6 is key 13, LED 9 is key 14, LED 0 is key 0.
+    base.rgb = {...base.rgb, stages: [...base.rgb.stages, {id: "autocorrect", label: "Replacement feedback", bit: 32, enabled: true}],
+        autocorrectFeedbackAccents: [
+            {index: 0, owner: "AUTOCORRECT_FEEDBACK_GROUP_TEXT", color: narrower, ledIndices: [6], leds: "LED 6"},
+            {index: 1, owner: "AUTOCORRECT_FEEDBACK_GROUP_ALL", color: own, ledIndices: [6, 9], leds: "LEDs 6, 9"},
+            {index: 2, owner: "AUTOCORRECT_FEEDBACK_GROUP_UNDO", color: colour(0, 255, 200), ledIndices: [9], leds: "LED 9"},
+            {index: 3, owner: "AUTOCORRECT_FEEDBACK_GROUP_ALL", color: colour(0, 0, 0), ledIndices: [0], leds: "LED 0"},
+        ]};
+    const layer = {index: 4};
+    const flash = (color, owner = "AUTOCORRECT_FEEDBACK_GROUP_TEXT") => ({replacementActive: {owner, color, locality: "RGB_RIGHT_HALF", triggerIndex: 49}});
+    assert.deepEqual(keyLight(base, layer, position(13, "KC_A"), flash(text)).colour, narrower, "the accent naming the case repaints the one for every case, though stored before it");
+    assert.deepEqual(keyLight(base, layer, position(14, "KC_B"), flash(text)).colour, own, "another case's accent does not light");
+    assert.deepEqual(keyLight(base, layer, position(0, "KC_ESC"), flash(text)).colour, text, "a black accent takes the case's colour, outside its locality too");
+    assert.deepEqual(keyLight(base, layer, position(14, "KC_B"), flash(colour(0, 255, 200), "AUTOCORRECT_FEEDBACK_GROUP_UNDO")).colour, colour(0, 255, 200));
+    const dark = flash(colour(77, 0, 0));
+    assert.equal(replacementPaints(dark.replacementActive.color), false);
+    assert.notEqual(keyLight(base, layer, position(7, "KC_U"), dark).source, "replacement", "a case that is off does not flash");
+    assert.notEqual(keyLight(base, layer, position(0, "KC_ESC"), dark).source, "replacement", "nor does its black accent");
+    assert.deepEqual(keyLight(base, layer, position(13, "KC_A"), dark).colour, narrower, "an accent in a colour of its own still lights");
+});
+
+test("a replacement flash previews from the first key that sends Space, or Backspace for an undo", () => {
+    const base = {index: 0, positions: [position(0, "KC_A"), position(49, "KC_SPC"), position(54, "KC_BSPC"), position(55, "KC_BACKSPACE")]};
+    const other = {index: 3, positions: [position(49, "KC_TRANSPARENT"), position(5, "KC_SPACE")]};
+    const m = {...publishedModel(), layers: [base, other]};
+    assert.deepEqual(replacementTrigger(m, base, false), {layoutIndex: 49, layer: 0}, "Space, under any of its names");
+    assert.deepEqual(replacementTrigger(m, base, true), {layoutIndex: 54, layer: 0}, "Backspace for an undo");
+    assert.deepEqual(replacementTrigger(m, other, false), {layoutIndex: 5, layer: 3}, "the viewed layer's key first");
+    assert.deepEqual(replacementTrigger(m, other, true), {layoutIndex: 54, layer: 0}, "else from layer 0 up");
+    assert.equal(replacementTrigger({...m, layers: [other]}, other, true), null, "no key stands in where none sends it");
 });
 
 test("a key's LED and the trackball's are the ones core publishes", () => {

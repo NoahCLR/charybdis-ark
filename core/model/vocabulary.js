@@ -179,10 +179,13 @@ const PROFILE_FULL_WORDS = Object.freeze({
     /** @type {Readonly<Record<string, (most: number) => string>>} */
     counts: Object.freeze({
         lightingGroups: (most) => `The keyboard holds at most ${most} different LED sets across all accents. Remove an accent, or light LEDs another accent already lights.`,
-        lightingGroupRows: (most) => `The keyboard holds at most ${most} accents across layers, pointing modes, combo feedback and key feedback. Remove one before adding another.`,
-        lightingTableGroupRows: (most) => `The keyboard holds at most ${most} accents on any one of layers, pointing modes, combo feedback and key feedback. Remove one there before adding another.`,
+        lightingGroupRows: (most) => `The keyboard holds at most ${most} accents across layers, pointing modes, combo feedback, behaviour feedback and replacement feedback. Remove one before adding another.`,
+        lightingTableGroupRows: (most) => `The keyboard holds at most ${most} accents on any one of layers, pointing modes, combo feedback, behaviour feedback and replacement feedback. Remove one there before adding another.`,
         behaviours: (most) => `The keyboard holds at most ${most} behaviours. Remove one before adding another.`,
         behaviourSteps: (most) => `The keyboard holds at most ${most} behaviour tap counts, added up across all behaviours. Remove a tap count or a behaviour first.`,
+        autocorrectCorrections: (most) => `The keyboard holds at most ${most.toLocaleString("en-US")} text replacements. Delete one before adding another.`,
+        autocorrectTypos: (most) => `The keyboard holds at most ${most.toLocaleString("en-US")} inputs across all text replacements. Remove one before adding another.`,
+        autocorrectText: (most) => `The text replacement list holds at most ${most.toLocaleString("en-US")} bytes of text across its replacements and their inputs. Delete a replacement first.`,
     }),
     profile: "This change does not fit: the keyboard's profile is full. Remove an accent, a behaviour, a combo or a macro first.",
     name: "The keyboard's profile is full, so this name does not fit. Shorten another name, or remove a behaviour or combo.",
@@ -315,9 +318,9 @@ const OS_WORDS = {macos: "macOS", windows: "Windows", linux: "Linux"};
 // draws it; a note says where a section is in these words too.
 const SETTINGS_SECTIONS = Object.freeze({
     keyTiming: "Tap & hold timing", normalPointerSpeed: "Pointer speed", sniping: "Auto-sniping", autoMouse: "Auto-mouse",
-    automouseFade: "Auto-mouse fade", lightingPower: "All lighting", rgbAppearance: "Background effect", lightingFeedback: "Key feedback flash",
+    automouseFade: "Auto-mouse fade", lightingPower: "All lighting", rgbAppearance: "Background effect", lightingFeedback: "Behaviour feedback flash", replacementFeedback: "Replacement feedback flash",
     startupLayers: "Default layers", behaviorSettings: "Where behaviours run", comboSettings: "How combos run", comboReferences: "Combo layer matching",
-    keyboardOptions: "Key swaps & typing", host: "Your computer",
+    keyboardOptions: "Key swaps & typing", host: "Your computer", autocorrect: "Text replacement",
 });
 
 // A Settings screen as anything but the rail names it. The rail lists
@@ -343,6 +346,11 @@ const THRESHOLDS = Object.freeze({tapHoldTerm: "tap / hold", longHoldTerm: "long
 /** @param {import("../../contracts/model.js").WordList<unknown>} list @param {unknown} key @returns {string} */
 const word = (list, key) => (list.find(([id]) => id === key)?.[1] ?? String(key ?? ""));
 
+// QMK's switch keys for autocorrect, which is text replacement here
+// (GLOSSARY.md): each key's words, as the switch keys for combos, behaviours
+// and auto-mouse are worded (Combo On, Combo Off, Toggle Combo). QMK's own
+// words stay among a key's search terms, so either name finds it.
+const TEXT_REPLACEMENT_KEYS = Object.freeze({QK_AUTOCORRECT_ON: "Text replacement On", QK_AUTOCORRECT_OFF: "Text replacement Off", QK_AUTOCORRECT_TOGGLE: "Toggle Text replacement"});
 // How a macro plays: whether it is uninterruptible, chosen or automatic.
 /** @type {import("../../contracts/model.js").WordList<"auto" | "on" | "off">} */
 const MACRO_PROTECTION = [["auto", "Automatic"], ["on", "On"], ["off", "Off"]];
@@ -390,6 +398,12 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     // Each kind of macro step by its one name (glossary "Macro step"): the
     // add buttons, the step editor and the picker it opens all say it so.
     macroSteps: [["text", "Text"], ["tap", "Key or chord"], ["delay", "Delay"], ["press", "Press"], ["release", "Release"]],
+    // What a text replacement is (schema/autocorrect-domain-v1.js
+    // AUTOCORRECT_KIND), as its editor's choice and its tag say it.
+    replacementKinds: [["text", "Text"], ["macro", "Macro"]],
+    // The formats a text replacement list is saved in (autocorrect-import.js
+    // AUTOCORRECT_FILE_FORMATS), as Export's menu names each.
+    listFileFormats: [["txt", "Text (QMK)"], ["csv", "CSV"], ["json", "JSON"]],
     // The same names, short, as the word under a step's tile, the editor's
     // legend beside its mark and a screen reader before a chip say them; a
     // key or chord step says which of the two it is.
@@ -474,12 +488,14 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     lightingFields: {colour: "Colour", locality: "Locality", paintMode: "Which keys light up", fadeMode: "Fade mode", endColour: "End colour",
         tapBranchCommit: "Tap branch commit"},
     // What the colour editor says about HSV(0, 0, 0) in each stage: the tip on
-    // Turn off and the note shown once it is stored. Outside a layer colour
-    // and a group row black is literal black (firmware RGB domain spec,
-    // "Black"), so there only the Stage on switch paints nothing. The
-    // background effect offers no Turn off. A layer colour that paints
-    // nothing is passthrough, so its button and its reading say so in place
-    // of Turn off and Off.
+    // Turn off and the note shown once it is stored. Outside a layer colour,
+    // a replacement feedback colour and a group row black is literal black
+    // (firmware RGB domain spec, "Black"), so there only the Stage on switch
+    // paints nothing. The background effect offers no Turn off. A layer
+    // colour that paints nothing is passthrough, so its button and its
+    // reading say so in place of Turn off and Off; a replacement feedback
+    // colour that paints nothing switches its case off, which Turn off and
+    // Off already say (D-L89).
     colourOff: {
         layers: {
             offTip: "Store HSV(0, 0, 0): this layer then paints nothing, and what is beneath shows through.",
@@ -501,20 +517,39 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
             offTip: "Store HSV(0, 0, 0): this state then flashes black. To flash nothing, switch Stage on off.",
             offNote: "The colour is black, so the keyboard flashes black for this state. To flash nothing, switch Stage on off; that turns off every feedback colour.",
         },
+        autocorrect: {
+            offTip: "Store HSV(0, 0, 0): the keyboard then does not flash for this case. The other two still flash.",
+            offNote: "This case is off: the keyboard does not flash for it, and its accents that take its colour stay dark. The other two cases still flash.",
+        },
     },
     feedbackOwners: [
-        ["KEY_FEEDBACK_GROUP_ALL", "Every feedback state"],
+        ["KEY_FEEDBACK_GROUP_ALL", "Every behaviour state"],
         ["KEY_FEEDBACK_GROUP_TAP_BRANCH_PENDING", "Tap branch pending"],
         ["KEY_FEEDBACK_GROUP_TAP_COMMITTED", "Tap committed"],
         ["KEY_FEEDBACK_GROUP_HOLD_ACTIVE", "Hold active"],
         ["KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE", "Long hold active"],
     ],
-    // The behaviour tier each key feedback state flashes for, which marks its
+    // The behaviour tier each behaviour state flashes for, which marks its
     // rows with that tier's dot, as the review does; the other states have
     // none.
     feedbackTiers: {KEY_FEEDBACK_GROUP_TAP_COMMITTED: "tap", KEY_FEEDBACK_GROUP_HOLD_ACTIVE: "hold", KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE: "long"},
+    // What Replacement feedback flashes for (D-L89; the firmware's
+    // replacement-feedback semantics, D-F70): the three cases, an input
+    // replaced with text, one replaced by its macro and a replacement undone
+    // with Backspace, and all of them, which an accent may light for.
+    replacementOwners: [
+        ["AUTOCORRECT_FEEDBACK_GROUP_ALL", "Every replacement flash"],
+        ["AUTOCORRECT_FEEDBACK_GROUP_TEXT", "Replaced with text"],
+        ["AUTOCORRECT_FEEDBACK_GROUP_MACRO", "Replaced by a macro"],
+        ["AUTOCORRECT_FEEDBACK_GROUP_UNDO", "Replacement undone"],
+    ],
+    // The case each Replacement feedback colour flashes for, by the colour's
+    // field, in the order the keyboard stores them. The tab lists its
+    // colours by it, the review names them by it, and an accent of the case
+    // is found by it.
+    replacementColourOwners: {textColor: "AUTOCORRECT_FEEDBACK_GROUP_TEXT", macroColor: "AUTOCORRECT_FEEDBACK_GROUP_MACRO", undoColor: "AUTOCORRECT_FEEDBACK_GROUP_UNDO"},
     // Accents (D-L77), by the table an accent edit names: when they light,
-    // with {owner} for the layer, mode or feedback state picked; the owner
+    // with {owner} for the layer, mode, behaviour state or replacement case picked; the owner
     // that is all of a table's, by the name core reads and writes
     // (`everyOwner`, the schema's RGB_EVERY_OWNER), and what it is called, as an accent lighting for it is
     // tagged and offered and the review names it (combo accents all light for
@@ -527,25 +562,29 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
             everyOwner: RGB_EVERY_OWNER.pdMode, every: "Every pointing mode", stageColour: "Same as the mode"},
         combo: {when: "LEDs that light in a colour of their own while a combo's inputs are held: the same LEDs for every combo.",
             every: "Every combo", stageColour: "Same as combo feedback"},
-        keyBehavior: {when: "LEDs that light in a colour of their own while a key shows {owner}, with those for every feedback state: the same LEDs whichever key it is.",
-            everyOwner: RGB_EVERY_OWNER.keyBehavior, every: "Every feedback state", stageColour: "Same as the feedback colour"},
+        keyBehavior: {when: "LEDs that light in a colour of their own while a key shows {owner}, with those for every behaviour state: the same LEDs whichever key it is.",
+            everyOwner: RGB_EVERY_OWNER.keyBehavior, every: "Every behaviour state", stageColour: "Same as the feedback colour"},
+        autocorrect: {when: "LEDs that light in a colour of their own while the keyboard flashes {owner}, with those for every replacement flash: the same LEDs whichever key caused it.",
+            everyOwner: RGB_EVERY_OWNER.autocorrect, every: "Every replacement flash", stageColour: "Same as the flash colour"},
     },
     // The accent editor's own fields; its colour field is lightingFields.colour.
     accentFields: {lightsFor: "Lights for", ownColour: "Its own"},
-    // The key feedback state each Key feedback colour flashes for, by the
+    // The behaviour state each Behaviour feedback colour flashes for, by the
     // colour's field: the tiers', then the tap branches', which all wait as
-    // one state. Key feedback lists its colours by it, the review names them
+    // one state. Behaviour feedback lists its colours by it, the review names them
     // by it, and an accent of the state is found by it.
     feedbackColourOwners: {tapCommittedColor: "KEY_FEEDBACK_GROUP_TAP_COMMITTED", holdActiveColor: "KEY_FEEDBACK_GROUP_HOLD_ACTIVE",
         longHoldActiveColor: "KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE", tapBranchColors: "KEY_FEEDBACK_GROUP_TAP_BRANCH_PENDING"},
     // The groups of Lighting's lists beside an editor (webview/ui/groups.mjs
     // groupedTable): the layers and slots in use, ahead of the empty ones;
-    // Key feedback's two groups of colours, as the behaviour grid's columns
-    // and rows; and the combos by what holding one shows.
+    // Behaviour feedback's two groups of colours, as the behaviour grid's columns
+    // and rows; Replacement feedback's cases; and the combos by what holding
+    // one shows.
     lightingLists: {
         inUse: "In use",
         tiers: {title: "Tiers", tip: "Flash as a key's tap, hold or long hold fires."},
         tapBranches: {title: "Tap branches", tip: "Flash while a run of taps waits on that tap count, until it resolves."},
+        replacements: {title: "Flashes", tip: "One flash as text replacement changes what was typed, in the colour of what it did."},
         comboFeedback: {title: "Combo feedback", empty: "No combo on this view lights combo feedback."},
         holdLayer: {title: "Hold a layer", empty: "No combo on this view holds a layer."},
     },
@@ -557,7 +596,8 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
         {id: "auto", label: "Auto-mouse fade", bit: RGB_STAGE_BITS.AUTOMOUSE},
         {id: "pd", label: "Pointing modes", bit: RGB_STAGE_BITS.POINTING_MODE},
         {id: "combo", label: "Combo feedback", bit: RGB_STAGE_BITS.COMBO},
-        {id: "key", label: "Key feedback", bit: RGB_STAGE_BITS.KEY_BEHAVIOR},
+        {id: "key", label: "Behaviour feedback", bit: RGB_STAGE_BITS.KEY_BEHAVIOR},
+        {id: "autocorrect", label: "Replacement feedback", bit: RGB_STAGE_BITS.AUTOCORRECT},
     ],
 
     // A custom key's shortcut (firmware D-F26): why a layer cannot be one it
@@ -577,6 +617,13 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     // (key-names.js), and a branch or combo action that acts on a layer is
     // tagged with them. TG is a lock on this firmware (firmware D-F46).
     layerKeyVerbs: {MO: "Hold", TG: "Lock", LOCK_LAYER: "Lock", TT: "Tap-toggle", OSL: "One-shot", TO: "Move to", DF: "Default", PDF: "Default"},
+    // The switch keys for behaviours and for auto-mouse, by their names' homes
+    // (data/user-keycodes.js BEHAVIOR_SWITCH_KEYS, AUTO_MOUSE_SWITCH_KEYS),
+    // worded as QMK's catalogue words the switch keys for combos: Combo On,
+    // Combo Off, Toggle Combo.
+    switchKeys: /** @satisfies {Readonly<Record<import("../data/user-keycodes.js").BehaviorSwitchKey | import("../data/user-keycodes.js").AutoMouseSwitchKey, string>>} */ ({
+        BH_ON: "Behaviours On", BH_OFF: "Behaviours Off", BH_TOGG: "Toggle Behaviours",
+        AM_ON: "Auto-mouse On", AM_OFF: "Auto-mouse Off", AM_TOGG: "Toggle Auto-mouse"}),
     // Review's checks: each level's word, and where a check that is not new
     // in the draft comes from.
     checkLevels: {blocker: "Blocker", trap: "Trap", warning: "Warning", notice: "Notice"},
@@ -589,12 +636,16 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     // A backup's settings sections, as Import's summary counts the
     // file's differences: by their headings, but for three. The summary
     // already names behaviour and combo rows "Behaviours" and "Combos", so
-    // their sections say "settings"; Key feedback flash is counted with the
-    // Key feedback lighting stage, so it takes the stage's name.
+    // their sections say "settings"; Behaviour feedback flash and Replacement
+    // feedback flash are counted with their lighting stages, so they take the
+    // stages' names; and Text
+    // replacement's section, which is its switch, is counted beside its list
+    // and says so.
     fileSections: {
         keyTiming: SETTINGS_SECTIONS.keyTiming, startupLayers: SETTINGS_SECTIONS.startupLayers, behaviorSettings: "Behaviour settings", comboSettings: "Combo settings",
         comboReferences: SETTINGS_SECTIONS.comboReferences, keyboardOptions: SETTINGS_SECTIONS.keyboardOptions, lightingPower: SETTINGS_SECTIONS.lightingPower, rgbAppearance: SETTINGS_SECTIONS.rgbAppearance,
-        lightingFeedback: "Key feedback", normalPointerSpeed: SETTINGS_SECTIONS.normalPointerSpeed, sniping: SETTINGS_SECTIONS.sniping, autoMouse: SETTINGS_SECTIONS.autoMouse,
+        lightingFeedback: "Behaviour feedback", replacementFeedback: "Replacement feedback", normalPointerSpeed: SETTINGS_SECTIONS.normalPointerSpeed, sniping: SETTINGS_SECTIONS.sniping, autoMouse: SETTINGS_SECTIONS.autoMouse,
+        autocorrect: "Text replacement switch",
     },
     // Why a behaviour, or a key toward a combo, does not take part
     // (participation.js), in the words of the switch that says no, and of the
@@ -619,10 +670,11 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
         behaviourSteps: {label: "Behaviour tap counts", what: "Each behaviour's tap counts, up to the deepest one it sets, added up across all behaviours."},
         combos: {label: "Combos", what: "Combos on any layer."},
         macros: {label: "Macros", what: "Macro slots with steps."},
+        autocorrectInputs: {label: "Text replacement inputs", what: "Every input of every text replacement, added up across the list."},
         customKeys: {label: "Custom keys", what: "Custom keys with a name, a shortcut or a behaviour."},
         pointingModes: {label: "Pointing modes", what: "Slots that hold a pointing mode."},
         lightingGroups: {label: "LED sets", what: "The different sets of LEDs accents light; accents that light the same LEDs share one."},
-        lightingGroupRows: {label: "Accents", what: "Accents on layers, pointing modes, combo feedback and key feedback."},
+        lightingGroupRows: {label: "Accents", what: "Accents on layers, pointing modes, combo feedback, behaviour feedback and replacement feedback."},
     },
     pointing: {
         kinds: [[0, "Empty"], [1, "Send keys"], [2, "Scroll"]],
@@ -731,7 +783,8 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     // switch, and what a lighting stage adds when it is the thing kept off.
     settingOff: {switches: {behaviour: {off: "Behaviours are off.", fix: `Turn them on in ${SETTINGS_SCREENS.behaviours} →`},
         combo: {off: "Combos are off.", fix: `Turn them on in ${SETTINGS_SCREENS.combos} →`},
-        autoMouse: {off: "Auto-mouse is off.", fix: `Turn it on in ${SETTINGS_SCREENS.pointer} →`}}, stage: "This stage paints nothing."},
+        autoMouse: {off: "Auto-mouse is off.", fix: `Turn it on in ${SETTINGS_SCREENS.pointer} →`},
+        autocorrect: {off: "Text replacement is off.", detail: "The keyboard keeps this list and replaces nothing.", fix: `Turn it on in ${SETTINGS_SCREENS.host} →`}}, stage: "This stage paints nothing."},
     // A behaviour's own switch, as its editor labels it and the review names
     // it, and the fold its timings open from.
     behaviourFields: {anchor: "Keeps the pointer layer on", timings: "Timings"},
@@ -791,14 +844,14 @@ const modifierNames = (mask) => VOCABULARY.modifiers.filter(([bit]) => mask & bi
 // that screen is (the pointer's settings are Pointer's); Settings is the
 // other Settings screens'. The interface keeps a copy of the order
 // (webview/view/review.mjs AREAS, pinned by tests/view/enum-drift.test.mjs).
-const REVIEW_AREAS = Object.freeze({keys: "Keys", layers: "Layers", behaviours: "Behaviours", combos: "Combos", customKeys: "Custom keys", macros: "Macros",
+const REVIEW_AREAS = Object.freeze({keys: "Keys", layers: "Layers", behaviours: "Behaviours", combos: "Combos", customKeys: "Custom keys", macros: "Macros", autocorrect: "Text replacement",
     pointer: "Pointer", pointing: "Pointing modes", lighting: "Lighting", settings: "Settings", profile: "Profile", recovery: "Recovery"});
 // Each part of the profile as the area Review groups its changes under, by
 // the area core/schema/profile-domains.js gives it: where a refusal says the
 // keyboard found a problem.
 /** @type {Readonly<Record<import("../schema/profile-domains.js").ProfileDomain["area"], string>>} */
 const PROFILE_AREAS = Object.freeze({lighting: REVIEW_AREAS.lighting, behaviours: REVIEW_AREAS.behaviours, combos: REVIEW_AREAS.combos, settings: REVIEW_AREAS.settings,
-    pointing: REVIEW_AREAS.pointing, keys: REVIEW_AREAS.keys, macros: REVIEW_AREAS.macros});
+    pointing: REVIEW_AREAS.pointing, keys: REVIEW_AREAS.keys, macros: REVIEW_AREAS.macros, autocorrect: REVIEW_AREAS.autocorrect});
 
 // What a failure says to a person (interface contracts: no code or developer
 // word reaches one). Ark's own failures are sentences written for a person: a
@@ -848,4 +901,4 @@ function failureSentence(error) {
     return INCOMPATIBLE_ANSWERS.has(String(code)) ? FAILURE_WORDS.incompatible : FAILURE_WORDS.unreadable;
 }
 
-module.exports = {PHASE, listed, PHASE_WORDS, HALVES_WORDS, LIVE_RESULT_WORDS, SAVE_STEP_WORDS, SAVE_FAILURE_WORDS, APPLY_VERDICTS, SAVE_WORDS, INTERRUPTION_REASONS, PROFILE_FULL_WORDS, heldWords, EDIT_MODE_WORDS, editModeWords, quietWords, VOCABULARY, word, layerName, macroDefaultName, slotName, branchName, ledsCalled, LAYER_KEY_VERBS, wordedMacroError, protectionWords, settingsPath, modifierNames, PROFILE_AREAS, REVIEW_AREAS, FAILURE_WORDS, sayable, arkCode, failureSentence};
+module.exports = {TEXT_REPLACEMENT_KEYS, PHASE, listed, PHASE_WORDS, HALVES_WORDS, LIVE_RESULT_WORDS, SAVE_STEP_WORDS, SAVE_FAILURE_WORDS, APPLY_VERDICTS, SAVE_WORDS, INTERRUPTION_REASONS, PROFILE_FULL_WORDS, heldWords, EDIT_MODE_WORDS, editModeWords, quietWords, VOCABULARY, word, layerName, macroDefaultName, slotName, branchName, ledsCalled, LAYER_KEY_VERBS, wordedMacroError, protectionWords, settingsPath, modifierNames, PROFILE_AREAS, REVIEW_AREAS, FAILURE_WORDS, sayable, arkCode, failureSentence};

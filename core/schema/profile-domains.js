@@ -7,7 +7,7 @@
 // the portable document's single profile blob; editors use decoded views.
 /** @typedef {import("./profile-domains-types.js").DomainOptions} DomainOptions */
 const PROFILE_DOMAINS = Object.freeze([
-    Object.freeze({name: "RGB", id: 0x10, key: "rgb", readKey: "rgb", version: 4, wireBit: 1 << 0, area: "lighting", document: "profile",
+    Object.freeze({name: "RGB", id: 0x10, key: "rgb", readKey: "rgb", version: 5, wireBit: 1 << 0, area: "lighting", document: "profile",
         /** @param {import("./types.js").RgbInput} value @param {DomainOptions} [options] @returns {Buffer} */
         encode: (value, options = {}) => require("./rgb-domain-v1").encodeRgbDomainV1(value, options.rgb),
         /** @param {Uint8Array} bytes @param {DomainOptions} [options] @returns {import("./profile-domains-types.js").DomainModels["rgb"]} */
@@ -22,7 +22,7 @@ const PROFILE_DOMAINS = Object.freeze([
         encode: value => require("./combo-domain-v1").encodeComboDomain(value),
         /** @param {Uint8Array} bytes @param {DomainOptions} [_options] @returns {import("./profile-domains-types.js").DomainModels["combos"]} */
         decode: (bytes, _options = {}) => require("./combo-domain-v1").decodeComboDomain(bytes)}),
-    Object.freeze({name: "SETTINGS", id: 0x40, key: "settings", readKey: "settings", version: 11, wireBit: 1 << 3, area: "settings", document: "profile",
+    Object.freeze({name: "SETTINGS", id: 0x40, key: "settings", readKey: "settings", version: 12, wireBit: 1 << 3, area: "settings", document: "profile",
         /** @param {import("./types.js").SettingsDomain} value @returns {Buffer} */
         encode: value => require("./settings-domain-v1").encodeSettings(value),
         /** @param {Buffer} bytes @param {DomainOptions} [_options] @returns {import("./profile-domains-types.js").DomainModels["settings"]} */
@@ -44,6 +44,13 @@ const PROFILE_DOMAINS = Object.freeze([
         encode: value => require("./macro-domain-v1").encodeMacroDomain(value),
         /** @param {Uint8Array} bytes @param {DomainOptions} [_options] @returns {import("./profile-domains-types.js").DomainModels["macros"]} */
         decode: (bytes, _options = {}) => require("./macro-domain-v1").decodeMacroDomain(bytes)}),
+    // The autocorrect list is read from the document like the keymap and the
+    // macros: the keyboard read has no readback of its own for it.
+    Object.freeze({name: "AUTOCORRECT", id: 0x80, key: "autocorrect", readKey: undefined, version: 1, wireBit: 1 << 7, area: "autocorrect", document: "profile",
+        /** @param {import("./autocorrect-domain-v1.js").AutocorrectList} value @param {DomainOptions} [options] @returns {Buffer} */
+        encode: (value, options = {}) => require("./autocorrect-domain-v1").encodeAutocorrectDomain(value, options.autocorrect),
+        /** @param {Uint8Array} bytes @param {DomainOptions} [_options] @returns {import("./profile-domains-types.js").DomainModels["autocorrect"]} */
+        decode: (bytes, _options = {}) => require("./autocorrect-domain-v1").decodeAutocorrectDomain(bytes)}),
 ]);
 /** @typedef {typeof PROFILE_DOMAINS[number]} ProfileDomain */
 /** @typedef {ProfileDomain['name']} DomainName */

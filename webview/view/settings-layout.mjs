@@ -11,15 +11,16 @@ import {vocabulary} from "./vocabulary.mjs";
 // The Settings group of the rail, a screen per subject, each drawing its
 // sections open in the order a person reads them: where behaviours run and
 // what a key press feels like; combos and the layers they match on; how
-// the trackball moves the pointer; the computer the keyboard is plugged into
-// and the keyboard-wide swaps. Combos also holds the combo timing, saved
+// the trackball moves the pointer; the computer the keyboard is plugged into,
+// text replacement, which types through that computer's layout, and the
+// keyboard-wide swaps. Combos also holds the combo timing, saved
 // with the combos. Default layers is on none: moving the base layer covers
 // it, and the keyboard's stored value is kept as it is.
 export const SETTINGS_SCREENS = Object.freeze({
     behaviours: Object.freeze(["behaviorSettings", "keyTiming"]),
     combos: Object.freeze(["comboSettings", "comboReferences"]),
     pointer: Object.freeze(["normalPointerSpeed", "sniping", "autoMouse"]),
-    host: Object.freeze(["host", "keyboardOptions"]),
+    host: Object.freeze(["host", "autocorrect", "keyboardOptions"]),
 });
 /** @typedef {keyof typeof SETTINGS_SCREENS} SettingsScreen */
 

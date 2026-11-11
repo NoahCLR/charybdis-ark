@@ -1,13 +1,14 @@
 // @ts-check
 // Accents (D-L77): LEDs that light in a colour of their own while a layer is
-// on, a pointing mode runs, a combo's inputs are held or a key shows a
-// feedback state. The keyboard keeps them as rows in four tables, one per
-// stage, each naming a group of LEDs; Ark keeps the groups, so a person sees
+// on, a pointing mode runs, a combo's inputs are held, a key shows a
+// behaviour state or the keyboard flashes for a replacement. The keyboard
+// keeps them as rows in five tables, one per stage, each naming a group of
+// LEDs; Ark keeps the groups, so a person sees
 // only accents. Each stage's tab lists the accents of the owner it has picked,
 // and this module says which those are and what they are called, purely, so
 // the lists are tested without a screen.
 
-import {layerColourRow, layerPaints, pdColourRow, POINTING_MODE_IDS} from "./lighting.mjs";
+import {layerColourRow, layerPaints, pdColourRow, POINTING_MODE_IDS, replacementPaints} from "./lighting.mjs";
 import {layerAt, layerCalled, slotCalled, vocabulary, word} from "./vocabulary.mjs";
 
 /**
@@ -15,12 +16,12 @@ import {layerAt, layerCalled, slotCalled, vocabulary, word} from "./vocabulary.m
  * @typedef {import("../../contracts/panel.js").Accent} Accent
  * @typedef {import("../../contracts/edits.js").Colour} Colour
  * @typedef {Partial<import("../../contracts/panel.js").PublishedModel> | null | undefined} Model
- * @typedef {{layer?: number, pointingSlot?: number, feedbackRow?: string}} Picked what a stage's tab has picked: the layer shown, the pointing slot and the key feedback row
+ * @typedef {{layer?: number, pointingSlot?: number, feedbackRow?: string, replacementRow?: string}} Picked what a stage's tab has picked: the layer shown, the pointing slot, the behaviour feedback row and the replacement feedback row
  */
 
 // The stages whose tab lists accents, by the table it edits.
 /** @type {Readonly<Record<string, AccentTable>>} */
-export const ACCENT_STAGES = Object.freeze({layers: "layer", pd: "pdMode", combo: "combo", key: "keyBehavior"});
+export const ACCENT_STAGES = Object.freeze({layers: "layer", pd: "pdMode", combo: "combo", key: "keyBehavior", autocorrect: "autocorrect"});
 
 // The owner that is all of a table's, by the RGB enum name core reads and
 // writes (vocabulary.accents.everyOwner); combo accents have no such owner,
@@ -28,7 +29,7 @@ export const ACCENT_STAGES = Object.freeze({layers: "layer", pd: "pdMode", combo
 /** @param {Model} model @param {AccentTable} target @returns {string | undefined} */
 export const everyOwner = (model, target) => vocabulary(model).accents[target]?.everyOwner;
 
-// The key feedback state a Key feedback row is, by the colour it edits (a
+// The behaviour state a Behaviour feedback row is, by the colour it edits (a
 // tier's field, or any tap branch's, all of which wait as one state), and
 // the row that shows a state, a tap branch pending showing on the double
 // tap's; both read from vocabulary.feedbackColourOwners.
@@ -45,13 +46,27 @@ export function feedbackRowOf(model, owner) {
     return Object.keys(owners).find((field) => owners[/** @type {keyof typeof owners} */ (field)] === owner) || "tapCommittedColor";
 }
 
+// The case a Replacement feedback row is, by the colour it edits, and the row
+// that shows a case; both read from vocabulary.replacementColourOwners. A row
+// the tab does not have reads as its first, as the tab picks it.
+/** @param {Model} model @param {string | undefined} row */
+export function replacementOwner(model, row) {
+    const owners = vocabulary(model).replacementColourOwners;
+    return owners[/** @type {keyof typeof owners} */ (String(row))] || owners.textColor;
+}
+/** @param {Model} model @param {string} owner @returns {import("../../contracts/edits.js").AutocorrectFeedbackColourField} */
+export function replacementRowOf(model, owner) {
+    const owners = vocabulary(model).replacementColourOwners;
+    return /** @type {(keyof typeof owners)[]} */ (Object.keys(owners)).find((field) => owners[field] === owner) || "textColor";
+}
+
 /**
- * Where an owner sits on its stage's tab: the layer, the pointing slot or the
- * Key feedback row that shows its accents, or that it is all of them, which
- * every one of those shows. The one reading of an owner's name the lists,
+ * Where an owner sits on its stage's tab: the layer, the pointing slot, the
+ * Behaviour feedback row or the Replacement feedback row that shows its accents,
+ * or that it is all of them, which every one of those shows. The one reading of an owner's name the lists,
  * marks, colours and All accents' Open share.
  * @param {Model} model @param {AccentTable} target @param {string} owner
- * @returns {{every: boolean, layer?: number, slot?: number, feedbackRow?: string}}
+ * @returns {{every: boolean, layer?: number, slot?: number, feedbackRow?: string, replacementRow?: string}}
  */
 export function ownerPlace(model, target, owner) {
     if (owner && owner === everyOwner(model, target)) return {every: true};
@@ -61,11 +76,12 @@ export function ownerPlace(model, target, owner) {
     }
     if (target === "pdMode") return POINTING_MODE_IDS.includes(owner) ? {every: false, slot: POINTING_MODE_IDS.indexOf(owner)} : {every: false};
     if (target === "keyBehavior") return {every: false, feedbackRow: feedbackRowOf(model, owner)};
+    if (target === "autocorrect") return {every: false, replacementRow: replacementRowOf(model, owner)};
     return {every: false};
 }
 
 // An owner's mark, as the review marks the same accent: the layer's or
-// pointing mode's icon in its colour, a feedback state's tier dot; none for
+// pointing mode's icon in its colour, a behaviour state's tier dot; none for
 // the owner that is all of them, or combo feedback's.
 /** @param {Model} model @param {AccentTable} target @param {string} owner @returns {import("../../contracts/model.js").ReviewMark | null} */
 export function ownerMark(model, target, owner) {
@@ -82,12 +98,13 @@ export function accentRows(model, target) {
     if (target === "layer") return rgb?.layerAccents || [];
     if (target === "pdMode") return rgb?.pdModeAccents || [];
     if (target === "combo") return rgb?.comboAccents || [];
+    if (target === "autocorrect") return rgb?.autocorrectFeedbackAccents || [];
     return rgb?.keyFeedbackAccents || [];
 }
 
 /**
- * Whose accents a stage's tab shows: the layer shown, or the pointing slot or
- * feedback state picked; null for a stage with no accents.
+ * Whose accents a stage's tab shows: the layer shown, or the pointing slot,
+ * behaviour state or replacement case picked; null for a stage with no accents.
  * @param {Model} model @param {string} stage @param {Picked} picked @returns {{target: AccentTable, owner: string} | null}
  */
 export function accentOwner(model, stage, picked) {
@@ -99,13 +116,16 @@ export function accentOwner(model, stage, picked) {
     }
     if (target === "pdMode") return {target, owner: POINTING_MODE_IDS[picked.pointingSlot ?? 0]};
     if (target === "combo") return {target, owner: ""};
+    if (target === "autocorrect") return {target, owner: replacementOwner(model, picked.replacementRow)};
     return {target, owner: feedbackOwner(model, picked.feedbackRow)};
 }
 
 /**
  * The accents a tab lists for an owner. `here` it edits: its own and those
- * of the owner that is all of them, which light here too, in the order the
- * keyboard paints them, a later one repainting an earlier one. `beneath`,
+ * of the owner that is all of them, which light here too, in their stored
+ * order. The keyboard paints them in that order, a later one repainting an
+ * earlier one, except that behaviour feedback's and replacement feedback's rows
+ * for every state or case paint before the rows naming one. `beneath`,
  * for a layer above the base, are the base layer's, which stay lit over it
  * (firmware paints every layer's accents after all the layer colours) and
  * are edited on the base. Each keeps its index in its table, which an edit
@@ -122,13 +142,14 @@ export function accentsFor(model, target, owner) {
     };
 }
 
-/** What an owner is called: the layer's or mode's name, the feedback state, or the owner that is all of them. @param {Model} model @param {AccentTable} target @param {string} owner */
+/** What an owner is called: the layer's or mode's name, the behaviour state, the replacement case, or the owner that is all of them. @param {Model} model @param {AccentTable} target @param {string} owner */
 export function ownerCalled(model, target, owner) {
     const place = ownerPlace(model, target, owner);
     if (place.every) return vocabulary(model).accents[target]?.every || owner;
     if (place.layer !== undefined) return layerCalled((model?.layers || []).find((layer) => layer.index === place.layer)) || owner;
     if (place.slot !== undefined) return slotCalled(model, place.slot) || owner;
     if (target === "keyBehavior") return word(vocabulary(model).feedbackOwners, owner);
+    if (target === "autocorrect") return word(vocabulary(model).replacementOwners, owner);
     return "";
 }
 
@@ -145,7 +166,8 @@ export function accentsWhen(model, target, owner) {
 /**
  * The colour an accent that takes its stage's colour lights with: the layer's
  * where it paints (the shown layer's for every layer's), the mode's, combo
- * feedback's or the feedback state's; null when it would paint nothing.
+ * feedback's, the behaviour state's or the replacement case's where it
+ * flashes; null when it would paint nothing.
  * @param {Model} model @param {AccentTable} target @param {string} owner @param {Picked} picked @returns {Colour | null}
  */
 export function stageShade(model, target, owner, picked) {
@@ -157,6 +179,10 @@ export function stageShade(model, target, owner, picked) {
     }
     if (target === "pdMode") return pdColourRow(model, place.every ? picked.pointingSlot ?? 0 : place.slot ?? -1)?.color || null;
     if (target === "combo") return model?.rgb?.comboFeedback?.color || null;
+    if (target === "autocorrect") {
+        const colour = model?.rgb?.autocorrectFeedback?.[replacementRowOf(model, place.every ? replacementOwner(model, picked.replacementRow) : owner)];
+        return colour && replacementPaints(colour) ? colour : null;
+    }
     const row = place.every ? picked.feedbackRow : place.feedbackRow;
     const feedback = model?.rgb?.keyBehaviorFeedback;
     if (String(row || "").startsWith("branch:")) return feedback?.tapBranchColors?.[0] || null;

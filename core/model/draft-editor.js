@@ -12,6 +12,7 @@ const {editProfileDomains} = require("./portable-profile");
 const {draftEditEntry} = require("./draft-edits");
 const {editSettings} = require("./settings-editor");
 const {editMacro} = require("./macro-editor");
+const {editAutocorrect} = require("./autocorrect-editor");
 const {editCustomKey} = require("./custom-key-editor");
 const {editKeyboardName} = require("./keyboard-name");
 const {editSlots} = require("./slot-editor");
@@ -68,6 +69,7 @@ const HANDLERS = Object.freeze(/** @satisfies {{[E in Exclude<Editor, "profile">
     keymap: editLayout,
     settings: editSettings,
     macro: editMacro,
+    autocorrect: editAutocorrect,
     customKey: editCustomKey,
     keyboardName: editKeyboardName,
     slots: editSlots,
@@ -79,6 +81,7 @@ const HANDLERS = Object.freeze(/** @satisfies {{[E in Exclude<Editor, "profile">
 const CHANGED_SINCE = {
     settings: ["The keyboard changed since these settings were opened. Read the keyboard and review your changes before saving again.", "INVALID_SETTINGS_EDIT"],
     macro: ["The keyboard changed since this macro draft was opened. Read the keyboard and review the draft before saving again.", "MACRO_EDIT_CONFLICT"],
+    autocorrect: ["The keyboard changed since this list was opened. Read the keyboard and review the draft before saving again.", "AUTOCORRECT_EDIT_CONFLICT"],
     customKey: ["The keyboard changed since this draft was opened. Read the keyboard and review the draft before saving again.", "CUSTOM_KEY_EDIT_CONFLICT"],
     keyboardName: ["The keyboard changed since this draft was opened. Read the keyboard and review the draft before saving again.", "KEYBOARD_NAME_EDIT_CONFLICT"],
     slots: ["The keyboard changed since this draft was opened. Read the keyboard and review the draft before swapping slots again.", "SLOT_EDIT_CONFLICT"],

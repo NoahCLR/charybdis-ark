@@ -13,7 +13,7 @@ import {draftBlockWords} from "./vocabulary.mjs";
 
 /**
  * @typedef {import("../../contracts/panel.js").PublishedModel} Model
- * @typedef {"keys" | "lighting" | "discard" | "behaviours" | "settings" | "macros" | "customKeys" | "pointing" | "combos" | "layers" | "import" | "export"} EditArea
+ * @typedef {"keys" | "lighting" | "discard" | "behaviours" | "settings" | "macros" | "autocorrect" | "customKeys" | "pointing" | "combos" | "layers" | "import" | "export"} EditArea
  * @typedef {{editable: boolean, quiet: boolean, why: string}} EditGate
  */
 
@@ -35,6 +35,7 @@ const TAKES_EDITS = {
     behaviours: draftAnd((model) => Boolean(model?.behaviorEditing?.writable)),
     settings: draftAnd((model) => Boolean(model?.settingsEditing?.writable)),
     macros: draftAnd((model) => Boolean(model?.macroEditing?.writable)),
+    autocorrect: draftAnd((model) => Boolean(model?.autocorrectEditing?.writable)),
     customKeys: draftAnd((model) => Boolean(model?.customKeyEditing?.writable)),
     pointing: draftAnd((model) => Boolean(model?.pdModeEditing?.writable)),
     combos: draftAnd((model) => model?.comboReadback?.writable !== false),

@@ -6,10 +6,11 @@
 // its colour where it paints, then the layers' accents, then a held combo's
 // feedback where its output runs the pointing mode, then a running pointing
 // mode's colour where it reaches and its accents, then any other held
-// combo's feedback where it reaches and its accents. The interface's
-// lighting preview runs it as a person turns layers on, holds a pointing
-// mode or holds a combo (webview/view/lighting.mjs); what it paints with it
-// reads from the model (D-L73).
+// combo's feedback where it reaches and its accents, and last a replacement
+// flash where it reaches and its accents. The interface's lighting preview
+// runs it as a person turns layers on, holds a pointing mode, holds a combo
+// or picks a replacement flash (webview/view/lighting.mjs); what it paints
+// with it reads from the model (D-L73).
 
 /** @typedef {{h?: string | number, s?: string | number, v?: string | number}} Colour */
 /**
@@ -20,6 +21,7 @@
  * @property {{colour: Colour | null | undefined, owners: number[]}[]} layerGroups The layer accents that light this LED, in stored order, with the layers on that own each.
  * @property {{colour: Colour, reaches: boolean, groups: (Colour | null | undefined)[]} | null} pointing A running pointing mode's stage, null when none runs or it is off: its colour, whether its locality reaches this LED, and its groups that hold this LED.
  * @property {{colour: Colour, reaches: boolean, groups: (Colour | null | undefined)[], beneath?: boolean} | null} [combo] A held combo's feedback, null when none is held, it holds a momentary layer (the layer stage shows the hold) or the stage is off: its colour, whether its locality reaches this LED, its accents that hold this LED, and whether it paints beneath the pointing mode, as one whose output runs that mode does (firmware stage 3).
+ * @property {{colour: Colour, reaches: boolean, every: (Colour | null | undefined)[], own: (Colour | null | undefined)[]} | null} [replacement] A replacement flash showing (firmware stage 8), null when none shows or the stage is off: its case's colour, whether its locality reaches this LED, and its accents that hold this LED, those for every case (`every`) and those for its own (`own`), each in stored order.
  */
 
 export const OFF = Object.freeze({h: "0", s: "0", v: "0"});
@@ -30,6 +32,10 @@ export const OFF = Object.freeze({h: "0", s: "0", v: "0"});
 // (rgb_helpers.h rgb_hsv_is_inherit_color).
 /** @param {Colour | null | undefined} colour */
 export const layerPaints = (colour) => Boolean(colour) && !(Number(colour?.s) === 0 && Number(colour?.v) === 0);
+// A replacement feedback colour follows the layer colour's rule (firmware
+// D-F70): with saturation and value 0, at any hue, its case does not flash;
+// with brightness alone at zero it flashes black.
+export const replacementPaints = layerPaints;
 /** @param {Colour | null | undefined} colour */
 export const inheritsStageColour = (colour) => !colour || (Number(colour?.h) === 0 && Number(colour?.s) === 0 && Number(colour?.v) === 0);
 
@@ -37,7 +43,7 @@ export const inheritsStageColour = (colour) => !colour || (Number(colour?.h) ===
  * The colour one LED shows, which stage painted it, and the layer that did.
  * @param {LedStages} stages @returns {{colour: Colour, source: string, layer?: number | null}}
  */
-export function ledColour({off, base, layers, layerGroups, pointing, combo = null}) {
+export function ledColour({off, base, layers, layerGroups, pointing, combo = null, replacement = null}) {
     if (off) return {colour: OFF, source: "off"};
     /** @type {Colour} */
     let colour = base?.colour || OFF;
@@ -73,5 +79,17 @@ export function ledColour({off, base, layers, layerGroups, pointing, combo = nul
     // Any other combo paints above them all (stage 6); black is black here
     // too.
     if (combo && !combo.beneath) paintCombo(combo);
+    // A replacement flash paints last. A case whose colour paints nothing
+    // does not flash, and neither do its accents that take its colour; an
+    // accent in a colour of its own still lights. Accents for every case
+    // paint before those naming one, so the narrower repaints them.
+    if (replacement) {
+        const flashes = replacementPaints(replacement.colour);
+        if (flashes && replacement.reaches) paint(replacement.colour, "replacement");
+        for (const group of [...replacement.every, ...replacement.own]) {
+            if (!inheritsStageColour(group)) paint(/** @type {Colour} */ (group), "replacement");
+            else if (flashes) paint(replacement.colour, "replacement");
+        }
+    }
     return {colour, source, layer: painter};
 }

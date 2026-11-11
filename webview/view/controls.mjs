@@ -28,6 +28,21 @@ export const layersFollow = (keysFollow, names) => ({type: 'editPortableLayer', 
 /** @param {number} id @param {LayerMove} change @param {string[]} names @returns {import("../../contracts/messages.js").LayerEditControl} */
 export const moveLayer = (id, change, names) => ({type: 'editPortableLayer', id, ...change, names});
 
+// An autocorrect list file (D-L85): a dropped file or the file the shell's
+// chooser picks, read and judged against the draft; and the draft's list
+// saved in one of the three formats.
+/** @param {string} text @param {string} name @param {number} requestId @returns {import("../../contracts/messages.js").ControlsOn<'inspect'>} */
+export const previewAutocorrectFile = (text, name, requestId) => ({type: 'previewAutocorrectImport', text, name, requestId});
+/** @param {number} requestId @returns {import("../../contracts/messages.js").ControlsOn<'inspect'>} */
+export const chooseAutocorrectFile = (requestId) => ({type: 'chooseAutocorrectFile', requestId});
+/** @param {import("../../contracts/messages.js").AutocorrectFileFormat} format @returns {import("../../contracts/messages.js").PortableControl} */
+export const exportAutocorrect = (format) => ({type: 'exportAutocorrect', format});
+
+// Try it: what the keyboard would leave on screen for what was typed into
+// the box (`\b` for Backspace) after the text already in it.
+/** @param {{before: string, typed: string, capsLock: boolean}} tried @param {number} requestId @returns {import("../../contracts/messages.js").ControlsOn<'inspect'>} */
+export const tryAutocorrect = ({before, typed, capsLock}, requestId) => ({type: 'tryAutocorrect', before, typed, capsLock, requestId});
+
 // Live preview + save (firmware D-F32): the keyboard's Save and Revert, the
 // answer to a live edit's trap check, and how edits reach the keyboard.
 /** @param {boolean} [confirmChecks] @returns {import("../../contracts/messages.js").DraftControl} */

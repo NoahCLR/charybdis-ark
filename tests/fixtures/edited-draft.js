@@ -1,8 +1,9 @@
 "use strict";
+const {CURRENT_BASE} = require("./portable-profile");
 // A draft of the PD profile (./pd-profile) with one edit in every area the
 // review describes: keys, a key's participation, a layer's name, macros (steps
 // and name), the key timing settings section, a behaviour, a combo
-// and the combo timing, a custom key, the keyboard's name, a pointing slot and
+// and the combo timing, the autocorrect list (an entry added, one respelled), a custom key, the keyboard's name, a pointing slot and
 // the lighting records.
 const {fingerprint, reorderLayers, summary, validateSnapshot} = require("../../core/model/portable-profile");
 const {settingsEditorView} = require("../../core/model/settings-editor");
@@ -11,7 +12,7 @@ const {LAYER_IDENTITY} = require("../../core/data/charybdis-layout");
 const {RGB_LOCALITIES, RGB_TAP_COMMIT_MODES} = require("../../core/schema/rgb-domain-v1");
 const {document: pdDocument} = require("./pd-profile");
 
-const capabilities = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 3}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0x67df11b3};
+const capabilities = CURRENT_BASE;
 /** @param {import("../../core/model/types.js").PortableDocument} document */
 const snapshotOf = (document) => ({document, fingerprint: fingerprint(document), summary: summary(document), limits: {brightnessMax: 200}});
 
@@ -34,6 +35,8 @@ function editedDraft() {
     stage({type: "retargetBehavior", keycode: "KC_ESCAPE", target: "KC_Q", expectedBase: draft.identity()});
     stage({type: "addCombo", inputs: ["KC_A", "KC_B"], output: "KC_C", termMs: "50", holdTermMs: "200"});
     stage({type: "updateComboDefaultWindow", defaultTermMs: "70"});
+    stage({type: "addAutocorrectTypos", correction: "then", typos: [{typo: "tehn"}], expectedFingerprint: draft.current.fingerprint});
+    stage({type: "updateAutocorrectCorrection", correction: "thing", to: "things"});
     stage({type: "updateCustomKey", keycode: "CUSTOM_KEY_3", name: "Thumb", expectedFingerprint: draft.current.fingerprint});
     stage({type: "renameKeyboard", name: "Desk", expectedFingerprint: draft.current.fingerprint});
     stage({type: "updateLayerColor", layer: "Layer 2", mode: "ALL_KEYS", h: 20, s: 200, v: 100});
@@ -45,6 +48,8 @@ function editedDraft() {
     const named = (names, value) => Object.keys(names).find((name) => names[name] === value);
     stage({type: "updateKeyBehaviorFeedback", config: {...feedback, holdActiveColor: {h: 5, s: 6, v: 7},
         tapCommitMode: named(RGB_TAP_COMMIT_MODES, feedback.tapCommitMode), locality: named(RGB_LOCALITIES, feedback.locality)}});
+    const replacement = validateSnapshot(draft.document).rgb.autocorrectFeedback;
+    stage({type: "updateAutocorrectFeedback", config: {...replacement, undoColor: {h: 8, s: 9, v: 10}, locality: named(RGB_LOCALITIES, replacement.locality)}});
     stage({type: "updateRgbStages", stageEnableMask: validateSnapshot(draft.document).rgb.stageEnableMask ^ 1});
     stage({type: "addRgbLedGroup", group: {target: "layer", owner: "Layer 3", ledIndices: [1, 2, 3], h: 0, s: 0, v: 0}});
     const slot = validateSnapshot(draft.document).pdModes[1];

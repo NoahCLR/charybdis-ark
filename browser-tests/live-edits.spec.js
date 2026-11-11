@@ -134,6 +134,44 @@ test("combos turned off by a key show beside the switch, not as a change", async
     await expect(page.locator(".commit.live")).toContainText("1 unsaved change");
 });
 
+// The switch keys BH_OFF and BH_TOGG (firmware D-F66) turn behaviours off as
+// CM_OFF and CM_TOGG do combos, and Behaviour settings says so the same way.
+test("behaviours turned off by a key show beside their switch, which says keyboard keys change it", async ({page}) => {
+    await openLive(page, "behaviours");
+    const row = page.locator('.setrow:has([data-macro="behaviorsEnabled"])');
+    await expect(row.locator(".kk-mark")).toHaveText(["↺ keyboard keys change this too"]);
+    await withModel(page, model => {model.offByKey = {combo: false, behaviour: true, autoMouse: false, autocorrect: false};});
+    await expect(row.locator(".off-by-key")).toHaveText("turned off by key");
+    await expect(page.locator(".off-by-key")).toHaveCount(1);
+});
+
+// AM_OFF and AM_TOGG (firmware D-F66) switch auto-mouse the same way, and
+// Pointer settings says so beside its Auto-mouse switch, still on.
+test("auto-mouse turned off by a key shows beside its switch, which says keyboard keys change it", async ({page}) => {
+    await openLive(page, "pointer");
+    const row = page.locator('.setrow:has([data-macro="autoMouse"])');
+    await expect(row.locator(".kk-mark")).toHaveText(["↺ keyboard keys change this too"]);
+    await expect(row.locator(".off-by-key")).toHaveCount(0);
+    await withModel(page, model => {model.offByKey = {combo: false, behaviour: false, autoMouse: true, autocorrect: false};});
+    await expect(row.locator(".off-by-key")).toHaveText("turned off by key");
+    await expect(row.locator('[data-macro="autoMouse"]')).toBeChecked();
+    await expect(page.locator(".off-by-key")).toHaveCount(1);
+    await expect(page.locator(".commit.live")).toContainText("1 unsaved change");
+});
+
+// AC_OFF and AC_TOGG (firmware D-F66) switch text replacement the same way,
+// and its switch, on the Host screen with the other switches' kind, says so.
+test("text replacement turned off by a key shows beside its Host switch, which says keyboard keys change it", async ({page}) => {
+    await openLive(page, "host");
+    const row = page.locator('.settings-group[data-section="autocorrect"] .setrow:has([data-macro="autocorrect"])');
+    await expect(row.locator(".kk-mark")).toHaveText(["↺ keyboard keys change this too"]);
+    await expect(row.locator(".off-by-key")).toHaveCount(0);
+    await withModel(page, model => {model.offByKey = {combo: false, behaviour: false, autoMouse: false, autocorrect: true};});
+    await expect(row.locator(".off-by-key")).toHaveText("turned off by key");
+    await expect(page.locator(".off-by-key")).toHaveCount(1);
+    await expect(page.locator(".commit.live")).toContainText("1 unsaved change");
+});
+
 // In the live modes a builder's Keep sends its edit to the keyboard at once,
 // and posts as in Review and save.
 test("the combo builder's Keep says it sends the combo to the keyboard, and posts", async ({page}) => {

@@ -11,11 +11,12 @@ import {stageAuto} from "./auto.mjs";
 import {stagePointing} from "./pd.mjs";
 import {stageCombo} from "./combo.mjs";
 import {stageKey} from "./key.mjs";
+import {stageAutocorrect} from "./autocorrect.mjs";
 import {accentsOverview} from "./accents.mjs";
 
 // The bench chooses one surface; each stage owns its controls and listeners.
 /** @type {Readonly<Record<string, (model: import("../../../contracts/panel.js").PublishedModel) => HTMLElement>>} */
-const STAGES = Object.freeze({base: stageBase, layers: stageLayers, auto: stageAuto, pd: stagePointing, combo: stageCombo, key: stageKey, accents: accentsOverview});
+const STAGES = Object.freeze({base: stageBase, layers: stageLayers, auto: stageAuto, pd: stagePointing, combo: stageCombo, key: stageKey, autocorrect: stageAutocorrect, accents: accentsOverview});
 
 // A stage a global switch keeps from painting leads with that switch's banner,
 // and its height counts the banner too.
@@ -33,7 +34,7 @@ function stageSurface(model, id) {
 // height holds until the model, the width or what the stages show from the
 // panel's state changes, so a render that changes none of them lays out no
 // stage unseen.
-const LISTED = Object.freeze(["layers", "pd", "combo", "key"]);
+const LISTED = Object.freeze(["layers", "pd", "combo", "key", "autocorrect"]);
 /** @param {HTMLElement} surface */
 const holding = (surface) => { const box = el(`<div></div>`); box.appendChild(surface); return box; };
 /** @type {{model: object | null, key: string, heights: Map<string, number>}} */
@@ -43,8 +44,8 @@ export function matchTallestStageHeight(root) {
     const bench = /** @type {HTMLElement | null} */ (root.querySelector(".lighting-bench"));
     const model = getModel();
     if (!bench || !model) return;
-    const {accent, allSlotsShown, comboPreview, emptyLayersShown, feedbackRow, layer, layersOn, lightingGroupsShut, pointingSlot} = state;
-    const key = JSON.stringify([bench.clientWidth, accent, allSlotsShown, comboPreview, emptyLayersShown, feedbackRow, layer, layersOn, lightingGroupsShut, pointingSlot]);
+    const {accent, allSlotsShown, comboPreview, emptyLayersShown, feedbackRow, layer, layersOn, lightingGroupsShut, pointingSlot, replacementRow} = state;
+    const key = JSON.stringify([bench.clientWidth, accent, allSlotsShown, comboPreview, emptyLayersShown, feedbackRow, layer, layersOn, lightingGroupsShut, pointingSlot, replacementRow]);
     if (measured.model !== model || measured.key !== key) measured = {model, key, heights: new Map()};
     let tallest = bench.getBoundingClientRect().height;
     for (const stage of LISTED) {

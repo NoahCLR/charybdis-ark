@@ -14,7 +14,7 @@ const {builtInActions} = require("./built-in-behavior");
 const {emptyCells} = require("./empty-cells");
 const {changesNothing} = require("./inert-behaviors");
 const {
-    RGB_AUTOMOUSE_MODES, RGB_DOMAIN_V1, RGB_EVERY_OWNER, RGB_KEY_SEMANTICS, RGB_LAYER_MODES,
+    RGB_AUTOCORRECT_SEMANTICS, RGB_AUTOMOUSE_MODES, RGB_DOMAIN_V1, RGB_EVERY_OWNER, RGB_KEY_SEMANTICS, RGB_LAYER_MODES,
     RGB_LOCALITIES, RGB_POINTING_MODE_IDS, RGB_TAP_COMMIT_MODES,
 } = require("../schema/rgb-domain-v1");
 
@@ -153,6 +153,15 @@ function rgbForView(domain) {
             locality: enumName(RGB_LOCALITIES, domain.keyFeedback.locality),
         },
         keyFeedbackAccents: groupRows(domain.keyGroupRows, (row) => enumName(RGB_KEY_SEMANTICS, row.semantic)),
+        // Replacement feedback (firmware D-F70): a colour for each case, one
+        // of saturation and value 0 painting nothing for its own.
+        autocorrectFeedback: {
+            textColor: colorForView(domain.autocorrectFeedback.textColor),
+            macroColor: colorForView(domain.autocorrectFeedback.macroColor),
+            undoColor: colorForView(domain.autocorrectFeedback.undoColor),
+            locality: enumName(RGB_LOCALITIES, domain.autocorrectFeedback.locality),
+        },
+        autocorrectFeedbackAccents: groupRows(domain.autocorrectGroupRows, (row) => enumName(RGB_AUTOCORRECT_SEMANTICS, row.semantic)),
     };
 }
 

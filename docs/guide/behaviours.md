@@ -51,7 +51,8 @@ marked **standard key**:
 
 - An empty Single tap sends the key's own keycode, and an empty Hold holds
   it. A layer-tap key holds its layer; a mod-tap key holds its modifiers. A
-  macro plays. A custom key sends its shortcut; a Tap-toggle one does
+  macro plays. A pointing mode's lock key locks the mode, and a switch key
+  turns combos, behaviours or auto-mouse on or off (below). A custom key sends its shortcut; a Tap-toggle one does
   nothing on a tap, a One-shot one arms its layers, and one with no shortcut
   does nothing.
 - A hold that starts as the key goes down, such as a layer key's or a
@@ -200,14 +201,42 @@ The switches per layer fold the [empty layers](board-and-layers.md#empty-layers)
 at their end; **Layers it runs on** shows any it is off on.
 
 The layer that counts is the one the key comes from: a transparent key takes
-the switches of the layer it falls through to. When a behaviour is off for a
-key, the key does what it would without one: the board shows no dots on it,
-and the Key tab and the hover card say which switch is keeping it off, with
-no branches or timing, since none of them run.
+the switches of the layer it falls through to. When one of these switches
+keeps a behaviour off for a key, the key does what it would without one: the
+board shows no dots on it, and the Key tab and the hover card say which
+switch is keeping it off, with no branches or timing, since none of them run.
 
-A key on the keyboard can turn behaviours or combos off for now. Behaviour
-settings or Combo settings then marks the switch **turned off by key**. That
-isn't a change and isn't in Review: the key, or unplugging, turns it back on.
+### Switch keys
+
+A **switch key** on the keyboard turns behaviours, combos,
+[auto-mouse](pointing.md#pointer-settings) or
+[text replacement](text-replacement.md#turning-it-on-and-off) on or off for the whole
+keyboard until it restarts: **Behaviours On**, **Behaviours Off** and **Toggle
+Behaviours** (`BH_ON`, `BH_OFF`, `BH_TOGG`), QMK's **Combo On**, **Combo Off**
+and **Toggle Combo** (`CM_ON`, `CM_OFF`, `CM_TOGG`), **Auto-mouse On**,
+**Auto-mouse Off** and **Toggle Auto-mouse** (`AM_ON`, `AM_OFF`, `AM_TOGG`),
+and **Text replacement On**, **Text replacement Off** and **Toggle Text
+replacement**, which are QMK's autocorrect keys (`AC_ON`, `AC_OFF`,
+`AC_TOGG`).
+Nothing is saved, and the switches in Ark stay as they are. That is why each
+switch, the **Enabled** of Behaviour settings and Combo settings, Pointer
+settings' **Auto-mouse** and the **Enabled** of Host settings' **Text
+replacement**, says
+**↺ keyboard keys change this too**. When a
+switch key has turned one off while Ark has it on, its settings mark it
+**turned off by key**. Nothing else says so: the board, the Key tab, the hover
+card and Lighting's auto-mouse fade show what the switches in Ark allow. It
+isn't a change and isn't in Review; the key, or unplugging, turns it back on.
+A switch key can't turn on what is off in Ark.
+
+A switch key goes on a key, in a behaviour's tap or hold, or as a combo's
+output, but not in a macro. With a behaviour of its own it does what the
+behaviour decides: held for its Hold it switches nothing, and where the
+behaviour leaves the Tap empty, a tap switches. While behaviours are off a
+key does what it would without one, so `BH_ON` and `BH_TOGG` turn them back
+on even with a behaviour of their own. A behaviour already holding something
+when behaviours go off keeps it until you let go. The picker lists all twelve
+under **Other QMK**, in **Switch keys**.
 
 ## Behaviour settings
 
@@ -224,9 +253,9 @@ behaviour leaves its own empty:
 - **Long hold threshold**.
 - **Multi tap window**.
 
-Each behaviour timing wears the colour its key feedback flashes: the two
+Each behaviour timing wears the colour its behaviour feedback flashes: the two
 behaviour thresholds their tier's dot, and the Multi tap window an "N×" badge
-split between the tap-branch colours, Key feedback's colour for each tap count
+split between the tap-branch colours, Behaviour feedback's colour for each tap count
 from 2× up, since it decides all of them.
 
 Changing a default moves every behaviour that follows it. Ark refuses a

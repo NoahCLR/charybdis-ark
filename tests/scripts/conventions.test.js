@@ -198,8 +198,14 @@ test("semantic domain lookups do not use a position's stored keycode name", () =
     assert.deepEqual(violations, []);
 });
 
-test("the page's backup chooser holds a file to the backup's byte limit", () => {
-    assert.match(read("web/web-shell.mjs"), /file\.size > FILE_MAX_BYTES\b/);
+// A chosen file is held to its kind's byte limit: a backup's unless the
+// chooser was opened for an autocorrect list, which has its own.
+test("the page's chooser holds a file to its kind's byte limit, a backup's by default", () => {
+    const shell = read("web/web-shell.mjs");
+    assert.match(shell, /const BACKUP_FILE = Object\.freeze\(\{[^}]*\bmax: FILE_MAX_BYTES\b/);
+    assert.match(shell, /const LIST_FILE = Object\.freeze\(\{[^}]*\bmax: LIST_FILE_MAX_BYTES\b/);
+    assert.match(shell, /readProfileFile\(file, kind = BACKUP_FILE\)/);
+    assert.match(shell, /file\.size > kind\.max\b/);
 });
 
 // Source with its comments blanked, so a rule can match across lines while

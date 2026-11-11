@@ -1,6 +1,6 @@
 {
   "profile": {
-    "formatVersion": 4,
+    "formatVersion": 5,
     "stageEnableMask": 31,
     "groups": [
       {"id": 0, "leds": []},
@@ -49,7 +49,14 @@
     "keyGroupRows": [
       {"semantic": 255, "color": {"h": 0, "s": 0, "v": 0}, "groupId": 2},
       {"semantic": 2, "color": {"h": 1, "s": 2, "v": 3}, "groupId": 1}
-    ]
+    ],
+    "autocorrectFeedback": {
+      "textColor": {"h": 0, "s": 0, "v": 0},
+      "macroColor": {"h": 0, "s": 0, "v": 0},
+      "undoColor": {"h": 0, "s": 0, "v": 0},
+      "locality": 0
+    },
+    "autocorrectGroupRows": []
   },
   "studioModel": {
     "layers": [

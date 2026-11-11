@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {OFF, inheritsStageColour, layerPaints, ledColour} from "../../rules/led-light.mjs";
+import {OFF, inheritsStageColour, layerPaints, ledColour, replacementPaints} from "../../rules/led-light.mjs";
 
 const colour = (h, s, v) => ({h: String(h), s: String(s), v: String(v)});
 const stages = (more = {}) => ({off: false, base: {colour: colour(10, 20, 30), source: "base"}, layers: [], layerGroups: [], pointing: null, ...more});
@@ -45,4 +45,35 @@ test("a layer colour with no saturation or value paints nothing, and a black gro
     assert.deepEqual(ledColour(stages({layers: row, layerGroups: [{colour: colour(0, 0, 0), owners: [1]}]})).colour, colour(80, 255, 255), "inherits the layer's colour");
     assert.deepEqual(ledColour(stages({pointing: {colour: colour(9, 9, 9), reaches: false, groups: [colour(0, 0, 0)]}})).colour, colour(9, 9, 9), "a pointing group inherits the mode's");
     assert.deepEqual(ledColour(stages({pointing: {colour: colour(9, 9, 9), reaches: true, groups: []}, layers: null})).colour, colour(9, 9, 9));
+});
+
+test("a replacement flash paints last, where it reaches, then its accents: those for every case before those for its own", () => {
+    const layers = [{layer: 0, colour: colour(80, 255, 255), paints: true}];
+    const combo = {colour: colour(190, 255, 200), reaches: true, groups: []};
+    const pointing = {colour: colour(9, 255, 255), reaches: true, groups: []};
+    const flash = {colour: colour(106, 255, 200), reaches: true, every: [], own: []};
+    assert.deepEqual(ledColour(stages({layers, combo, pointing, replacement: flash})), {colour: flash.colour, source: "replacement", layer: null}, "over every other stage");
+    assert.equal(ledColour(stages({layers, replacement: {...flash, reaches: false}})).source, "layer", "outside its locality what is beneath shows");
+    const accent = colour(20, 255, 200), narrower = colour(30, 255, 200);
+    assert.deepEqual(ledColour(stages({layers, replacement: {...flash, reaches: false, every: [accent]}})).colour, accent, "its accent paints wherever it names");
+    assert.deepEqual(ledColour(stages({layers, replacement: {...flash, reaches: false, every: [colour(0, 0, 0)]}})).colour, flash.colour, "a black accent takes the case's colour");
+    assert.deepEqual(ledColour(stages({layers, replacement: {...flash, every: [accent], own: [narrower]}})).colour, narrower, "an accent naming the case repaints one for every case");
+    assert.deepEqual(ledColour(stages({layers, replacement: {...flash, every: [accent, narrower], own: []}})).colour, narrower, "accents keep their stored order");
+    assert.equal(ledColour(stages({layers, replacement: null})).source, "layer");
+    assert.deepEqual(ledColour(stages({off: true, layers, replacement: flash})), {colour: OFF, source: "off"});
+});
+
+test("a replacement case whose colour has no saturation or value does not flash, nor do its black accents; a coloured accent still lights", () => {
+    assert.equal(replacementPaints(colour(0, 0, 0)), false);
+    assert.equal(replacementPaints(colour(77, 0, 0)), false, "at any hue");
+    assert.equal(replacementPaints(colour(0, 255, 0)), true, "brightness alone at zero flashes black");
+    assert.equal(replacementPaints(colour(0, 0, 1)), true);
+    const layers = [{layer: 0, colour: colour(80, 255, 255), paints: true}];
+    const dark = {colour: colour(77, 0, 0), reaches: true, every: [], own: []};
+    assert.equal(ledColour(stages({layers, replacement: dark})).source, "layer", "the case paints nothing");
+    assert.equal(ledColour(stages({layers, replacement: {...dark, every: [colour(0, 0, 0)], own: [colour(0, 0, 0)]}})).source, "layer", "a black accent of it paints nothing");
+    const accent = colour(20, 255, 200);
+    assert.deepEqual(ledColour(stages({layers, replacement: {...dark, own: [accent]}})), {colour: accent, source: "replacement", layer: null});
+    const black = {colour: colour(0, 255, 0), reaches: true, every: [], own: []};
+    assert.deepEqual(ledColour(stages({layers, replacement: black})).colour, black.colour, "black is painted");
 });

@@ -28,12 +28,13 @@ import {matchTallestStageHeight} from "./ui/lighting/stage-body.mjs";
 import {historyOverlay} from "./ui/history.mjs";
 import {discardLayers} from "./ui/layers.mjs";
 import {escapeKeyboardMenu} from "./ui/keyboard-menu.mjs";
-import {escapeBoardShortcuts} from "./ui/keys/board-card.mjs";
+import {escapeInfoMark} from "./ui/info-mark.mjs";
 import {screenLighting} from "./ui/lighting.mjs";
 import {screenBehaviours, screenCombos, screenHost, screenPointer} from "./ui/settings.mjs";
 import {screenPointing} from "./ui/pointing.mjs";
 import {screenMacros} from "./ui/macros.mjs";
 import {receiveMacroValidation} from "./ui/macros/validation.mjs";
+import {closeAutocorrectImport, receiveAutocorrectImport, receiveAutocorrectTry, receiveAutocorrectValidation, screenAutocorrect} from "./ui/autocorrect.mjs";
 import {reconcileRecording} from "./ui/macros/recorder.mjs";
 import {macroClipboardShortcut, macroHistoryShortcut} from './ui/macros/history.mjs';
 import {macroStepShortcut} from "./ui/macros/steps.mjs";
@@ -50,7 +51,7 @@ const root = /** @type {HTMLElement} */ (document.getElementById("root"));
 let renderedScreen = null;
 
 const SCREEN_RENDERERS = {
-    screenKeys, screenLighting, screenMacros, screenCustomKeys, screenPointing,
+    screenKeys, screenLighting, screenMacros, screenAutocorrect, screenCustomKeys, screenPointing,
     screenBehaviours, screenCombos, screenPointer, screenHost, screenProfile, screenDevice,
 };
 
@@ -190,7 +191,7 @@ function refreshCommitBar() {
     announce(announcements(getModel(), state));
 }
 
-const receivePanelMessage = createPanelMessages({root, refreshCommitBar, render, receiveMacroValidation});
+const receivePanelMessage = createPanelMessages({root, refreshCommitBar, render, receiveMacroValidation, receiveAutocorrectValidation, receiveAutocorrectImport, receiveAutocorrectTry});
 // Replies from the core cross the message boundary as copies, in the shapes
 // contracts/ declares. Device values have already passed core's validators.
 addEventListener("message", (event) => receivePanelMessage(/** @type {import("../contracts/messages.js").PanelResponse} */ (event.data)));
@@ -246,6 +247,8 @@ addEventListener("keydown", (event) => {
     // sits over everything below, so it answers before any of them.
     const proposal = getModel()?.liveProposal;
     if (proposal) { post(controls.cancelLiveEdit(proposal.id)); return; }
+    // Esc on a list file's summary is its Cancel.
+    if (state.screen === "autocorrect" && closeAutocorrectImport()) return;
     // Esc on the backup's comparison is its Cancel, unless it is busy.
     const portable = getModel()?.portable;
     if (portable?.review && state.screen === "profile") {
@@ -254,7 +257,8 @@ addEventListener("keydown", (event) => {
     }
     // Esc on a recovery copy's "Delete this copy?" is its Cancel.
     if (state.recoveryAsk !== null && state.screen === "profile") { state.recoveryAsk = null; render(); return; }
-    escapeBoardShortcuts();
+    // Esc shuts an open info mark's list, the board's or a section's.
+    escapeInfoMark();
 });
 // A resize lets the workbench find its height again at the new width, the
 // Behaviours tab's or the tallest Lighting stage's included, once per frame

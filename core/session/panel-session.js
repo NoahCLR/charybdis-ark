@@ -22,6 +22,7 @@ const {PHASE, editModeWords, heldWords, layerName, quietWords} = require("../mod
  * @typedef {import("../model/types.js").CompleteSnapshot} Snapshot
  */
 const {EDIT_MODE} = require("../protocol/profile-edit-v1");
+const {SETTING} = require("../schema/settings-domain-v1");
 const {fingerprint, summary, reorderLayers} = require("../model/portable-profile");
 const {profileReview} = require("../model/profile-review");
 const {profileUsage} = require("../model/profile-usage");
@@ -74,6 +75,37 @@ function shellModel(shell) {
         progress: offered.progress || null,
         words: {...SHELL_WORDS, ...shell?.words},
     };
+}
+
+// The global switches a switch key turned off over a stored "on" (plan
+// answer 10): shown beside the switch, never a change. One rule serves all
+// three, each a stored master and a runtime override that must both allow
+// (live-edits.md, "Toggles and the settings QMK holds"; firmware D-F66):
+// combos' and behaviours' masters are on the runtime page beside their
+// overrides; auto-mouse's is its stored setting (scalar 4), which settings
+// readback reports, read here from what the keyboard runs; autocorrect's is
+// its key option as the keyboard's settings were read (its mask is the
+// keyboard's own), and its override the runtime page 1's.
+/** @param {{master: boolean, override: boolean}} toggle */
+const turnedOffByKey = ({master, override}) => master && !override;
+// Autocorrect's stored switch, as the keyboard's settings were read.
+/** @param {State["settingsView"]} settings */
+function autocorrectStored(settings) {
+    const stored = settings?.sections.flatMap(section => section.fields).find(field => field.offSwitch === "autocorrect");
+    return Boolean(stored && "enabled" in stored && stored.enabled);
+}
+/** @param {import("../protocol/types.js").RuntimeRead} runtime @param {State["committed"]} committed @param {State["settingsView"]} settings @returns {Readonly<Record<import("../../contracts/model.js").SettingOffSwitch, boolean>>} */
+function switchesOffByKey(runtime, committed, settings) {
+    const autoMouse = {master: Boolean(committed?.domains?.settings?.values?.[SETTING.AUTO_MOUSE_ENABLED]), override: runtime.autoMouse.override};
+    const autocorrect = {master: autocorrectStored(settings), override: runtime.autocorrect.override};
+    return {combo: turnedOffByKey(runtime.combos), behaviour: turnedOffByKey(runtime.behaviours), autoMouse: turnedOffByKey(autoMouse), autocorrect: turnedOffByKey(autocorrect)};
+}
+// Whether the keyboard is replacing text now, as it reports it: its stored
+// switch on, read with its settings, and no key holding it off. Try it says
+// so beside its box, where the keyboard then replaces what is typed too.
+/** @param {import("../protocol/types.js").RuntimeRead} runtime @param {State["settingsView"]} settings */
+function replacingNow(runtime, settings) {
+    return autocorrectStored(settings) && runtime.autocorrect.override;
 }
 
 /** @param {Session} session @param {State} state @param {Snapshot | undefined} snapshot */
@@ -135,10 +167,8 @@ function buildPanelModel(session, state) {
     const liveWait = waiting && words ? {title: words.title, detail: words.detail, cancellable: waiting.kind === "edit" && !waiting.cancelling} : null;
     const proposal = session.liveProposal && session.draft && session.liveProposal.draftId === session.draft.id && session.liveProposal.revision === session.draft.revision
         ? {id: session.liveProposal.id, label: session.liveProposal.target.label, checks: session.liveProposal.checks} : null;
-    // Toggles a key turned off on top of a stored "on" (plan answer 10): shown,
-    // never a change.
-    const runtime = state.connected && state.runtime ? {combosOffByKey: state.runtime.combos.master && !state.runtime.combos.override,
-        behavioursOffByKey: state.runtime.behaviours.master && !state.runtime.behaviours.override} : null;
+    const offByKey = state.connected && state.runtime ? switchesOffByKey(state.runtime, state.committed, state.settingsView) : null;
+    const autocorrectRunning = Boolean(state.connected && state.runtime && !session.demo && replacingNow(state.runtime, state.settingsView));
     // The last Apply's steps: live while it runs, kept when it failed. A
     // successful one lasts only until its readback ends, so a later busy
     // operation is not drawn as reading back an Apply.
@@ -190,7 +220,7 @@ function buildPanelModel(session, state) {
     };
     // What the firmware says about itself and its ceilings (Keyboard, Settings).
     const firmware = firmwareView(state.capabilities);
-    return {...model, devices, selectedDeviceId, ...(draft ? {draft} : {}), demo, apply, postApplyRead, portable, shell, load, reconnecting, firmware, editMode, liveProposal: proposal, liveWait, runtime};
+    return {...model, devices, selectedDeviceId, ...(draft ? {draft} : {}), demo, apply, postApplyRead, portable, shell, load, reconnecting, firmware, editMode, liveProposal: proposal, liveWait, offByKey, autocorrectRunning};
 }
 
 // How full the profile is: the draft's, when one is open for this keyboard,

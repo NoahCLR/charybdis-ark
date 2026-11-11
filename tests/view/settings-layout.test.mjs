@@ -18,7 +18,7 @@ test("each Settings screen draws its sections in the order a person reads them",
     assert.deepEqual(ids("behaviours"), ["behaviorSettings", "keyTiming"], "where behaviours run, then Tap & hold timing");
     assert.deepEqual(ids("combos"), ["comboSettings", "comboReferences"], "Combos, then Combo layer matching");
     assert.deepEqual(ids("pointer"), ["normalPointerSpeed", "sniping", "autoMouse"], "everything filed under Pointer");
-    assert.deepEqual(ids("host"), ["host", "keyboardOptions"], "Your computer, then Key swaps & typing");
+    assert.deepEqual(ids("host"), ["host", "autocorrect", "keyboardOptions"], "Your computer, Text replacement, which types through its layout, then Key swaps & typing");
     assert.deepEqual(sectionsOn(sections, "keys"), [], "a screen that is not a Settings one draws none");
 });
 
@@ -58,10 +58,14 @@ test("a section is edited on the screen that draws it", () => {
     assert.equal(screenOfSection("startupLayers"), null, "Default layers has no editor");
     assert.equal(screenOfSection("lightingPower"), null, "Lighting draws its own");
     assert.equal(screenOfSection(undefined), null);
+    // Text replacement's switch is a Host setting, as every switch is a
+    // Settings screen's (D-L87): no section is edited anywhere else.
+    assert.equal(screenOfSection("autocorrect"), "host");
+    assert.equal(byId("autocorrect").area, "Settings", "core files it under Settings by the same id");
 });
 
 test("Key swaps & typing lists its fields under what they change", () => {
-    assert.deepEqual(fieldParts(byId("keyboardOptions").fields).map(({part, fields}) => [part, fields.length]), [["Modifiers", 7], ["Keys", 3], ["Typing", 3]]);
+    assert.deepEqual(fieldParts(byId("keyboardOptions").fields).map(({part, fields}) => [part, fields.length]), [["Modifiers", 7], ["Keys", 3], ["Typing", 2]]);
     assert.deepEqual(fieldParts(byId("keyTiming").fields).map(({part}) => part), [""], "a section without parts is one");
 });
 

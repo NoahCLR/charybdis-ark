@@ -149,12 +149,14 @@ Ark leaves the product out rather than repeat the title. The halves are the
 **Slave half**, the left one. Each says whether it is connected and holds the
 same saved settings.
 
-**Memory** shows how full the profile is. Behaviours, combos, lighting,
-pointing modes, custom keys, settings and names share one space. **In use**
-counts what you have set up against what the keyboard holds, in the order of
-Keymap's tabs and then Lighting: behaviours, tap counts, combos, macros, custom
-keys, pointing modes, LED sets and accents. Macro steps live in the same space, within a limit of their own, shown
-as **Macro memory**. The bar turns orange from 90%, when the next edit may not
+**Memory** shows how full the profile is. Behaviours, combos, macros, text
+replacements, custom keys, pointing modes, lighting, settings and names share
+one space. **In use** counts what you have set up against what the keyboard
+holds, in the order of the rail's Configure screens and then Lighting:
+behaviours, tap counts, combos, macros, the inputs of text replacements,
+custom keys, pointing modes, LED sets and accents. Macro steps live in the
+same space, within a limit of their own, shown as **Macro memory**, and so
+does the text replacement list, shown as **Text replacement memory**. The bar turns orange from 90%, when the next edit may not
 fit. While your draft has changes, the figures are the draft's. An edit that
 would go past one of these counts, or past the shared space, is refused in the
 draft before the keyboard sees it, saying which is full and what to remove.

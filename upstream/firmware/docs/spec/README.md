@@ -3,7 +3,7 @@
 The contracts the firmware keeps with clients, with itself across the two
 halves, and with its own flash. Each section states the contract and names the
 test or fixture that holds it; a change to a contract changes its spec in the
-same pass, and the decisions behind them are in [`docs/adr/`](https://github.com/NoahCLR/charybdis-4x6/blob/9dcf1c915a84d0b61381e7c6af6a33a933390f26/docs/adr/).
+same pass, and the decisions behind them are in [`docs/adr/`](https://github.com/NoahCLR/charybdis-4x6/blob/b734c89a86a682564faad5a65b0a526af360466b/docs/adr/).
 Words are the [glossary](../../GLOSSARY.md)'s.
 
 Read them in layers, from the report a client sends up to the save both halves
@@ -13,11 +13,12 @@ make:
 | --- | --- | --- |
 | HID channel | [profile-wire-v1/](profile-wire-v1/README.md) | Profile Wire: the Raw HID reports, every value id, results, candidate transfer and live edits |
 | Blob | [profile-wire-v1/blob-and-digests.md](profile-wire-v1/blob-and-digests.md) | The canonical profile blob, the domain registry, action encoding, digests |
-| Domains | [key behaviours](profile-wire-v1/key-behavior-domain.md), [combos](profile-wire-v1/combo-domain.md), [settings](profile-wire-v1/settings-domain.md), [keymap](profile-wire-v1/keymap-domain.md), [macros](profile-wire-v1/macro-domain.md) | Each domain's payload and readback |
+| Domains | [key behaviours](profile-wire-v1/key-behavior-domain.md), [combos](profile-wire-v1/combo-domain.md), [settings](profile-wire-v1/settings-domain.md), [keymap](profile-wire-v1/keymap-domain.md), [macros](profile-wire-v1/macro-domain.md), [autocorrect list](profile-wire-v1/autocorrect-domain.md) | Each domain's payload and readback |
 | | [pd-mode-domain-v1.md](pd-mode-domain-v1.md) | The pointing domain and how pointing modes run |
 | | [rgb-domain-v1.md](rgb-domain-v1.md) | The lighting domain and how it is drawn |
 | | [participation-policy.md](participation-policy.md) | When a press uses its behaviour or joins a combo |
-| | [host-layouts-v1.md](host-layouts-v1.md) | The host layout catalogue macro text is typed through |
+| | [host-layouts-v1.md](host-layouts-v1.md) | The host layout catalogue macro text is typed through and typing is read through |
+| | [autocorrect-v1.md](autocorrect-v1.md) | What text replacement (autocorrect) reads, replaces, undoes and holds back |
 | | [field-classification.md](field-classification.md) | Which authored values are profile data and which only a build changes |
 | Split | [profile-split-v1.md](profile-split-v1.md) | How the halves compare and copy saved profiles, candidates and the working copy |
 | | [split-activity-sync.md](split-activity-sync.md) | The split link, activity and runtime state, and its diagnostic recorders |

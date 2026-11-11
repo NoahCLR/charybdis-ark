@@ -29,7 +29,7 @@ test("RGB policies preserve zero and reject missing or malformed values", () => 
 });
 
 // Every accent table, and the groups no accent lights.
-const accents = rgbProfile => [rgbProfile.layerGroupRows, rgbProfile.pdModeGroupRows, rgbProfile.comboGroupRows, rgbProfile.keyGroupRows].flat();
+const accents = rgbProfile => [rgbProfile.layerGroupRows, rgbProfile.pdModeGroupRows, rgbProfile.comboGroupRows, rgbProfile.keyGroupRows, rgbProfile.autocorrectGroupRows].flat();
 const unused = rgbProfile => rgbProfile.groups.filter(group => !accents(rgbProfile).some(row => row.groupId === group.id));
 
 test("an accent changed in place keeps its place and the accents around it, and refuses LEDs the keyboard lacks", () => {
@@ -53,6 +53,55 @@ test("an accent lights some LEDs, and every accent edit drops the groups no acce
     assert.ok(!rgb(removed).groups.some(group => group.leds.join() === "30"), "and so does one whose last accent goes");
     assert.deepEqual(rgb(removed).groups.map(group => group.id), rgb(removed).groups.map((_, index) => index), "ids stay consecutive from zero");
     for (const row of accents(rgb(removed))) assert.ok(rgb(removed).groups.some(group => group.id === row.groupId), "every accent still names a group");
+});
+
+test("replacement feedback saves its three colours and its locality as one record, a case off included", () => {
+    const before = rgb(base);
+    const config = {textColor: {h: 1, s: 2, v: 3}, macroColor: {h: 0, s: 0, v: 0}, undoColor: {h: "7", s: "8", v: "9"}, locality: "RGB_KEYS_ONLY"};
+    const edited = edit(base, {type: "updateAutocorrectFeedback", config});
+    assert.deepEqual(rgb(edited).autocorrectFeedback, {textColor: {h: 1, s: 2, v: 3}, macroColor: {h: 0, s: 0, v: 0}, undoColor: {h: 7, s: 8, v: 9}, locality: 4});
+    assert.deepEqual({...rgb(edited), autocorrectFeedback: before.autocorrectFeedback}, before, "nothing else in lighting moves");
+    assert.deepEqual(payloads(edited).filter(domain => domain.id !== 0x10), payloads(base).filter(domain => domain.id !== 0x10));
+    assert.throws(() => edit(base, {type: "updateAutocorrectFeedback", config: {...config, locality: "RGB_NOWHERE"}}), /Unknown locality/);
+    assert.throws(() => edit(base, {type: "updateAutocorrectFeedback", config: {...config, locality: undefined}}), /Unknown locality/);
+    assert.throws(() => edit(base, {type: "updateAutocorrectFeedback", config: {...config, undoColor: {h: 0, s: 0, v: 256}}}), /Brightness/);
+    assert.throws(() => edit(base, {type: "updateAutocorrectFeedback", config: {...config, undoColor: {h: 0, s: 0, v: 201}}}, {limits: {brightnessMax: 200}}), /Brightness must be between 0 and 200/);
+    assert.throws(() => edit(base, {type: "updateAutocorrectFeedback", config: {...config, textColor: {h: "", s: 0, v: 0}}}));
+});
+
+test("the stage switch takes replacement feedback's bit and no bit past it", () => {
+    const mask = rgb(base).stageEnableMask;
+    assert.equal(mask & 32, 32, "on in the keyboard's compiled defaults");
+    assert.equal(rgb(edit(base, {type: "updateRgbStages", stageEnableMask: mask & ~32})).stageEnableMask, mask & ~32);
+    assert.equal(rgb(edit(base, {type: "updateRgbStages", stageEnableMask: 63})).stageEnableMask, 63);
+    assert.throws(() => edit(base, {type: "updateRgbStages", stageEnableMask: 64}), /RGB stage mask must be between 0 and 63/);
+});
+
+test("a replacement feedback accent is added for one case or all, changed where it stands and removed", () => {
+    const before = rgb(base).autocorrectGroupRows;
+    assert.deepEqual(before.map(row => row.semantic), [255], "the compiled accent for every replacement flash");
+    const added = edit(base, {type: "addRgbLedGroup", group: {target: "autocorrect", owner: "AUTOCORRECT_FEEDBACK_GROUP_UNDO", ledIndices: [57], h: 0, s: 255, v: 200}});
+    const row = rgb(added).autocorrectGroupRows.at(-1);
+    assert.equal(rgb(added).autocorrectGroupRows.length, before.length + 1, "at the table's end");
+    assert.deepEqual([rgb(added).groups.find(group => group.id === row.groupId).leds, row.color, row.semantic], [[57], {h: 0, s: 255, v: 200}, 2]);
+    for (const [owner, semantic] of [["AUTOCORRECT_FEEDBACK_GROUP_TEXT", 0], ["AUTOCORRECT_FEEDBACK_GROUP_MACRO", 1], ["AUTOCORRECT_FEEDBACK_GROUP_ALL", 255]]) {
+        const next = edit(added, {type: "updateRgbLedGroup", target: "autocorrect", index: 1, group: {owner, ledIndices: [3, 4], h: 0, s: 0, v: 0}});
+        const changed = rgb(next).autocorrectGroupRows[1];
+        assert.deepEqual([rgb(next).groups.find(group => group.id === changed.groupId).leds, changed.color, changed.semantic], [[3, 4], {h: 0, s: 0, v: 0}, semantic], owner);
+        assert.deepEqual(rgb(next).autocorrectGroupRows[0].semantic, 255, "the accent before it keeps its place");
+        assert.ok(!rgb(next).groups.some(group => group.leds.join() === "57"), "the set it no longer lights is dropped");
+    }
+    const removed = edit(added, {type: "deleteRgbLedGroup", target: "autocorrect", index: 1});
+    const lit = value => accents(value).map(accent => [value.groups.find(group => group.id === accent.groupId).leds.join(), accent.color]);
+    assert.deepEqual(lit(rgb(removed)), lit(rgb(base)), "removing it leaves every other accent lighting what it lit");
+    assert.ok(!rgb(removed).groups.some(group => group.leds.join() === "57"), "and its LED set is dropped");
+    assert.deepEqual(rgb(edit(base, {type: "deleteRgbLedGroup", target: "autocorrect", index: 0})).autocorrectGroupRows, []);
+    assert.deepEqual(rgb(added).keyGroupRows.map(key => key.semantic), rgb(base).keyGroupRows.map(key => key.semantic), "other tables keep their accents");
+    // A behaviour state is no replacement case, nor the other way round.
+    assert.throws(() => edit(base, {type: "addRgbLedGroup", group: {target: "autocorrect", owner: "KEY_FEEDBACK_GROUP_ALL", ledIndices: [1], h: 0, s: 0, v: 0}}), /Unknown replacement flash/);
+    assert.throws(() => edit(base, {type: "addRgbLedGroup", group: {target: "keyBehavior", owner: "AUTOCORRECT_FEEDBACK_GROUP_ALL", ledIndices: [1], h: 0, s: 0, v: 0}}), /Unknown behaviour state/);
+    assert.throws(() => edit(base, {type: "addRgbLedGroup", group: {target: "autocorrect", owner: "AUTOCORRECT_FEEDBACK_GROUP_TEXT", ledIndices: [], h: 0, s: 0, v: 0}}), /Pick LEDs/);
+    assert.throws(() => edit(base, {type: "deleteRgbLedGroup", target: "autocorrect", index: 1}), /Accent/);
 });
 
 const {decodeComboPages} = require("../../core/protocol/combo-readback-v1");

@@ -13,12 +13,13 @@ const {settingsEditorView, fieldMask} = require("./settings-editor");
 const {singleComboRemovalIndex} = require("./profile-review");
 const {settingsShortcutRefusal} = require("./shortcut-layers");
 const {UNIT, parseUnit} = require("./review-units");
+const {restoreEntry} = require("./autocorrect-list");
 
 /** @template T @param {T} value @returns {T} */
 const copy = value => JSON.parse(JSON.stringify(value));
 /** @param {string} text */
 const fail = text => Object.assign(new Error(text), {code: "PROFILE_REVERT_UNSUPPORTED"});
-const GROUP_TABLES = /** @type {const} */ (["groups", "layerGroupRows", "pdModeGroupRows", "comboGroupRows", "keyGroupRows"]);
+const GROUP_TABLES = /** @type {const} */ (["groups", "layerGroupRows", "pdModeGroupRows", "comboGroupRows", "keyGroupRows", "autocorrectGroupRows"]);
 /** @typedef {import("../schema/profile-domains-types.js").DomainModels} DomainModels */
 /** @typedef {keyof DomainModels} DomainKey */
 /**
@@ -66,6 +67,9 @@ function revertUnits(before, after, units, capabilities) {
                 macros.mine[unit.index] = macros.theirs[unit.index];
                 const settings = domain("settings");
                 settings.mine.macroNames[unit.index] = settings.theirs.macroNames[unit.index];
+            } else if (unit.kind === "autocorrect") {
+                const list = domain("autocorrect");
+                restoreEntry(list.mine, list.theirs, unit.correction, unit.respelled);
             } else if (unit.kind === "customKey") {
                 const settings = domain("settings");
                 settings.mine.customKeyNames[unit.index] = settings.theirs.customKeyNames[unit.index];
@@ -125,6 +129,7 @@ function revertUnits(before, after, units, capabilities) {
                 else if (unit.record === "automouse") mine.automouseFade = theirs.automouseFade;
                 else if (unit.record === "combo") mine.comboFeedback = theirs.comboFeedback;
                 else if (unit.record === "key") mine.keyFeedback = theirs.keyFeedback;
+                else if (unit.record === "autocorrect") mine.autocorrectFeedback = theirs.autocorrectFeedback;
                 else if (unit.record === "groups") for (const table of GROUP_TABLES) restoreRgbTable(mine, theirs, table);
                 else if (unit.record === "layer") restoreColor(mine.layerColors, theirs.layerColors, "layerId", unit.layer);
                 else if (unit.record === "pd") restoreColor(mine.pdModeColors, theirs.pdModeColors, "pdModeId", unit.slot);

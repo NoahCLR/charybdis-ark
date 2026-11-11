@@ -48,3 +48,66 @@ for (const theme of ["dark", "light"]) {
         expect(validateSnapshot(draft.document).layers[0][0]).toBe(0x7f02);
     });
 }
+
+// The keyboard's switch keys for behaviours (firmware D-F66) are picked beside
+// QMK's for combos, in Other QMK, and post by the keyboard's name.
+test("a switch key for behaviours is picked beside those for combos and posts by name", async ({page}) => {
+    await openControls(page, "keys", {tab: "key", selected: 0});
+    await page.locator('[data-act="pick"]').click();
+    const picker = page.getByRole("dialog", {name: "Pick a keycode"});
+    await picker.locator('[data-sec="other"]').click();
+    const switches = ["QK_COMBO_ON", "QK_COMBO_OFF", "QK_COMBO_TOGGLE", "QK_AUTOCORRECT_ON", "QK_AUTOCORRECT_OFF", "QK_AUTOCORRECT_TOGGLE", "BH_ON", "BH_OFF", "BH_TOGG"];
+    const shown = await picker.locator("[data-pick]").evaluateAll(tiles => tiles.map(tile => tile.getAttribute("data-pick")));
+    const at = shown.indexOf("QK_COMBO_ON");
+    expect(shown.slice(at, at + switches.length)).toEqual(switches);
+    await expect(picker.locator('[data-pick="BH_TOGG"]')).toContainText("Toggle Behaviours");
+    await clearPosts(page);
+    await picker.locator('[data-pick="BH_TOGG"]').click();
+    await picker.locator('[data-act="use"]').click();
+    expect(await posted(page)).toEqual([expect.objectContaining({type: "updateLayoutKeys",
+        changes: [expect.objectContaining({layoutIndex: 0, keycode: "BH_TOGG"})]})]);
+});
+
+// And its switch keys for auto-mouse (firmware D-F66), right after them in the
+// same group.
+test("a switch key for auto-mouse is picked after those for behaviours and posts by name", async ({page}) => {
+    await openControls(page, "keys", {tab: "key", selected: 0});
+    await page.locator('[data-act="pick"]').click();
+    const picker = page.getByRole("dialog", {name: "Pick a keycode"});
+    await picker.locator('[data-sec="other"]').click();
+    const switches = ["QK_COMBO_ON", "QK_COMBO_OFF", "QK_COMBO_TOGGLE", "QK_AUTOCORRECT_ON", "QK_AUTOCORRECT_OFF", "QK_AUTOCORRECT_TOGGLE", "BH_ON", "BH_OFF", "BH_TOGG", "AM_ON", "AM_OFF", "AM_TOGG"];
+    const shown = await picker.locator("[data-pick]").evaluateAll(tiles => tiles.map(tile => tile.getAttribute("data-pick")));
+    const at = shown.indexOf("QK_COMBO_ON");
+    expect(shown.slice(at, at + switches.length)).toEqual(switches);
+    await expect(picker.locator('[data-pick="AM_TOGG"]')).toContainText("Toggle Auto-mouse");
+    await clearPosts(page);
+    await picker.locator('[data-pick="AM_TOGG"]').click();
+    await picker.locator('[data-act="use"]').click();
+    expect(await posted(page)).toEqual([expect.objectContaining({type: "updateLayoutKeys",
+        changes: [expect.objectContaining({layoutIndex: 0, keycode: "AM_TOGG"})]})]);
+});
+
+// QMK's switch keys for autocorrect (firmware D-F66, D-F69) are offered with
+// the others, after those for combos, worded as text replacement, found by
+// either name, and post by QMK's name.
+test("a switch key for text replacement is picked beside those for combos, found as autocorrect too, and posts by name", async ({page}) => {
+    await openControls(page, "keys", {tab: "key", selected: 0});
+    await page.locator('[data-act="pick"]').click();
+    const picker = page.getByRole("dialog", {name: "Pick a keycode"});
+    await picker.locator('[data-sec="other"]').click();
+    await expect(picker.locator('[data-pick="QK_AUTOCORRECT_ON"]')).toContainText("Text replacement On");
+    await expect(picker.locator('[data-pick="QK_AUTOCORRECT_OFF"]')).toContainText("Text replacement Off");
+    await expect(picker.locator('[data-pick="QK_AUTOCORRECT_TOGGLE"]')).toContainText("Toggle Text replacement");
+    // Searching for the keys' own name, or the feature's, finds all three.
+    for (const query of ["autocorrect", "text replacement", "AC_TOGG"]) {
+        await picker.locator("#pickerSearch").fill(query);
+        await expect(picker.locator('[data-pick="QK_AUTOCORRECT_TOGGLE"]')).toBeVisible();
+    }
+    await picker.locator("#pickerSearch").fill("");
+    await picker.locator('[data-sec="other"]').click();
+    await clearPosts(page);
+    await picker.locator('[data-pick="QK_AUTOCORRECT_TOGGLE"]').click();
+    await picker.locator('[data-act="use"]').click();
+    expect(await posted(page)).toEqual([expect.objectContaining({type: "updateLayoutKeys",
+        changes: [expect.objectContaining({layoutIndex: 0, keycode: "QK_AUTOCORRECT_TOGGLE"})]})]);
+});

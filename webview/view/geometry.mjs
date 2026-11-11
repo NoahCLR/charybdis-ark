@@ -47,6 +47,11 @@ export function inLocality(layoutIndex, locality, trigger) {
     }
 }
 
+// Whether a locality follows the keys that triggered the light, so what it
+// paints depends on which those are.
+/** @param {string | undefined} locality */
+export const followsTrigger = (locality) => locality === "RGB_KEY_HALF" || locality === "RGB_KEYS_ONLY";
+
 /** @param {number} layoutIndex */
 export function keyVisual(layoutIndex) {
     const thumb = GEO.thumbs[layoutIndex];

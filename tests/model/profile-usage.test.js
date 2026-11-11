@@ -1,4 +1,5 @@
 "use strict";
+const {CURRENT_BASE} = require("../fixtures/portable-profile");
 const {profileMacros, editMacros} = require("../fixtures/profile-document");
 const test = require("node:test");
 const assert = require("node:assert/strict");
@@ -12,7 +13,7 @@ const {document: pdDocument} = require("../fixtures/pd-profile");
 
 const snapshot = value => ({document: value, fingerprint: fingerprint(value)});
 const schema2 = {maxProfilePayload: 130048, maxBehaviorRows: 64, maxPopulatedBehaviorSteps: 128, maxCombos: 32, maxReusableRgbGroups: 16, maxRgbStageGroupRows: 32};
-const customKeyCapabilities = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 3}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0x67df11b3};
+const customKeyCapabilities = CURRENT_BASE;
 const count = (usage, id) => usage.counts.find(entry => entry.id === id);
 
 // The fixture with no behaviours and no combos.
@@ -24,12 +25,15 @@ function emptied(value) {
 }
 
 test("the bar is the bytes Apply writes, and each count is what its screen sets up", () => {
-    const value = pdDocument(), usage = profileUsage(snapshot(value), schema2);
+    const value = pdDocument(), usage = profileUsage(snapshot(value), {...schema2, maxAutocorrectTypos: 1024});
     assert.equal(usage.used, validateSnapshot(value).candidate.length);
     assert.equal(usage.capacity, 130048, "the size is the one the firmware advertises");
     assert.deepEqual(usage.counts.map(entry => entry.id),
-        ["behaviours", "behaviourSteps", "combos", "macros", "customKeys", "pointingModes", "lightingGroups", "lightingGroupRows"],
-        "in the order of Keymap's workbench tabs, then Lighting");
+        ["behaviours", "behaviourSteps", "combos", "macros", "autocorrectInputs", "customKeys", "pointingModes", "lightingGroups", "lightingGroupRows"],
+        "in the order of the rail's Configure screens, Keymap's tabs first, then Lighting's two");
+    assert.deepEqual(count(usage, "autocorrectInputs"), {id: "autocorrectInputs", used: validateSnapshot(value).autocorrect.entries.reduce((total, entry) => total + entry.typos.length, 0), limit: 1024},
+        "everything typed for a text replacement, against what the keyboard holds");
+    assert.ok(count(usage, "autocorrectInputs").used > 0, "the fixture's list is counted");
     const {behaviors, combos, pdModes, settings} = validateSnapshot(value);
     assert.deepEqual(count(usage, "behaviours"), {id: "behaviours", used: behaviors.rows.length, limit: 64});
     assert.deepEqual(count(usage, "behaviourSteps"), {id: "behaviourSteps", used: behaviors.populatedStepCount, limit: 128});
@@ -42,6 +46,16 @@ test("the bar is the bytes Apply writes, and each count is what its screen sets 
     assert.deepEqual(Object.keys(VOCABULARY.usageCounts), usage.counts.map(entry => entry.id), "every count has its words");
     assert.equal(count(usage, "customKeys").limit, settings.customKeyNames.length, "every custom key the keyboard has");
     assert.ok(!("areas" in usage), "no storage breakdown: the counts are what an edit runs into");
+});
+
+test("an accent counts toward the 640 whichever stage it is for, replacement feedback's too", () => {
+    const before = snapshot(pdDocument());
+    const rows = count(profileUsage(before, schema2), "lightingGroupRows").used;
+    const accent = (target, owner) => ({type: "addRgbLedGroup", group: {target, owner, ledIndices: [7], h: 10, s: 255, v: 100}});
+    const replacement = snapshot(draftEdit(before, accent("autocorrect", "AUTOCORRECT_FEEDBACK_GROUP_UNDO"), customKeyCapabilities));
+    assert.equal(count(profileUsage(replacement, schema2), "lightingGroupRows").used, rows + 1, "a replacement feedback accent");
+    const key = snapshot(draftEdit(replacement, accent("keyBehavior", "KEY_FEEDBACK_GROUP_ALL"), customKeyCapabilities));
+    assert.equal(count(profileUsage(key, schema2), "lightingGroupRows").used, rows + 2, "and a behaviour feedback one beside it");
 });
 
 test("a custom key is in use once it has a name, a shortcut or a behaviour", () => {

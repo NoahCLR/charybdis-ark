@@ -100,10 +100,10 @@ test("listed keyboards read by name, told apart by serial or number only where t
 
 test("the Settings card gets the stored name, and the built-in one only while the keyboard reports it", () => {
     const {buildSnapshotModel} = require("../../core/session/device-model");
-    const {document} = require("../fixtures/portable-profile");
+    const {document, CURRENT_BASE} = require("../fixtures/portable-profile");
     const {fingerprint, summary} = require("../../core/model/portable-profile");
     const value = document(), snapshot = {document: value, fingerprint: fingerprint(value), summary: summary(value)};
-    const caps = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 3}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0x67df11b3};
+    const caps = CURRENT_BASE;
     const binding = {editable: true, reason: ""}, device = {product: "Charybdis (4x6) Splinky"};
     assert.deepEqual(buildSnapshotModel(snapshot, caps, binding, {device, storedKeyboardName: ""}).keyboardName,
         {name: "", builtIn: "Charybdis (4x6) Splinky", identity: snapshot.fingerprint, perName: 32});

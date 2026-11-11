@@ -37,6 +37,7 @@ const {KEY_BEHAVIOR_LIMITS} = require("../schema/key-behavior-domain-v1");
 const {COMBO_LIMITS} = require("../schema/combo-domain-v1");
 const {RGB_DOMAIN_V1} = require("../schema/rgb-domain-v1");
 const {MACRO_DOMAIN_V1} = require("../schema/macro-domain-v1");
+const {AUTOCORRECT_DOMAIN_V1} = require("../schema/autocorrect-domain-v1");
 const {NAME_MAX_BYTES} = require("../schema/profile-name");
 const {CUSTOM_KEY_SLOTS} = require("../data/user-keycodes");
 const {RAW_HID_REPORT_SIZE} = require("../transport/device-adapter");
@@ -81,6 +82,12 @@ const DEMO_CAPABILITIES = Object.freeze({
     profileSlotPayload: PROFILE_BLOB_V1.MAX_SIZE,
     profileSlotSize: 131072,
     macroBytes: MACRO_DOMAIN_V1.MAX_SIZE,
+    maxAutocorrectCorrections: AUTOCORRECT_DOMAIN_V1.MAX_CORRECTIONS,
+    maxAutocorrectTypos: AUTOCORRECT_DOMAIN_V1.MAX_TYPOS,
+    autocorrectTextBytes: AUTOCORRECT_DOMAIN_V1.MAX_TEXT_BYTES,
+    autocorrectBytes: AUTOCORRECT_DOMAIN_V1.MAX_SIZE,
+    autocorrectTextMax: AUTOCORRECT_DOMAIN_V1.TEXT_MAX,
+    autocorrectCorrectionMax: AUTOCORRECT_DOMAIN_V1.CORRECTION_MAX,
     supportedDomainMask: PROFILE_WIRE_KNOWN_MASKS.SUPPORTED_DOMAINS,
     nameMaxBytes: NAME_MAX_BYTES,
     layerMaskBits: 32,
@@ -91,7 +98,7 @@ const DEMO_CAPABILITIES = Object.freeze({
 // is never read from a firmware checkout): its brightness limit, and the
 // keyboard options page — the RGB Matrix effects the Charybdis build enables,
 // in QMK's order, the QMK key options it supports (Magic and one-shot keys; no
-// NKRO or Autocorrect) and the LED classes it has (modifier and key lights).
+// NKRO) and the LED classes it has (modifier and key lights).
 const DEMO_LIMITS = Object.freeze({brightnessMax: 200});
 const DEMO_EFFECTS = [
     "SOLID_COLOR", "ALPHAS_MODS", "GRADIENT_UP_DOWN", "GRADIENT_LEFT_RIGHT", "BREATHING", "BAND_SAT", "BAND_VAL",
@@ -105,7 +112,7 @@ const DEMO_EFFECTS = [
 const DEMO_OPTIONS = Object.freeze({
     effects: DEMO_EFFECTS.map((name, index) => Object.freeze({id: index + 1, name})),
     keymapMasks: Object.freeze(Array.from({length: 13}, (_, bit) => 1 << bit)),
-    supportedKeymapOptions: 0x0f7f,
+    supportedKeymapOptions: 0x1f7f,
     ledFlags: 5,
 });
 

@@ -2,7 +2,7 @@
 
 Whether a press uses its keycode's behaviour and whether it can join a combo
 is decided by one firmware policy (D-F14,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/9dcf1c915a84d0b61381e7c6af6a33a933390f26/docs/adr/0014-bigger-profiles.md)): the combo decision at the physical
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/b734c89a86a682564faad5a65b0a526af360466b/docs/adr/0014-bigger-profiles.md)): the combo decision at the physical
 press, the behaviour decision when the press is delivered. The stored
 switches are in the [settings domain](profile-wire-v1/settings-domain.md)
 (scalars and layer records), the [key-behaviour domain](profile-wire-v1/key-behavior-domain.md)
@@ -24,6 +24,20 @@ cannot overrule a higher one. Behaviour and combo participation are
 independent. Each override is a runtime toggle beside its stored master,
 starts allowed at boot and is never saved
 ([toggles](profile-wire-v1/live-edits.md#toggles-and-the-settings-qmk-holds)).
+The switch keys set the overrides, at their tap or press, wherever they are
+sent (D-F66, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/b734c89a86a682564faad5a65b0a526af360466b/docs/adr/0066-switch-keys-turn-combos-and-behaviours-on-and-off.md)):
+`CM_ON`, `CM_OFF` and `CM_TOGG` QMK's combo flag, which QMK leaves to the
+firmware (`COMBO_KEYCODES_DOWNSTREAM`), and `BH_ON`, `BH_OFF` and `BH_TOGG`
+the behaviours override. With behaviours off a behaviours key is the
+standard key, its own switch, so `BH_ON` and `BH_TOGG` always work then.
+Switching behaviours off settles no press already decided: a press keeps its
+decision through its release.
+
+Auto-mouse has the same two switches outside participation: its stored
+setting and a runtime override that the switch keys `AM_ON`, `AM_OFF` and `AM_TOGG` set
+(D-F66, [toggles](profile-wire-v1/live-edits.md#toggles-and-the-settings-qmk-holds)).
+So has autocorrect: its stored switch and the override `AC_ON`, `AC_OFF` and
+`AC_TOGG` set ([autocorrect](autocorrect-v1.md#on-and-off)).
 
 Switching something off keeps it: a disabled behaviour row keeps its branches,
 timing and layers, a disabled combo its inputs, output and window, and
@@ -32,7 +46,7 @@ switching it on again restores them unchanged.
 The compiled defaults allow everything: both masters on, every layer bit set,
 every definition enabled on every bank layer, every placement bit clear.
 
-Held by: `tests/host/run_participation_tests.sh` (`participation_test.c`, `test_defaults_allow_everything`, `test_master_and_definition`, `test_overrides_beside_the_masters`, `test_placement`).
+Held by: `tests/host/run_participation_tests.sh` (`participation_test.c`, `test_defaults_allow_everything`, `test_master_and_definition`, `test_overrides_beside_the_masters`, `test_placement`), `tests/host/run_key_runtime_layer_lock_integration_tests.sh` (`key_runtime_layer_lock_integration_test.c`, `test_plain_behaviors_keys_switch_the_override`, `test_behaviors_off_keeps_the_way_back`, `test_behavior_tap_switches_behaviors_off_and_a_held_one_still_releases`, `test_switch_key_held_for_its_behaviour_does_not_switch`), `tests/host/run_qmk_gesture_pipeline_tests.sh` (`pointing_mode_key_runtime_integration_test.c`, `test_qmk_combo_keys_switch_combos_wherever_they_are_sent`).
 
 ## Source layer and placement
 
@@ -64,9 +78,9 @@ A physical press uses its keycode's behaviour row only if:
 Otherwise the press takes its normal action: the keycode as if it had no
 row, with the usual modifier, layer and pointing ownership. An `LT()`, `MT()`
 or `OSM()` key stays the key runtime's and keeps its default, as without a row
-(D-F27, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/9dcf1c915a84d0b61381e7c6af6a33a933390f26/docs/adr/0027-a-keys-hold-decides-how-later-keys-meet-it.md)). A
+(D-F27, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/b734c89a86a682564faad5a65b0a526af360466b/docs/adr/0027-a-keys-hold-decides-how-later-keys-meet-it.md)). A
 custom key's normal action is its shortcut, held from press to release (D-F26,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/9dcf1c915a84d0b61381e7c6af6a33a933390f26/docs/adr/0026-custom-key-carries-a-shortcut.md)); without one it does
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/b734c89a86a682564faad5a65b0a526af360466b/docs/adr/0026-custom-key-carries-a-shortcut.md)); without one it does
 nothing. One row serves every placement of its keycode, so bypassing it at one
 placement leaves the others as they were.
 
@@ -124,7 +138,7 @@ Held by: `tests/host/run_participation_tests.sh` (`participation_test.c`, `test_
 Placement applies to physical presses only; a combo's output and a
 behaviour's generated records have no placement. Whether a combo fires and
 whether its output uses its keycode's behaviour are independent (D-F24,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/9dcf1c915a84d0b61381e7c6af6a33a933390f26/docs/adr/0024-combo-output-behaviour-permission.md)). The output uses its
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/b734c89a86a682564faad5a65b0a526af360466b/docs/adr/0024-combo-output-behaviour-permission.md)). The output uses its
 behaviour only if:
 
 1. the behaviour master and override allow it;
@@ -149,7 +163,7 @@ output behind native tapping, and travels with the output's record through
 tapping and admission to its release. Each delivered output takes the oldest
 fired completion not yet delivered, so two chords with one output that wait
 together keep their own decisions
-([pairing](https://github.com/NoahCLR/charybdis-4x6/blob/9dcf1c915a84d0b61381e7c6af6a33a933390f26/users/noah/lib/compat/README.md#combo-origin-pairing)). A change
+([pairing](https://github.com/NoahCLR/charybdis-4x6/blob/b734c89a86a682564faad5a65b0a526af360466b/users/noah/lib/compat/README.md#combo-origin-pairing)). A change
 to a switch, a definition or the layers cannot reclassify a completed output
 or lose its release; a suppressed completion drops its permission. When the
 origin cannot be reconstructed, the output bypasses its behaviour if any

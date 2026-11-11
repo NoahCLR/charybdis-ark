@@ -46,7 +46,7 @@ test("a key wears its behaviour's dots only where the behaviour runs, judged on 
     assert.deepEqual([throughBase.from, dots(throughBase)], [model.layers[0], []], "answered by Base's C, it marks nothing: C's row does not run on Base");
 });
 
-test("a dot carries the colour its tier flashes, none while key feedback is off", () => {
+test("a dot carries the colour its tier flashes, none while behaviour feedback is off", () => {
     assert.notEqual(keyOf(model, 0, [], 1).tiers[0].colour, null);
     const off = modelOf([rgbStages(model.rgb.stageEnableMask, 16, false)]);
     assert.deepEqual(keyOf(off, 0, [], 1).tiers, [{kind: "tap", count: 1, colour: null}]);

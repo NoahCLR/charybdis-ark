@@ -1,6 +1,6 @@
 /** Posted values are editor values; the core validates and converts them to wire values. */
-/** The four tables of accents, as an accent edit names them (D-L77). */
-export type AccentTable = 'layer' | 'pdMode' | 'combo' | 'keyBehavior';
+/** The five tables of accents, as an accent edit names them (D-L77); `autocorrect` is Replacement feedback's (D-L89). */
+export type AccentTable = 'layer' | 'pdMode' | 'combo' | 'keyBehavior' | 'autocorrect';
 export type LayerReference = `Layer ${number}`;
 export type Scalar = string | number;
 export interface Hsv {h: number; s: number; v: number}
@@ -51,6 +51,14 @@ export interface KeyFeedback<C = Hsv> {
 }
 export type FeedbackColourField = 'tapCommittedColor' | 'holdActiveColor' | 'longHoldActiveColor';
 export type FeedbackRow = FeedbackColourField | `branch:${number}`;
+/** Replacement feedback (D-L89, firmware D-F70): the colour the keyboard flashes for an input replaced with text, one replaced by its macro and a replacement undone, and where the flash paints. HSV(0, 0, 0) switches its case off. */
+export interface AutocorrectFeedback<C = Hsv> {
+    textColor: C;
+    macroColor: C;
+    undoColor: C;
+    locality?: string;
+}
+export type AutocorrectFeedbackColourField = 'textColor' | 'macroColor' | 'undoColor';
 export interface PdTap {keycode: Scalar; modifierPolicy: number; mask: number}
 export type Direction = 'left' | 'right' | 'up' | 'down';
 export type Diagonal = 'upLeft' | 'upRight' | 'downLeft' | 'downRight';
@@ -76,6 +84,14 @@ export interface PdConfig {
     directionOutput?: number;
     scroll?: Record<string, number>;
 }
+/** Where a typo matches a word, as the keyboard stores it: 0 the whole word, 1 its start, 2 its end, 3 anywhere in it. */
+export type AutocorrectMatch = 0 | 1 | 2 | 3;
+/** An input as an edit names it (the firmware's and this contract's name for one is a typo): written as a person writes it, a whole word or with `*` where other letters may go (`recieve*`, `*mnet`, `*tihng*`). `match` is only an older list file's, for one written without `*`. */
+export interface AutocorrectTypoEdit {typo: string; match?: AutocorrectMatch}
+/** What an edit names as a replacement (a correction, in the firmware's and this contract's names): its text, or the number of the macro slot it plays. One of the two. */
+export type AutocorrectReplacement = {correction: string; macro?: undefined} | {macro: number; correction?: undefined};
+/** A replacement with its inputs, as a list file gives one. */
+export type AutocorrectEntryEdit = AutocorrectReplacement & {typos: AutocorrectTypoEdit[]};
 export interface SettingEdit {macro: string; enabled?: boolean; value?: Scalar | boolean}
 
 export interface EditPayloads {
@@ -96,6 +112,7 @@ export interface EditPayloads {
     updatePdModeColor: Hsv & {pointingMode: string; locality: string};
     updateComboFeedback: Hsv & {locality: string};
     updateKeyBehaviorFeedback: {config: KeyFeedback};
+    updateAutocorrectFeedback: {config: AutocorrectFeedback};
     /** An accent (D-L77): the LEDs it lights, its colour (HSV(0, 0, 0) takes its stage's) and who it lights for in its table; combo accents have no owner. Ark keeps the groups. */
     addRgbLedGroup: {group: Hsv & {target: AccentTable; owner?: string; ledIndices: number[]}};
     /** The accent at `index` of its table, changed where it stands. */
@@ -107,6 +124,19 @@ export interface EditPayloads {
         | {protection: 'auto' | 'on' | 'off'; payload?: string; name?: string}
     );
     validateMacro: {keycode: string; payload: string; requestId: number};
+    /** Inputs for a replacement: the entry is made when the list has none of that exact text or macro, otherwise they are added to it. `inputs` is a field's text as it was typed, which core reads into inputs, split at spaces; `typos` gives them one by one. One of the two. */
+    addAutocorrectTypos: AutocorrectReplacement & {typos?: AutocorrectTypoEdit[]; inputs?: string; expectedFingerprint?: string};
+    /** A replacement changed where it stands: its text respelled (`to`), or made to play a macro (`toMacro`). Changed to one the list already has, its inputs joins that one. */
+    updateAutocorrectCorrection: AutocorrectReplacement & ({to: string; toMacro?: undefined} | {toMacro: number; to?: undefined}) & {expectedFingerprint?: string};
+    /** One input, named by its stored letters, written anew (`to`, with its `*`). */
+    updateAutocorrectTypo: {typo: string; to: string; expectedFingerprint?: string};
+    /** An input removed; a replacement's last one takes its entry with it. */
+    deleteAutocorrectTypo: {typo: string; expectedFingerprint?: string};
+    deleteAutocorrectEntry: AutocorrectReplacement & {expectedFingerprint?: string};
+    /** A file's entries added to the list or replacing it. What the list cannot take of them is left out, as the import's preview said it would be. */
+    importAutocorrect: {mode: 'add' | 'replace'; entries: AutocorrectEntryEdit[]; expectedFingerprint?: string};
+    /** An autocorrect edit checked against the draft without staging it: answered with what it would be refused for, or would newly warn about. */
+    validateAutocorrect: {edit: AutocorrectEdit; requestId: number};
     updateCustomKey: {keycode: string; name: string; expectedFingerprint?: string};
     /**
      * A custom key's shortcut (firmware D-F26): a HID report modifier mask, up to six keys held together in the order they are pressed
@@ -132,8 +162,11 @@ export interface EditPayloads {
 
 export type EditOf<K extends keyof EditPayloads> = {type: K} & EditPayloads[K];
 export type PanelEdit = {[K in keyof EditPayloads]: EditOf<K>}[keyof EditPayloads];
-/** Every posted edit the draft stages: an import opens a review and a macro check is answered, neither an edit. core/model/draft-edits.js registers each one. */
-export type DraftEditType = Exclude<keyof EditPayloads, 'reviewPortableProfile' | 'validateMacro'>;
+/** Every posted edit the draft stages: an import opens a review and a macro or autocorrect check is answered, none of them an edit. core/model/draft-edits.js registers each one. */
+export type DraftEditType = Exclude<keyof EditPayloads, 'reviewPortableProfile' | 'validateMacro' | 'validateAutocorrect'>;
+/** The edits the Text replacement screen makes to the list. */
+export type AutocorrectEditType = 'addAutocorrectTypos' | 'updateAutocorrectCorrection' | 'updateAutocorrectTypo' | 'deleteAutocorrectTypo' | 'deleteAutocorrectEntry' | 'importAutocorrect';
+export type AutocorrectEdit = Extract<PanelEdit, {type: AutocorrectEditType}>;
 
 /** A dense decoded slot has values even for inactive fields. */
 export interface PointingSlot extends PdConfig {

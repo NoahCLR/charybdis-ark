@@ -15,16 +15,18 @@ import {el, esc} from "../lib/dom.mjs";
 // off, as for the background effect. A colour turned off reads "Off", never
 // its stored numbers; the callout says what off means here. Where off has a
 // name of its own (a layer's passthrough), `offAction` and `offWord` replace
-// Turn off and Off.
-/** @param {{identity: string, colour: import("../../contracts/edits.js").Colour | null | undefined, title: string, canEdit?: boolean, onChange?: (colour: import("../../contracts/edits.js").Colour) => void, offNote?: string, offTip?: string, offAction?: string, offWord?: string, maximumBrightness?: number}} options */
-export function colourEditor({identity, colour, title, canEdit = true, onChange, offNote, offTip, offAction = "Turn off", offWord = "Off", maximumBrightness}) {
+// Turn off and Off. `off` says the colour is off where the stage has a rule
+// of its own for that (a replacement case's, off at any hue with no
+// saturation or brightness); otherwise it is off as HSV(0, 0, 0).
+/** @param {{identity: string, colour: import("../../contracts/edits.js").Colour | null | undefined, title: string, canEdit?: boolean, onChange?: (colour: import("../../contracts/edits.js").Colour) => void, offNote?: string, offTip?: string, offAction?: string, offWord?: string, off?: boolean, maximumBrightness?: number}} options */
+export function colourEditor({identity, colour, title, canEdit = true, onChange, offNote, offTip, offAction = "Turn off", offWord = "Off", off = inheritsStageColour(colour), maximumBrightness}) {
     const [h, s, v] = hsv(colour);
     const maximum = brightnessLimit(maximumBrightness);
     const node = el(`<div class="stack gap-12"></div>`);
     /** @param {number[]} next */
     const commit = (next) => onChange?.(clampHsv(next, maximum));
 
-    if (inheritsStageColour(colour)) {
+    if (off) {
         node.append(el(`<div class="row colour-head"><span class="swatch-lg swatch-off"></span>
             <div><div class="colour-title">${esc(title)}</div><div class="note">${esc(offWord)}</div></div></div>`));
         node.append(el(`<div class="callout">${esc(offNote || "This colour has zero brightness.")}</div>`));

@@ -41,13 +41,13 @@ test("a draft change resets forms, applies each field's rule to the state before
 
 // Every field of the panel's state, by what a draft change does to it. A new
 // field joins one of these lists, so its decision is made in review.
-const RESETS = ["retarget", "timingRefusal", "pdKind", "pdTaps", "lastTake", "accent", "accentShown", "heldSlot"];
+const RESETS = ["retarget", "timingRefusal", "pdKind", "pdTaps", "lastTake", "accent", "accentShown", "heldSlot", "autocorrectNew", "autocorrectEdit", "autocorrectCheck", "autocorrectImport"];
 const CUSTOM = ["combo", "macroForms"];
 const KEPT = [
     "screen", "layer", "layersOn", "layerGripFocus", "selected", "tab", "behaviourRow", "behaviourRowShown", "behaviourRoute",
     "reachGroups", "resetBenchHeight", "reachRow", "cell", "cellRow", "reveal", "pickCombo", "settingsOpen", "flashPausesAsked", "foldsOpen", "emptyLayersShown", "allSlotsShown", "checkGroupsOpen", "cellHow", "placement",
-    "macroClipboard", "keyClipboard", "stage", "railMenu", "layersOpen", "layersAsked", "pointingSlot", "pointingSearch", "pdAdvanced", "applyDismissed", "recoveryAsk", "feedbackRow", "comboPreview", "lightingGroupsShut",
-    "macroSlot", "macroSearch", "customKey", "customKeySearch", "recording", "recordDelays", "recordPreserveHoldTiming", "recordDelayThreshold",
+    "macroClipboard", "keyClipboard", "stage", "railMenu", "layersOpen", "layersAsked", "pointingSlot", "pointingSearch", "pdAdvanced", "applyDismissed", "recoveryAsk", "feedbackRow", "replacementRow", "comboPreview", "lightingGroupsShut",
+    "macroSlot", "macroSearch", "autocorrectSearch", "autocorrectEntry", "autocorrectTry", "autocorrectExport", "customKey", "customKeySearch", "recording", "recordDelays", "recordPreserveHoldTiming", "recordDelayThreshold",
     "recordDelayRound", "overlay", "leaveDemo", "modeAsk", "confirmChecks",
     "picker", "notice", "error", "settingsDurationUnits",
 ];
@@ -80,6 +80,8 @@ test("a draft change resets the existing forms and preserves historically kept p
         accent: {stage: "layers", target: "layer", every: false, index: 0, leds: [1, 4], adding: true, colour: {h: 10, s: 20, v: 30}, stageColour: false},
         accentShown: {stage: "layers", key: "layer:0"},
         macroForms: {MACRO_0: {draft: "unstaged", stepError: "bad"}},
+        autocorrectEdit: {entry: "the", part: "input", typo: "teh"}, autocorrectNew: {kind: "text", text: "then", macro: null, shown: true},
+        autocorrectCheck: {form: "input", requestId: 3, error: "", warnings: []},
     });
     openComboBuilder({id: 4, inputs: ["KC_A", "KC_B"], output: "KC_C", termMs: 40, followsDefault: false, enabled: true, allowedLayers: 1});
     state.combo.picking = true;
@@ -90,6 +92,7 @@ test("a draft change resets the existing forms and preserves historically kept p
     for (const name of Object.keys(standing)) assert.equal(state[name], references[name], `${name} is kept as it was`);
     for (const name of RESETS) assert.equal(state[name], null, `${name} starts again`);
     assert.deepEqual(state.macroForms, {});
+    assert.equal(state.autocorrectNew, null, "the replacement being made is let go");
     assert.equal(state.combo.open, false, "the combo builder closes");
     assert.equal(state.combo.picking, false);
     assert.equal(state.combo.form.allowedLayers, 0b111, "and starts again on every layer of the keyboard");
@@ -126,4 +129,19 @@ test("a take being recorded keeps the text it is building on, and nothing else o
     state.macroForms = {MACRO_0: {draft: "other"}};
     resetDraftForms();
     assert.deepEqual(state.macroForms, {}, "a take whose slot has no form leaves none behind");
+});
+
+// Review's Show is a patch of the state (view/review.mjs placeState): a key
+// it sets that the state does not have opens nothing, and passes unseen.
+test("where Review shows an item is said in fields the state has", async () => {
+    const {placeState} = await import("../../webview/view/review.mjs");
+    const places = [{kind: "key", layer: 0, layoutIndex: 3}, {kind: "behaviour", keycode: "KC_A"}, {kind: "combo", index: 2}, {kind: "macro", index: 1, keycode: "MACRO_1"},
+        {kind: "autocorrect", entry: "the"}, {kind: "customKey", keycode: "CK_0"}, {kind: "pointing", slot: 2}, {kind: "lighting", stage: "base"},
+        {kind: "settings", section: "host", area: "Settings"}, {kind: "settings", stage: "base"}, {kind: "layers"}, {kind: "slots", bank: "macros", keycodes: ["MACRO_1"], slots: [1]}];
+    for (const place of places) {
+        const patch = placeState(place);
+        assert.ok(patch, place.kind);
+        assert.deepEqual(Object.keys(patch).filter((field) => !(field in STATE_FIELDS)), [], `${place.kind}: every field is the state's`);
+    }
+    assert.equal(placeState({kind: "autocorrect", entry: "the"}).autocorrectEntry, "the", "a replacement's Show opens it in its editor");
 });

@@ -95,6 +95,11 @@ test("real device RGB retains every value and reference through the presentation
     assert.equal("ledGroups" in view, false, "the groups themselves are Ark's to keep (D-L77)");
     assert.equal(view.pdModeAccents[0].owner, "RGB_POINTING_MODE_GROUP_ALL");
     assert.equal(view.keyFeedbackAccents[0].owner, "KEY_FEEDBACK_GROUP_ALL");
+    // Replacement feedback as the keyboard's compiled defaults have it.
+    assert.deepEqual(view.autocorrectFeedback, {textColor: {h: "106", s: "255", v: "200"}, macroColor: {h: "234", s: "255", v: "200"}, undoColor: {h: "0", s: "255", v: "200"}, locality: "RGB_KEY_HALF"});
+    assert.deepEqual(view.autocorrectFeedbackAccents.map(({index, owner, color, leds}) => ({index, owner, color, leds})),
+        [{index: 0, owner: "AUTOCORRECT_FEEDBACK_GROUP_ALL", color: {h: "0", s: "0", v: "0"}, leds: "LEDs 24–28, 53–55"}]);
+    assert.deepEqual(view.stages.at(-1), {id: "autocorrect", label: "Replacement feedback", bit: 32, enabled: true});
     assert.equal(JSON.stringify(rgb), original, "converting a snapshot cannot mutate it");
 });
 
@@ -104,12 +109,16 @@ test("RGB selectors and disabled stages are displayed without inventing enabled 
     rgb.layerGroupRows = [{selector: 0, groupId: 0, color: {h: 0, s: 0, v: 0}}, {selector: 255, groupId: 0, color: {h: 1, s: 2, v: 3}}];
     rgb.pdModeGroupRows[0].selector = 0;
     rgb.keyGroupRows[0].semantic = 0;
+    rgb.autocorrectGroupRows = [0, 1, 2].map(semantic => ({semantic, groupId: 0, color: {h: 0, s: 0, v: 0}}));
+    rgb.autocorrectFeedback.textColor = {h: 9, s: 0, v: 0};
     const view = rgbForView(rgb);
     assert.ok(view.stages.every(stage => !stage.enabled));
     assert.deepEqual(view.layerAccents.map(r => r.owner), ["Layer 0", "RGB_LAYER_GROUP_ALL"]);
     assert.deepEqual(view.layerAccents.map(r => r.ownerLayer), [0, undefined], "a layer's own group names its layer by number");
     assert.equal(view.pdModeAccents[0].owner, "POINTING_MODE_DRAGSCROLL");
     assert.equal(view.keyFeedbackAccents[0].owner, "KEY_FEEDBACK_GROUP_TAP_BRANCH_PENDING");
+    assert.deepEqual(view.autocorrectFeedbackAccents.map(r => r.owner), ["AUTOCORRECT_FEEDBACK_GROUP_TEXT", "AUTOCORRECT_FEEDBACK_GROUP_MACRO", "AUTOCORRECT_FEEDBACK_GROUP_UNDO"]);
+    assert.deepEqual(view.autocorrectFeedback.textColor, {h: "9", s: "0", v: "0"}, "a colour that paints nothing is reported as stored, hue included");
 });
 
 test("authored and built-in behaviour labels use the profile's host naming rule", () => {

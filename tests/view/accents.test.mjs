@@ -2,11 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {createRequire} from "node:module";
 import {said} from "../../webview/view/vocabulary.mjs";
-import {ACCENT_STAGES, accentBudget, accentOwner, accentRows, accentsFor, accentsWhen, allAccents, everyOwner, feedbackOwner, feedbackRowOf, ownerCalled, ownerMark, ownerPlace, stageShade} from "../../webview/view/accents.mjs";
+import {ACCENT_STAGES, accentBudget, accentOwner, accentRows, accentsFor, accentsWhen, allAccents, everyOwner, feedbackOwner, feedbackRowOf, ownerCalled, ownerMark, ownerPlace, replacementOwner, replacementRowOf, stageShade} from "../../webview/view/accents.mjs";
 
 const require = createRequire(import.meta.url);
 const {publishedModel} = require("../fixtures/published-model.js");
-const {RGB_EVERY_OWNER, RGB_KEY_SEMANTICS} = require("../../core/schema/rgb-domain-v1");
+const {RGB_AUTOCORRECT_SEMANTICS, RGB_EVERY_OWNER, RGB_KEY_SEMANTICS} = require("../../core/schema/rgb-domain-v1");
 const {VOCABULARY} = require("../../core/model/vocabulary");
 const {rgbForView} = require("../../core/model/device-profile-view");
 const {decodedDeviceProfile} = require("../fixtures/device-profile");
@@ -28,12 +28,14 @@ function model() {
     return published;
 }
 
-test("the owner a stage's tab shows: its layer, slot or feedback state", () => {
+test("the owner a stage's tab shows: its layer, slot or behaviour state", () => {
     const published = model();
     assert.deepEqual(accentOwner(published, "layers", {layer: 2}), {target: "layer", owner: "Layer 2"});
     assert.deepEqual(accentOwner(published, "pd", {pointingSlot: 1}), {target: "pdMode", owner: "POINTING_MODE_VOLUME"});
     assert.deepEqual(accentOwner(published, "combo", {}), {target: "combo", owner: ""}, "combo accents have one owner, every combo");
     assert.deepEqual(accentOwner(published, "key", {feedbackRow: "holdActiveColor"}), {target: "keyBehavior", owner: "KEY_FEEDBACK_GROUP_HOLD_ACTIVE"});
+    assert.deepEqual(accentOwner(published, "autocorrect", {replacementRow: "undoColor"}), {target: "autocorrect", owner: "AUTOCORRECT_FEEDBACK_GROUP_UNDO"});
+    assert.deepEqual(accentOwner(published, "autocorrect", {}), {target: "autocorrect", owner: "AUTOCORRECT_FEEDBACK_GROUP_TEXT"}, "the first case, as its tab picks it");
     assert.equal(accentOwner(published, "base", {}), null, "the background effect and the fade have none");
     assert.equal(accentOwner(published, "auto", {}), null);
 });
@@ -45,10 +47,17 @@ test("every owner the interface names is one the core publishes and reads", () =
     domain.layerGroupRows = [{selector: 255, groupId: 0, color: black}];
     domain.pdModeGroupRows = [{selector: 255, groupId: 0, color: black}];
     domain.keyGroupRows = [{semantic: RGB_KEY_SEMANTICS.KEY_FEEDBACK_GROUP_ALL, groupId: 0, color: black}];
+    domain.autocorrectGroupRows = [{semantic: RGB_AUTOCORRECT_SEMANTICS.AUTOCORRECT_FEEDBACK_GROUP_ALL, groupId: 0, color: black}];
     const all = rgbForView(domain);
     const published = model();
-    assert.deepEqual([all.layerAccents[0].owner, all.pdModeAccents[0].owner, all.keyFeedbackAccents[0].owner],
-        [everyOwner(published, "layer"), everyOwner(published, "pdMode"), everyOwner(published, "keyBehavior")]);
+    assert.deepEqual([all.layerAccents[0].owner, all.pdModeAccents[0].owner, all.keyFeedbackAccents[0].owner, all.autocorrectFeedbackAccents[0].owner],
+        [everyOwner(published, "layer"), everyOwner(published, "pdMode"), everyOwner(published, "keyBehavior"), everyOwner(published, "autocorrect")]);
+    // Each Replacement feedback row is a case the keyboard knows, and each case opens on the row that shows it.
+    for (const row of Object.keys(published.rgb.autocorrectFeedback).filter((field) => field !== "locality")) {
+        assert.ok(Object.keys(RGB_AUTOCORRECT_SEMANTICS).includes(replacementOwner(published, row)), row);
+        assert.equal(replacementRowOf(published, replacementOwner(published, row)), row);
+    }
+    assert.equal(replacementOwner(published, "nothing"), "AUTOCORRECT_FEEDBACK_GROUP_TEXT", "a row the tab lacks reads as its first");
     assert.equal(everyOwner(published, "combo"), undefined, "every combo shares the combo accents, so none stands for all of them");
     for (const row of ["tapCommittedColor", "holdActiveColor", "longHoldActiveColor", "branch:0", "branch:3"]) {
         assert.ok(Object.keys(RGB_KEY_SEMANTICS).includes(feedbackOwner(published, row)), row);
@@ -71,6 +80,9 @@ test("an owner's place and mark on its stage: its layer, slot or feedback row, o
     assert.deepEqual(ownerPlace(published, "pdMode", "POINTING_MODE_VOLUME"), {every: false, slot: 1});
     assert.deepEqual(ownerPlace(published, "keyBehavior", "KEY_FEEDBACK_GROUP_HOLD_ACTIVE"), {every: false, feedbackRow: "holdActiveColor"});
     assert.deepEqual(ownerPlace(published, "keyBehavior", "KEY_FEEDBACK_GROUP_ALL"), {every: true});
+    assert.deepEqual(ownerPlace(published, "autocorrect", "AUTOCORRECT_FEEDBACK_GROUP_MACRO"), {every: false, replacementRow: "macroColor"});
+    assert.deepEqual(ownerPlace(published, "autocorrect", "AUTOCORRECT_FEEDBACK_GROUP_ALL"), {every: true});
+    assert.equal(ownerMark(published, "autocorrect", "AUTOCORRECT_FEEDBACK_GROUP_MACRO"), null, "a replacement case has no mark of its own");
     assert.deepEqual(ownerMark(published, "layer", "Layer 2"), {kind: "layer", layer: 2});
     assert.deepEqual(ownerMark(published, "pdMode", "POINTING_MODE_VOLUME"), {kind: "pointing", slot: 1});
     assert.deepEqual(ownerMark(published, "keyBehavior", "KEY_FEEDBACK_GROUP_HOLD_ACTIVE"), {kind: "tier", tier: "hold"});
@@ -95,6 +107,10 @@ test("owners and when their accents light read in the vocabulary's words", () =>
     assert.equal(ownerCalled(published, "layer", "RGB_LAYER_GROUP_ALL"), "Every layer");
     assert.equal(ownerCalled(published, "pdMode", "POINTING_MODE_DRAGSCROLL"), "Dragscroll");
     assert.equal(ownerCalled(published, "keyBehavior", "KEY_FEEDBACK_GROUP_HOLD_ACTIVE"), "Hold active");
+    assert.equal(ownerCalled(published, "autocorrect", "AUTOCORRECT_FEEDBACK_GROUP_UNDO"), "Replacement undone");
+    assert.equal(ownerCalled(published, "autocorrect", "AUTOCORRECT_FEEDBACK_GROUP_ALL"), "Every replacement flash");
+    assert.equal(said(accentsWhen(published, "autocorrect", "AUTOCORRECT_FEEDBACK_GROUP_TEXT")),
+        "LEDs that light in a colour of their own while the keyboard flashes Replaced with text, with those for every replacement flash: the same LEDs whichever key caused it.");
     assert.match(said(accentsWhen(published, "layer", "Layer 2")), /while Symbol is on, with those for every layer\..*lower layer stays lit/);
     assert.match(said(accentsWhen(published, "combo", "")), /same LEDs for every combo/);
     assert.doesNotMatch(said(accentsWhen(published, "keyBehavior", "KEY_FEEDBACK_GROUP_HOLD_ACTIVE")), /\{owner\}/);
@@ -108,6 +124,13 @@ test("an accent that takes its stage's colour takes the layer's where it paints,
     assert.deepEqual(stageShade(published, "layer", "RGB_LAYER_GROUP_ALL", {layer: 2}), colour(90, 255, 200), "every layer's takes the shown layer's");
     assert.deepEqual(stageShade(published, "keyBehavior", "KEY_FEEDBACK_GROUP_HOLD_ACTIVE", {}), published.rgb.keyBehaviorFeedback.holdActiveColor);
     assert.deepEqual(stageShade(published, "combo", "", {}), published.rgb.comboFeedback.color);
+    // A replacement case's colour, the picked case's for every flash, and nothing for a case that is off.
+    published.rgb.autocorrectFeedback = {textColor: colour(106, 255, 200), macroColor: colour(9, 0, 0), undoColor: colour(0, 255, 0), locality: "RGB_KEY_HALF"};
+    assert.deepEqual(stageShade(published, "autocorrect", "AUTOCORRECT_FEEDBACK_GROUP_TEXT", {}), colour(106, 255, 200));
+    assert.deepEqual(stageShade(published, "autocorrect", "AUTOCORRECT_FEEDBACK_GROUP_ALL", {replacementRow: "textColor"}), colour(106, 255, 200), "every flash's takes the picked case's");
+    assert.equal(stageShade(published, "autocorrect", "AUTOCORRECT_FEEDBACK_GROUP_MACRO", {}), null, "a case that is off paints nothing, at any hue");
+    assert.equal(stageShade(published, "autocorrect", "AUTOCORRECT_FEEDBACK_GROUP_ALL", {replacementRow: "macroColor"}), null);
+    assert.deepEqual(stageShade(published, "autocorrect", "AUTOCORRECT_FEEDBACK_GROUP_UNDO", {}), colour(0, 255, 0), "brightness alone at zero is black, which is painted");
 });
 
 test("the budget counts accents and LED sets against the keyboard, and All accents lists every one by stage and owner", () => {
@@ -116,7 +139,9 @@ test("the budget counts accents and LED sets against the keyboard, and All accen
     assert.deepEqual(accentBudget(published).map((count) => count.what), [VOCABULARY.usageCounts.lightingGroupRows.what, VOCABULARY.usageCounts.lightingGroups.what], "with what each counts, as the Memory card says it");
     assert.deepEqual(accentBudget({...published, portable: {...published.portable, usage: null}}), [], "nothing when the core sent no usage");
     const listed = allAccents(published);
-    assert.deepEqual(listed.map((entry) => entry.stage), ["layers", "pd", "combo", "key"].filter((stage) => listed.some((entry) => entry.stage === stage)));
+    assert.deepEqual(listed.map((entry) => entry.stage), ["layers", "pd", "combo", "key", "autocorrect"].filter((stage) => listed.some((entry) => entry.stage === stage)));
+    assert.deepEqual(listed.find((entry) => entry.stage === "autocorrect"), {stage: "autocorrect", target: "autocorrect",
+        owners: [{owner: "AUTOCORRECT_FEEDBACK_GROUP_ALL", rows: published.rgb.autocorrectFeedbackAccents}]}, "the demo's accent for every replacement flash");
     assert.deepEqual(listed[0].owners.map((entry) => [entry.owner, entry.rows.map((row) => row.index)]),
         [["Layer 0", [0]], ["Layer 2", [1, 3]], ["RGB_LAYER_GROUP_ALL", [2]]]);
 });
