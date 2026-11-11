@@ -176,6 +176,13 @@ export interface RgbKeyFeedback {
     tapCommitMode: number;
     locality: number;
 }
+/** Replacement feedback (firmware D-F70): a colour for an input replaced with text, one replaced by its macro and a replacement undone, each painting nothing with saturation and value 0, and where the flash paints. */
+export interface RgbAutocorrectFeedback {
+    textColor: Hsv;
+    macroColor: Hsv;
+    undoColor: Hsv;
+    locality: number;
+}
 export interface RgbProfile {
     formatVersion: number;
     stageEnableMask: number;
@@ -189,8 +196,10 @@ export interface RgbProfile {
     comboGroupRows: {color: Hsv; groupId: number}[];
     keyFeedback: RgbKeyFeedback;
     keyGroupRows: RgbGroupRow<'semantic'>[];
+    autocorrectFeedback: RgbAutocorrectFeedback;
+    autocorrectGroupRows: RgbGroupRow<'semantic'>[];
 }
-export type RgbInput = Partial<Omit<RgbProfile, 'keyFeedback'>> & {keyFeedback?: Partial<RgbKeyFeedback>};
+export type RgbInput = Partial<Omit<RgbProfile, 'keyFeedback' | 'autocorrectFeedback'>> & {keyFeedback?: Partial<RgbKeyFeedback>; autocorrectFeedback?: Partial<RgbAutocorrectFeedback>};
 export interface RgbOptions {
     maxLogicalLayers?: number;
     logicalLayerCount?: number;

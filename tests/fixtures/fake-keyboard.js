@@ -41,40 +41,45 @@ const MUTATING_COMMANDS = new Set([0x03, 0x05, 0x06, 0x07, 0x09, 0x0a, 0x0b, 0x0
 const FEATURES = PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES;
 
 // The domain versions current firmware stores, and refuses any other.
-const CURRENT_DOMAINS = "16:4,32:2,48:3,64:11,80:4,96:1,112:1";
+const CURRENT_DOMAINS = "16:5,32:2,48:3,64:12,80:4,96:1,112:1,128:1";
 
 // `compiled` is the profile it was built with, which GET 0x05 serves: the
 // document's own unless given (current firmware's carries every domain, with
 // its authored combos and factory settings). `compiledOnly` runs those
 // defaults, with nothing committed; the live combo and settings readbacks
 // still answer from the document. `settingsVersion` is the version its
-// settings readback reports: any but 11 is firmware Ark does not read.
+// settings readback reports: any but 12 is firmware Ark does not read.
 /** @param {import("./types.js").FakeKeyboardOptions} options @returns {import("./types.js").FakeKeyboard} */
-function fakeKeyboard({document, compiled, settingsVersion = 11, compiledOnly = false, slaveKnown = true, generation = 42, firmwareVersion = 0x00010000, brightnessMax = 255, options = keyboardOptions.wire()}) {
+function fakeKeyboard({document, compiled, settingsVersion = 12, compiledOnly = false, slaveKnown = true, generation = 42, firmwareVersion = 0x00010000, brightnessMax = 255, options = keyboardOptions.wire()}) {
     const held = validateSnapshot(document);
     if (document.version !== 5 || held.layers.length !== 16) throw new Error("The fake keyboard runs current firmware: a schema-4, sixteen-layer document.");
     /** @param {Buffer} blob */
     const versions = blob => decodeProfileBlob(blob).domains.map(domain => `${domain.id}:${domain.version}`).join();
-    if (versions(held.candidate) !== CURRENT_DOMAINS || (compiled && versions(compiled) !== CURRENT_DOMAINS)) throw new Error("The fake keyboard runs current firmware: RGB 4, key behaviours 2, combos 3, settings 10, PD 4, keymap 1 and macros 1.");
+    if (versions(held.candidate) !== CURRENT_DOMAINS || (compiled && versions(compiled) !== CURRENT_DOMAINS)) throw new Error("The fake keyboard runs current firmware: RGB 5, key behaviours 2, combos 3, settings 12, PD 4, keymap 1, macros 1 and autocorrect 1.");
     const profile = held.candidate, digest = fnv1a32(profile), defaults = compiled || profile;
     const settingsDomain = decodeProfileBlob(profile).domains.find(domain => domain.id === PROFILE_DOMAIN_IDS.SETTINGS);
     if (!settingsDomain) throw new Error("The fake keyboard fixture must contain settings.");
     const settings = settingsDomain.payload;
 
     const capabilities = [page(25, (p) => {
-        p.set([PROFILE_WIRE_V1.CAPABILITY_LAYOUT, 3, PROFILE_WIRE_V1.PROTOCOL_MAJOR, PROFILE_WIRE_V1.PROTOCOL_MINOR, PROFILE_BLOB_V1.SCHEMA_MAJOR, PROFILE_BLOB_V1.SCHEMA_MINOR, RAW_HID_REPORT_SIZE, PROFILE_CANDIDATE_V1.CHUNK_MAX, PROFILE_WIRE_V1.STATUS_PAGE_COUNT]);
+        p.set([PROFILE_WIRE_V1.CAPABILITY_LAYOUT, PROFILE_WIRE_V1.CAPABILITY_PAGE_COUNT, PROFILE_WIRE_V1.PROTOCOL_MAJOR, PROFILE_WIRE_V1.PROTOCOL_MINOR, PROFILE_BLOB_V1.SCHEMA_MAJOR, PROFILE_BLOB_V1.SCHEMA_MINOR, RAW_HID_REPORT_SIZE, PROFILE_CANDIDATE_V1.CHUNK_MAX, PROFILE_WIRE_V1.STATUS_PAGE_COUNT]);
         p.writeUInt32LE(FEATURES, 9); p.writeUInt32LE(document.actionAbiDigest, 13);
         p.writeUInt32LE(firmwareVersion, 17); p.writeUInt32LE(fnv1a32(defaults), 21);
     }), page(25, (p) => {
         // Layers, behaviour rows, tap depth, combos, keys per combo, LED
         // sets, accents in one lighting table, LEDs, LED bitmap, custom keys,
         // macros, domain mask, name bytes, mask bits, positions.
-        p.set([16, 16, 128, 5, 128, 16, 128, 255, 58, 8, 128, 128, 127, 32, 32, 60]);
+        p.set([16, 16, 128, 5, 128, 16, 128, 255, 58, 8, 128, 128, 255, 32, 32, 60]);
     }), page(25, (p) => {
         // Populated steps, slot size, profile payload, slot payload, macro
         // bank, accents in all (firmware D-F63).
         p.writeUInt16LE(640, 0); p.writeUInt32LE(131072, 2); p.writeUInt32LE(130048, 6);
         p.writeUInt32LE(130048, 10); p.writeUInt32LE(34903, 14); p.writeUInt16LE(640, 18);
+    }), page(25, (p) => {
+        // The autocorrect list's ceilings (firmware D-F68): corrections,
+        // typos, text bytes, the domain, bytes in one typo and in one text
+        // correction.
+        p.writeUInt16LE(1024, 0); p.writeUInt16LE(1024, 2); p.writeUInt16LE(20480, 4); p.writeUInt32LE(34824, 6); p[10] = 32; p[11] = 128;
     })];
     // Committed (or running its defaults), converged with the slave half,
     // nothing pending.

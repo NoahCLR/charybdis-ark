@@ -3,9 +3,9 @@
 Ark is the web editor for
 [Noah's Charybdis 4x6 firmware](https://github.com/NoahCLR/charybdis-4x6),
 and works only with that firmware. Once a keyboard is connected, Ark reads
-its profile: keymap, behaviours, combos, macros, trackball and lighting. In
-the default edit mode, a change runs on the keyboard from the next keypress
-and can be tried in real typing before it is saved.
+its profile: keymap, behaviours, combos, macros, text replacement, trackball and
+lighting. In the default edit mode, a change runs on the keyboard from the
+next keypress and can be tried in real typing before it is saved.
 
 <p align="center">
   <picture>
@@ -143,6 +143,21 @@ character it can't type says which one and isn't kept.
   <sub>Command+Space added as a chord, then <code>notes</code> and Enter recorded, and the macro named Open Notes.</sub>
 </p>
 
+### Text replacement
+
+The keyboard replaces what you type as you finish a word, on any computer:
+it fixes a typo, types longer text for you, or plays a macro. A replacement
+is written once with its inputs, what you type to get it, so "because" stands for
+`becuase`, `becasue` and `beacuse`, and `pnumber` types your phone number.
+An input is a whole word unless you add `*` where other letters may go:
+`recieve*` also fixes "recieved". A replacement is a line of text up to 128
+bytes, or one of your macros for anything longer. Ark checks each entry as
+it is typed, refuses one the computer's layout can't type, and marks the
+ones that would misfire. A list comes in from, and goes out to, QMK's
+autocorrect format, a spreadsheet's CSV or JSON. **Try it** previews what the keyboard would type
+for a sentence before anything is saved, and a key on the keyboard switches it off
+for a password or a terminal.
+
 ### Pointing modes
 
 A pointing mode changes what the ball does while its key is held or locked.
@@ -167,20 +182,21 @@ moves.
 ### Lighting
 
 Pick a layer and the board shows what the keyboard will light. Lighting is
-built from six stages, from the background effect at the bottom to key
-feedback at the top. Key feedback lights tap counts and holds in their own
-colours. Any stage above the background can be switched off without losing its
-colours, and accents light chosen LEDs in their own colour while a layer,
-pointing mode, combo or key feedback shows.
+built from seven stages, from the background effect at the bottom to
+replacement feedback at the top. Behaviour feedback lights tap counts and
+holds in their own colours, and replacement feedback flashes when text
+replacement changes what you typed. Any stage above the background can be switched off
+without losing its colours, and accents light chosen LEDs in their own colour
+while a layer, pointing mode, combo, behaviour feedback or replacement flash shows.
 
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/lighting-dark.png">
     <img src="docs/images/readme/lighting-light.png" width="640"
-         alt="The Lighting screen previewing the Navigation layer in indigo, with the six stages below it and the key feedback colours for tap, hold, long hold and double tap">
+         alt="The Lighting screen previewing the Navigation layer in indigo, with the six stages below it and the behaviour feedback colours for tap, hold, long hold and double tap">
   </picture>
   <br>
-  <sub>Navigation previewed, with the stages and the key feedback colours.</sub>
+  <sub>Navigation previewed, with the stages and the behaviour feedback colours.</sub>
 </p>
 
 ### Host and Keyboard screens
@@ -284,6 +300,7 @@ The [Ark guide](docs/guide/README.md) has a page per screen:
 - [Behaviours](docs/guide/behaviours.md)
 - [Combos](docs/guide/combos.md)
 - [Macros](docs/guide/macros.md)
+- [Text replacement](docs/guide/text-replacement.md)
 - [Pointing](docs/guide/pointing.md)
 - [Lighting](docs/guide/lighting.md)
 - [Edit modes and Review](docs/guide/review-and-save.md)

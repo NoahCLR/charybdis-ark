@@ -118,7 +118,7 @@ function reachSections(reach, position, {foot = true} = {}) {
             ${branches}
             ${count && foot ? `<div class="hc-sub hc-foot">${lit
                 ? "Each dot is the colour this key flashes when that tier resolves."
-                : "Key feedback is off, so no tier flashes on the keyboard."}</div>` : ""}</div>`);
+                : "Behaviour feedback is off, so no tier flashes on the keyboard."}</div>` : ""}</div>`);
     }
     if (reach.macros.length) {
         sections.push(`<div class="hc-sect"><div class="hc-h">Macro</div>${reach.macros.map(({keycode, slot}) => {

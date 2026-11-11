@@ -13,7 +13,7 @@ value ids are listed in
 - Both halves run the split serial link at a fixed 460,800 baud
   (`SERIAL_USART_SPEED`, set in `users/noah/lib/compat/qmk_split_transport.mk`).
   There is no speed selector: `NOAH_SPLIT_BAUD` fails the build (D-F52,
-  [0052](https://github.com/NoahCLR/charybdis-4x6/blob/9dcf1c915a84d0b61381e7c6af6a33a933390f26/docs/adr/0052-split-activity-coalescing-and-fixed-baud.md)).
+  [0052](https://github.com/NoahCLR/charybdis-4x6/blob/b734c89a86a682564faad5a65b0a526af360466b/docs/adr/0052-split-activity-coalescing-and-fixed-baud.md)).
 - `SERIAL_USART_TIMEOUT` is 5 ms, for each wait on the serial FIFO.
 - Every split data frame carries the fork's frame CRC8 by default
   (`SPLIT_TRANSPORT_CRC`); `NOAH_SPLIT_CRC=no` builds without it. The build
@@ -71,16 +71,19 @@ build's packed C struct, sent whole.
 
 | RPC | Packet |
 | --- | --- |
-| `PUT_SPLIT_RUNTIME_BASE_SYNC` | auto-mouse fade progress, active and locked pointing slot, the pointing mode's owning half and keys (when `RGB_POINTING_MODE_ACTIVE_HALF_ENABLE`), key preview layer |
+| `PUT_SPLIT_RUNTIME_BASE_SYNC` | auto-mouse fade progress, active and locked pointing slot, the pointing mode's owning half and keys (when `RGB_POINTING_MODE_ACTIVE_HALF_ENABLE`), key preview layer, the replacement feedback that shows and its keys (when `RGB_AUTOCORRECT_FEEDBACK_ENABLE`) |
 | `PUT_SPLIT_COMBO_FEEDBACK_SYNC` | combo feedback underlay and overlay key bitmaps |
-| `PUT_SPLIT_KEY_FEEDBACK_SEMANTIC_SYNC` | key feedback flash visibility and semantic map |
-| `PUT_SPLIT_KEY_FEEDBACK_BRANCH_SYNC` | key feedback owner map and tap branch map |
+| `PUT_SPLIT_KEY_FEEDBACK_SEMANTIC_SYNC` | behaviour-feedback flash visibility and semantic map |
+| `PUT_SPLIT_KEY_FEEDBACK_BRANCH_SYNC` | behaviour-feedback owner map and tap branch map |
 
 - A packet is sent when it changed, when forced, and as a heartbeat: every
   250 ms while it carries active state, every 1,000 ms otherwise. A pass
   sends at most one heartbeat; one due behind another's goes out on a
   following pass, and each packet's heartbeat counts from its own last send.
   Changed and forced packets never wait.
+- Replacement feedback is active state while a flash shows. The master half
+  times the flash and sends its end as a change; the slave half shows what
+  the last packet said and times nothing (D-F70).
 - Fade progress is active state only while the pointer layer is on, where
   both halves draw it. With the layer off the packet carries the finished
   fade, whatever the auto-mouse timer reads; with auto-mouse off, or a
@@ -218,7 +221,7 @@ arming and just after, and summarises the windows wholly between them, stage
 times included. It also estimates the poll rate with measured split time
 removed, a comparison between builds rather than a prediction. Install its
 dependencies with `npm ci --prefix tools`. Capture with the procedure in
-[`measurements/pointing-cadence/`](https://github.com/NoahCLR/charybdis-4x6/blob/9dcf1c915a84d0b61381e7c6af6a33a933390f26/measurements/pointing-cadence/README.md),
+[`measurements/pointing-cadence/`](https://github.com/NoahCLR/charybdis-4x6/blob/b734c89a86a682564faad5a65b0a526af360466b/measurements/pointing-cadence/README.md),
 which also keeps the recorded sets.
 
 Held by: `tests/host/run_split_activity_tests.sh` (`split_diagnostics_tool_test.cjs`).

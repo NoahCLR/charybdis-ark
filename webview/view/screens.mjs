@@ -6,7 +6,7 @@
 // the rail item it highlights.
 
 /** @typedef {import("../../contracts/model.js").StatusModel} StatusModel */
-/** @typedef {{screenKeys: () => HTMLElement, screenLighting: () => HTMLElement, screenMacros: () => HTMLElement,
+/** @typedef {{screenKeys: () => HTMLElement, screenLighting: () => HTMLElement, screenMacros: () => HTMLElement, screenAutocorrect: () => HTMLElement,
  * screenCustomKeys: () => HTMLElement, screenPointing: () => HTMLElement, screenBehaviours: () => HTMLElement,
  * screenCombos: () => HTMLElement, screenPointer: () => HTMLElement, screenHost: () => HTMLElement,
  * screenProfile: () => HTMLElement, screenDevice: () => HTMLElement}} ScreenRenderers */
@@ -42,6 +42,14 @@ export const SCREENS = Object.freeze({
         label: "Macros", group: "Configure", keepOnPublish: true,
         icon: '<svg viewBox="0 0 16 16"><rect x="3" y="5" width="10" height="8.5" rx="2"/><path d="M8 5V2.8M1.5 8v2.5M14.5 8v2.5"/><g fill="currentColor" stroke="none"><circle cx="8" cy="2.2" r="1.1"/><circle cx="6" cy="9" r="1.05"/><circle cx="10" cy="9" r="1.05"/></g></svg>',
         available: configureReady, render: renderers => renderers.screenMacros(),
+    }),
+    // Text replacement (its id stays the keyboard's name for it,
+    // autocorrect). A field of text set right: one closed shape with its
+    // mark inside, as the icons around it are, a dash of text and a tick.
+    autocorrect: screen({
+        label: "Text replacement", group: "Configure", keepOnPublish: true,
+        icon: '<svg viewBox="0 0 16 16"><rect x="1.5" y="4" width="13" height="8" rx="2"/><path d="M4.2 8h3M9 8.1l1.3 1.3 2.3-2.8"/></svg>',
+        available: configureReady, render: renderers => renderers.screenAutocorrect(),
     }),
     customKeys: screen({
         label: "Custom keys", group: "Configure", keepOnPublish: true,

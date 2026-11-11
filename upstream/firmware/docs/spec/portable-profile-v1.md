@@ -17,9 +17,9 @@ Which authored values become profile data at all is the
 A backup is a canonical profile blob
 ([blob and digests](profile-wire-v1/blob-and-digests.md)) holding every
 domain in the build's supported domain mask (capability page 1 byte 12): on
-this keyboard all seven, lighting `0x10`, key behaviours `0x20`, combos
-`0x30`, settings `0x40`, pointing `0x50`, keymap `0x60` and macros `0x70`, in
-registry order. It is at most 130,048 bytes, the blob ceiling. The profile is
+this keyboard all eight, lighting `0x10`, key behaviours `0x20`, combos
+`0x30`, settings `0x40`, pointing `0x50`, keymap `0x60`, macros `0x70` and the
+autocorrect list `0x80`, in registry order. It is at most 130,048 bytes, the blob ceiling. The profile is
 the whole of it: nothing outside the blob is part of a backup.
 
 A backup's identity is the blob's schema (header bytes 4–5), the domain
@@ -51,7 +51,7 @@ left out:
    bytes are one profile; anything else means it changed during the read.
 
 The settings in a backup are the stored settings, never QMK's live copies
-(D-F32, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/9dcf1c915a84d0b61381e7c6af6a33a933390f26/docs/adr/0032-live-edits-working-copy-and-save.md)). GET `0x07`
+(D-F32, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/b734c89a86a682564faad5a65b0a526af360466b/docs/adr/0032-live-edits-working-copy-and-save.md)). GET `0x07`
 reads the active settings domain alone, or the compiled defaults' when none is
 active ([settings domain](profile-wire-v1/settings-domain.md#settings-readback--get-0x07)).
 A keyboard adjustment (DPI or a lighting key) shows in QMK at once and reaches
@@ -102,7 +102,7 @@ Held by: `tests/host/run_profile_compiled_defaults_v1_tests.sh` (`folded_keyboar
 ## Layers and their references
 
 The bank has sixteen layers, ids 0–15 (D-F14,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/9dcf1c915a84d0b61381e7c6af6a33a933390f26/docs/adr/0014-bigger-profiles.md)); layer 0 is the base layer. A layer
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/b734c89a86a682564faad5a65b0a526af360466b/docs/adr/0014-bigger-profiles.md)); layer 0 is the base layer. A layer
 has no identity beyond its index, so the profile names layers by index
 throughout. `LT()` and `LM()` hold their layer in four bits, so every layer
 they can express is a bank layer; the five-bit layer actions (`MO()`, `TG()`,
@@ -139,7 +139,7 @@ The keyboard validates the whole blob against the running firmware: schema,
 every domain version, the declared action-ABI digest, every ceiling and every
 action's placement. It becomes the next generation on both halves or nothing
 does. No part of a backup is translated (D-F10,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/9dcf1c915a84d0b61381e7c6af6a33a933390f26/docs/adr/0010-firmware-accepts-only-current-formats.md)): a blob in an
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/b734c89a86a682564faad5a65b0a526af360466b/docs/adr/0010-firmware-accepts-only-current-formats.md)): a blob in an
 earlier schema or domain version, or declared under another action-ABI digest,
 is refused.
 

@@ -50,12 +50,12 @@ const ledLabelAt = (cx, cy, led) => ledLabel(cx - ledLabelWidth(led) / 2 + LED_L
 
 /** @param {import("../view/keyface-types.js").LayerView} view @param {import("./surface-types.js").BoardOptions} [options] */
 export function board(view, options = {}) {
-    const {selected, holding = [], reach = [], pdActive = null, comboActive = null, drafted = null, faces = true, ledIndex = false, accent = null, card = true,
+    const {selected, holding = [], reach = [], pdActive = null, comboActive = null, replacementActive = null, drafted = null, faces = true, ledIndex = false, accent = null, card = true,
         onKey, onOpen, onSwap, onLed} = options;
 
     const measure = pageTextMeasure() ?? estimateWidth;
     let glow = "", keys = "";
-    for (const key of boardKeys(view, {faces, pdActive, comboActive, accent})) {
+    for (const key of boardKeys(view, {faces, pdActive, comboActive, replacementActive, accent})) {
         const {index, from, glass, tiers, badges, icons, sub, led, picked} = key;
         const visual = keyVisual(index);
         const cx = visual.x + GEO.keyW / 2, cy = visual.y + GEO.keyH / 2;
@@ -147,7 +147,7 @@ export function board(view, options = {}) {
     // The trackball LED is index 56 and belongs to no key, but it is lit like
     // every other LED, so it is drawn with the light it emits rather than as an
     // outline of where the ball sits.
-    const ball = trackballGlyph(boardTrackball(view, {pdActive, comboActive, accent}), {ledIndex, picking: Boolean(accent), clickable: Boolean(onLed)});
+    const ball = trackballGlyph(boardTrackball(view, {pdActive, comboActive, replacementActive, accent}), {ledIndex, picking: Boolean(accent), clickable: Boolean(onLed)});
     if (ball.glow) glow += ball.glow;
     const node = /** @type {import("./surface-types.js").BoardNode} */ (el(`<div class="board ${options.picking ? "picking" : ""}">
         <svg viewBox="${GEO.viewBox}" xmlns="http://www.w3.org/2000/svg">${glow}${ball.markup}${keys}</svg></div>`));

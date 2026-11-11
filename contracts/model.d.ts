@@ -1,6 +1,7 @@
 import type {AccentTable, Scalar, Tier, TimingTerm} from './edits.js';
-// A global switch a banner names (vocabulary.settingOff).
-export type SettingOffSwitch = 'behaviour' | 'combo' | 'autoMouse';
+// A global switch: one a banner names (vocabulary.settingOff), and whose
+// runtime override a switch key turns off for now (offByKey).
+export type SettingOffSwitch = 'behaviour' | 'combo' | 'autoMouse' | 'autocorrect';
 export type {AccentTable};
 
 /** The setting a behaviour timing's default comes from: the dual-role tapping term or a behaviour default. */
@@ -8,7 +9,7 @@ export type TimingSource = 'tappingTerm' | TimingTerm;
 /** A macro step's kind (glossary "Macro step"). */
 export type MacroStepKind = 'text' | 'tap' | 'delay' | 'press' | 'release';
 /** What a profile holds that the keyboard counts against a limit (core/model/profile-usage.js). */
-export type UsageCountId = 'behaviours' | 'behaviourSteps' | 'combos' | 'lightingGroups' | 'lightingGroupRows' | 'macros' | 'customKeys' | 'pointingModes';
+export type UsageCountId = 'behaviours' | 'behaviourSteps' | 'combos' | 'lightingGroups' | 'lightingGroupRows' | 'macros' | 'autocorrectInputs' | 'customKeys' | 'pointingModes';
 
 /** Device operation identity is stable when presentation words change. */
 export type PhaseId = 'idle' | 'available' | 'empty' | 'connected' | 'demo' | 'enumerate' | 'connect' | 'refresh' | 'starting' | 'read-layout' | 'read-profile' | 'read-complete' | 'restore-complete' | 'disconnect' | 'read-combos' | 'read-base-rgb' | 'live-edit' | 'live-save' | 'live-revert' | 'edit-mode' | 'restart';
@@ -117,6 +118,10 @@ export interface Vocabulary {
     /** The setting macroProtection chooses, by its name, and Automatic as it says whether it plays uninterruptibly now ("Automatic · on"). */
     macroUninterruptible: Readonly<{label: string; automatic: Readonly<{on: string; off: string}>}>;
     macroSteps: WordList<MacroStepKind>;
+    /** What a text replacement is, text or a macro, as its editor's choice and its tag say it. */
+    replacementKinds: WordList<'text' | 'macro'>;
+    /** The formats a text replacement list is saved in, by extension, in the order Export offers them. */
+    listFileFormats: WordList<import('./messages.js').AutocorrectFileFormat>;
     /** A step's short name under its tile and in the legend: a key or chord step says which it is. */
     macroStepTiles: Readonly<Record<Exclude<MacroStepKind, 'tap'> | 'key' | 'chord', string>>;
     /** Why a macro does not read in the step editor, by the macro grammar's reason code (rules/macro-payload.mjs). */
@@ -149,22 +154,28 @@ export interface Vocabulary {
     /** What storing HSV(0, 0, 0) does, by lighting stage: Turn off's tip and the note once stored, and, where off has a name of its own (a layer's passthrough), the button's words and what the colour then reads. */
     colourOff: Readonly<Record<string, {offTip: string; offNote?: string; offAction?: string; offWord?: string}>>;
     feedbackOwners: WordList<string>;
-    /** The behaviour tier each key feedback state flashes for, by its RGB_KEY_SEMANTICS name; the others have none. */
+    /** The behaviour tier each behaviour state flashes for, by its RGB_KEY_SEMANTICS name; the others have none. */
     feedbackTiers: Readonly<Partial<Record<string, Tier>>>;
     /** Accents by the table an accent edit names (D-L77): when they light, `{owner}` standing for the owner picked; the owner that is all of a table's, by its RGB enum name, where it has one, and what all of its owners are called; what an accent that takes its stage's colour takes. */
     accents: Readonly<Record<AccentTable, {when: string; everyOwner?: string; every: string; stageColour: string}>>;
     /** The accent editor's own fields. */
     accentFields: {lightsFor: string; ownColour: string};
-    /** The key feedback state (an RGB_KEY_SEMANTICS name) each Key feedback colour flashes for, by the colour's field. */
+    /** The behaviour state (an RGB_KEY_SEMANTICS name) each Behaviour feedback colour flashes for, by the colour's field. */
     feedbackColourOwners: Readonly<Record<'tapCommittedColor' | 'holdActiveColor' | 'longHoldActiveColor' | 'tapBranchColors', string>>;
+    /** What Replacement feedback flashes for, by its RGB_AUTOCORRECT_SEMANTICS name: each case, and all of them. */
+    replacementOwners: WordList<string>;
+    /** The case (an RGB_AUTOCORRECT_SEMANTICS name) each Replacement feedback colour flashes for, by the colour's field. */
+    replacementColourOwners: Readonly<Record<'textColor' | 'macroColor' | 'undoColor', string>>;
     /** The groups of Lighting's lists beside an editor. */
-    lightingLists: {inUse: string; tiers: {title: string; tip: string}; tapBranches: {title: string; tip: string}; comboFeedback: {title: string; empty: string}; holdLayer: {title: string; empty: string}};
+    lightingLists: {inUse: string; tiers: {title: string; tip: string}; tapBranches: {title: string; tip: string}; replacements: {title: string; tip: string}; comboFeedback: {title: string; empty: string}; holdLayer: {title: string; empty: string}};
     stages: readonly {id: string; label: string; bit?: number}[];
     customKeys: {alwaysOn: {base: string; default: string}; layerKinds: WordList<number>};
     /** A layer key's second line on its cap, by its QMK function (MO, TG…). */
     keyCapLayerVerbs: Readonly<Record<string, string>>;
     /** What each layer key does to its layer, in the words its name reads by ("Hold", "Lock"), by its form; LT and LM have none. */
     layerKeyVerbs: Readonly<Partial<Record<LayerForm, string>>>;
+    /** The keyboard's switch keys for behaviours (BH_ON, BH_OFF, BH_TOGG) and auto-mouse (AM_ON, AM_OFF, AM_TOGG), in words, by name; QMK's for combos are worded by its catalogue. */
+    switchKeys: Readonly<Record<string, string>>;
     checkLevels: Readonly<Record<FindingLevel, string>>;
     checkStatuses: Readonly<Record<Check['status'], string>>;
     recoveryCauses: Readonly<Record<RecoveryCause, string>>;
@@ -207,7 +218,7 @@ export interface Vocabulary {
     comboOptions: Readonly<Record<string, string>>;
     /** What a behaviour and a combo share: whether it runs, and on which layers. */
     definitionFields: {use: Readonly<Record<'behaviour' | 'combo', string>>; allowedLayers: string; offInSettings: Readonly<Record<'behaviour' | 'combo', string>>; onceOn: Readonly<Record<'behaviour' | 'combo', string>>};
-    settingOff: {switches: Readonly<Record<SettingOffSwitch, {off: string; fix: string}>>; stage: string};
+    settingOff: {switches: Readonly<Record<SettingOffSwitch, {off: string; fix: string; /** What off means where the banner is, when it says so. */ detail?: string}>>; stage: string};
     behaviourFields: Readonly<Record<'anchor' | 'timings', string>>;
     comboFields: Readonly<Record<'inputs' | 'sends' | 'window' | 'conditions', string>>;
 }
@@ -231,6 +242,8 @@ export type FindingPlace =
     | {kind: 'pointing'; slot: number}
     /** `keycode`: the slot's name, as the Macros screen picks it. */
     | {kind: 'macro'; index: number; keycode: string}
+    /** A text replacement entry, by its id in the draft's list (the keyboard's, for one the draft removed): its replacement's text, or a macro replacement's key. */
+    | {kind: 'autocorrect'; entry: string}
     | {kind: 'settings'; area?: string; section?: string; stage?: string};
 export interface Finding {
     kind: string;
@@ -357,6 +370,8 @@ export interface SettingFieldBase extends SettingBits {
     notBuilt?: boolean;
     /** QMK owns the live value, so keys on the keyboard (or VIA) change it too. */
     keyboardKeys?: boolean;
+    /** The global switch this field is, whose runtime override a switch key turns off for now (the published `offByKey`). */
+    offSwitch?: SettingOffSwitch;
     governs?: {kind: 'tier'; tier: string} | {kind: 'branches'} | {kind: 'layer'; layer: number};
     /** The heading a field is listed under within its section. */
     part?: string;

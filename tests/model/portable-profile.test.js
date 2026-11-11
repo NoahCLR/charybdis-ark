@@ -36,7 +36,7 @@ test("a backup from older firmware is refused, never upgraded: the keyboard stor
     // Another schema, action vocabulary or layer count, and the retired
     // pointing-mode evidence older backups carried.
     assert.throws(() => validateSnapshot({...source, version: 1}), older);
-    for (const actionAbiDigest of [0x837cf479, 0x1d3fcacc, 0x61072732, 0xeb80829c, 0xdcb00959, 0xf79c6151]) assert.throws(() => validateSnapshot({...source, actionAbiDigest}), older);
+    for (const actionAbiDigest of [0x837cf479, 0x1d3fcacc, 0x61072732, 0xeb80829c, 0xdcb00959, 0xf79c6151, 0x91fcd248, 0x3c9e17ff]) assert.throws(() => validateSnapshot({...source, actionAbiDigest}), older);
     assert.throws(() => validateSnapshot({...source, pdModeSource: {version: 1}}), {code: "INVALID_PORTABLE_PROFILE", message: /holds more than a backup from current firmware/});
     assert.throws(() => validateSnapshot({...source, layers: profileLayers(source).slice(0, 8)}), {code: "INVALID_PORTABLE_PROFILE", message: /holds more than a backup from current firmware/});
     const truncated = decodeProfileBlob(Buffer.from(source.profile, "base64"));
@@ -59,6 +59,11 @@ test("a backup from older firmware is refused, never upgraded: the keyboard stor
         const relabelled = Buffer.from(raw); relabelled[4] = major;
         assert.throws(() => validateSnapshot({...source, profile: relabelled.toString("base64")}), older, `schema ${major}`);
     }
+    // The schema before this one, 4.4, whose lighting had no replacement
+    // feedback (firmware D-F70): refused by its minor, as its backups are by
+    // their vocabulary's digest above.
+    const before = Buffer.from(raw); before[5] = 4;
+    assert.throws(() => validateSnapshot({...source, profile: before.toString("base64")}), older, "schema 4.4");
 });
 test("behaviour targets and tap/hold branches follow their layers", () => {
     const source = document(), blob = decodeProfileBlob(Buffer.from(source.profile, "base64"));
@@ -251,14 +256,14 @@ test("current backups preserve retired user assignments without reinterpreting t
 test("a keyboard storing a domain in another version than current firmware's is not read", () => {
     const source = validateSnapshot(document());
     const current = encodeSettings(settings());
-    const v7 = Buffer.concat([current.subarray(0, 404), current.subarray(1684)]);
+    const v7 = Buffer.concat([current.subarray(0, 408), current.subarray(1688)]);
     v7[0] = 7; v7[6] = 0;
     const blob = decodeProfileBlob(source.profile);
     const live = encodeProfileBlob({schema: blob.schema, domains: blob.domains.map(domain => domain.id === 0x40 ? {...domain, version: 7, payload: v7} : domain)},
-        {domainVersions: {0x10: 4, 0x20: 2, 0x30: 3, 0x40: 7, 0x50: 4, 0x60: 1, 0x70: 1}});
+        {domainVersions: {0x10: 5, 0x20: 2, 0x30: 3, 0x40: 7, 0x50: 4, 0x60: 1, 0x70: 1, 0x80: 1}});
     const combos = {defaultTermMs: 50, holdTermMs: 200, rows: []};
     assert.throws(() => materializeProfile(live, live, combos, current), {code: "FIRMWARE_UPDATE_REQUIRED", message: /Ark supports only current firmware/});
-    assert.throws(() => materializeProfile(source.candidate, source.candidate, combos, Buffer.from([12, ...current.subarray(1)])), /settings/i, "settings in another version are refused");
+    assert.throws(() => materializeProfile(source.candidate, source.candidate, combos, Buffer.from([13, ...current.subarray(1)])), /settings/i, "settings in another version are refused");
     assert.doesNotThrow(() => materializeProfile(source.candidate, source.candidate, combos, current));
 });
 
@@ -369,7 +374,7 @@ test("a refused profile says what is wrong with it in plain words, under its sta
         said(() => reorderLayers(beyond, [0, 2, 1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15])),
         said(() => validateSnapshot({...document(), profile: "!"})),
         said(() => validateSnapshot({...document(), extra: 1})),
-        said(() => validateSnapshot(document(), {compiledLayerCount: 8, supportedDomainMask: 127, actionAbiDigest: document().actionAbiDigest})),
+        said(() => validateSnapshot(document(), {compiledLayerCount: 8, supportedDomainMask: 255, actionAbiDigest: document().actionAbiDigest})),
     ];
     assert.equal(words[0], "A key in this profile reaches a layer the keyboard does not have.");
     for (const sentence of words) assert.doesNotMatch(sentence, /layer bank|layer-mod|portable profile|action vocabulary|domain|RGB|Invalid|Unbalanced|Unsupported/, sentence);

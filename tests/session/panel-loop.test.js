@@ -7,12 +7,12 @@ const {FakeDeviceAdapter} = require("../../core/transport/fake-device-adapter");
 const {LIVE_LINK_ERROR_CODES, liveLinkError} = require("../../core/transport/device-adapter");
 const {fingerprint, summary} = require("../../core/model/portable-profile");
 const {document} = require("../fixtures/pd-profile");
-const {document: currentDocument} = require("../fixtures/portable-profile");
+const {document: currentDocument, CURRENT_CAPABILITIES} = require("../fixtures/portable-profile");
 const {fakeKeyboardAdapter, fakeKeyboard} = require("../fixtures/fake-keyboard");
 const {fakeShell} = require("../fixtures/panel-loop");
 const {PHASE} = require("../../core/model/vocabulary");
 
-const capabilities = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 3}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0x67df11b3, featureFlags: require("../../core/protocol/profile-wire-v1").PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES};
+const capabilities = CURRENT_CAPABILITIES;
 const snapshot = () => {
     const doc = document();
     return {document: doc, fingerprint: fingerprint(doc), summary: summary(doc), limits: {brightnessMax: 200}};
@@ -448,6 +448,124 @@ test("the published binding is what edits, macro checks, imports and Apply answe
         assert.deepEqual(shell.recoveries, [], `${label}: Apply wrote no recovery copy`);
         assert.equal(service.calls.includes("restorePortableProfile"), false);
     }
+});
+
+test("an autocorrect edit is checked against the draft without staging it: its refusal in words, or what it would newly warn about", async () => {
+    const service = fakeService(), shell = fakeShell(), loop = openPanelLoop(shell, {service});
+    loop.serviceChanged(); shell.posted.length = 0;
+    const draft = loop.session.draft, before = structuredClone(draft.document), revision = draft.revision;
+    const ask = (edit, extra = {}) => loop.handleMessage({type: "validateAutocorrect", edit, requestId: 41, draftId: draft.id, draftRevision: revision, ...extra});
+    await ask({type: "addAutocorrectTypos", correction: "then", typos: [{typo: "tehn"}]});
+    assert.deepEqual(last(shell), {type: "autocorrectValidation", requestId: 41, draftId: draft.id, draftRevision: revision, validation: {error: "", code: "", warnings: [], entry: "then", label: "then", listed: false}},
+        "with the entry its replacement would be");
+    await ask({type: "addAutocorrectTypos", correction: "no", typos: [{typo: "*on"}]});
+    assert.equal(last(shell).validation.error, "");
+    assert.deepEqual(last(shell).validation.warnings, ["“*on” is a short input with *, so it catches many words."]);
+    await ask({type: "addAutocorrectTypos", correction: "ten", typos: [{typo: "teh"}]});
+    assert.deepEqual(last(shell).validation, {error: "“teh” is already an input for “the”.", code: "AUTOCORRECT_EDIT_REFUSED", warnings: [], entry: "ten", label: "ten", listed: false},
+        "a refusal still says which entry its replacement is");
+    await ask({type: "addAutocorrectTypos", correction: "then", typos: [{typo: "te*hn"}]});
+    assert.match(last(shell).validation.error, /has \* where it cannot go/);
+    await ask({type: "addAutocorrectTypos", macro: 5, typos: [{typo: "sig"}]});
+    assert.equal(last(shell).validation.error, "", "a replacement may play a macro");
+    // A field's text is read by core, and the entry the list has for the
+    // replacement is named: the screen offers to open it, and follows it.
+    await ask({type: "addAutocorrectTypos", correction: " the ", inputs: "tthe thhe"});
+    assert.deepEqual(last(shell).validation, {error: "", code: "", warnings: [], entry: "the", label: "the", listed: true, listedSaid: "“the” is already on your list. Add inputs to it there."});
+    // An add that names no input yet is only asked which entry it would be.
+    await ask({type: "addAutocorrectTypos", correction: "the", inputs: ""});
+    assert.deepEqual(last(shell).validation, {error: "", code: "", warnings: [], entry: "the", label: "the", listed: true, listedSaid: "“the” is already on your list. Add inputs to it there."});
+    await ask({type: "addAutocorrectTypos", correction: "the", inputs: "teh"});
+    assert.deepEqual(last(shell).validation, {error: "“teh” is already an input for “the”.", code: "AUTOCORRECT_EDIT_REFUSED", warnings: [], entry: "the", label: "the", listed: true,
+        listedSaid: "“the” is already on your list. Add inputs to it there."}, "and that the list has it, whatever is wrong with the input");
+    await ask({type: "addAutocorrectTypos", correction: "  ", inputs: "teh"});
+    assert.deepEqual(last(shell).validation, {error: "Type the replacement.", code: "AUTOCORRECT_EDIT_REFUSED", warnings: []}, "a replacement that is none names no entry");
+    // Changing a replacement to one the list has joins the two, and says so first.
+    await ask({type: "updateAutocorrectCorrection", correction: "thing", to: "the"});
+    assert.deepEqual(last(shell).validation, {error: "", code: "", warnings: ["“the” is already on your list: this one's inputs will join it."], entry: "the", label: "the", listed: true});
+    await ask({type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "KC_A"}]});
+    assert.ok(last(shell).validation.error, "only an autocorrect edit is checked here");
+    for (const stale of [{draftId: "old"}, {draftRevision: revision - 1}]) {
+        await ask({type: "deleteAutocorrectTypo", typo: "teh"}, stale);
+        assert.ok(last(shell).validation.error);
+    }
+    assert.deepEqual(draft.document, before);
+    assert.equal(draft.revision, revision);
+    assert.equal(draft.dirty, false);
+    assert.deepEqual(shell.errors, []);
+    assert.deepEqual(service.calls, []);
+});
+
+test("text is tried against the draft's autocorrect list without staging anything", async () => {
+    const service = fakeService(), shell = fakeShell(), loop = openPanelLoop(shell, {service});
+    loop.serviceChanged(); shell.posted.length = 0;
+    const draft = loop.session.draft, before = structuredClone(draft.document), revision = draft.revision;
+    const bound = {draftId: draft.id, draftRevision: revision};
+    await loop.handleMessage({type: "tryAutocorrect", requestId: 9, before: "", typed: "Teh ", capsLock: false, ...bound});
+    assert.deepEqual(last(shell), {type: "autocorrectTry", requestId: 9, ...bound, result: {text: "The ", fired: [{entry: "the", correction: "the", typo: "teh"}], marks: [{entry: "the", correction: "the", typo: "teh", start: 0, end: 3}], undone: false}});
+    await loop.handleMessage({type: "tryAutocorrect", requestId: 10, before: "", typed: "Teh \b", capsLock: false, ...bound});
+    assert.deepEqual(last(shell).result, {text: "Teh", fired: [], marks: [], undone: true});
+    await loop.handleMessage({type: "tryAutocorrect", requestId: 11, before: "", typed: 7, capsLock: false, ...bound});
+    assert.deepEqual([last(shell).requestId, last(shell).result, typeof last(shell).error], [11, undefined, "string"]);
+    await loop.handleMessage({type: "tryAutocorrect", requestId: 12, before: "", typed: "teh ", capsLock: false, draftId: "old", draftRevision: revision});
+    assert.ok(last(shell).error, "a try belongs to the draft it was typed against");
+    assert.deepEqual(draft.document, before);
+    assert.equal(draft.revision, revision);
+    assert.deepEqual(service.calls, []);
+});
+
+test("an autocorrect list file is read and judged against the draft without staging it, dropped or chosen", async () => {
+    let chosen;
+    const service = fakeService(), shell = fakeShell({chooseProfile: async () => chosen}), loop = openPanelLoop(shell, {service});
+    loop.serviceChanged(); shell.posted.length = 0;
+    const draft = loop.session.draft, before = structuredClone(draft.document), revision = draft.revision;
+    const bound = {draftId: draft.id, draftRevision: revision};
+    await loop.handleMessage({type: "previewAutocorrectImport", requestId: 5, text: ":tehn: -> then\n:teh: -> ten\nbroken\n", name: "mine.txt", ...bound});
+    const reply = last(shell);
+    assert.deepEqual({type: reply.type, requestId: reply.requestId, name: reply.name, draftId: reply.draftId, draftRevision: reply.draftRevision, error: reply.error},
+        {type: "autocorrectImportPreview", requestId: 5, name: "mine.txt", ...bound, error: undefined});
+    assert.equal(reply.preview.format, "txt");
+    assert.deepEqual(reply.preview.add.newReplacements, [{label: "then", inputs: ["tehn"]}]);
+    assert.deepEqual(reply.preview.add.refused.map(row => row.reason), ["“teh” is already an input for “the”.", "It has no “->” between the input and its replacement."], "in the file's order");
+    assert.equal(reply.preview.replace.replacements, 2);
+    // The chooser's file, as the shell hands it over; none chosen answers with no preview.
+    chosen = {text: "replacement,inputs\nthen,tehn then*\n", name: "sheet.csv"};
+    await loop.handleMessage({type: "chooseAutocorrectFile", requestId: 6, ...bound});
+    assert.deepEqual([last(shell).name, last(shell).preview.format, last(shell).preview.entries], ["sheet.csv", "csv", [{correction: "then", typos: [{typo: "tehn"}, {typo: "then*"}]}]]);
+    chosen = undefined;
+    await loop.handleMessage({type: "chooseAutocorrectFile", requestId: 7, ...bound});
+    assert.deepEqual(last(shell), {type: "autocorrectImportPreview", requestId: 7, name: "", ...bound});
+    // A file that is no list, and a stale draft, answer with why.
+    await loop.handleMessage({type: "previewAutocorrectImport", requestId: 9, text: "{nope", name: "x.json", ...bound});
+    assert.deepEqual([last(shell).error, last(shell).preview], ["This file is not a valid text replacement list.", undefined]);
+    await loop.handleMessage({type: "previewAutocorrectImport", requestId: 10, text: "a -> b", name: "x.txt", draftId: draft.id, draftRevision: revision - 1});
+    assert.ok(last(shell).error);
+    assert.deepEqual(draft.document, before);
+    assert.equal(draft.revision, revision);
+    assert.deepEqual(shell.errors, []);
+    assert.deepEqual(service.calls, []);
+
+    // Keeping it is one draft edit of the preview's entries.
+    await loop.handleMessage({type: "importAutocorrect", mode: "add", entries: reply.preview.entries, ...bound});
+    assert.equal(draft.dirty, true);
+    assert.equal(last(shell).acceptedEdit.message.type, "importAutocorrect");
+});
+
+test("the draft's autocorrect list is exported as a file in the format asked for", async () => {
+    const service = fakeService(), shell = fakeShell(), loop = openPanelLoop(shell, {service});
+    loop.serviceChanged();
+    const draft = loop.session.draft;
+    await loop.handleMessage({type: "addAutocorrectTypos", correction: "then", typos: [{typo: "tehn"}], draftId: draft.id, draftRevision: draft.revision});
+    for (const format of ["txt", "csv", "json"]) {
+        await loop.handleMessage({type: "exportAutocorrect", format});
+        const file = shell.exports.at(-1);
+        assert.match(file.fileName, new RegExp(`^charybdis-text-replacements-\\d{4}-\\d\\d-\\d\\d\\.${format}$`));
+        assert.match(file.text, /tehn/, "the draft's list, the edit not yet saved included");
+        assert.equal(last(shell).notice, `Text replacement list exported to /exports/${file.fileName}`);
+    }
+    await loop.handleMessage({type: "exportAutocorrect", format: "xml"});
+    assert.match(last(shell).notice, /^Failed: Choose a text, CSV or JSON file\./);
+    assert.deepEqual(service.calls, [], "nothing is read from or written to the keyboard");
 });
 
 test("a reconnect refuses keeping an already-open import or layer review", async () => {

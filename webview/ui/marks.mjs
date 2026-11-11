@@ -22,7 +22,7 @@ import {sequenceFace} from "../view/macro-sequence.mjs";
 import {layerTapAction, namedAction} from "../view/named-action.mjs";
 import {keyIdentity, reachKind, slotKeycodeNames} from "../view/key-identity.mjs";
 import {feedbackColours, pdColourRow, stageEnabled} from "../view/lighting.mjs";
-import {REACH_ICONS} from "../view/screens.mjs";
+import {REACH_ICONS, SCREENS} from "../view/screens.mjs";
 import {layerAt, layerCalled, layerCalledAt, vocabulary} from "../view/vocabulary.mjs";
 import {boardOutlineMarkup} from "../view/geometry.mjs";
 import {layerSwatch} from "./layerbar.mjs";
@@ -42,7 +42,7 @@ export function branchBadge(model, count, className = "") {
 // badge, counting "N×", tinted with every tap-branch colour rather than one
 // (D-L31). Each tap count takes an equal share of the badge, left to right in
 // tap order, with a hard edge between colours. A colour that is off leaves its
-// share empty; with key feedback off, or every colour off, the badge is
+// share empty; with behaviour feedback off, or every colour off, the badge is
 // drawn unlit.
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model */
 export function branchesBadge(model) {
@@ -102,10 +102,13 @@ function kindIcon(kind, colour) {
     return "";
 }
 
-// A macro's or a custom key's mark: its screen's rail icon in the words'
-// colour, since neither has a colour of its own (D-L31).
-/** @param {"macro" | "customKey"} kind */
-const plainIcon = (kind) => `<span class="kind-icon plain" data-kind="${esc(kind)}" aria-hidden="true">${REACH_ICONS[kind]}</span>`;
+// A macro's, a custom key's or a text replacement's mark: its screen's rail
+// icon in the words' colour, since none has a colour of its own (D-L31).
+const PLAIN_ICONS = Object.freeze({macro: REACH_ICONS.macro, customKey: REACH_ICONS.customKey, replacement: SCREENS.autocorrect.icon});
+/** @param {"macro" | "customKey" | "replacement"} kind */
+const plainIcon = (kind) => `<span class="kind-icon plain" data-kind="${esc(kind)}" aria-hidden="true">${PLAIN_ICONS[kind]}</span>`;
+// A text replacement's mark, heading its editor as a macro's heads a macro's.
+export const replacementMark = () => plainIcon("replacement");
 
 // A layer's icon with no colour, for a line that stands for several layers at
 // once (the layer stack's folded run), so it lines up with the marks around it.

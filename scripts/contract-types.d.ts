@@ -92,3 +92,13 @@ export interface FixtureHostLayout {
     chars: Record<string, string[]>;
 }
 export interface HostLayoutFixture { format: number; layouts: FixtureHostLayout[] }
+export interface AutocorrectFixtureEntry { correction: string; typos: {typo: string; match: string}[] }
+export interface AutocorrectDomainFixture {
+    version: number;
+    ceilings: {corrections: number; typos: number; bytesPerText: number; textBytes: number; domainBytes: number};
+    matches: string[];
+    apostrophe: string;
+    wordCharacters: [string, string][];
+    valid: {name: string; entries: AutocorrectFixtureEntry[]; hex: string}[];
+    invalid: {name: string; hex: string; error: {code: string; table: number | null; row: number | null}}[];
+}

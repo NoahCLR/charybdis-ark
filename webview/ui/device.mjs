@@ -59,7 +59,7 @@ export function screenDevice() {
         ...(build?.version ? /** @type {const} */ ([["Ark", esc(`Ark ${build.version}`)]]) : []),
         ["Halves", demo ? "Demo · no keyboard" : `<span class="halves">${halves}</span>`],
     ]);
-    const usage = model?.portable?.available ? profileUsageView(model, model.portable.usage, model?.macroBank) : null;
+    const usage = model?.portable?.available ? profileUsageView(model, model.portable.usage, model?.macroBank, model?.autocorrect?.usage) : null;
     const diagnosticsOpen = (state.settingsOpen || []).includes("diagnostics");
     // Diagnostics reads each half's flash pauses when it opens, and once for
     // each connection while it stays open: a keyboard reconnected or chosen
@@ -154,10 +154,10 @@ function usageCard(usage) {
             <div><div class="sect-h"><h4>Profile</h4>
                 <span class="right note">${esc(bytes(usage.used))} of ${esc(bytes(usage.capacity))} bytes used · ${esc(bytes(usage.free))} free</span></div>
                 <div class="meter ${usage.nearlyFull ? "near" : ""}" data-tip="${Math.round(usage.share * 100)}% used">${meterFill(usage.share * 100)}</div></div>
-            <p class="note">Behaviours, combos, lighting, pointing modes, custom keys, settings and names are stored together here${usage.nearlyFull ? ". It is nearly full: the next edit may not fit" : ""}.</p>
+            <p class="note">Behaviours, combos, macros, text replacements, custom keys, pointing modes, lighting, settings and names are stored together here${usage.nearlyFull ? ". It is nearly full: the next edit may not fit" : ""}.</p>
             ${usage.counts.length ? `<table class="t usage-counts"><thead><tr><th>In use</th><th class="count num"></th><th></th><th></th></tr></thead>
                 <tbody>${usage.counts.map((count) => `<tr data-tip="${esc(count.tip)}"><td>${esc(count.label)}</td>
-                    <td class="mono count num">${esc(count.used)} of ${esc(count.limit)}</td>
+                    <td class="mono count num">${esc(bytes(count.used))} of ${esc(bytes(count.limit))}</td>
                     <td class="bar"><div class="meter">${meterFill(count.share * 100)}${count.unavailable
                         ? `<span class="out" style="width:${count.unavailableShare * 100}%"></span>` : ""}</div></td>
                     <td class="note">${esc(count.note)}</td></tr>`).join("")}</tbody></table>` : ""}
@@ -165,5 +165,9 @@ function usageCard(usage) {
                 <span class="right note">${esc(bytes(usage.macros.used))} of ${esc(bytes(usage.macros.capacity))} bytes used</span></div>
                 <div class="meter">${meterFill(usage.macros.share * 100)}</div>
                 <p class="note meter-note">Macro steps are part of the profile above, within their own limit, and counted slot by slot on Macros.</p></div>` : ""}
+            ${usage.replacements ? `<div data-usage="replacements"><div class="sect-h"><h4>Text replacement memory</h4>
+                <span class="right note">${esc(bytes(usage.replacements.used))} of ${esc(bytes(usage.replacements.capacity))} bytes used</span></div>
+                <div class="meter">${meterFill(usage.replacements.share * 100)}</div>
+                <p class="note meter-note">Replacements and their inputs are part of the profile above, within their own limit, and listed on Text replacement.</p></div>` : ""}
         </div></div>`;
 }

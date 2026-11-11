@@ -7,7 +7,7 @@
 // app decided on. A field the firmware cannot report stays visible and
 // read-only with its reason. Which sections each screen draws is
 // view/settings-layout.mjs's; every one is drawn open. Lighting draws its own
-// sections with the same rows.
+// sections with the same rows (sectionCard).
 
 // Selector assertions refer to elements created by this module's authored markup.
 import * as edits from "../view/edits.mjs";
@@ -40,7 +40,7 @@ export const screenCombos = () => settingsScreen("combos", "Combos",
 export const screenPointer = () => settingsScreen("pointer", "Pointer",
     "Pointer speed, sniping and the pointer layer.");
 export const screenHost = () => settingsScreen("host", "Host",
-    "The computer you type on, and key swaps for every layer.");
+    "The computer you type on, text replacement's switch, and key swaps for every layer.");
 
 // One Settings screen: its sections as cards, all open, each saved whole.
 /** @param {string} screen @param {string} title @param {string} subtitle */
@@ -312,18 +312,19 @@ function snipingKeys(model, canEdit) {
 
 // QMK keeps the live value of these, so a key on the keyboard (a Magic, DF()
 // or DPI key) changes it too, until the keyboard restarts: the profile is
-// their only saved owner (firmware D-F32), and a combos key is a toggle over
-// it, shown beside the switch rather than as a change.
+// their only saved owner (firmware D-F32), and a switch key (CM_*, BH_*,
+// AM_*, firmware D-F66) sets the keyboard's override over it, shown beside
+// the switch rather than as a change.
 const KEYBOARD_KEYS_TIP = "Keys on the keyboard can change this too, until the keyboard restarts; it then comes back to the value set here.";
 /** @param {import("../../contracts/panel.js").PresentedField | undefined} field */
 const keyboardKeysMark = (field) => field?.keyboardKeys ? ` <span class="kk-mark" data-tip="${esc(KEYBOARD_KEYS_TIP)}">↺ keyboard keys change this too</span>` : "";
 
-// A toggle key turned this off over a stored "on" (plan answer 10): said
-// beside the switch, never a change in the review.
+// A switch key turned this off over a stored "on" (plan answer 10): said
+// beside the switch, never a change in the review. The field names its
+// switch, and core decides whether a key turned it off.
 /** @param {import("../../contracts/panel.js").PresentedField | undefined} field */
 function offByKeyMark(field) {
-    const runtime = getModel()?.runtime;
-    const off = field?.macro === "combosEnabled" ? runtime?.combosOffByKey : field?.macro === "behaviorsEnabled" ? runtime?.behavioursOffByKey : false;
+    const off = field?.offSwitch ? getModel()?.offByKey?.[field.offSwitch] : false;
     return off ? ` <span class="kk-mark off-by-key" data-tip="${esc("A key on the keyboard turned this off for now. It stays on here; the key turns it back on, and so does unplugging the keyboard. Nothing to save.")}">turned off by key</span>` : "";
 }
 

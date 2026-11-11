@@ -32,7 +32,21 @@ export interface PanelState {
     placement: {keycode: string} | null; retarget: {from: string; to: string; existing: string} | null; keyClipboard: {keycode: string; label: string} | null;
     railMenu: boolean; stage: string; layersOpen: boolean; layersAsked: boolean; layerGripFocus?: number; pointingSlot: number; pointingSearch: string; pdKind: {slot: number; kind: number} | null;
     pdTaps: {slot: number; rows: Record<string, PdTap>} | null;
-    pdAdvanced: boolean; applyDismissed: number; recoveryAsk: string | null; feedbackRow: string | undefined; comboPreview: {id: number; keys: number[]} | null; lightingGroupsShut: string[];
+    pdAdvanced: boolean; applyDismissed: number; recoveryAsk: string | null; feedbackRow: string | undefined; replacementRow: string | undefined; comboPreview: {id: number; keys: number[]} | null; lightingGroupsShut: string[];
+    /** The Text replacement screen's search, and the entry open in its editor, by its id (null: the first shown). */
+    autocorrectSearch: string; autocorrectEntry: string | null;
+    /** A replacement being made, or null: its kind, its text or macro slot, and its first input as typed so far. It joins the list with that input; `sent` once that is posted, the list it was posted against, and `made`, the id core's check said its entry would have. `label` is what core's check calls it, and `joins` the entry the list already has for it, as the check said, with core's sentence for it. `shown` while its editor is the one open. */
+    autocorrectNew: {kind: 'text' | 'macro'; text: string; macro: number | null; input?: string; label?: string; joins?: {entry: string; said: string} | null; shown: boolean; sent?: string; made?: string} | null;
+    /** What is open in the editor of the entry with this id: Text or Macro picked there and not yet kept (`kind`), the field that adds inputs (`more`, `left` once it was left with an input on its way), or one input being written anew (`input`, with `typo`, its stored letters); `sent` once an edit from it is posted, the list it was posted against, and `follow`, the id core's check said the entry would then have. */
+    autocorrectEdit: {entry: string; part: 'kind' | 'more' | 'input'; typo?: string; kind?: 'text' | 'macro'; left?: boolean; sent?: string; follow?: string} | null;
+    /** Whether the Export menu is open. */
+    autocorrectExport: boolean;
+    /** The core's answer to the text replacement edit being typed, for the field it is in (a replacement's text, an input, or a new replacement): the edit asked about (`asked`), whether the answer is still on its way (`pending`), its refusal or what it would newly warn about, and the entry its replacement is in the list (contracts/messages.d.ts AutocorrectValidation). */
+    autocorrectCheck: {form: 'replacement' | 'input' | 'new'; requestId: number; asked: string; pending: boolean; error: string; warnings: string[]; entry?: string; label?: string; listed?: boolean; listedSaid?: string} | null;
+    /** A list file being read, or read and waiting on Add or Replace: the request it answers, whether the shell's chooser is asking for it (`choosing`), the file's name ('' until the chooser names it), and core's preview or why it could not be read. */
+    autocorrectImport: {requestId: number; pending: boolean; choosing?: boolean; name: string; preview?: import('../contracts/messages.js').AutocorrectImportPreview; error?: string} | null;
+    /** Try it: what its box holds (`text`, never changed by Ark), read as the text that was there (`before`) and the keys typed since (`typed`, `\b` for Backspace), the Caps Lock the preview is made under, and the core's last answer: the text the keyboard would leave (`shown`), what fired, where each replacement stands in it (`marks`), whether the last key undid one, the draft it was tried against and why it could not be. */
+    autocorrectTry: {before: string; typed: string; capsLock: boolean; text: string; shown: string; fired: import('../contracts/messages.js').AutocorrectTryResult['fired']; marks: import('../contracts/messages.js').AutocorrectTryResult['marks']; undone: boolean; error: string; requestId: number; draft: string};
     macroSlot: string | null; macroSearch: string; customKey: string | null; customKeySearch: string; macroForms: Record<string, MacroForm>;
     /** The slot tile held for a keyboard swap (D-L81): its bank and the key its screen picks it by. */
     heldSlot: {bank: string; key: string} | null;

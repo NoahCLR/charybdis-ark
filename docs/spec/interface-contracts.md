@@ -62,7 +62,8 @@ layers in view reach:
   tall as its tallest stage with a list whichever is open, as the Keys
   workbench takes the Behaviours tab's (`matchTallestStageHeight`,
   `webview/ui/lighting/stage-body.mjs`), so the two workbenches read alike: its column header, a counted band per group that
-  folds (Key feedback's tiers and tap branches; the combos, parted into those
+  folds (Behaviour feedback's tiers and tap branches; Replacement feedback's
+  cases; the combos, parted into those
   lighting combo feedback and those holding a layer), rows ruled as
   a table's that pick themselves (`pickRow`, `pickButton`, `attachPickRows`),
   the picked one shaded with the bar and kept in view. The layers and slots
@@ -133,7 +134,8 @@ The same kind of control looks and sits the same on every screen.
   layers together, which reads the board, whether or not the board takes an
   edit; while it takes none, the rest of the list says only what still
   works, selecting a key and copying it, all in this computer's shortcut
-  words (`boardShortcuts`, `webview/ui/keys/board-card.mjs`;
+  words (`boardShortcuts`, `webview/ui/keys/board-card.mjs`, drawn by the
+  one info mark, `webview/ui/info-mark.mjs`, in its corner form;
   `browser-tests/shortcut-glyphs.spec.js`).
 - A number field's unit rides inside the input (`.affix.unit`), so its label
   names only the value, and a whole number is a text field with
@@ -183,9 +185,10 @@ The same kind of control looks and sits the same on every screen.
   says it: the Keymap's Behaviours and Combos tabs and a custom key's What it
   does carry one amber banner across their top while it is off, which goes to
   that switch on its Settings screen and marks its row. Lighting's Auto-mouse
-  fade, Combo feedback and Key feedback tabs read off and carry the same banner
-  while Auto-mouse, combos' or behaviours' master switch keeps them from
-  painting (`stageIdle`). All of them stay editable
+  fade, Combo feedback, Behaviour feedback and Replacement feedback tabs read off
+  and carry the same banner while Auto-mouse, combos' or behaviours' master
+  switch, or Text replacement's switch, keeps them from painting
+  (`stageIdle`). All of them stay editable
   (`browser-tests/participation.spec.js`). Closed, Timings wears the mark of each timing the behaviour sets, after its name
   (**Marks**), and none when all follow the defaults
   (`browser-tests/participation.spec.js`).
@@ -493,7 +496,7 @@ macro and a custom key, which have none:
 
 | Thing | Mark |
 | --- | --- |
-| A behaviour tier (tap, hold, long hold) | the dot the keyboard flashes when it resolves (`tierDot`); a key feedback state's LED rows carry its tier's (`vocabulary.feedbackTiers`) |
+| A behaviour tier (tap, hold, long hold) | the dot the keyboard flashes when it resolves (`tierDot`); a behaviour state's LED rows carry its tier's (`vocabulary.feedbackTiers`) |
 | A tap count (2× and up) | its branch badge in its tap-branch colour (`branchBadge`) |
 | Every tap count at once (what the Multi tap window governs) | a branch badge counting "N×", its border and fill split into an equal, hard-edged share per tap-branch colour, in tap order (`branchesBadge`) |
 | A layer | the board's icon in its layer colour (`kindIcon`); in a set of layers, before each layer's name (`valueMarked`) |
@@ -670,6 +673,10 @@ here: its home and tests are in
 | A definition's own switches: why a behaviour or combo's Use switch or its layers keep it off a layer (D-L73) | `rules/definition-switches.mjs`, read by `core/model/participation.js` and `webview/view/participation.mjs` | `tests/rules/definition-switches.test.mjs`, `tests/model/participation.test.js`, `tests/view/participation-oracle.test.mjs` |
 | Layer keycode placement: where a layer keycode may be stored (a key, a tap, a press-and-hold branch, a combo's output), and that DF(), PDF(), a layer past the keyboard's and a lock of a layer it lacks go nowhere; each side says it in its own words (D-L73) | `rules/layer-placement.mjs`, said by `core/schema/actions.js` (`placementProblem`) and `webview/view/keycode-expression.mjs` (`keyProblem`, `comboOutputProblem`) | `tests/rules/layer-placement.test.mjs`, `tests/schema/actions.test.js`, `tests/view/keycode-expression.test.mjs` |
 | QMK key expressions: how a name, a call (LCTL(KC_A), MT(), LT(), MO(n)…) or a number reads as the keycode it stores, in one grammar with two dialects whose differences are one table (`DIALECTS`): QMK's own, which core's encoder reads, and the keyboard's, with its own names and whitespace anywhere, which the draft stores by and the picker checks by, so the two accept the same keys (D-L73) | `rules/keycode-expression.mjs`, read by `core/schema/keycodes.js` (`encode`), `core/schema/compiled-profile-v1.js` (`resolveNativeQmkExpression`) and `webview/view/keycode-expression.mjs` (`keycodeValue`) | `tests/rules/keycode-expression.test.mjs`, `tests/schema/keycodes.test.js`, `tests/schema/compiled-profile-v1.test.js`, `tests/view/keycode-expression.test.mjs` |
+| The text replacement list (D-L84): how an input is written with `*` (`inputOf`, `inputForm`); what an edit to it is refused for, in words; what is only warned about (untypable on the host layout, a replacement changed again, a loop, a short input with `*`, one that matches inside a replacement, a macro with no steps), asking the matcher (D-L86) which input fires on a word; what a replacement is called wherever one is listed (`replacementCalled`, published as each entry's `label`) and inside a sentence (`replacementSaid`); how a field's text is read into its inputs (`splitInputs`); which entry an edit's replacement is and whether the list has it (`editNames`); the list's size against every ceiling (`autocorrectCounts`), how full its memory is and what is free (`usage.share`, `usage.free`); and two lists' entries paired for Review. The interface holds none of it: it posts a field's text as it was typed, asks core to check it (`validateAutocorrect`), posts the edit only once that check has passed, opens and follows entries by the id the check answered with, and draws the labels, figures and warnings core publishes on each entry and input | `core/model/autocorrect-list.js`; the screen's view and its edits, `core/model/autocorrect-editor.js`; the list's counts, `core/schema/autocorrect-domain-v1.js`; what the screen draws of it (a plain search over what is published, order, counts in words), `webview/view/autocorrect.mjs` | `tests/model/autocorrect-list.test.js`, `tests/model/autocorrect-editor.test.js`, `tests/view/autocorrect.test.mjs`, `tests/session/panel-loop.test.js`, `browser-tests/autocorrect.spec.js` |
+| Try it (D-L86): what the keyboard would leave on screen for text typed against the draft's list, by the firmware's own rules. The interface runs none of them: it reads its box as typing (text added, a Backspace, or text that stands), asks core (`tryAutocorrect`) and shows the answer in the preview under its box, each standing replacement marked where the answer's `marks` say it is; it never writes to the box. Whether the connected keyboard is replacing now is core's to say (`autocorrectRunning`, from the keyboard's settings as read and its runtime page) | `core/model/autocorrect-matcher.js`, through `tryText` in `core/model/autocorrect-editor.js`; how the box is read, `triedAfter` in `webview/view/autocorrect.mjs` | `tests/model/autocorrect-matcher.test.js` (the firmware's fixture), `tests/model/autocorrect-editor.test.js`, `tests/session/panel-loop.test.js`, `tests/view/autocorrect.test.mjs`, `browser-tests/autocorrect.spec.js` |
+| The Text replacement screen (D-L88): a bank of replacements beside the editor of the one picked, as Macros is. The interface holds which entry is open, the replacement being made and the field open in the editor (`autocorrectEntry`, `autocorrectNew`, `autocorrectEdit`); which entries a search shows and which is open are `autocorrectRows` and `openEntry` (one is always open while the list has any). A replacement's macro is picked in the keycode picker on the macros alone (`allowedKeys`). No control that removes is a bare ×. How each section works is behind the info mark, the one component the board's shortcuts mark is too, which keeps its list inside the screen's area (`infoMark`, `attachInfoMarks`); the words for Text and Macro and for the file formats are the vocabulary's (`replacementKinds`, `listFileFormats`), and the Export menu's keys the rail menu's (`menuKey`) | `webview/ui/autocorrect.mjs`, `webview/view/autocorrect.mjs`, `webview/ui/info-mark.mjs`, `webview/lib/menu-keys.mjs` | `tests/view/autocorrect.test.mjs`, `browser-tests/autocorrect.spec.js` |
+| A text replacement list file (D-L85): how QMK's text, a spreadsheet's CSV and Ark's JSON read and are written, which lines a file is refused, and what a file would do to the list added to it or replacing it. The interface reads a dropped file's text and posts it; core reads it and answers with the preview (`previewAutocorrectImport`, `chooseAutocorrectFile`), and the import is one draft edit of the preview's entries | `core/model/autocorrect-import.js`; the preview's sentences, `importLines` in `webview/view/autocorrect.mjs` | `tests/model/autocorrect-import.test.js`, `tests/model/autocorrect-editor.test.js`, `tests/session/panel-loop.test.js`, `tests/view/autocorrect.test.mjs`, `browser-tests/autocorrect.spec.js` |
 | Macro text: how text, `{key}`, `{key,key}`, `{+key}`, `{-key}` and `{milliseconds}` read as steps, the limits on them, and why one does not read, as a reason code (D-L73). Core reads it by keycode, sending only the key names the step editor offers, and refuses a macro that leaves a key held, which the step editor names key by key; the step editor reads it by key name, as a person types. Both word each reason from `vocabulary.macroProblems` (core through `wordedMacroError`, wherever it reads a macro), and both skip an empty name between commas | `rules/macro-payload.mjs`, read by `core/schema/macro-payload.js` (`parsePayload`) and `webview/view/macro.mjs` (`parseMacro`) | `tests/rules/macro-payload.test.mjs`, `tests/schema/macro-payload.test.js`, `tests/view/macro.test.mjs`, `tests/view/macro-cache.test.mjs` |
 | The lighting colour compositor: the order the stages paint in and the two "no colour" rules, a firmware rule (D-L73) ([more](#lighting-preview)) | `rules/led-light.mjs`, read by `webview/view/lighting.mjs` | `tests/rules/led-light.test.mjs`, `tests/view/lighting.test.mjs` |
 | Idle lighting timeout: staged in milliseconds, edited in seconds or minutes; changing the unit stages nothing; zero means always on | `webview/view/duration.mjs` | `tests/view/duration.test.mjs`, `browser-tests/preview.spec.js` |
@@ -710,7 +717,11 @@ Which settings sections each Settings screen draws, in order, is
 Show goes, is `screenOfSection`; a note names it as the screen, named as
 outside the rail, then the section ("Behaviour settings → Tap & hold timing",
 `sectionPath`). Lighting's Auto-mouse links open Pointer settings and the
-macro editor's Your computer link opens Host settings. Outside the rail, a
+macro editor's Your computer link opens Host settings. A section that
+switches what a Configure screen edits says where that is in its switch's
+hint, as words (Combo settings' "in Keymap → Combos", Host's Text replacement
+card's "in Text replacement"; no card has a link of its own, D-L88), and that
+screen says when the switch is off, with the way back (D-L87). Outside the rail, a
 Settings screen is named as `vocabulary.settingsScreens` names it ("Pointer
 settings"), since nothing around a link says it is a setting. Default layers
 is on none: core still publishes it, so the review lists and reverts a stored
@@ -990,7 +1001,7 @@ system and mouse keys, each once, at most one media key and one system key;
 how it turns them on, all alike, as one layer key does (`layerKind`: hold,
 lock, move to, tap-toggle or one-shot; `SHORTCUT_LAYER_KINDS`); no modifiers,
 no keys and no layers is no shortcut, any part alone is one, and a kind other
-than hold needs layers. Ark reads and writes settings version 11 only (D-L64;
+than hold needs layers. Ark reads and writes settings version 12 only (D-L64;
 `tests/schema/settings-domain-v1.test.js`).
 
 - The Custom keys screen's Shortcut field says what a shortcut is in its
@@ -1355,8 +1366,9 @@ first; never the other default layers, which the keyboard's lighting does
 not read), then their accents, a layer's own by the layer core publishes
 it for (`ownerLayer`), following the firmware's membership, pass-through and
 inheritance rules. The order the stages paint in, and the
-two "no colour" rules, are the shared compositor (`rules/led-light.mjs`,
-D-L73); `webview/view/lighting.mjs` gathers what each stage paints from the
+"no colour" rules (a layer's passthrough, an accent that takes its stage's
+colour, a replacement case that is off), are the shared compositor
+(`rules/led-light.mjs`, D-L73); `webview/view/lighting.mjs` gathers what each stage paints from the
 model (`tests/rules/led-light.test.mjs`, `tests/view/lighting.test.mjs`). The caption
 on the board names those layers as the Keymap's layer preview does, top
 first down to the base ("Function on top of Pointing and Base, over the
@@ -1380,8 +1392,20 @@ its feedback is judged against those keys; a combo whose output holds layers
 lights nothing of its own and the board turns them on over the view, as the
 layer strip would, since the firmware shows the layers instead
 (`viewWhileHeld`); one whose output runs a pointing mode runs it from those
-keys and paints beneath it (the compositor's combo stage `beneath`). What
-the board shows and the line under it are `lightingBoard`
+keys and paints beneath it (the compositor's combo stage `beneath`). On
+Replacement feedback (D-L89) the board shows the flash of the case picked
+in its list, painted last, over every other stage, in that case's colour
+where the stage's locality reaches, then its accents, those for every case
+before those for the case. The key the flash follows is the keyboard's to
+know as a word ends, so one stands in for it: the first key that sends
+Space, on the layer shown and then from the base up, or Backspace for
+Replacement undone (`replacementTrigger`, `webview/view/lighting.mjs`),
+ringed while the locality follows a key and named in the line under the
+board; with none, the flash paints as the keyboard paints one whose key it
+cannot tell, both halves or every key. A case whose colour paints nothing
+(`replacementPaints`) shows no flash, its accents in a colour of their own
+still lit, and the line says it is off; with the stage off no flash shows.
+What the board shows and the line under it are `lightingBoard`
 (`webview/view/lighting-board.mjs`; `tests/view/combo-held.test.mjs`,
 `tests/view/lighting-board.test.mjs`, `tests/view/lighting.test.mjs`,
 `browser-tests/lighting-controls.spec.js`).

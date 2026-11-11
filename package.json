@@ -11,6 +11,7 @@
     "test": "node --test tests/",
     "keycodes": "node scripts/generate-keycode-catalog.js",
     "host-layouts": "node scripts/generate-host-layouts.js",
+    "autocorrect-words": "node scripts/generate-autocorrect-words.js",
     "probe:live-link": "node scripts/probe-live-link.js",
     "preview": "node scripts/preview.js",
     "build:web": "node scripts/build-web.js",

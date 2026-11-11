@@ -28,6 +28,14 @@ function number(macro, id, label, hint, extra = {}) {
 }
 /** @param {string} macro @param {number} id @param {string} label @param {string} [hint] @returns {import("../../contracts/model.js").StoredSettingField} */
 const toggle = (macro, id, label, hint) => ({macro, id, label, hint, kind: "toggle"});
+// A global switch whose switch keys override it until the keyboard restarts
+// (firmware D-F66): combos' QMK's CM_ON, CM_OFF and CM_TOGG, behaviours' BH_ON,
+// BH_OFF and BH_TOGG, auto-mouse's AM_ON, AM_OFF and AM_TOGG, autocorrect's
+// QMK's AC_ON, AC_OFF and AC_TOGG. It says keyboard
+// keys change it, and names the switch whose "turned off by key" the session
+// publishes (offByKey).
+/** @param {import("../../contracts/model.js").StoredSettingField} field @param {import("../../contracts/model.js").SettingOffSwitch} offSwitch @returns {import("../../contracts/model.js").StoredSettingField} */
+const switchedByKeys = (field, offSwitch) => ({...field, keyboardKeys: true, offSwitch});
 /** @overload @param {string} macro @param {number} id @param {string} label @param {string} [hint] @returns {import("../../contracts/model.js").StoredSettingField} */
 /** @overload @param {string} macro @param {undefined} id @param {string} label @param {string} [hint] @returns {Omit<import("../../contracts/model.js").LayerSettingField, 'record' | 'layer'>} */
 /** @param {string} macro @param {number | undefined} id @param {string} label @param {string} [hint] @returns {import("../../contracts/model.js").SettingFieldBase & {id: number | undefined, kind: 'layer', validate: string}} */
@@ -90,7 +98,7 @@ const sections = [
         toggle("autoSniping", SETTING.AUTO_SNIPING_ENABLED, "Auto-sniping", "Use sniping speed while any of the layers below is on."),
     ]},
     {id: "autoMouse", label: SECTION.autoMouse, area: AREA.pointer, fields: [
-        toggle("autoMouse", SETTING.AUTO_MOUSE_ENABLED, "Auto-mouse", "Trackball movement automatically activates the selected layer."),
+        switchedByKeys(toggle("autoMouse", SETTING.AUTO_MOUSE_ENABLED, "Auto-mouse", "Trackball movement automatically activates the selected layer."), "autoMouse"),
         layer("pointerLayer", SETTING.AUTO_MOUSE_LAYER, "Pointer layer", "The layer that moving the trackball turns on when Auto-mouse is on."),
         number("mouseTimeout", SETTING.AUTO_MOUSE_TIMEOUT, "Timeout (ms)", `How long the layer stays active after movement. The lighting fade keeps its share of it (${PROFILE_AREAS.lighting} → ${SECTION.automouseFade}).`, {min: 1}),
         number("mouseDebounce", SETTING.AUTO_MOUSE_DEBOUNCE, "Movement debounce (ms)", undefined, {tooltip: "Minimum time between trackball events that update auto-mouse. Higher values ignore closely spaced movement events."}),
@@ -123,6 +131,11 @@ const sections = [
     {id: "lightingFeedback", label: SECTION.lightingFeedback, area: AREA.lighting, stage: "key", fields: [
         number("feedbackFlash", SETTING.FEEDBACK_PERIOD, "Flash interval (ms)", "Time for each on or off phase; a full blink takes twice this value.", {min: SETTING_FIELD.FEEDBACK_PERIOD.min, validate: "positive-int"}),
     ]},
+    // A replacement feedback flash has a length of its own (firmware D-F70,
+    // D-L89), drawn on that stage's tab as the flash interval is on its.
+    {id: "replacementFeedback", label: SECTION.replacementFeedback, area: AREA.lighting, stage: "autocorrect", fields: [
+        number("replacementFlash", SETTING.AUTOCORRECT_FEEDBACK_PERIOD, "Flash length (ms)", "How long one flash lasts.", {min: SETTING_FIELD.AUTOCORRECT_FEEDBACK_PERIOD.min, validate: "positive-int"}),
+    ]},
 ];
 
 // In the keyboard's bit order: an option's place here is its bit. `part` is
@@ -142,8 +155,14 @@ const optionLabels = [
     ["swapRightControlGui", "Swap right Control and GUI", "Exchange the right Control and GUI modifier actions across all layers.", "Modifiers"],
     ["oneshot", "One-shot modifiers and layers", "Allow one-shot modifier and layer keys to affect the next key after they are released.", "Typing"],
     ["swapEscapeCaps", "Swap Escape and Caps Lock", "Exchange the Escape and Caps Lock key actions across all layers.", "Keys"],
-    ["autocorrect", "Autocorrect", "Enable the running firmware's autocorrection of recognized typing mistakes.", "Typing"],
+    ["autocorrect", "Enabled", "Off, the keyboard types every word as you typed it and keeps your list. Replacements and their inputs are in Text replacement.", "Typing"],
 ];
+// Text replacement's switch (autocorrect, in the keyboard's names) is a key
+// option the keyboard stores with the others (option 12, firmware
+// settings-domain.md). It has a section of its own on the Host screen, since
+// replacements are typed through the host layout chosen there; the list it
+// turns on is the Text replacement screen's.
+const AUTOCORRECT_SWITCH = "autocorrect";
 // Which bits of its settings word a field owns: one flag, a shifted byte or
 // nibble, or the whole word. Reading, writing and putting a field back to the
 // keyboard's value all go through this.
@@ -232,25 +251,32 @@ function settingsSections(snapshot, settings) {
     // (participation-policy.md): a key takes part only where every switch that
     // applies is on, judged by the layer its key came from. Each behaviour and
     // combo has its own switch and layers in Keymap, and each key position its
-    // own in the key's editor.
+    // own in the key's editor. Each master has switch keys that override it
+    // until the keyboard restarts (switchedByKeys).
     result.push({id: "behaviorSettings", area: AREA.settings, label: SECTION.behaviorSettings,
         layerGroup: {label: "On these layers", hint: "A key uses its behaviour only when the layer it comes from is on here."}, fields:
-        [toggle("behaviorsEnabled", SETTING.BEHAVIORS_ENABLED, "Enabled", "Off, every key does what it would without its behaviour."),
+        [switchedByKeys(toggle("behaviorsEnabled", SETTING.BEHAVIORS_ENABLED, "Enabled", "Off, every key does what it would without its behaviour."), "behaviour"),
             ...everyLayer(i => ({...toggle(`behaviorsOnLayer${i}`, SETTING.LAYER_BEHAVIORS, `On ${name(i)}`, "Keys that come from this layer use their behaviours."), bitMask: 2 ** i, governs: {kind: /** @type {const} */ ("layer"), layer: i}}))]});
     // Combos get a section of their own beside their layer matching. The
     // Interface adds the default window and hold threshold to it, which
     // the keyboard stores with the combos rather than here.
     result.push({id: "comboSettings", comboTiming: COMBO_TIMING, area: AREA.settings, label: SECTION.comboSettings,
         layerGroup: {label: "On these layers", hint: "A key can be part of a combo only when the layer it comes from is on here."}, fields:
-        [{...toggle("combosEnabled", SETTING.COMBOS_ENABLED, "Enabled", "Each combo's own window and conditions are in Keymap → Combos."), keyboardKeys: true},
+        [switchedByKeys(toggle("combosEnabled", SETTING.COMBOS_ENABLED, "Enabled", "Each combo's own window and conditions are in Keymap → Combos."), "combo"),
             {macro: "comboOutputBehaviors", header: "comboOutputBehaviors", kind: "toggle", label: "Combo outputs use behaviours",
                 hint: "Off, combos still fire but send their output without its behaviour; a custom key sends only its shortcut."},
             ...everyLayer(i => ({...toggle(`combosOnLayer${i}`, SETTING.LAYER_COMBOS, `On ${name(i)}`, "Keys that come from this layer can join combos."), bitMask: 2 ** i, governs: {kind: /** @type {const} */ ("layer"), layer: i}}))]});
     // A layer's combo reference is in its layer record, not a setting value.
     result.push({id: "comboReferences", area: AREA.settings, label: SECTION.comboReferences, description: "Each layer matches its combos against the keys of the layer chosen here.", fields:
         everyLayer(i => ({...layer(`comboReference${i}`, undefined, `Combos on ${name(i)}`, "The layer whose key assignments are used to match combos on this layer. Choose the same layer to keep its combos independent."), record: /** @type {const} */ ("reference"), layer: i, governs: {kind: /** @type {const} */ ("layer"), layer: i}}))});
+    /** @type {import("../../contracts/model.js").StoredSettingField[]} */
+    const keyOptions = options ? optionLabels.map(([macro, label, hint, part], i) => ({...toggle(macro, SETTING.KEYMAP_OPTIONS, hostKeyLabel(label, host.effective)), tooltip: hostKeyLabel(hint, host.effective), part, bitMask: options.keymapMasks[i], keyboardKeys: true, readOnly: !(options.supportedKeymapOptions & (1 << i)), notBuilt: !(options.supportedKeymapOptions & (1 << i)), hint: options.supportedKeymapOptions & (1 << i) ? "" : "Not in this firmware (does nothing)."})) : [];
     result.push({id: "keyboardOptions", area: AREA.settings, label: SECTION.keyboardOptions, ...(options ? {} : {description: "Read the keyboard to see the key options it supports."}), fields:
-        options ? optionLabels.map(([macro, label, hint, part], i) => ({...toggle(macro, SETTING.KEYMAP_OPTIONS, hostKeyLabel(label, host.effective)), tooltip: hostKeyLabel(hint, host.effective), part, bitMask: options.keymapMasks[i], keyboardKeys: true, readOnly: !(options.supportedKeymapOptions & (1 << i)), notBuilt: !(options.supportedKeymapOptions & (1 << i)), hint: options.supportedKeymapOptions & (1 << i) ? "" : "Not in this firmware (does nothing)."})) : []});
+        keyOptions.filter(field => field.macro !== AUTOCORRECT_SWITCH)});
+    // Its switch keys override it until the keyboard restarts (switchedByKeys),
+    // so it is no longer a "Typing" option among the swaps.
+    result.push({id: "autocorrect", area: AREA.settings, label: SECTION.autocorrect, fields:
+        keyOptions.filter(field => field.macro === AUTOCORRECT_SWITCH).map(({part, tooltip, ...field}) => switchedByKeys({...field, hint: field.hint || tooltip}, "autocorrect"))});
     /** @param {number} id */
     const label = id => VOCABULARY.hostOs.find(([value]) => value === id)?.[1] || "Unknown";
     const macos = host.effective === MACOS;
@@ -279,8 +305,8 @@ function settingsSections(snapshot, settings) {
             : "The keyboard could not tell. Choose the one your computer runs.", {max: 3, unit: undefined}), bitMask: 3, kind: "number",
             choices: VOCABULARY.hostOs.map(([value, word]) => ({value, label: value === 0 && host.detected ? `${word} (${label(host.detected)} detected)` : word}))},
         {...byte("hostLayout", SETTING.UNICODE_HOST_MODE, LAYOUT_SHIFT, "Keyboard layout"), kind: "number",
-            hint: macos ? "The layout active on your Mac; macros type through it. Unicode Hex Input types emoji too."
-                : "The layout active on your computer; macros type through it.",
+            hint: macos ? "The layout active on your Mac; macros and text replacements type through it. Unicode Hex Input types emoji too."
+                : "The layout active on your computer; macros and text replacements type through it.",
             choices: offered.map(layout => ({value: layout.id, label: layoutWord(layout.id)}))},
         ...(macos || host.macosIso ? [{...toggle("macosIso", SETTING.UNICODE_HOST_MODE, "ISO keyboard on macOS", "On if macOS set this keyboard up as ISO; macros then swap the keys left of 1 and Z."), bitMask: MACOS_ISO}] : []),
         // On macOS, Unicode entry is the Unicode Hex Input layout, not a switch.

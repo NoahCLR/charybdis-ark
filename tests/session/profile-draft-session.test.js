@@ -11,7 +11,7 @@ const {settingsEditorView} = require("../../core/model/settings-editor");
 const {behaviorRowsForView} = require("../../core/model/device-profile-view");
 function fixture() {
     const value = document(), snapshot = {document:value, fingerprint:fingerprint(value), summary:summary(value), limits:{brightnessMax:200}, options:options()};
-    const caps = {compiledLayerCount:16,supportedDomainMask:127,actionAbiDigest:value.actionAbiDigest};
+    const caps = {compiledLayerCount:16,supportedDomainMask:255,actionAbiDigest:value.actionAbiDigest};
     return {snapshot, caps, draft:new ProfileDraftSession(snapshot, "board", caps)};
 }
 function settings(draft, id, updates) {
@@ -393,7 +393,7 @@ test("a discard from a current review keeps it current, and discarding the last 
 });
 test("a macro name discarded back leaves no indescribable settings difference", () => {
     const value = require("../fixtures/pd-profile").document();
-    const draft = new ProfileDraftSession({document:value,fingerprint:fingerprint(value),summary:summary(value),limits:{brightnessMax:200}}, "board", {compiledLayerCount:16,supportedDomainMask:127,actionAbiDigest:value.actionAbiDigest});
+    const draft = new ProfileDraftSession({document:value,fingerprint:fingerprint(value),summary:summary(value),limits:{brightnessMax:200}}, "board", {compiledLayerCount:16,supportedDomainMask:255,actionAbiDigest:value.actionAbiDigest});
     stage(draft,{type:"updateMacro",keycode:"MACRO_3",name:"Hello",expectedFingerprint:draft.current.fingerprint});
     draft.discard(draft.revision,groupOf(draft,"macro:3"));
     assert.equal(draft.dirty,false,"discard restores the original settings bytes too");
@@ -622,7 +622,7 @@ test("undoing and redoing a reorder brings a custom key's shortcut layers back e
     policy.customKeyShortcuts[1] = {mods: 0, keys: [], layers: 0xfffe, layerKind: 1};
     const value = compiled({policy});
     const snapshot = {document: value, fingerprint: fingerprint(value), summary: summary(value), limits: {brightnessMax: 200}, options: options()};
-    const draft = new ProfileDraftSession(snapshot, "board", {compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: value.actionAbiDigest});
+    const draft = new ProfileDraftSession(snapshot, "board", {compiledLayerCount: 16, supportedDomainMask: 255, actionAbiDigest: value.actionAbiDigest});
     const shortcuts = () => validateSnapshot(draft.document).settings.customKeyShortcuts.slice(0, 2);
     const start = shortcuts();
     layers(draft, [0, 3, 1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
@@ -693,7 +693,7 @@ const {encodeMacroPayload} = require("../../core/schema/macro-payload");
 function slotFixture() {
     const value = editProfileDomains(pdDocument(), {}, open => { const macros = open("macros"); for (const slot of [1, 2, 3]) macros[slot] = encodeMacroPayload(`m${slot}`); });
     const snapshot = {document: value, fingerprint: fingerprint(value), summary: summary(value), limits: {brightnessMax: 200}, options: options()};
-    const caps = {compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: value.actionAbiDigest};
+    const caps = {compiledLayerCount: 16, supportedDomainMask: 255, actionAbiDigest: value.actionAbiDigest};
     return {snapshot, caps, draft: new ProfileDraftSession(snapshot, "board", caps)};
 }
 const fieldsOf = row => row.fields.map(field => [field.label, field.before, field.after]);

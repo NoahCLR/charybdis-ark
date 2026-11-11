@@ -20,6 +20,7 @@ const {profileMacroBudget} = require("./macro-editor");
 const {PROFILE_ACTION_KINDS: ACTION, decodeProfileBlob} = require("../schema/profile-blob-v1");
 const {PROFILE_DOMAIN_IDS} = require("../schema/profile-domains");
 const {shortcutPresent} = require("../schema/settings-domain-v1");
+const {autocorrectCounts} = require("../schema/autocorrect-domain-v1");
 
 /** @param {number | undefined} value @returns {value is number} */
 const positive = value => typeof value === "number" && Number.isInteger(value) && value > 0;
@@ -56,8 +57,9 @@ function profileUsage(snapshot, capabilities) {
     if (cached?.capabilities === capabilities) return cached.usage;
 
     const {profile, settings, behaviors, combos, pdModes, macroSlots} = decoded;
-    // RGB header: byte 4 is the group count; bytes 6, 8, 9 and 11 count the
-    // layer, pointing, combo and key-feedback override rows.
+    // RGB header: byte 4 is the group count; bytes 6, 8, 9, 11 and 14 count
+    // the layer, pointing, combo, behaviour-feedback and replacement-feedback
+    // override rows.
     const lighting = rgbPayload(profile);
     // A custom key is in use once it has a name, a shortcut or a behaviour, as
     // the Custom keys screen marks its tile; a pointing slot once it has a mode.
@@ -76,10 +78,13 @@ function profileUsage(snapshot, capabilities) {
         ["behaviourSteps", behaviors.populatedStepCount, capabilities.maxPopulatedBehaviorSteps],
         ["combos", combos.rows.length, capabilities.maxCombos],
         ["macros", macroSlots.length - macros.empty, macroSlots.length, macros.outOfRoom.size],
+        // Text replacement, the screen after Macros: what is typed is the
+        // count the keyboard caps first, each replacement having at least one.
+        ["autocorrectInputs", autocorrectCounts(decoded.autocorrect || {entries: []}).typos, capabilities.maxAutocorrectTypos],
         ["customKeys", customKeys, settings.customKeyNames.length],
         ["pointingModes", pdModes.filter(slot => slot.kind).length, pdModes.length],
         ["lightingGroups", lighting[4], capabilities.maxReusableRgbGroups],
-        ["lightingGroupRows", lighting[6] + lighting[8] + lighting[9] + lighting[11], capabilities.maxRgbStageGroupRows],
+        ["lightingGroupRows", lighting[6] + lighting[8] + lighting[9] + lighting[11] + lighting[14], capabilities.maxRgbStageGroupRows],
     ]).filter(([, , limit]) => positive(limit)).map(([id, used, limit, unavailable]) =>
         ({id, used, limit: /** @type {number} */ (limit), ...(unavailable ? {unavailable} : {}), ...(FIXED_SETS.has(id) ? {fixed: /** @type {const} */ (true)} : {})}));
 

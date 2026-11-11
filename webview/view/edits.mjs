@@ -186,7 +186,7 @@ export const pdModeColour = (pointingMode, locality, colour) => ({type: "updateP
 /** @param {string} locality @param {Colour} colour @returns {import("../../contracts/edits.js").EditOf<'updateComboFeedback'>} */
 export const comboFeedback = (locality, colour) => ({type: "updateComboFeedback", locality, ...hsvPayload(colour)});
 
-// Key feedback is stored as one record, so any change posts the whole thing
+// Behaviour feedback is stored as one record, so any change posts the whole thing
 // with the one field replaced: `rowId` is a colour field or `branch:<n>`.
 /** @param {Partial<import("../../contracts/edits.js").KeyFeedback<Colour>>} [feedback] @param {import("../../contracts/edits.js").FeedbackRow | null} [rowId] @param {Colour} [next] @param {{tapCommitMode?: string, locality?: string}} [overrides] @returns {import("../../contracts/edits.js").EditOf<'updateKeyBehaviorFeedback'>} */
 export function keyFeedback(feedback = {}, rowId, next, overrides = {}) {
@@ -205,6 +205,21 @@ export function keyFeedback(feedback = {}, rowId, next, overrides = {}) {
         else config[/** @type {import("../../contracts/edits.js").FeedbackColourField} */ (rowId)] = hsvPayload(next);
     }
     return {type: "updateKeyBehaviorFeedback", config};
+}
+
+// Replacement feedback is stored as one record too (D-L89): `field` is the
+// colour of the case changed, and HSV(0, 0, 0) switches that case off.
+/** @param {Partial<import("../../contracts/edits.js").AutocorrectFeedback<Colour>>} [feedback] @param {import("../../contracts/edits.js").AutocorrectFeedbackColourField | null} [field] @param {Colour} [next] @param {{locality?: string}} [overrides] @returns {import("../../contracts/edits.js").EditOf<'updateAutocorrectFeedback'>} */
+export function autocorrectFeedback(feedback = {}, field, next, overrides = {}) {
+    const config = {
+        textColor: hsvPayload(feedback.textColor),
+        macroColor: hsvPayload(feedback.macroColor),
+        undoColor: hsvPayload(feedback.undoColor),
+        locality: feedback.locality,
+        ...overrides,
+    };
+    if (field && next) config[field] = hsvPayload(next);
+    return {type: "updateAutocorrectFeedback", config};
 }
 
 // An accent (D-L77): the LEDs it lights, its colour (HSV(0, 0, 0) takes its
@@ -231,6 +246,35 @@ export const deleteAccent = (target, index) => ({type: "deleteRgbLedGroup", targ
 export const macroMessage = (keycode, payload, identity, fields) => ({type: "updateMacro", keycode, payload, ...(fields ? {name: fields.name, protection: fields.protection} : {}), expectedFingerprint: identity});
 /** @param {string} keycode @param {string} payload @param {number} requestId @returns {import("../../contracts/edits.js").EditOf<'validateMacro'>} */
 export const macroValidationMessage = (keycode, payload, requestId) => ({type: "validateMacro", keycode, payload, requestId});
+// The text replacement list (firmware D-F68, where a replacement is a
+// correction and an input a typo; the edits keep those names). A
+// replacement is named by its text or by the macro slot it plays; an input
+// is posted as it is written, with `*` where other letters may go. Core
+// trims and folds what is typed, reads the `*`, and judges every edit; a
+// refusal comes back in words.
+/** @typedef {import("../../contracts/edits.js").AutocorrectReplacement} AutocorrectReplacement */
+// Inputs for a replacement: the entry is made when the list has none of
+// that text or macro, else they are added to it. `typed` is the field's text
+// as it stands: core reads it into its inputs.
+/** @param {AutocorrectReplacement} replacement @param {string} typed @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'addAutocorrectTypos'>} */
+export const addAutocorrectInputs = (replacement, typed, identity) => ({type: "addAutocorrectTypos", ...replacement, inputs: typed, expectedFingerprint: identity});
+// A replacement changed where it stands: to other text, or to a macro.
+/** @param {AutocorrectReplacement} replacement @param {AutocorrectReplacement} to @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'updateAutocorrectCorrection'>} */
+export const changeAutocorrectReplacement = (replacement, to, identity) => ({type: "updateAutocorrectCorrection", ...replacement,
+    ...(to.macro === undefined ? {to: to.correction} : {toMacro: to.macro}), expectedFingerprint: identity});
+// One input, named by its stored letters, written anew.
+/** @param {string} typo @param {string} to @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'updateAutocorrectTypo'>} */
+export const changeAutocorrectInput = (typo, to, identity) => ({type: "updateAutocorrectTypo", typo, to, expectedFingerprint: identity});
+/** @param {string} typo @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'deleteAutocorrectTypo'>} */
+export const deleteAutocorrectTypo = (typo, identity) => ({type: "deleteAutocorrectTypo", typo, expectedFingerprint: identity});
+/** @param {AutocorrectReplacement} replacement @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'deleteAutocorrectEntry'>} */
+export const deleteAutocorrectEntry = (replacement, identity) => ({type: "deleteAutocorrectEntry", ...replacement, expectedFingerprint: identity});
+// A file's entries added to the list or replacing it.
+/** @param {'add' | 'replace'} mode @param {import("../../contracts/edits.js").AutocorrectEntryEdit[]} entries @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'importAutocorrect'>} */
+export const importAutocorrect = (mode, entries, identity) => ({type: "importAutocorrect", mode, entries, expectedFingerprint: identity});
+// An autocorrect edit to be checked without staging it.
+/** @param {import("../../contracts/edits.js").AutocorrectEdit} edit @param {number} requestId @returns {import("../../contracts/edits.js").EditOf<'validateAutocorrect'>} */
+export const autocorrectValidationMessage = (edit, requestId) => ({type: "validateAutocorrect", edit, requestId});
 // A macro's name; its steps stay as they are.
 /** @param {string} keycode @param {string} name @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'updateMacro'> & {name: string}} */
 export const macroNameMessage = (keycode, name, identity) => ({type: "updateMacro", keycode, name: String(name ?? "").trim(), expectedFingerprint: identity});

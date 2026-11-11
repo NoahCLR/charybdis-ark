@@ -3,7 +3,8 @@
 The words for the app: how a person reads the keyboard, edits it in a draft,
 reviews and keeps changes, and backs them up. The keyboard's own words
 (profile, half, generation, working copy, edit mode, Save, Apply, behaviour,
-pointing mode and the rest) are in the [firmware's
+pointing mode, switch key, the autocorrect list with its entries, and the
+rest) are in the [firmware's
 glossary](upstream/firmware/GLOSSARY.md), which Ark imports at a pinned
 commit. A person sees the keyboard's Apply and its Save both as **Save**
 (D-L72).
@@ -136,12 +137,75 @@ _Avoid_: restore (alone), load, upload
 
 **Screen**:
 One of Ark's top-level views chosen from the rail, in three groups: Keymap,
-Lighting, Macros, Custom keys and Pointing modes under Configure; Behaviours,
-Combos, Pointer and Host under Settings; Backups and Keyboard under
-Keyboard. Outside the rail, a Settings screen is named with "settings" after
+Lighting, Macros, Text replacement, Custom keys and Pointing modes under
+Configure; Behaviours, Combos, Pointer and Host under Settings; Backups and
+Keyboard under Keyboard. Outside the rail, a Settings screen is named with "settings" after
 it (Behaviour settings, Combo settings, Pointer settings, Host settings),
 since nothing around a link or a tip says it is one.
 _Avoid_: page, tab, area (for this), surface, panel
+
+**Text replacement**:
+What a person calls the keyboard replacing what is typed when a word ends: a
+typo fixed, longer text typed, a macro played. It is the name on the rail,
+the screen, the Host card, the Memory panel, the picker and every message.
+The keyboard, its firmware and its keys call it **autocorrect**, and Ark's
+code, contracts, screen id, domain name and files keep that name
+(`autocorrect`, `AC_ON`, `core/model/autocorrect-*.js`). A person reads
+"autocorrect" only where QMK's or the keyboard's own thing is named as
+theirs: "QMK's autocorrect dictionary" (the file format), "QMK's autocorrect
+keys", "the keyboard's autocorrect" where the guide first says what the
+feature is. The picker's search keeps QMK's words for its keys, so a search
+for it finds the feature.
+_Avoid_: autocorrect (as Ark's name for the feature, its screen, its list or
+anything on it), text expansion, snippets, shortcut (a custom key's)
+
+**Replacement**:
+What an entry of the text replacement list puts in place of its input:
+a line of text of up to 128 bytes, or a macro, named by its slot and shown by
+its name. Stored once. A replacement is **deleted** (an input is
+**removed**). Wherever one is listed it is called the same, by core
+(`replacementCalled`): its text, or its macro's name, which the screens draw
+after the macros' mark (never a character such as "▶"); in a sentence,
+its text in quotes or "the macro “Sign-off”". The firmware and Ark's code
+call it a `correction`.
+_Avoid_: correction (in anything a person reads), word, expansion, output
+
+**Input**:
+What is typed to get a replacement: one word of letters and digits, a
+misspelling or an abbreviation such as `pnumber`. A replacement has one or
+more. A heading, a count and a label read **Inputs** ("15 of 1,024 inputs",
+"+ Input"), a sentence says "an input" or "its inputs", and a list file names
+them `inputs`. It belongs to one replacement. The firmware and Ark's code
+call it a `typo`, on the wire as in the identifiers; the firmware's specs
+and ADRs say "typed form" and its guide says input, as here
+(`upstream/firmware/GLOSSARY.md`): the same thing.
+_Avoid_: typed, typed form, what is typed for it (Ark's words before; a file
+that says `typed` is still read), typo (as the term; a misspelling is still a
+typo, and "typo fixes" says so), variation, trigger, abbreviation (as the
+term), pattern
+
+**`*`** (in an input):
+Where other letters may go. An input is the whole word unless it is
+written with one: `recieve*` the start of a word, `*mnet` the end, `*tihng*`
+anywhere in one (D-L84). It is how Ark writes, shows and takes the four
+matches the keyboard stores; no control, label or message names a match. It
+may be called **the wildcard** ("Add *, the wildcard, where other letters
+may go"), and an input written with one "catches" the words it matches.
+_Avoid_: whole word, start of word, end of word, anywhere (as a choice or a
+label), match type, boundary; fires (in anything a person reads: an input
+catches a word, and the keyboard replaces it)
+
+**Try it**:
+The last section of a replacement's editor on the Text replacement screen: a
+box to type in, which Ark never changes, and under it the **preview**, that
+text as the keyboard would type it with the draft's list, through the
+draft's host layout, each replaced part marked. It runs the
+keyboard's own rules over text (D-L86), so the preview shows the replacements
+and the undo, and nothing that needs a key or a timing: a shortcut, a cursor
+key, a held key, a macro key. For a replacement that plays a macro it says
+which, and shows the macro's text when that is all it is.
+_Avoid_: simulator, test box; preview (for the section: the preview is the
+line under its box)
 
 **Area**:
 The part of the profile Review groups its changes under, mostly one screen's,
@@ -209,8 +273,8 @@ _Avoid_: layer stack, overlay view
 
 **Accent**:
 LEDs that light in a colour of their own, or their stage's, while a layer is
-on, a pointing mode runs, a combo's inputs are held or a key shows a feedback
-state (D-L77). It is added and changed on that stage's tab on Lighting, its
+on, a pointing mode runs, a combo's inputs are held, a key shows a behaviour
+state or the keyboard flashes for a replacement (D-L77). It is added and changed on that stage's tab on Lighting, its
 LEDs picked on the board and named by index ("LEDs 24–28, 53–55"). The
 different sets of LEDs accents light are **LED sets**; Ark keeps them.
 _Avoid_: LED group, LED override, group row, assignment
@@ -219,8 +283,37 @@ _Avoid_: LED group, LED override, group row, assignment
 A layer colour that paints nothing, so what is beneath it shows through: the
 layers on under it, or the background effect. Ark stores it as HSV(0, 0, 0);
 the keyboard treats any layer colour with no saturation or brightness so. It
-is a layer's alone: black in every other stage is black.
+is a layer's alone: a case of replacement feedback with such a colour is
+off, and black in every other stage is black.
 _Avoid_: no colour, off (for a layer), transparent (that is a key)
+
+**Behaviour feedback**:
+The lighting stage that shows the state of a key's behaviour, and its tab on
+Lighting (D-L89): a key flashes, or holds, the colour of what its behaviour
+is doing. Its **behaviour states** are the tiers (**Tap committed**, **Hold
+active**, **Long hold active**) and **Tap branch pending**, the tap
+branches' colours; its accents light for one state or for **Every behaviour
+state**. Its **Flash interval** is how long one on or off phase lasts. The
+firmware's code and Ark's keep the stage's old name: the stage id `key`, the
+record `keyFeedback`, the accent table `keyBehavior`, the edit
+`updateKeyBehaviorFeedback`.
+_Avoid_: key feedback, feedback state (for a behaviour state), behavior
+feedback (the spelling)
+
+**Replacement feedback**:
+The lighting stage that flashes once as text replacement changes what was
+typed, painted last, and its tab on Lighting (D-L89). It has three **cases**,
+each with a colour of its own: **Replaced with text**, **Replaced by a
+macro** and **Replacement undone** (with Backspace). A case whose colour is
+turned off does not flash; the others still do. Its accents light for one
+case or for **Every replacement flash**. The flash follows the key that
+ended the word, or the Backspace that undid the replacement, and lasts its
+**Flash length**, apart from behaviour feedback's Flash interval. The firmware's
+code and Ark's call the stage `autocorrect` feedback
+(`autocorrectFeedback`, the accent table `autocorrect`).
+_Avoid_: autocorrect feedback, autocorrect flash, typo light, correction
+feedback (in anything a person reads); state (for a case: a behaviour
+state is a key's)
 
 **Empty layer**:
 A layer with nothing in it: not the base or a default layer, no name of its

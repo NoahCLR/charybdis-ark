@@ -7,33 +7,12 @@ import {editGate} from "../../view/edit-gate.mjs";
 import {offWording, stageEnabled} from "../../view/lighting.mjs";
 import {branchName, vocabulary, word} from "../../view/vocabulary.mjs";
 import * as edits from "../../view/edits.mjs";
-import {aboutStage, colourControl, lightingGroup, paintsSection, section, stack} from "./common.mjs";
+import {aboutStage, colourControl, flashSetting, lightingGroup, paintsSection, section, stack} from "./common.mjs";
 import {accentsSection} from "./accents.mjs";
 import {attachPickRows, groupedTable, pickButton, pickableRow} from "../groups.mjs";
-import {sectionsIn} from "../../view/settings-layout.mjs";
-
-// How fast feedback blinks. The keyboard stores it with its settings, so it
-// saves as a settings section of one field.
-/** @param {import("../../../contracts/panel.js").PublishedModel} model */
-function flashInterval(model) {
-    const flash = sectionsIn(model, "Lighting").find((entry) => entry.id === "lightingFeedback");
-    const field = flash?.fields[0];
-    if (!flash || !field) return el(`<span></span>`);
-    const editable = editGate(model, "settings").editable && !field.readOnly;
-    const label = field.unit ? field.label.replace(new RegExp(`\\s*\\(${field.unit}\\)$`), "") : field.label;
-    const node = el(`<label class="field" data-tip="${esc([field.tooltip, field.hint].filter(Boolean).join(" "))}"><span>${esc(label)}</span>
-        <span class="affix unit"><input class="input mono num" inputmode="numeric" data-macro="${esc(field.macro)}" data-f="setting:${esc(field.macro)}" value="${esc(field.value)}" ${editable ? "" : "disabled"}>${field.unit ? `<i>${esc(field.unit)}</i>` : ""}</span>
-        <span class="hint">${esc(field.hint || "")}</span></label>`);
-    /** @type {HTMLInputElement} */ (node.querySelector("input")).addEventListener("change", (event) => {
-        const written = /** @type {HTMLInputElement} */ (event.target).value.trim();
-        if (!written) { /** @type {HTMLInputElement} */ (event.target).value = field.value; return; }
-        if (written !== field.value) post(edits.settingsSection(flash, () => written, model.settingsEditing?.identity));
-    });
-    return node;
-}
 
 // The tiers' colour fields, in the order the behaviour grid's columns are;
-// each is named as the feedback state it flashes for
+// each is named as the behaviour state it flashes for
 // (vocabulary.feedbackColourOwners).
 /** @type {import("../../../contracts/edits.js").FeedbackColourField[]} */
 const TIER_FIELDS = ["tapCommittedColor", "holdActiveColor", "longHoldActiveColor"];
@@ -90,7 +69,7 @@ export function stageKey(model) {
         ${vocabulary(model).localities.map(([id, text]) => `<option value="${esc(id)}" ${feedback.locality === id ? "selected" : ""}>${esc(text)}</option>`).join("")}</select></label>`);
     /** @type {HTMLSelectElement} */ (locality.querySelector("select")).addEventListener("change", (event) =>
         post(edits.keyFeedback(model.rgb.keyBehaviorFeedback, null, null, {locality: /** @type {HTMLSelectElement} */ (event.target).value})));
-    policy.append(stack(commit, locality, flashInterval(model)));
+    policy.append(stack(commit, locality, flashSetting(model, "lightingFeedback")));
     main.append(colour, policy, aboutStage(`While a key's behaviour fires, the key flashes the colour of what fired, in the area chosen above. The board's behaviour dots and the behaviour grid's branch numbers wear these colours${stageEnabled(model, "key") ? "" : ", hollow while the stage is off"}.`));
     const accents = accentsSection(model, "key");
     if (accents) main.append(accents);

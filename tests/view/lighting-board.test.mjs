@@ -60,3 +60,45 @@ test("a view where no combo fires says so", () => {
     assert.equal(board.held, null);
     assert.match(said(board.caption), /· no combo fires in this view$/);
 });
+
+test("on Replacement feedback the board flashes the picked case from the key standing in for the one that caused it", () => {
+    const view = layerView(model, 0, []);
+    const feedback = model.rgb.autocorrectFeedback;
+    assert.equal(feedback.locality, "RGB_KEY_HALF", "the demo's locality follows the key");
+    const text = shows(view, {stage: "autocorrect", replacementRow: "textColor"});
+    // The demo's Space is key 49 and its first Backspace key 54.
+    assert.deepEqual(text.replacementActive, {owner: "AUTOCORRECT_FEEDBACK_GROUP_TEXT", color: feedback.textColor, locality: "RGB_KEY_HALF", triggerIndex: 49});
+    assert.equal(text.standIn, 49, "ringed on the board");
+    assert.deepEqual([text.shown, text.held, text.pdActive, text.comboActive], [view, null, null, null]);
+    assert.equal(said(text.caption), "Base over the background effect · Replaced with text flashing, painting the half holding the trigger key · Space stands in for the key that ended the word");
+    const macro = shows(view, {stage: "autocorrect", replacementRow: "macroColor"});
+    assert.deepEqual([macro.replacementActive?.owner, macro.replacementActive?.color, macro.standIn], ["AUTOCORRECT_FEEDBACK_GROUP_MACRO", feedback.macroColor, 49]);
+    const undo = shows(view, {stage: "autocorrect", replacementRow: "undoColor"});
+    assert.deepEqual([undo.replacementActive?.owner, undo.replacementActive?.color, undo.standIn], ["AUTOCORRECT_FEEDBACK_GROUP_UNDO", feedback.undoColor, 54]);
+    assert.match(said(undo.caption), /· Replacement undone flashing, painting the half holding the trigger key · Backspace stands in for the key that undid it$/);
+    assert.equal(shows(view, {stage: "autocorrect"}).replacementActive?.owner, "AUTOCORRECT_FEEDBACK_GROUP_TEXT", "the first case until one is picked");
+    // Off its tab, no flash shows.
+    assert.deepEqual([shows(view, {stage: "key", replacementRow: "textColor"}).replacementActive, shows(view, {stage: "key"}).standIn], [null, undefined]);
+});
+
+test("a flash that follows no key rings none, a case that is off says so, and a stage that is off flashes nothing", () => {
+    const withFeedback = (/** @type {object} */ change, /** @type {object} */ rgb = {}) => ({...model, rgb: {...model.rgb, autocorrectFeedback: {...model.rgb.autocorrectFeedback, ...change}, ...rgb}});
+    const both = lightingBoard(layerView(withFeedback({locality: "RGB_BOTH_HALVES"}), 0, []), {stage: "autocorrect", pointingSlot: 0, comboPreview: null, replacementRow: "textColor"});
+    assert.equal(both.standIn, undefined);
+    assert.equal(both.replacementActive?.triggerIndex, 49, "the key is still the one that caused it");
+    assert.match(said(both.caption), /· Replaced with text flashing, painting both halves$/);
+    const dark = lightingBoard(layerView(withFeedback({macroColor: {h: "40", s: "0", v: "0"}}), 0, []), {stage: "autocorrect", pointingSlot: 0, comboPreview: null, replacementRow: "macroColor"});
+    assert.ok(dark.replacementActive, "its accents in a colour of their own still light");
+    assert.match(said(dark.caption), /· Replaced by a macro is off, so it does not flash · Space stands in/);
+    const off = lightingBoard(layerView(withFeedback({}, {stages: model.rgb.stages.map((/** @type {any} */ stage) => stage.id === "autocorrect" ? {...stage, enabled: false} : stage)}), 0, []),
+        {stage: "autocorrect", pointingSlot: 0, comboPreview: null, replacementRow: "textColor"});
+    assert.deepEqual([off.replacementActive, off.standIn], [null, undefined]);
+    assert.equal(said(off.caption), "Base over the background effect");
+    // A profile with no Space key: the flash paints as the keyboard paints one whose key it cannot tell.
+    const bare = publishedModel(profileDocument({keys: {0: {0: "KC_A"}}}));
+    bare.rgb.stages = bare.rgb.stages.map((/** @type {any} */ stage) => ({...stage, enabled: true}));
+    bare.rgb.autocorrectFeedback = {...model.rgb.autocorrectFeedback, locality: "RGB_KEYS_ONLY"};
+    const none = lightingBoard(layerView(bare, 0, []), {stage: "autocorrect", pointingSlot: 0, comboPreview: null, replacementRow: "undoColor"});
+    assert.deepEqual([none.replacementActive?.triggerIndex, none.standIn], [undefined, undefined]);
+    assert.match(said(none.caption), /painting only the trigger key · no Backspace key to stand in, so it paints as when the keyboard cannot tell the key$/);
+});

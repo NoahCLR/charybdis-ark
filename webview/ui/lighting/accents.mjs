@@ -1,7 +1,7 @@
 // @ts-check
 // Accents on Lighting (D-L77): LEDs that light in a colour of their own
-// while a layer is on, a pointing mode runs, a combo's inputs are held or a
-// key shows a feedback state. Each stage's tab lists the accents of the owner
+// while a layer is on, a pointing mode runs, a combo's inputs are held, a
+// key shows a behaviour state or the keyboard flashes for a replacement. Each stage's tab lists the accents of the owner
 // it has picked and changes them where they stand; the board picks an
 // accent's LEDs, numbered by index. All accents lists every one. Ark keeps the
 // groups the keyboard stores them in, so none is ever shown.
@@ -26,7 +26,7 @@ import {marked, phraseMarked} from "../marks.mjs";
 /** @typedef {NonNullable<import("../../state.js").PanelState["accent"]>} Editing */
 
 // What the stage's tab has picked, as view/accents.mjs reads it.
-const picked = () => ({layer: state.layer, pointingSlot: state.pointingSlot, feedbackRow: state.feedbackRow});
+const picked = () => ({layer: state.layer, pointingSlot: state.pointingSlot, feedbackRow: state.feedbackRow, replacementRow: state.replacementRow});
 
 // The accent being edited on this stage, while it is one the tab lists for
 // what it has picked: a new one, or one of those it edits. One being changed
@@ -268,7 +268,7 @@ export function accentsOverview(model) {
     const node = el(`<div class="stack gap-16 accents-overview">
         <p class="note">Every accent, by the stage that paints it. An accent is changed on its stage's tab.</p></div>`);
     const stages = allAccents(model);
-    if (!stages.length) node.append(el(`<p class="note">No accents yet. Add one on Layer colours, Pointing modes, Combo feedback or Key feedback.</p>`));
+    if (!stages.length) node.append(el(`<p class="note">No accents yet. Add one on Layer colours, Pointing modes, Combo feedback, Behaviour feedback or Replacement feedback.</p>`));
     for (const {stage, target, owners} of stages) {
         const label = vocabulary(model).stages.find((entry) => entry.id === stage)?.label || stage;
         const box = el(`<section><div class="sect-h"><h4>${esc(label)}</h4></div><div class="accent-list"></div></section>`);
@@ -290,6 +290,7 @@ export function accentsOverview(model) {
                 if (place.layer !== undefined) showLayer(place.layer);
                 if (place.slot !== undefined) state.pointingSlot = place.slot;
                 if (place.feedbackRow !== undefined) state.feedbackRow = /** @type {typeof state.feedbackRow} */ (place.feedbackRow);
+                if (place.replacementRow !== undefined) state.replacementRow = place.replacementRow;
                 render();
             });
             list.append(line);

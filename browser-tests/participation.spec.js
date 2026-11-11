@@ -4,6 +4,8 @@ const {test, expect} = require("@playwright/test");
 const {demoDocument, openDraft, panelModel} = require("../tests/fixtures/published-model");
 const {editDomain} = require("../tests/fixtures/profile-document");
 const {SETTING} = require("../core/schema/settings-domain-v1");
+// Text replacement's switch: key option 12 of the settings (firmware's settings domain).
+const AUTOCORRECT_OPTION = 1 << 12;
 
 // What core publishes for the demo profile, or `doc`, saved with `edits` (a
 // fresh draft on it, so no key reads as drafted), as the shell posts it, shown
@@ -187,7 +189,7 @@ test("a Lighting stage a global switch keeps from painting says so, reads off, a
         await page.locator('[data-screen="lighting"]').click();
         await page.locator(`[data-ltab="${stage}"]`).click();
     };
-    for (const stage of ["auto", "combo", "key", "layers"]) {
+    for (const stage of ["auto", "combo", "key", "autocorrect", "layers"]) {
         await open(stage);
         await expect(banner).toHaveCount(0);
     }
@@ -195,11 +197,13 @@ test("a Lighting stage a global switch keeps from painting says so, reads off, a
         settings.values[SETTING.AUTO_MOUSE_ENABLED] = 0;
         settings.values[SETTING.COMBOS_ENABLED] = 0;
         settings.values[SETTING.BEHAVIORS_ENABLED] = 0;
+        settings.values[SETTING.KEYMAP_OPTIONS] &= ~AUTOCORRECT_OPTION;
     }));
     for (const [stage, words, screen, macro] of [
         ["auto", "Auto-mouse is off. This stage paints nothing. Turn it on in Pointer settings →", "pointer", "autoMouse"],
         ["combo", "Combos are off. This stage paints nothing. Turn them on in Combo settings →", "combos", "combosEnabled"],
-        ["key", "Behaviours are off. This stage paints nothing. Turn them on in Behaviour settings →", "behaviours", "behaviorsEnabled"]]) {
+        ["key", "Behaviours are off. This stage paints nothing. Turn them on in Behaviour settings →", "behaviours", "behaviorsEnabled"],
+        ["autocorrect", "Text replacement is off. This stage paints nothing. Turn it on in Host settings →", "host", "autocorrect"]]) {
         await open(stage);
         await expect(banner).toHaveText(words);
         if (stage === "auto") {

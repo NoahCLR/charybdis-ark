@@ -9,6 +9,8 @@ const {SETTING, shortcutIdentity, shortcutPresent} = require("../schema/settings
 const {decodedOf} = require("./portable-profile");
 const {settingsEditorView, COMBO_TIMING} = require("./settings-editor");
 const {macroEditorView} = require("./macro-editor");
+const {findTypo, pairEntries, replacementCalled, replacementSaid, inputForm} = require("./autocorrect-list");
+const {entryKey} = require("../schema/autocorrect-domain-v1");
 const {inspectMacroPlayback} = require("./macro-input");
 const {hostLayout} = require("../data/host-layouts");
 const rgbEnums = require("../schema/rgb-domain-v1");
@@ -18,7 +20,7 @@ const {effectiveTimings} = require("./gesture-timing");
 const {REVIEW_AREAS: AREA, VOCABULARY, word, layerName: layerCalled, macroDefaultName, slotName, ledsCalled, modifierNames, protectionWords, settingsPath} = require("./vocabulary");
 const {macroName} = require("../../rules/qmk-keycodes.mjs");
 const {SHORTCUT_JOIN} = require("../../rules/shortcut-notation.mjs");
-const {layerPaints} = require("../../rules/led-light.mjs");
+const {layerPaints, replacementPaints} = require("../../rules/led-light.mjs");
 const {customKeyName} = require("../data/user-keycodes");
 const {ORDER_UNITS, UNIT, parseUnit} = require("./review-units");
 const {movedBanks} = require("./draft-order");
@@ -314,25 +316,33 @@ function lightingRecords(value) {
     record(UNIT.rgb("automouse"), "Auto-mouse fade", "auto", [[F.fadeMode, nameIn(V.fadeModes, rgbEnums.RGB_AUTOMOUSE_MODES, r.automouseFade.mode)], [F.endColour, colour(r.automouseFade.endColor)]]);
     record(UNIT.rgb("combo"), "Combo feedback", "combo", [[F.colour, colour(r.comboFeedback.color)], [F.locality, nameIn(V.localities, rgbEnums.RGB_LOCALITIES, r.comboFeedback.locality)]]);
     const k = r.keyFeedback;
-    // Named and ordered as the Key feedback tab lists them: the tiers, then
+    // Named and ordered as the Behaviour feedback tab lists them: the tiers, then
     // the tap branches, then when and where.
-    record(UNIT.rgb("key"), "Key feedback", "key", [
+    record(UNIT.rgb("key"), "Behaviour feedback", "key", [
         ...(/** @type {const} */ (["tapCommittedColor", "holdActiveColor", "longHoldActiveColor"])).map(/** @returns {[string, Field]} */ (field) =>
             [word(V.feedbackOwners, V.feedbackColourOwners[field]), colour(k[field])]),
         ...k.tapBranchColors.map(/** @returns {[string, Field]} */ (value, i) => [V.branches[i + 1] || `${i + 2} taps`, colour(value)]),
         [F.tapBranchCommit, nameIn(V.tapCommit, rgbEnums.RGB_TAP_COMMIT_MODES, k.tapCommitMode)], [F.locality, nameIn(V.localities, rgbEnums.RGB_LOCALITIES, k.locality)]]);
+    // Replacement feedback's three cases as its tab lists them, then where
+    // the flash paints. A colour that paints nothing reads off, as a layer's
+    // reads passthrough; one with brightness alone at zero flashes black.
+    const a = r.autocorrectFeedback;
+    record(UNIT.rgb("autocorrect"), "Replacement feedback", "autocorrect", [
+        ...(/** @type {const} */ (["textColor", "macroColor", "undoColor"])).map(/** @returns {[string, Field]} */ (field) =>
+            [word(V.replacementOwners, V.replacementColourOwners[field]), replacementPaints(a[field]) ? colour(a[field], "black") : colour(a[field])]),
+        [F.locality, nameIn(V.localities, rgbEnums.RGB_LOCALITIES, a.locality)]]);
     // Accents are one record with the groups they light: a row names its
     // group by id, so a row put back without its group could point at one
     // that no longer exists. Each accent reads as Lighting lists it, by who
     // it lights for and its LEDs (D-L77); a group reads only while no accent
     // lights it, as the unused LED set Ark drops at the next accent edit.
     const groups = new Map(r.groups.map(group => [group.id, group]));
-    const lit = new Set([r.layerGroupRows, r.pdModeGroupRows, r.comboGroupRows, r.keyGroupRows].flat().map(row => row.groupId));
+    const lit = new Set([r.layerGroupRows, r.pdModeGroupRows, r.comboGroupRows, r.keyGroupRows, r.autocorrectGroupRows].flat().map(row => row.groupId));
     /** @type {[string, Field][]} */
     const fields = r.groups.filter(group => !lit.has(group.id))
         .map(group => [`set:${group.leds.join(",")}`, {label: "Unused LED set", text: ledsCalled(group.leds), key: group.leds.join(",")}]);
     /** @type {Record<string, import("../../contracts/model.js").AccentTable>} */
-    const tableOf = {layerGroupRows: "layer", pdModeGroupRows: "pdMode", comboGroupRows: "combo", keyGroupRows: "keyBehavior"};
+    const tableOf = {layerGroupRows: "layer", pdModeGroupRows: "pdMode", comboGroupRows: "combo", keyGroupRows: "keyBehavior", autocorrectGroupRows: "autocorrect"};
     /** @template {{color: import("../schema/types.js").Hsv, groupId: number}} T @param {string} table @param {T[]} rows @param {(row: T) => string} owner @param {(row: T) => Mark | undefined} ownerMark */
     const overrides = (table, rows, owner, ownerMark) => rows.forEach((row, i) => {
         const group = groups.get(row.groupId), leds = group ? ledsCalled(group.leds) : `LED set ${row.groupId}`;
@@ -350,6 +360,7 @@ function lightingRecords(value) {
         const tier = name === undefined ? undefined : V.feedbackTiers[name];
         return tier ? {kind: "tier", tier} : undefined;
     });
+    overrides("autocorrectGroupRows", r.autocorrectGroupRows, row => nameIn(V.replacementOwners, rgbEnums.RGB_AUTOCORRECT_SEMANTICS, row.semantic), () => undefined);
     record(UNIT.rgb("groups"), "Accents", "accents", fields);
     return records;
 }
@@ -456,6 +467,28 @@ function profileReview(before, after, capabilities) {
         const old = macrosA.macros[i], next = macrosB.macros[i], has = /** @param {Macros["macros"][number]} macro */ (macro) => Boolean(macro.payload || macro.name || macro.protection !== "auto");
         item(AREA.macros, UNIT.macro(i), `${macroDefaultName(i)}${(next.name || old.name) ? ` · ${next.name || old.name}` : ""}`, fields(old), fields(next), {kind: "macro", index: i, keycode: macroName(i)}, [has(old), has(next)]);
     });
+    // The text replacement list, an entry an item: its replacement, and each
+    // input as it is written. One that changed entries says where it
+    // went or came from; an entry whose replacement changed is one item, old
+    // to new.
+    for (const pair of pairEntries(a.autocorrect, b.autocorrect)) {
+        /** @param {import("../schema/autocorrect-domain-v1.js").Entry} entry @param {Decoded} profile */
+        const replacement = (entry, profile) => replacementCalled(entry, profile.settings.macroNames);
+        /** @param {import("../schema/autocorrect-domain-v1.js").Entry | undefined} entry @param {Decoded} mine @param {Decoded} theirs @param {import("../schema/autocorrect-domain-v1.js").Entry | undefined} twin @param {string} moved @returns {Fields} */
+        const fields = (entry, mine, theirs, twin, moved) => new Map(/** @type {[string, Field][]} */ (!entry ? [] : [["Replacement",
+                entry.macro === undefined ? replacement(entry, mine) : {text: replacement(entry, mine), key: `macro:${entry.macro}`, mark: {kind: "macro"}}],
+            ...entry.typos.map(typo => {
+                const elsewhere = twin?.typos.some(row => row.typo === typo.typo) ? undefined : findTypo(theirs.autocorrect, typo.typo)?.entry;
+                return [`typo:${typo.typo}`, {label: "Input", key: typo.match,
+                    text: `${inputForm(typo)}${elsewhere === undefined ? "" : ` · ${moved} ${replacementSaid(elsewhere, theirs.settings.macroNames)}`}`}];
+            })]));
+        const old = pair.before, next = pair.after;
+        const shown = next ? replacement(next, b) : replacement(/** @type {import("../schema/autocorrect-domain-v1.js").Entry} */ (old), a);
+        const key = entryKey(/** @type {import("../schema/autocorrect-domain-v1.js").Entry} */ (old ?? next));
+        item(AREA.autocorrect, UNIT.autocorrect(key, old && next && entryKey(old) !== entryKey(next) ? entryKey(next) : undefined), shown,
+            fields(old, a, b, next, "moved to"), fields(next, b, a, old, "moved from"), {kind: "autocorrect", entry: entryKey(/** @type {import("../schema/autocorrect-domain-v1.js").Entry} */ (next ?? old))}, [Boolean(old), Boolean(next)],
+            (next ?? old)?.macro === undefined ? undefined : {kind: "macro"});
+    }
     if (a.settings.values[HOST_SETTING] !== b.settings.values[HOST_SETTING]) {
         const oldHost = hostSettings(a.settings.values, before.hostOs?.detected), nextHost = hostSettings(b.settings.values, after.hostOs?.detected);
         macrosB.macros.forEach((macro, index) => {

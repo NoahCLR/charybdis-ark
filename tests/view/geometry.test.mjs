@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {GEO, LEGEND_CONDENSE, LEGEND_SIZES, boardOutlineMarkup, estimateWidth, inLocality, isRightHalf, keyFaceRows, keyLegends, keyVisual, legendBreak, setLegend, trackballInLocality} from "../../webview/view/geometry.mjs";
+import {createRequire} from "node:module";
+import {GEO, LEGEND_CONDENSE, LEGEND_SIZES, boardOutlineMarkup, estimateWidth, followsTrigger, inLocality, isRightHalf, keyFaceRows, keyLegends, keyVisual, legendBreak, setLegend, trackballInLocality} from "../../webview/view/geometry.mjs";
 
 test("the board splits into halves the way the LED numbering does", () => {
     assert.equal(isRightHalf(0), false, "left home column");
@@ -29,6 +30,12 @@ test("locality answers for the regions the firmware defines", () => {
     assert.equal(inLocality(0, "RGB_KEY_HALF", [1, 7]), true, "inputs spanning the halves paint both");
     assert.equal(trackballInLocality("RGB_KEY_HALF", [1, 2]), false, "the trackball sits on the right half");
     assert.equal(trackballInLocality("RGB_KEY_HALF", [1, 7]), true);
+});
+
+test("two localities follow the keys that triggered the light, as every locality the keyboard stores is told", () => {
+    const {RGB_LOCALITIES} = createRequire(import.meta.url)("../../core/schema/rgb-domain-v1");
+    assert.deepEqual(Object.keys(RGB_LOCALITIES).filter(followsTrigger), ["RGB_KEY_HALF", "RGB_KEYS_ONLY"]);
+    assert.equal(followsTrigger(undefined), false);
 });
 
 test("the trackball is drawn at its own size, clear of the keys around it", () => {

@@ -6,8 +6,8 @@ const {CUSTOM_KEY_SLOTS} = require("../data/user-keycodes");
 const {MACRO_DOMAIN_V1} = require("./macro-domain-v1");
 const {validHostSetting} = require("./host-settings");
 const {canonical} = require("./bytes");
-// Settings domain 0x40, version 11, the only one the keyboard stores (firmware
-// D-F14, D-F26): 31 values, sixteen layer records, 128 custom-key shortcuts,
+// Settings domain 0x40, version 12, the only one the keyboard stores (firmware
+// D-F14, D-F26, D-F70): 32 values, sixteen layer records, 128 custom-key shortcuts,
 // then 273 counted names — sixteen
 // layer names, 128 macro names, 128 custom-key names and the keyboard's
 // own name, each a length byte and up to 32 bytes of UTF-8 (profile-name.js).
@@ -49,7 +49,7 @@ const rule = valid => ({valid});
 const UINT16 = range(0, 65535), SWITCH = range(0, 1), RETIRED = range(0, 0);
 const LAYER = {...rule((v, layers) => v < layers), layerReference: /** @type {const} */ ("layer"), layerReorder: /** @type {const} */ ("storage")};
 const LAYER_MASK = {...rule((v, layers) => v < 2 ** layers), layerReference: /** @type {const} */ ("mask"), layerReorder: /** @type {const} */ ("storage")};
-// The 31 stored values, each once, in ID order: the firmware's name for it
+// The 32 stored values, each once, in ID order: the firmware's name for it
 // (profile_settings_v1.h, without NOAH_SETTING_) and what it accepts
 // (firmware profile-wire-v1/settings-domain.md). The editor's words for
 // them are in model/settings-editor.js.
@@ -61,7 +61,7 @@ const STORED = /** @type {const} */ ([
     ["AUTO_SNIPING_ENABLED", SWITCH], ["AUTO_SNIPING_LAYERS", LAYER_MASK],
     // Retired per-mode DPI: mode tuning is in domain 0x50.
     ["DRAGSCROLL_DPI", RETIRED], ["VOLUME_DPI", RETIRED], ["BRIGHTNESS_DPI", RETIRED], ["ZOOM_DPI", RETIRED], ["ARROW_DPI", RETIRED],
-    // A half-period: one on or off phase of the key feedback flash.
+    // A half-period: one on or off phase of the behaviour feedback flash.
     ["FEEDBACK_PERIOD", range(1, 65535)],
     // Shorter than the auto-mouse timeout, which encodeSettings checks.
     ["AUTO_MOUSE_DEAD_TIME", UINT16],
@@ -81,6 +81,9 @@ const STORED = /** @type {const} */ ([
     // Participation (participation-policy.md): the behaviour master switch,
     // then one bit per layer for its behaviours and for its combos.
     ["BEHAVIORS_ENABLED", SWITCH], ["LAYER_BEHAVIORS", LAYER_MASK], ["LAYER_COMBOS", LAYER_MASK],
+    // How long one replacement feedback flash lasts, apart from the behaviour
+    // feedback flash (firmware D-F70).
+    ["AUTOCORRECT_FEEDBACK_PERIOD", range(1, 65535)],
 ]);
 // RGB_MODE's LED flags byte: QMK's LED classes. The background effect lights
 // an LED whose class is in the flags; ALL lights every one.

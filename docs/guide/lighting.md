@@ -17,18 +17,19 @@ Beside the title:
 
 ## Stages
 
-Lighting is painted in six stages, each over the one before it:
+Lighting is painted in seven stages, each over the one before it:
 
 1. **Background effect**
 2. **Layer colours**
 3. **Auto-mouse fade**
 4. **Pointing modes**
 5. **Combo feedback**
-6. **Key feedback**
+6. **Behaviour feedback**
+7. **Replacement feedback**
 
 Each stage's tab shows the colour it paints, and says under its controls,
 behind **What this stage does**, what the stage does and what the board
-shows of it; opened once, it stays open on every stage. Stages 2 to 6 have a **Stage
+shows of it; opened once, it stays open on every stage. Stages 2 to 7 have a **Stage
 on** switch on the line of the section that says where or when the stage
 paints (**Where it paints**, **When and where**, **Timing**), which turns the
 whole stage off without losing its colours. A
@@ -43,13 +44,16 @@ the keyboard reports.
 **Turn off** stores HSV(0, 0, 0), and the colour then reads **Off**; what
 that does depends on the stage. On a layer the button is **Make
 passthrough** and the colour reads **Passthrough**: the layer paints nothing,
-so what is underneath shows through.
+so what is underneath shows through. A case of
+[replacement feedback](#replacement-feedback) turned off does not flash,
+and the other two still do.
 Everywhere else black is
-black: a pointing mode, combo feedback or a key feedback colour turned off
+black: a pointing mode, combo feedback or a behaviour feedback colour turned off
 paints its area black while it runs, and the auto-mouse fade ends on black.
 To paint nothing there, switch the stage's **Stage on** off. A colour with
 brightness at zero but some hue and saturation also paints black, and keeps
 its hue and saturation for when you raise the brightness again.
+**Give it a colour** brings a colour that is off back.
 
 ### Background effect
 
@@ -139,9 +143,9 @@ With **Enabled** off on Combo settings no combo fires, so this stage paints
 nothing: its tab reads off, and an amber banner says so. Its controls stay
 editable. Click the banner to go to that switch.
 
-### Key feedback
+### Behaviour feedback
 
-The colours a key flashes as a behaviour fires, in two groups, as the
+The state of a key's behaviour: the colours a key flashes as its behaviour fires, in two groups, as the
 behaviour grid has a column per tier and a row per tap count:
 
 - **Tiers**: **Tap committed**, **Hold active** and **Long hold active**
@@ -165,16 +169,61 @@ With **Enabled** off on Behaviour settings no behaviour fires, so this stage
 paints nothing: its tab reads off, and an amber banner says so. Its controls
 stay editable. Click the banner to go to that switch.
 
+### Replacement feedback
+
+One flash when [text replacement](text-replacement.md) changes what you
+typed, over everything else the keyboard is lighting. It has three cases,
+each with a colour of its own:
+
+- **Replaced with text**: an input replaced with text.
+- **Replaced by a macro**: an input replaced by its macro. The flash comes
+  as the input is erased, before the macro plays.
+- **Replacement undone**: Backspace straight after a replacement put the
+  word back.
+
+Pick a case in the list to change its colour. **Turn off** switches that
+case off: it does not flash, the list says **off** beside it, and the other
+two still flash. **Give it a colour** switches it back on. A word left as
+you typed it never flashes, whatever the reason.
+
+Under **When and where**:
+
+- **Locality**: where the flash paints, with the same choices as a pointing
+  mode. Here the trigger key is the key that ended the word (Space, Enter, a
+  punctuation key), or the Backspace that undid the replacement; for a
+  combo, every key of it. When the keyboard cannot tell which key it was,
+  the flash paints both halves, or every key.
+- **Flash length**: how long one flash lasts, in milliseconds. The flash
+  begins as the replacement starts to be typed.
+
+One flash shows at a time: an undo straight after a replacement takes its
+place.
+
+While this tab is open, the board shows the flash of the case picked, with
+its accents. It can't know which key will end a word, so the first key that
+sends Space stands in for it, and the first that sends Backspace for
+**Replacement undone**: with a locality that follows the trigger key that key
+is ringed, and the line under the board names it. A case that is off shows
+no flash, and the line says so. The board shows where the flash lands, not
+the flash itself.
+
+With **Enabled** off under **Text replacement** on
+[Host settings](text-replacement.md#turning-it-on-and-off) nothing is replaced, so this
+stage paints nothing: its tab reads off, and an amber banner says so. Its
+controls stay editable. Click the banner to go to that switch.
+
 ## Accents
 
 An **accent** lights some LEDs in a colour of their own while a layer is on,
-a pointing mode runs, a combo's inputs are held or a key shows a feedback
-state. **Layer colours**, **Pointing modes**, **Combo feedback** and **Key
-feedback** each end with an **Accents** list for what the tab has picked: the
-layer shown, the pointing mode, or the feedback colour. The list includes the
-accents that light for all of them, tagged **Every layer**, **Every pointing
-mode** or **Every feedback state**, which you change or remove from any of
-their lists. Combo accents light for every combo. The background effect and
+a pointing mode runs, a combo's inputs are held, a key shows a behaviour
+state or the keyboard flashes for a replacement. **Layer colours**,
+**Pointing modes**, **Combo feedback**, **Behaviour feedback** and
+**Replacement feedback** each end with an **Accents** list for what the tab
+has picked: the layer shown, the pointing mode, the feedback colour, or the
+replacement case. The list includes the accents that light for all of them,
+tagged **Every layer**, **Every pointing mode**, **Every behaviour state** or
+**Every replacement flash**, which you change or remove from any of their
+lists. Combo accents light for every combo. The background effect and
 the auto-mouse fade have none.
 
 Every key on the board carries its LED's number on a small label over its
@@ -189,8 +238,10 @@ let go.
    across keys to pick each one the drag crosses. Clicking a picked key takes
    it back. The board shows the picked LEDs in the accent's colour, ringed.
 2. **Colour**: **Its own**, set with the colour editor, or the stage's (**Same
-   as the layer**, the mode, combo feedback or the feedback colour), useful to
-   keep keys lit where a layer paints only its mapped keys.
+   as the layer**, the mode, combo feedback, the feedback colour or the
+   flash colour), useful to keep keys lit where a layer paints only its
+   mapped keys. An accent that takes the colour of a replacement case that
+   is off stays dark with it.
 3. **Lights for**: just what the tab picked, or all of them.
 4. **Keep accent in draft** (**Send accent to keyboard** in the live modes,
    where it takes effect at once). **Cancel** drops it.
@@ -205,8 +256,11 @@ the layers above it; **Go to Base** is where they're changed. One exception:
 while a pointing mode linked to a layer above Base runs, it paints over Base
 and its accents, beneath that layer.
 
-An accent of a combo or a feedback state lights the same LEDs whichever combo
-or key caused it.
+An accent of a combo, a behaviour state or a replacement case lights the same
+LEDs whichever combo or key caused it. On Behaviour feedback and Replacement
+feedback, the accents for every behaviour state or every replacement flash
+paint before those for one state or case, whatever their place in the list,
+so the one for the state or case wins an LED they share.
 
 **All accents**, after the stages, lists every accent by the stage that paints
 it and who it lights for; click a line to keep its LEDs glowing on the board,

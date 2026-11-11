@@ -34,7 +34,7 @@ import {keyLed, keyLight, ownLight, stageEnabled, tierColour, trackballLed, trac
 /** @typedef {import("../lib/colour.mjs").Colour} Colour */
 /** @typedef {import("./key-identity.mjs").ReachKind} KeyIcon */
 /** @typedef {{leds: ReadonlySet<number>, colour: Colour | null}} AccentPicks the LEDs picked for the accent being edited, and the colour it lights them, none when it would paint nothing */
-/** @typedef {{faces?: boolean, pdActive?: import("./types.js").LightOptions["pdActive"] | null, comboActive?: import("./types.js").LightOptions["comboActive"] | null, accent?: AccentPicks | null}} BoardShows */
+/** @typedef {{faces?: boolean, pdActive?: import("./types.js").LightOptions["pdActive"] | null, comboActive?: import("./types.js").LightOptions["comboActive"] | null, replacementActive?: import("./types.js").LightOptions["replacementActive"] | null, accent?: AccentPicks | null}} BoardShows */
 
 /**
  * @typedef {object} BoardKey
@@ -49,7 +49,7 @@ import {keyLed, keyLight, ownLight, stageEnabled, tierColour, trackballLed, trac
  *     names it, never by its layout index
  * @property {boolean} glass
  * @property {Colour} light the colour it shows
- * @property {{kind: import("./keyface-types.js").Tier, count: number, colour: Colour | null}[]} tiers one dot per tier, with the colour it flashes, none when key feedback leaves it dark
+ * @property {{kind: import("./keyface-types.js").Tier, count: number, colour: Colour | null}[]} tiers one dot per tier, with the colour it flashes, none when behaviour feedback leaves it dark
  * @property {{text: string, lit: Colour | null}[]} badges one per combo, lit in the combo feedback colour
  * @property {KeyIcon[]} icons one per kind of thing it reaches: a macro, a custom key, a pointing mode
  * @property {string} main
@@ -57,7 +57,7 @@ import {keyLed, keyLight, ownLight, stageEnabled, tierColour, trackballLed, trac
  */
 
 /** @param {LayerView} view @param {BoardShows} [shows] @returns {BoardKey[]} */
-export function boardKeys(view, {faces = true, pdActive = null, comboActive = null, accent = null} = {}) {
+export function boardKeys(view, {faces = true, pdActive = null, comboActive = null, replacementActive = null, accent = null} = {}) {
     const model = /** @type {import("../../contracts/panel.js").PublishedModel | null} */ (view.model ?? null);
     const {layer} = view;
     const answering = layer && view.previewing;
@@ -82,7 +82,7 @@ export function boardKeys(view, {faces = true, pdActive = null, comboActive = nu
             meaning: keyMeaning(shown),
             name: keyName(shown, model),
             glass: face.kind === "transparent" || Boolean(from),
-            light: picked && accent?.colour ? accent.colour : keyLight(model, layer, position, {pdActive, comboActive, held}).colour,
+            light: picked && accent?.colour ? accent.colour : keyLight(model, layer, position, {pdActive, comboActive, replacementActive, held}).colour,
             tiers: runs ? behaviourTiers(behaviour).map((tier) => {
                 const colour = tierColour(model, tier.kind);
                 return {...tier, colour: feedbackOn && !isOff(colour) ? colour : null};
@@ -99,9 +99,9 @@ export function boardKeys(view, {faces = true, pdActive = null, comboActive = nu
 // light is glass when it is seen through the viewed layer from underneath
 // rather than the layer's own (lighting.mjs ownLight).
 /** @param {LayerView} view @param {BoardShows} [shows] */
-export function boardTrackball(view, {pdActive = null, comboActive = null, accent = null} = {}) {
+export function boardTrackball(view, {pdActive = null, comboActive = null, replacementActive = null, accent = null} = {}) {
     const model = /** @type {import("../../contracts/panel.js").PublishedModel | null} */ (view.model ?? null);
-    const light = trackballLight(model, /** @type {import("../../contracts/panel.js").Layer} */ (view.layer), {pdActive, comboActive, held: heldIds(view)});
+    const light = trackballLight(model, /** @type {import("../../contracts/panel.js").Layer} */ (view.layer), {pdActive, comboActive, replacementActive, held: heldIds(view)});
     const led = trackballLed(model);
     const picked = led !== undefined && Boolean(accent?.leds.has(led));
     if (picked && accent?.colour) return {led, picked, light: accent.colour, glass: false};

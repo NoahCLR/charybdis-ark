@@ -338,9 +338,9 @@ function factoryProfile(source) {
         : domain.id === 0x30 ? {...domain, payload: encodeComboDomain(combos)} : domain)});
 }
 for (const compiledOnly of [false, true]) {
-    test(`a snapshot ${compiledOnly ? "of a keyboard running its defaults" : "of a committed profile"} keeps the live settings and the stored combos beside a seven-domain compiled read`, async () => {
+    test(`a snapshot ${compiledOnly ? "of a keyboard running its defaults" : "of a committed profile"} keeps the live settings and the stored combos beside an eight-domain compiled read`, async () => {
         const source = backup32(), compiled = factoryProfile(source);
-        assert.deepEqual(decodeProfileBlob(compiled).domains.map(domain => domain.id), [16, 32, 48, 64, 80, 96, 112], "the compiled read has every domain");
+        assert.deepEqual(decodeProfileBlob(compiled).domains.map(domain => domain.id), [16, 32, 48, 64, 80, 96, 112, 128], "the compiled read has every domain");
         const keyboard = fakeKeyboard({document: source, compiled, compiledOnly});
         const {connection, ids} = wired(keyboard);
         const snapshot = await snapshotProfile(connection, ids, snapshotCapabilities);
@@ -348,7 +348,7 @@ for (const compiledOnly of [false, true]) {
         assert.ok(reads.has(0x05) && reads.has(0x06) && reads.has(0x07), "the compiled, combo and settings reads all ran");
         assert.equal(reads.has(0x04), !compiledOnly);
         const domains = decodeProfileBlob(Buffer.from(snapshot.document.profile, "base64")).domains;
-        assert.deepEqual(domains.map(domain => domain.id), [16, 32, 48, 64, 80, 96, 112], "each domain once, in registry order");
+        assert.deepEqual(domains.map(domain => domain.id), [16, 32, 48, 64, 80, 96, 112, 128], "each domain once, in registry order");
         const live = validateSnapshot(source);
         assert.deepEqual(decodeSettings(domains[3].payload), live.settings, "the live settings, not the factory ones");
         assert.notEqual(decodeSettings(domains[3].payload).values[0], 1600);

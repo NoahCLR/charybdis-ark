@@ -10,9 +10,12 @@ import {screenDefinition} from "./view/screens.mjs";
 import {sameEditorContent} from "./view/render-content.mjs";
 
 /**
- * @param {{root: HTMLElement, refreshCommitBar: () => void, render: (options: {keepScreen: boolean}) => void, receiveMacroValidation: (message: Extract<import("../contracts/messages.js").PanelResponse, {type: 'macroValidation'}>) => void}} surface
+ * @param {{root: HTMLElement, refreshCommitBar: () => void, render: (options: {keepScreen: boolean}) => void, receiveMacroValidation: (message: Extract<import("../contracts/messages.js").PanelResponse, {type: 'macroValidation'}>) => void,
+ *   receiveAutocorrectValidation: (message: Extract<import("../contracts/messages.js").PanelResponse, {type: 'autocorrectValidation'}>) => void,
+ *   receiveAutocorrectImport: (message: Extract<import("../contracts/messages.js").PanelResponse, {type: 'autocorrectImportPreview'}>) => void,
+ *   receiveAutocorrectTry: (message: Extract<import("../contracts/messages.js").PanelResponse, {type: 'autocorrectTry'}>) => void}} surface
  */
-export function createPanelMessages({root, refreshCommitBar, render, receiveMacroValidation}) {
+export function createPanelMessages({root, refreshCommitBar, render, receiveMacroValidation, receiveAutocorrectValidation, receiveAutocorrectImport, receiveAutocorrectTry}) {
     let inDemo = false;
     /** @type {string | null} */
     let lastStackKey = null;
@@ -23,6 +26,9 @@ export function createPanelMessages({root, refreshCommitBar, render, receiveMacr
     /** @param {import("../contracts/messages.js").PanelResponse | null | undefined} message */
     return function receive(message) {
         if (message?.type === "macroValidation") { receiveMacroValidation(message); return; }
+        if (message?.type === "autocorrectValidation") { receiveAutocorrectValidation(message); return; }
+        if (message?.type === "autocorrectImportPreview") { receiveAutocorrectImport(message); return; }
+        if (message?.type === "autocorrectTry") { receiveAutocorrectTry(message); return; }
         if (message?.type === "catalog") {
             setCatalog(message.catalog);
             const waiting = held;

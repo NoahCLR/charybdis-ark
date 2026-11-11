@@ -99,8 +99,23 @@ export const STATE_FIELDS = {
     applyDismissed: kept(0),  // the failed Apply (by id) the person closed, so it stays closed
     recoveryAsk: kept(null),  // the recovery copy (by id) whose Delete is asking "Delete this copy?"
     feedbackRow: kept("hold"),
+    replacementRow: kept("textColor"), // the case picked on Lighting's Replacement feedback tab, by its colour's field
     macroSlot: kept(null),
     macroSearch: kept(""),
+    // The Text replacement screen: its search, the entry open in its editor,
+    // the replacement being made, what is open in the editor, and the core's
+    // answer to the edit being typed. The forms start again when the draft
+    // is replaced.
+    autocorrectSearch: kept(""),
+    autocorrectEntry: kept(null),
+    autocorrectNew: resets(null),
+    autocorrectEdit: resets(null),
+    autocorrectExport: kept(false),
+    autocorrectCheck: resets(null),
+    autocorrectImport: resets(null),
+    // What was typed into Try it stays through a draft change: it is tried
+    // again against the list as it then stands.
+    autocorrectTry: kept({before: "", typed: "", capsLock: false, text: "", shown: "", fired: [], marks: [], undone: false, error: "", requestId: 0, draft: ""}),
     heldSlot: resets(null),    // {bank, key}: the tile held for a keyboard swap, let go when the draft is replaced
     customKey: kept(null),
     customKeySearch: kept(""),

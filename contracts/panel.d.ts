@@ -1,4 +1,4 @@
-import type {BaseIdentity, Behavior, BehaviorBranch, Combo, Colour, KeyFeedback, LayerReference, PointingSlot, Scalar, Tier, TimingTerm} from './edits.js';
+import type {AutocorrectFeedback, BaseIdentity, Behavior, BehaviorBranch, Combo, Colour, KeyFeedback, LayerReference, PointingSlot, Scalar, Tier, TimingTerm} from './edits.js';
 import type {ApplyView, Check, DemoView, HistoryStep, ShellPanel, LoadView, Participation, PhaseId, ProfileUsage, ReviewChange, SettingField, SettingsSection, TimingSource, Vocabulary} from './model.js';
 
 export interface Position {
@@ -57,6 +57,18 @@ export interface ComboView extends Combo {inputPositions?: number[]; /** The lay
     /** The layers its output holds while it is held, ascending: such a combo shows no combo light, its layers' own light showing the hold (core/model/layer-effects.js comboHeldShows). */ holdsLayers?: number[];
     /** The pointing slot its output runs, held or locked, which paints over its combo feedback; null when it runs none. */ runsPointing?: number | null; id: number; badge: string; inputDisplays: string[]; outputDisplay: string}
 export interface CatalogEntry {value: string; key: string; label: string; group: string; aliases: string[]; keycode: number; searchTerms: string[]; search: string; searchCompact: string; name?: string; tip?: string; /** False for an entry the keycode picker never offers (core/data/offered-keycodes.js). */ offered?: boolean}
+/** One input of a text replacement entry (a typo, in the firmware's and these contracts' names): its letters as stored (folded), which name it in an edit; as it is written, with `*` where other letters may go; and what will misbehave about it, in words. */
+export interface AutocorrectTypo {typo: string; input: string; warnings: string[]}
+/** One text replacement entry: what names it among the entries (`id`), what it is called wherever a replacement is listed (`label`: its text, or its macro's name after the mark of one that plays), its replacement (a correction, in the firmware's names) as text, or '' with the macro slot it plays, all its inputs, and what will misbehave about the entry, in words. */
+export interface AutocorrectEntry {id: string; label: string; correction: string; macro?: number; typos: AutocorrectTypo[]; warnings: string[]}
+/** The text replacement list as its screen draws it (core/model/autocorrect-editor.js): entries in stored order; what the list uses against what the keyboard holds (`share`, 0 to 1, its bytes of its own limit, which both memory meters draw; `free`, the bytes it can still grow by, bounded by its text's ceiling and the profile's shared room too; `textMax` the bytes in one input, `correctionMax` in one replacement's text; `shortInput`, the letters under which an input with `*` is warned about); what the chosen host layout cannot type, said once with what to do; and that layout's name. */
+export interface AutocorrectView {
+    entries: AutocorrectEntry[];
+    usage: {corrections: number; typos: number; maxTypos: number; textBytes: number; maxTextBytes: number; bytes: number; capacity: number; share: number; free: number; textMax: number; correctionMax: number; shortInput: number};
+    notices: string[];
+    /** The host layout entries are checked against, by name. */
+    layoutName: string;
+}
 export interface MacroSlot {keycode: string; name: string; /** What it is called while it has no name of its own. */ defaultName: string; payload: string; protection: 'auto' | 'on' | 'off'; uninterruptible: boolean; needsUnicodeEntry: boolean; needsUnicodeSetup: boolean; playbackError: string; playbackCode: string; empty: boolean; bytes: number; playable: boolean; available: boolean; roomTaps: number}
 /** A custom key's shortcut (firmware D-F26): a HID report modifier mask (bit 0 Left Ctrl … bit 7 Right GUI), its keys in press order (at most six, each once, at most one media and one system key), a mask of the layers it turns on, and how it turns them on (`layerKind`: 0 hold, 1 lock, 2 move to, 3 tap-toggle, 4 one-shot; 0 without layers). */
 export interface CustomKeyShortcut {mods: number; keys: number[]; layers: number; layerKind: number}
@@ -134,6 +146,8 @@ export interface RgbView {
     comboAccents: Accent[];
     keyBehaviorFeedback: KeyFeedback<Colour>;
     keyFeedbackAccents: Accent[];
+    autocorrectFeedback: AutocorrectFeedback<Colour>;
+    autocorrectFeedbackAccents: Accent[];
 }
 export interface BaseRgbView {state: string; message?: string; enabled?: boolean; effectId?: number; hue?: number; saturation?: number; brightness?: number; speed?: number; readAt?: string; effectName?: string; brightnessPercent?: number; previewColor?: Colour}
 /** The fields every model of a build starts from, posted once as the catalog (core/model/profile-model.js panelCatalog). */
@@ -179,6 +193,9 @@ export interface PublishedModel {
     macroUnicode: {mode: number; enabled?: boolean; os?: number; layout?: number; layoutFits?: boolean; layoutName?: string; layoutChars?: string; entry?: string};
     macroProtectionChoices: {value: 'auto' | 'on' | 'off'; label: string}[];
     macroEditing: {identity: string; writable: boolean};
+    /** The autocorrect list (firmware D-F68), or null until a complete profile is read. */
+    autocorrect: AutocorrectView | null;
+    autocorrectEditing: {identity: string; writable: boolean};
     behaviorTimingDefaults: Record<string, string>;
     configDefaults: PresentedSection[];
     participation: Participation | null;
@@ -239,6 +256,8 @@ export interface PublishedModel {
     liveProposal: {id: number; label: string | null; checks: import('./model.js').Check[]} | null;
     /** Ark's own live edit or Revert, held by the keyboard until no key is held: what to do, what holds it, and whether Cancel edit is offered (never for a Revert). */
     liveWait: {title: string; detail: string; cancellable: boolean} | null;
-    /** Toggles a key turned off over a stored "on": shown as turned off by key, never as a change. */
-    runtime: {combosOffByKey: boolean; behavioursOffByKey: boolean} | null;
+    /** Each global switch a switch key turned off over a stored "on": shown as turned off by key, never as a change. Null without a keyboard's runtime read. */
+    offByKey: Readonly<Record<import('./model.js').SettingOffSwitch, boolean>> | null;
+    /** Whether the connected keyboard is replacing text now, as it reports it: its stored switch on and no key holding it off. False with no keyboard, and in the demo. */
+    autocorrectRunning: boolean;
 }

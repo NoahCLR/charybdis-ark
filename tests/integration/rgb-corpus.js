@@ -3,10 +3,10 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const {decodeRgbDomainV1, encodeRgbDomainV1} = require("../../core/schema/rgb-domain-v1");
-// Format 4, the sixteen-layer firmware's, from its own golden compiled domain
-// (rgb_domain_v4.json): the only RGB format it reads.
+// Format 5, the sixteen-layer firmware's with replacement feedback, from its
+// own golden compiled domain (rgb_domain_v5.json): the only RGB format it reads.
 /** @type {unknown} */
-const input = require(process.argv[2] + "/tests/fixtures/rgb_domain_v4.json");
+const input = require(process.argv[2] + "/tests/fixtures/rgb_domain_v5.json");
 assert(input && typeof input === "object" && "limits" in input && "valid" in input);
 const limits = input.limits, vectors = input.valid;
 assert(limits && typeof limits === "object");
@@ -17,7 +17,7 @@ assert("tapBranchColorCount" in limits && typeof limits.tapBranchColorCount === 
 assert("supportedPdModeMask" in limits && typeof limits.supportedPdModeMask === "number");
 assert(Array.isArray(vectors) && vectors.every((/** @type {unknown} */ vector) => vector && typeof vector === "object" && "name" in vector && typeof vector.name === "string" && "hex" in vector && typeof vector.hex === "string"));
 const v3 = {limits: {compiledStageMask: limits.compiledStageMask, logicalLayerCount: limits.logicalLayerCount, maximumBrightness: limits.maximumBrightness, tapBranchColorCount: limits.tapBranchColorCount, supportedPdModeMask: limits.supportedPdModeMask}, valid: /** @type {{name: string, hex: string}[]} */ (vectors)};
-const version = 4;
+const version = 5;
 const options = {compiledStageMask: v3.limits.compiledStageMask, logicalLayerCount: v3.limits.logicalLayerCount,
     maximumBrightness: v3.limits.maximumBrightness, tapBranchColorCount: v3.limits.tapBranchColorCount,
     supportedPdModeIds: Array.from({length: 32}, (_, id) => id).filter(id => (v3.limits.supportedPdModeMask >>> id) & 1)};
@@ -42,8 +42,8 @@ let accepted = 0, rejected = 0;
 function add(bytes) {
     let valid = 1;
     try {
-        // Ark still reads older backups' formats; the firmware takes only
-        // format 4, so a byte that makes another format is a rejection.
+        // The firmware takes only format 5, so a byte that makes another
+        // format is a rejection.
         if (bytes[0] !== version) throw new Error("Another RGB format");
         decodeRgbDomainV1(bytes, options); accepted++;
     } catch {valid = 0; rejected++;}

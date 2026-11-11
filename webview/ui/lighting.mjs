@@ -21,6 +21,7 @@ import {stageBody} from "./lighting/stage-body.mjs";
 import {accentPicks, editingOn, glowShown, pickLed} from "./lighting/accents.mjs";
 import {holdComboFrom} from "../view/combo-held.mjs";
 import {lightingBoard} from "../view/lighting-board.mjs";
+import {replacementOwner, replacementRowOf} from "../view/accents.mjs";
 import {durationControl} from "./duration.mjs";
 import {phraseMarked} from "./marks.mjs";
 import {sectionsIn} from "../view/settings-layout.mjs";
@@ -49,9 +50,10 @@ export function screenLighting() {
     const card = el(`<div class="board-card"></div>`);
     // On Pointing modes the board shows the picked mode running, and on
     // Combo feedback a combo held that fires in this view, its keys ringed
-    // as the Keymap rings them; a ringed key holds its input
-    // (view/lighting-board.mjs).
-    const shows = lightingBoard(view, {stage: state.stage, pointingSlot: state.pointingSlot, comboPreview: state.comboPreview});
+    // as the Keymap rings them; a ringed key holds its input. On Replacement
+    // feedback it shows the picked case's flash, the key standing in for
+    // the one that caused it ringed solid (view/lighting-board.mjs).
+    const shows = lightingBoard(view, {stage: state.stage, pointingSlot: state.pointingSlot, comboPreview: state.comboPreview, replacementRow: state.replacementRow});
     const held = shows.held;
     const editing = editingOn(model, state.stage);
     const stage = state.stage;
@@ -61,8 +63,9 @@ export function screenLighting() {
         accent: accentPicks(model, stage),
         pdActive: shows.pdActive,
         comboActive: shows.comboActive,
+        replacementActive: shows.replacementActive,
         reach: held && !editing ? held.ring : [],
-        holding: held && !editing ? held.held : [],
+        holding: editing ? [] : held ? held.held : shows.standIn === undefined ? [] : [shows.standIn],
         onKey: held && !editing ? (index) => {
             const next = holdComboFrom(view, state.comboPreview, index);
             if (next) { state.comboPreview = next; render(); }
@@ -156,7 +159,8 @@ function powerControls(model) {
 }
 
 // The colour a stage paints now, for its tab: the layer shown, the pointing
-// mode picked, the hold colour for key feedback.
+// mode picked, the hold colour for behaviour feedback, the picked case's for
+// replacement feedback.
 /** @param {import("../../contracts/panel.js").PublishedModel} model @param {string} id */
 function stageColour(model, id) {
     return /** @type {Record<string, () => import("../../contracts/edits.js").Colour | null | undefined>} */ ({
@@ -166,5 +170,6 @@ function stageColour(model, id) {
         pd: () => pdColourRow(model, state.pointingSlot)?.color,
         combo: () => model.rgb.comboFeedback?.color,
         key: () => feedbackColours(model).hold,
+        autocorrect: () => model.rgb.autocorrectFeedback?.[replacementRowOf(model, replacementOwner(model, state.replacementRow))],
     })[id]?.();
 }

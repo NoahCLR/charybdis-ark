@@ -36,6 +36,7 @@ test("each unit goes back to the keyboard's value, and nothing else moves", () =
         assert.ok(units.some((unit) => unit.startsWith(`${kind}:`)), `the fixture edits a ${kind} unit`);
     }
     assert.ok(units.includes("comboTiming"), "the fixture edits the combo timing");
+    assert.ok(units.includes("rgb:autocorrect"), "the fixture edits replacement feedback");
     for (const unit of units) {
         const document = revertUnits(base, current, new Set([unit]), capabilities);
         const left = profileReview(base, {...current, document, fingerprint: fingerprint(document)});
@@ -82,4 +83,22 @@ test("discarding a default-layer change alone that would put a shortcut on an al
         /^Error: These settings cannot be discarded on their own: \S+ is turned on by Custom key 9's shortcut, and a shortcut cannot turn on a default layer/);
     // Discarded together, both go back.
     assert.doesNotThrow(() => revertUnits(keyboard, draft, new Set([startup, "customKey:9"]), capabilities));
+});
+
+test("replacement feedback goes back apart from its stage switch and its accents, and each of those apart from it", () => {
+    const draft = new ProfileDraftSession(snapshotOf(pdDocument()), "board", capabilities);
+    const stage = message => draft.stage({...message, draftId: draft.id, draftRevision: draft.revision});
+    const before = validateSnapshot(draft.base.document).rgb;
+    stage({type: "updateAutocorrectFeedback", config: {textColor: {h: 106, s: 255, v: 200}, macroColor: {h: 0, s: 0, v: 0}, undoColor: {h: 0, s: 255, v: 200}, locality: "RGB_KEY_HALF"}});
+    stage({type: "updateRgbStages", stageEnableMask: before.stageEnableMask | 32});
+    stage({type: "addRgbLedGroup", group: {target: "autocorrect", owner: "AUTOCORRECT_FEEDBACK_GROUP_ALL", ledIndices: [24, 25], h: 0, s: 0, v: 0}});
+    const rows = profileReview(draft.base, draft.current);
+    assert.deepEqual(rows.map(row => row.unit).sort(), ["rgb:autocorrect", "rgb:groups", "rgb:stages"]);
+    const rgb = unit => validateSnapshot(revertUnits(draft.base, draft.current, new Set([unit]), capabilities)).rgb;
+    const now = validateSnapshot(draft.document).rgb;
+    assert.deepEqual(rgb("rgb:autocorrect"), {...now, autocorrectFeedback: before.autocorrectFeedback}, "the colours and the locality alone");
+    assert.deepEqual(rgb("rgb:stages"), {...now, stageEnableMask: before.stageEnableMask}, "the switch alone");
+    assert.deepEqual(rgb("rgb:groups"), {...now, groups: before.groups, autocorrectGroupRows: []}, "the accent alone, with the LED set it took");
+    const all = revertUnits(draft.base, draft.current, new Set(rows.map(row => row.unit)), capabilities);
+    assert.deepEqual(profileReview(draft.base, snapshotOf(all)), []);
 });

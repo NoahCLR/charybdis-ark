@@ -16,7 +16,7 @@ test("each Settings screen draws its own sections open, with nothing to fold and
         ["behaviours", "Behaviours", ["behaviorSettings", "keyTiming"]],
         ["combos", "Combos", ["comboSettings", "comboReferences"]],
         ["pointer", "Pointer", ["normalPointerSpeed", "sniping", "autoMouse"]],
-        ["host", "Host", ["host", "keyboardOptions"]],
+        ["host", "Host", ["host", "autocorrect", "keyboardOptions"]],
     ]) {
         await page.locator(`[data-screen="${screen}"]`).click();
         await expect(page.locator(".main > .topbar h1")).toHaveText(title);

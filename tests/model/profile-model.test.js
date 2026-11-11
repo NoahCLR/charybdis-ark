@@ -3,6 +3,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const {editorViews, panelCatalog, profileComboReadback, profileModel} = require("../../core/model/profile-model");
 const {VOCABULARY} = require("../../core/model/vocabulary");
+const {ACTION_ABI} = require("../../core/schema/actions");
 const {contractUnion} = require("../fixtures/contract-unions");
 const {profileFacts} = require("../../core/model/layer-walk");
 const {baseRgbForView} = require("../../core/model/device-profile-view");
@@ -143,7 +144,7 @@ test("every custom key has built-in behaviour defaults, placed or not", () => {
     const keys = [0, 5].map(slot => ({slot, keycode: `CUSTOM_KEY_${slot}`, code: 0x7f00 + slot, name: "", hasBehavior: false}));
     const model = readback({
         layout: layoutWith([0x7f00, 0x04].map((keycode, layoutIndex) => ({keycode, layoutIndex, resolved: resolve(keycode)}))),
-        committed: decodedDeviceProfile(), capabilities: {actionAbiDigest: 0x67df11b3},
+        committed: decodedDeviceProfile(), capabilities: {actionAbiDigest: ACTION_ABI},
         settingsView: {timing: {tappingTerm: "210", tapHoldTerm: "150", longHoldTerm: "400", multiTapTerm: "170"}},
         customKeyView: {keys},
     });
@@ -161,13 +162,52 @@ test("device shortcut labels stay complete and semantic names require the advert
     const values = [0x0806, 0x0a1d, 0x7e80, 0x7ec5, 0x7ec6, 0x7f02];
     const state = {
         layout: layoutWith(values.map((keycode, layoutIndex) => ({keycode, layoutIndex, resolved: resolve(keycode)}))),
-        committed: decodedDeviceProfile(), capabilities: {actionAbiDigest: 0x67df11b3},
+        committed: decodedDeviceProfile(), capabilities: {actionAbiDigest: ACTION_ABI},
     };
     const model = readback(state);
     assert.deepEqual(model.layers[0].positions.map(key => key.display), ["GUI+C", "Shift+GUI+Z", "Slot 0 · hold", "Lock Layer 5", "Lock Layer 6", "Custom key 2"],
         "a layer lock and a custom key are user slots under the native ABI, named by what they are");
     assert.equal(model.layers[0].positions[5].keycode, "0x7F02", "the editable identity still encodes to the original numeric value");
     assert.doesNotMatch(readback({...state, capabilities: {}}).layers[0].positions[5].display, /Custom key/, "an unknown ABI names no custom key");
+});
+
+test("the switch keys for behaviours are named and offered only on the vocabulary that has them", () => {
+    const values = [0x7ee0, 0x7ee1, 0x7ee2, 0x7ee3];
+    const state = {
+        layout: layoutWith(values.map((keycode, layoutIndex) => ({keycode, layoutIndex, resolved: resolve(keycode)}))),
+        committed: decodedDeviceProfile(), capabilities: {actionAbiDigest: ACTION_ABI},
+    };
+    const model = readback(state);
+    assert.deepEqual(model.layers[0].positions.map(key => [key.keycode, key.semantic, key.display]), [
+        ["0x7EE0", "BH_ON", "Behaviours On"], ["0x7EE1", "BH_OFF", "Behaviours Off"], ["0x7EE2", "BH_TOGG", "Toggle Behaviours"], ["0x7EE3", "0x7EE3", "0x7EE3"]]);
+    assert.deepEqual(model.qmkKeycodes.filter(key => /^BH_/.test(key.value)).map(key => [key.value, key.keycode, key.group, key.offered]),
+        [["BH_ON", 0x7ee0, "Switch keys", undefined], ["BH_OFF", 0x7ee1, "Switch keys", undefined], ["BH_TOGG", 0x7ee2, "Switch keys", undefined]]);
+    // QMK's own switch keys, for combos and autocorrect, are published in the
+    // same group, so the picker offers every switch key by its group alone.
+    assert.deepEqual(model.qmkKeycodes.filter(key => key.group === "Switch keys" && key.value.startsWith("QK_")).map(key => key.value),
+        ["QK_COMBO_ON", "QK_COMBO_OFF", "QK_COMBO_TOGGLE", "QK_AUTOCORRECT_ON", "QK_AUTOCORRECT_OFF", "QK_AUTOCORRECT_TOGGLE"]);
+    // The released firmware's vocabulary, before the keys (Profile Wire 2.0).
+    const older = readback({...state, capabilities: {actionAbiDigest: 0x67df11b3}});
+    assert.ok(!older.qmkKeycodes.some(key => /^BH_/.test(key.value)), "firmware without them is not offered them");
+    assert.equal(older.layers[0].positions[2].display, "0x7EE2", "and names no such key");
+});
+
+test("the switch keys for auto-mouse are named and offered only on the vocabulary that has them", () => {
+    const values = [0x7ef0, 0x7ef1, 0x7ef2, 0x7ef3];
+    const state = {
+        layout: layoutWith(values.map((keycode, layoutIndex) => ({keycode, layoutIndex, resolved: resolve(keycode)}))),
+        committed: decodedDeviceProfile(), capabilities: {actionAbiDigest: ACTION_ABI},
+    };
+    const model = readback(state);
+    assert.deepEqual(model.layers[0].positions.map(key => [key.keycode, key.semantic, key.display]), [
+        ["0x7EF0", "AM_ON", "Auto-mouse On"], ["0x7EF1", "AM_OFF", "Auto-mouse Off"], ["0x7EF2", "AM_TOGG", "Toggle Auto-mouse"], ["0x7EF3", "0x7EF3", "0x7EF3"]]);
+    assert.deepEqual(model.qmkKeycodes.filter(key => /^AM_/.test(key.value)).map(key => [key.value, key.keycode, key.group, key.offered]),
+        [["AM_ON", 0x7ef0, "Switch keys", undefined], ["AM_OFF", 0x7ef1, "Switch keys", undefined], ["AM_TOGG", 0x7ef2, "Switch keys", undefined]]);
+    // The vocabulary with the switch keys for behaviours but before these
+    // (firmware D-F66 before auto-mouse joined it).
+    const older = readback({...state, capabilities: {actionAbiDigest: 0xb2205fc3}});
+    assert.ok(!older.qmkKeycodes.some(key => /^(?:AM|BH)_/.test(key.value)), "firmware without them is not offered them");
+    assert.equal(older.layers[0].positions[2].display, "0x7EF2", "and names no such key");
 });
 
 test("a position carries what its value means, not only what the keyboard calls it", () => {
@@ -179,7 +219,7 @@ test("a position carries what its value means, not only what the keyboard calls 
     const model = readback({
         layout: layoutWith(values.map((keycode, layoutIndex) => ({keycode, layoutIndex, resolved: resolve(keycode)}))),
         committed: decodedDeviceProfile(),
-        capabilities: {actionAbiDigest: 0x67df11b3},
+        capabilities: {actionAbiDigest: ACTION_ABI},
         macroView: {macros: [{keycode: "MACRO_0", name: "Sign-off"}]},
         customKeyView: {keys: [{slot: 0, keycode: "CUSTOM_KEY_0", code: 0x7f00, name: "Right Thumb", hasBehavior: true}]},
     });
@@ -291,8 +331,8 @@ test("a behaviour on a key never renames what the vocabulary already names", () 
         row({kind: 6, flags: 0, operand: 0}),   // MACRO_0
     ]}};
     const macroView = {macros: [{keycode: "MACRO_0", payload: ""}], hardcodedMacros: []};
-    const labels = readback({committed, macroView, capabilities: {actionAbiDigest: 0x67df11b3}}).qmkKeyLabels;
-    const plain = readback({macroView, capabilities: {actionAbiDigest: 0x67df11b3}}).qmkKeyLabels;
+    const labels = readback({committed, macroView, capabilities: {actionAbiDigest: ACTION_ABI}}).qmkKeyLabels;
+    const plain = readback({macroView, capabilities: {actionAbiDigest: ACTION_ABI}}).qmkKeyLabels;
     assert.equal(labels["MO(1)"], plain["MO(1)"], "MO(1) reads as it does with no behaviour on it, not \"Mo(1)\"");
     assert.equal(labels.QK_MACRO_0, "Macro 0", "the macro screen's name");
     assert.equal(labels["0x7EC2"], "Lock Layer 2", "a bare user slot reads by what it does to which layer");

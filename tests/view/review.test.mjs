@@ -82,6 +82,15 @@ test("Show goes to where each kind of item is edited", () => {
     assert.deepEqual(placeState({kind: "slots", bank: "pdModes", slots: [1, 6]}), {screen: "pointing", pointingSlot: 1, pdKind: null, pdTaps: null});
     assert.equal(placeState({kind: "lighting", stage: "pd"}).stage, "pd");
     assert.equal(placeState(null), null, "the profile fallback has nowhere to go");
+    // Text replacement's switch is a Host setting; its list is its own screen's, an entry shown by its id.
+    assert.deepEqual(placeState({kind: "settings", section: "autocorrect", area: "Settings"}), {screen: "host", reveal: '.settings-group[data-section="autocorrect"]'});
+    // Show opens the entry in its editor, as a macro's opens the macro: what
+    // was open, being made or searched for gives way to it.
+    assert.deepEqual(placeState({kind: "autocorrect", entry: "the"}), {screen: "autocorrect", autocorrectEntry: "the", autocorrectNew: null, autocorrectEdit: null, autocorrectSearch: "", reveal: '[data-ac-entry="the"]'});
+    assert.equal(placeState({kind: "autocorrect", entry: 'say "hi"'}).reveal, '[data-ac-entry="say \\"hi\\""]', "a replacement's own quotes do not end the selector");
+    assert.ok(draftMarks([{place: {kind: "autocorrect", entry: "the"}, status: "changed"}]).autocorrect.has("the"));
+    assert.deepEqual(categorySummary(words, [{place: {kind: "settings", section: "autocorrect"}, status: "changed"}, {place: {kind: "autocorrect", entry: "the"}, status: "added"}, {place: {kind: "macro", index: 0, keycode: "MACRO_0"}, status: "changed"}])
+        .map(({category, rows}) => [category, rows]), [["Macros", []], ["Text replacement", [{label: "Replacements", count: 1}, {label: "Text replacement switch", count: 1}]]], "its switch is counted with the list, after Macros");
     const combo = placeState({kind: "combo", index: 3});
     assert.equal(combo.pickCombo, 3, "a combo is asked for by id, since its group depends on the layer");
     assert.equal(combo.reveal, '[data-reach][data-picked="true"]');
@@ -147,7 +156,7 @@ test("a profile file's differences are counted by what they configure, split as 
     const rows = (category) => groups.find((group) => group.category === category).rows.map((row) => `${row.label} ${row.count}`);
     assert.deepEqual(rows("Keys"), ["Keys on Base 1", "Keys on Navigation 2", "Layer names 1", "Behaviours 1", "Tap & hold timing 1", "Combos 1", "Key swaps & typing 1"],
         "the board's keys by layer first, then the rest of the Keys screen");
-    assert.deepEqual(rows("Lighting"), ["All lighting 1", "Stages on or off 1", "Background effect 1", "Layer colours 1", "Auto-mouse fade 1", "Key feedback 2"],
+    assert.deepEqual(rows("Lighting"), ["All lighting 1", "Stages on or off 1", "Background effect 1", "Layer colours 1", "Auto-mouse fade 1", "Behaviour feedback 2"],
         "all lighting first, then stages in paint order; a setting edited on a stage counts with it");
     assert.deepEqual(rows("Pointer"), ["Auto-sniping 1", "Auto-mouse 1"], "the pointer's settings are filed with Pointer, the screen that edits them");
     assert.deepEqual(rows("Pointing modes"), [], "the slots are the whole category");
@@ -157,7 +166,7 @@ test("a profile file's differences are counted by what they configure, split as 
 });
 
 // The summary's own words for settings sections, as it has always shown them;
-// three differ from the Settings screens' section labels.
+// four differ from the Settings screens' section labels.
 test("a profile file's settings sections are counted under the vocabulary's words, each in its category", () => {
     assert.deepEqual(Object.keys(SECTION_ROWS).sort(), Object.keys(VOCABULARY.fileSections).sort(), "every section placed has words, and only those");
     const at = (section) => ({status: "changed", place: {kind: "settings", section}});
@@ -165,8 +174,8 @@ test("a profile file's settings sections are counted under the vocabulary's word
         .flatMap((group) => group.rows.map((row) => [row.label, group.category])));
     assert.deepEqual(labels, {
         "Tap & hold timing": "Keys", "Default layers": "Keys", "Behaviour settings": "Keys", "Combo settings": "Keys", "Combo layer matching": "Keys",
-        "Key swaps & typing": "Keys", "All lighting": "Lighting", "Background effect": "Lighting", "Key feedback": "Lighting",
-        "Pointer speed": "Pointer", "Auto-sniping": "Pointer", "Auto-mouse": "Pointer",
+        "Key swaps & typing": "Keys", "All lighting": "Lighting", "Background effect": "Lighting", "Behaviour feedback": "Lighting", "Replacement feedback": "Lighting",
+        "Pointer speed": "Pointer", "Auto-sniping": "Pointer", "Auto-mouse": "Pointer", "Text replacement switch": "Text replacement",
     });
 });
 

@@ -29,6 +29,9 @@ export const pickable = (entry) => entry.offered !== false;
 const isKeyboardKey = inGroups("kb");
 // The keyboard's 128 custom keys, by the names the model gives them.
 const isCustom = inGroups("Custom keys");
+// The switch keys, in core's group for them: QMK's for combos and
+// autocorrect, and the keyboard's for behaviours and auto-mouse.
+const isSwitchKey = inGroups("Switch keys");
 /** @param {Entry} entry */
 const isSymbol = (entry) => entry.group === "shifted" || (entry.group === "basic" && SYMBOLS.has(valueOf(entry)));
 /** @param {Entry} entry */
@@ -102,12 +105,17 @@ export function pickerSections() {
         {id: "lighting", label: "Lighting", kind: "catalogue", filter: inGroups("backlight", "led_matrix", "underglow", "rgb", "rgb_matrix"), groups: [
             group("Switch", named(/_(?:ON|OFF|TOGGLE)$/)), group("Effect", named(/MODE|FLAG/)), group("Colour", rest),
         ]},
-        {id: "other", label: "Other QMK", kind: "catalogue", filter: inGroups(
+        {id: "other", label: "Other QMK", kind: "catalogue", filter: (entry) => isSwitchKey(entry) || inGroups(
             "connection", "joystick", "magic", "midi", "programmable_button", "quantum", "sequencer", "steno", "swap_hands", "system",
-        ), groups: [
+        )(entry), groups: [
             group("Magic swaps", (entry) => entry.group === "magic" && /SWAP|TOGGLE_(?:CONTROL|BACKSLASH|ALT_GUI|CTL_GUI|ESCAPE)/.test(valueOf(entry))),
             group("Magic switches", from("magic")),
-            group("System", from("system")), group("Firmware", named(/BOOTLOADER|REBOOT|DEBUG|EEPROM|MAKE/)), group("Space Cadet", named(/SPACE_CADET/)), group("Features", rest),
+            group("System", from("system")), group("Firmware", named(/BOOTLOADER|REBOOT|DEBUG|EEPROM|MAKE/)), group("Space Cadet", named(/SPACE_CADET/)),
+            // The switch keys: QMK's for combos and for autocorrect, then the
+            // keyboard's for behaviours and for auto-mouse, each in the order
+            // its catalogue gives them.
+            group("Switch keys", isSwitchKey),
+            group("Features", rest),
         ]},
         {id: "all", label: "All keycodes", kind: "all"},
     ];

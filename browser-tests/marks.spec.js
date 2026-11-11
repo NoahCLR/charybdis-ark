@@ -513,7 +513,7 @@ test("Settings marks the Multi tap window with an N× badge in every tap-branch 
     expect(close(pixels.ring[0], pixels.background)).toBe(true);
     expect(pixels.ring[1][2]).toBeGreaterThan(200);
 
-    // With key feedback off the badge is drawn unlit, as a tap count's is.
+    // With behaviour feedback off the badge is drawn unlit, as a tap count's is.
     const off = await page.evaluate(async () => {
         const {getModel} = await import("/webview/store.mjs");
         const {mark} = await import("/webview/ui/marks.mjs");

@@ -27,6 +27,12 @@ export interface ProfileDestination extends Partial<ActionLimits> {
     maxRgbStageGroupRows?: number;
     macroBytes?: number;
     macroSlots?: number;
+    maxAutocorrectCorrections?: number;
+    maxAutocorrectTypos?: number;
+    autocorrectTextBytes?: number;
+    autocorrectBytes?: number;
+    autocorrectTextMax?: number;
+    autocorrectCorrectionMax?: number;
     brightnessMax?: number;
     effects?: {id: number; name: string}[];
     detectedHostOs?: number;
@@ -58,6 +64,8 @@ export interface DecodedProfile {
     candidate: Buffer;
     layers: number[][];
     macroSlots: Buffer[];
+    /** The autocorrect list: each correction with its typos, in the stored order. */
+    autocorrect: import('../schema/autocorrect-domain-v1.js').AutocorrectList;
     settings: ReturnType<typeof import('../schema/settings-domain-v1.js').decodeSettings>;
     rgb: ReturnType<typeof import('../schema/rgb-domain-v1.js').decodeRgbDomainV1>;
     behaviors: ReturnType<typeof import('../schema/key-behavior-domain-v1.js').decodeKeyBehaviorDomain>;

@@ -13,7 +13,7 @@
 // be a lie about what the keyboard is running.
 
 const {PD_MODE_KEYS, formerNames, pdModeKeyOfCode} = require("../data/pd-mode-keys");
-const {VOCABULARY, layerName, slotName} = require("./vocabulary");
+const {TEXT_REPLACEMENT_KEYS, VOCABULARY, layerName, slotName} = require("./vocabulary");
 const {comboOutputBehaviorLayers, participation} = require("./participation");
 const {comboReferenceLayers, publishedComboReach} = require("./combo-reach");
 const keycodeCatalog = require("../data/keycode-catalog");
@@ -24,14 +24,15 @@ const {behaviorRowsForView, builtInBranches, comboRowsForView, rgbForView} = req
 const {emptyCells} = require("./empty-cells");
 const {dualRole, effectiveTimings, holdTermSetting} = require("./gesture-timing");
 const {timingAlone} = require("./inert-behaviors");
-const {compactKeyLabels, heldModifierWords, hostKeyVocabulary, keyKind, keyLabel, keyLayer, keyLayerForm, layerModWords, layerTapWords, profileKeyNames, shortcutAct, shortcutKeys, shortcutLabel, shortcutLayerNames} = require("./key-names");
-const {keycodeAction, knownActionAbi, layerRef, nativeCode} = require("../schema/actions");
+const {SWITCH_KEY_FAMILIES, compactKeyLabels, heldModifierWords, hostKeyVocabulary, keyKind, keyLabel, keyLayer, keyLayerForm, layerModWords, layerTapWords, profileKeyNames, shortcutAct, shortcutKeys, shortcutLabel, shortcutLayerNames} = require("./key-names");
+const {QMK_SWITCH_KEY_NAMES, keycodeAction, knownActionAbi, layerRef, nativeCode} = require("../schema/actions");
 const {dpiChoices} = require("./pointer-dpi");
 const {pointingTapKeys} = require("./pointing-taps");
 const {linkStarts, linkTargets, pointerCoveredLayers} = require("./pointing-links");
 const {comboHeldShows, keycodeLayersOn} = require("./layer-effects");
 const {settingsEditorView} = require("./settings-editor");
 const {macroEditorView} = require("./macro-editor");
+const {autocorrectEditorView} = require("./autocorrect-editor");
 const {customKeyEditorView} = require("./custom-key-editor");
 const {runningComboRows} = require("../schema/combo-domain-v1");
 const {SETTING, SHORTCUT_KEY_LIMITS, alwaysOnLayers} = require("../schema/settings-domain-v1");
@@ -53,19 +54,21 @@ const CATALOG_SOURCE = "vendored QMK keycode catalog";
  * @property {ReturnType<typeof import("./device-profile-view.js").baseRgbForView>} baseEffect
  * @property {ReturnType<typeof settingsEditorView> | null} [settingsView]
  * @property {ReturnType<typeof macroEditorView> | null} [macroView]
+ * @property {ReturnType<typeof autocorrectEditorView> | null} [autocorrectView]
  * @property {ReturnType<typeof customKeyEditorView> | null} [customKeyView]
  * @property {ReturnType<typeof import("./keyboard-name.js").keyboardNameView>} [keyboardNameView]
  * @property {Partial<import("../../contracts/edits.js").BaseIdentity> | null} identity
- * @typedef {{busy: boolean, behaviors: boolean, pointing: boolean, combos: boolean, macros: boolean, settings: boolean, customKeys: boolean}} Editing
+ * @typedef {{busy: boolean, behaviors: boolean, pointing: boolean, combos: boolean, macros: boolean, autocorrect: boolean, settings: boolean, customKeys: boolean}} Editing
  * @typedef {{actionAbiDigest?: number, maxTapStepsPerBehavior?: number} | null | undefined} Capabilities
  * @typedef {import("../../contracts/panel.js").CatalogEntry} CatalogEntry
  */
 
-// The three editor views of a complete snapshot, built here only: the
+// The four editor views of a complete snapshot, built here only: the
 // service keeps them for the profile it read, and a draft builds its own.
 /** @param {import("./types.js").ProfileSnapshot} snapshot @param {import("./types.js").ProfileDestination} [capabilities] */
 function editorViews(snapshot, capabilities) {
     return {settingsView: settingsEditorView(snapshot), macroView: macroEditorView(snapshot, capabilities),
+        autocorrectView: autocorrectEditorView(snapshot, capabilities),
         customKeyView: customKeyEditorView(snapshot, capabilities)};
 }
 
@@ -130,6 +133,13 @@ function profileModel(content, capabilities, editing) {
         const does = shortcutAct(names, shortcut);
         present(code, {value: name, key: name, label, group: "Custom keys", aliases: [native], keycode: code, searchTerms: [name, label], search: `${name} ${label}`.toLowerCase(), searchCompact: `${name}${label}`.toLowerCase(),
             tip: does ? `${label} · ${does}` : `${label} · no shortcut`});
+    }
+    // So is each switch key for behaviours and for auto-mouse, in a group of
+    // its own, on firmware whose vocabulary has them; the picker puts them
+    // beside QMK's switch keys for combos.
+    if (knownActionAbi(capabilities?.actionAbiDigest ?? 0)) for (const [family, codeOf] of SWITCH_KEY_FAMILIES) for (const name of family) {
+        const code = /** @type {number} */ (codeOf(name)), native = keycodes.resolve(code).name, label = names.labels[name];
+        present(code, {value: name, key: name, label, group: "Switch keys", aliases: [native], keycode: code, searchTerms: [name, label], search: `${name} ${label}`.toLowerCase(), searchCompact: `${name}${label}`.toLowerCase()});
     }
     // Every keycode the profile holds is in the table by its name here, so the
     // interface names any of them by keycode and never composes a name itself:
@@ -238,6 +248,9 @@ function profileModel(content, capabilities, editing) {
         macroUnicode: content.macroView?.unicode || {mode: 0},
         macroProtectionChoices: content.macroView?.protectionChoices || [],
         macroEditing: {identity: content.macroView?.identity || "", writable: editing.macros},
+        autocorrect: content.autocorrectView ? {entries: content.autocorrectView.entries, usage: content.autocorrectView.usage,
+            notices: content.autocorrectView.notices, layoutName: content.autocorrectView.layoutName} : null,
+        autocorrectEditing: {identity: content.autocorrectView?.identity || "", writable: editing.autocorrect},
         behaviorTimingDefaults: content.settingsView?.timing || {},
         configDefaults: content.settingsView?.sections || [],
         participation: content.domains.settings?.values && content.domains.settings.layers ? participation(content.domains.settings).view() : null,
@@ -506,23 +519,30 @@ function catalogViews() {
     const entries = [];
     /** @type {Record<string, string>} */
     const labels = {};
+    /** @type {Readonly<Record<string, string | undefined>>} */
+    const reworded = TEXT_REPLACEMENT_KEYS;
     for (const entry of keycodeCatalog.entries()) {
-        const searchTerms = [entry.name, entry.label, ...entry.aliases].filter(Boolean);
+        // A key Ark words its own way keeps QMK's words among its search
+        // terms, so either name finds it.
+        const own = reworded[entry.name], label = own ?? entry.label;
+        const searchTerms = [entry.name, label, ...(own ? [entry.label] : []), ...entry.aliases].filter(Boolean);
         entries.push({
             value: entry.name,
             key: entry.name,
-            label: entry.label,
-            group: entry.group,
+            label,
+            // QMK's switch keys for combos and autocorrect are offered with
+            // the keyboard's own, in the one group the picker reads.
+            group: QMK_SWITCH_KEY_NAMES.includes(entry.name) ? "Switch keys" : entry.group,
             aliases: entry.aliases,
             keycode: entry.value,
             searchTerms,
             search: searchTerms.join(" ").toLowerCase(),
             searchCompact: searchTerms.join("").toLowerCase(),
         });
-        labels[entry.name] = entry.label;
+        labels[entry.name] = label;
         for (const alias of entry.aliases) {
             if (!labels[alias]) {
-                labels[alias] = entry.label;
+                labels[alias] = label;
             }
         }
     }

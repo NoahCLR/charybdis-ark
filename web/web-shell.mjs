@@ -5,7 +5,7 @@
 // chooser, downloads, and the page itself for progress and errors. web/page.mjs starts it with the page's own globals; everything it
 // touches comes in through `env`, so it can be started with stand-ins.
 
-import {FILE_MAX_BYTES, FILE_TOO_LARGE, openPanelLoop, VOCABULARY, WebHidDeviceAdapter} from "./core.mjs";
+import {FILE_MAX_BYTES, FILE_TOO_LARGE, LIST_FILE_MAX_BYTES, LIST_FILE_TOO_LARGE, openPanelLoop, VOCABULARY, WebHidDeviceAdapter} from "./core.mjs";
 import {copyTitle} from "../webview/view/shell-panel.mjs";
 import {connectPanel} from "./panel-channel.mjs";
 import {nativePopups} from "./native-popups.mjs";
@@ -51,12 +51,17 @@ export function initialTheme(saved, prefersLight) {
     return saved === "light" || saved === "dark" ? saved : prefersLight ? "light" : "dark";
 }
 
-// A chosen profile file as the loop takes it, refused when it is too large.
-/** @param {Pick<File, "size" | "text" | "name"> | undefined} file */
-export async function readProfileFile(file) {
+// The files a chooser offers and takes: a backup, or an autocorrect list in
+// one of its three formats (D-L85), each held to its own byte ceiling.
+const BACKUP_FILE = Object.freeze({accept: ".json,application/json", max: FILE_MAX_BYTES, tooLarge: FILE_TOO_LARGE});
+export const LIST_FILE = Object.freeze({accept: ".txt,.csv,.json,text/plain,text/csv,application/json", max: LIST_FILE_MAX_BYTES, tooLarge: LIST_FILE_TOO_LARGE});
+
+// A chosen file as the loop takes it, refused when it is too large for its
+// kind: a backup's ceiling unless another is given.
+/** @param {Pick<File, "size" | "text" | "name"> | undefined} file @param {{max: number, tooLarge: string}} [kind] */
+export async function readProfileFile(file, kind = BACKUP_FILE) {
     if (!file) return undefined;
-    // A chosen file is held to the backup's byte ceiling.
-    if (file.size > FILE_MAX_BYTES) throw new Error(FILE_TOO_LARGE);
+    if (file.size > kind.max) throw new Error(kind.tooLarge);
     return {text: await file.text(), name: file.name};
 }
 
@@ -101,7 +106,7 @@ export function startWebShell(env) {
             return chosen;
         },
         saveExport: async (file) => {
-            download(document, window, file.fileName, file.text);
+            download(document, window, file.fileName, file.text, file.mime);
             return `${file.fileName} in your downloads`;
         },
         panel: () => ({chooseKeyboard: Boolean(hid) && !blocked, blocked, theme, recoveries: recoveryList, build, progress}),
@@ -129,6 +134,10 @@ export function startWebShell(env) {
         }
         if (message?.type === "choosePortableProfile" || message?.type === "openDemoProfile") {
             choosing = chooseFile(document);
+            choosing.catch(() => {});
+        }
+        if (message?.type === "chooseAutocorrectFile") {
+            choosing = chooseFile(document, LIST_FILE);
             choosing.catch(() => {});
         }
     }
@@ -242,23 +251,23 @@ function safely(read) {
 }
 
 // Chrome's file chooser, opened from the click that asked for it.
-/** @param {Document} document */
-function chooseFile(document) {
+/** @param {Document} document @param {{accept: string, max: number, tooLarge: string}} [kind] */
+function chooseFile(document, kind = BACKUP_FILE) {
     const input = document.createElement("input");
     input.type = "file";
-    input.accept = ".json,application/json";
+    input.accept = kind.accept;
     /** @type {Promise<File | undefined>} */
     const chosen = new Promise((resolve) => {
         input.addEventListener("change", () => resolve(input.files?.[0]), {once: true});
         input.addEventListener("cancel", () => resolve(undefined), {once: true});
     });
     input.click();
-    return chosen.then(readProfileFile);
+    return chosen.then((file) => readProfileFile(file, kind));
 }
 
-/** @param {Document} document @param {import("./types.js").WebEnvironment["window"]} window @param {string} name @param {string} text */
-function download(document, window, name, text) {
-    const url = window.URL.createObjectURL(new window.Blob([text], {type: "application/json"}));
+/** @param {Document} document @param {import("./types.js").WebEnvironment["window"]} window @param {string} name @param {string} text @param {string} [mime] */
+function download(document, window, name, text, mime = "application/json") {
+    const url = window.URL.createObjectURL(new window.Blob([text], {type: mime}));
     const link = document.createElement("a");
     link.href = url;
     link.download = name;

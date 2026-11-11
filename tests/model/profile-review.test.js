@@ -247,7 +247,43 @@ test("a layer colour that paints nothing reads passthrough, and one with only br
     assert.equal(field("rgb:layer:3").after,"black","saturation without brightness paints black");
     assert.equal(field("rgb:pd:0").after,"off","outside a layer, black is no passthrough");
 });
-test("an accent for every layer, mode or feedback state, and the combo accents, read by who they light for", () => {
+test("replacement feedback reads by its cases as its tab lists them, a case off as off and a black one as black", () => {
+    const {VOCABULARY: V} = require("../../core/model/vocabulary");
+    const base=pdDocument(), before=snapshot(base);
+    const after=snapshot(lighting(base,rgb=>({...rgb,
+        autocorrectFeedback:{textColor:{h:106,s:255,v:200},macroColor:{h:234,s:255,v:0},undoColor:{h:0,s:255,v:200},locality:3}})));
+    const item=profileReview(before,after).find(entry=>entry.unit==="rgb:autocorrect");
+    assert.equal(item.title,"Replacement feedback");
+    assert.equal(item.area,"Lighting");
+    assert.deepEqual(item.place,{kind:"lighting",stage:"autocorrect"},"Show opens its tab");
+    assert.deepEqual(item.fields.map(field=>[field.label,field.before,field.after]),[
+        ["Replaced with text","off","HSV(106, 255, 200)"],
+        ["Replaced by a macro","off","black"],
+        ["Replacement undone","off","HSV(0, 255, 200)"],
+        [V.lightingFields.locality,"Both halves","The half holding the trigger key"]],"each case, then where the flash paints");
+    assert.deepEqual(item.fields[0].afterColour,{h:106,s:255,v:200},"a colour travels as a colour");
+    // Any hue with no saturation or brightness paints nothing: the case is off.
+    const dark=snapshot(lighting(after.document,rgb=>({...rgb,autocorrectFeedback:{...rgb.autocorrectFeedback,textColor:{h:40,s:0,v:0}}})));
+    const [off]=profileReview(after,dark);
+    assert.deepEqual(off.fields.map(field=>[field.label,field.before,field.after]),[["Replaced with text","HSV(106, 255, 200)","off"]]);
+    // Its stage switch is named as its tab is.
+    const [stage]=profileReview(before,snapshot(lighting(base,rgb=>({...rgb,stageEnableMask:rgb.stageEnableMask | 32}))));
+    assert.deepEqual(stage.fields,[{label:"Replacement feedback",status:"changed",before:"off",after:"on",beforeMark:{kind:"stage",on:false},afterMark:{kind:"stage",on:true}}]);
+});
+test("a replacement feedback accent reads by the case it lights for, or every replacement flash", () => {
+    const base=pdDocument(), before=snapshot(base);
+    const after=snapshot(lighting(base,rgb=>({...rgb,
+        groups:[...rgb.groups,{id:rgb.groups.length,leds:[7,8]}],
+        autocorrectGroupRows:[{semantic:255,color:{h:0,s:0,v:0},groupId:rgb.groups.length},{semantic:0,color:{h:10,s:255,v:200},groupId:rgb.groups.length},
+            {semantic:1,color:{h:0,s:0,v:0},groupId:rgb.groups.length},{semantic:2,color:{h:0,s:0,v:0},groupId:rgb.groups.length}]})));
+    const accents=profileReview(before,after).find(entry=>entry.unit==="rgb:groups");
+    assert.deepEqual(accents.fields.map(field=>[field.label,field.after]),[
+        ["Accent · Every replacement flash","LEDs 7, 8 · Same as the flash colour"],["Accent · Replaced with text","LEDs 7, 8 · HSV(10, 255, 200)"],
+        ["Accent · Replaced by a macro","LEDs 7, 8 · Same as the flash colour"],["Accent · Replacement undone","LEDs 7, 8 · Same as the flash colour"]]);
+    assert.ok(accents.fields.every(field=>field.status==="added"));
+    assert.deepEqual(accents.place,{kind:"lighting",stage:"accents"});
+});
+test("an accent for every layer, mode or behaviour state, and the combo accents, read by who they light for", () => {
     const base=pdDocument(), before=snapshot(base);
     const after=snapshot(lighting(base,rgb=>({...rgb,
         groups:[...rgb.groups,{id:rgb.groups.length,leds:[7,8]}],
@@ -276,7 +312,7 @@ test("every Lighting field reads in the review as its Lighting tab labels it", (
     for (const entry of items) for (const field of entry.fields) assert.ok(words.has(field.label),`${entry.title}: "${field.label}" is not a Lighting word`);
     const key=items.find(entry=>entry.unit==="rgb:key");
     assert.deepEqual(key.fields.map(field=>field.label),["Tap committed","Hold active","Long hold active",...V.branches.slice(1,1+key.fields.length-5),
-        V.lightingFields.tapBranchCommit,V.lightingFields.locality],"listed as the Key feedback tab lists them");
+        V.lightingFields.tapBranchCommit,V.lightingFields.locality],"listed as the Behaviour feedback tab lists them");
     for (const unit of ["rgb:layer","rgb:pd","rgb:automouse","rgb:combo"]) assert.ok(items.some(entry=>entry.unit.startsWith(unit)),`${unit} changed`);
 });
 test("every behaviour, combo and pointing mode field reads in the review as its editor labels it", () => {
@@ -472,4 +508,26 @@ test("a shortcut kind that makes its key dual-role lists the threshold its behav
     // A kind change that keeps the key's threshold lists nothing more.
     const lock = snapshot(settings(withRow, shortcut(1)));
     assert.ok(!profileReview(before, lock)[0].fields.some(field => field.label.endsWith(" · Tap / hold threshold")));
+});
+test("each feedback flash's length is reviewed with its own stage, and discarded alone", () => {
+    const {settingsEditorView} = require("../../core/model/settings-editor");
+    const {draftEdit} = require("../fixtures/draft-edit");
+    const {revertUnits} = require("../../core/model/profile-revert");
+    const before = snapshot(document());
+    /** @param {object} from @param {string} sectionId @param {string} macro @param {string} value */
+    const edited = (from, sectionId, macro, value) => {
+        const section = settingsEditorView(from).sections.find(row => row.id === sectionId);
+        return snapshot(draftEdit(from, {type: "updateConfigDefaults", sectionId, fields: section.fields.map(field => ({macro: field.macro, value: field.macro === macro ? value : field.value}))}));
+    };
+    const flash = edited(before, "replacementFeedback", "replacementFlash", "350");
+    const both = edited(flash, "lightingFeedback", "feedbackFlash", "120");
+    const items = profileReview(before, both);
+    const length = items.find(row => row.unit === "settings:replacementFeedback");
+    assert.deepEqual({title: length.title, area: length.area, place: length.place, fields: length.fields.map(field => [field.label, field.before, field.after])},
+        {title: "Replacement feedback flash", area: "Lighting", place: {kind: "settings", area: "Lighting", section: "replacementFeedback", stage: "autocorrect"}, fields: [["Flash length", "200 ms", "350 ms"]]});
+    const interval = items.find(row => row.unit === "settings:lightingFeedback");
+    assert.deepEqual(interval.fields.map(field => [field.label, field.before, field.after]), [["Flash interval", "200 ms", "120 ms"]]);
+    // Discarding one puts back that length alone.
+    const kept = validateSnapshot(revertUnits(before, both, new Set(["settings:replacementFeedback"]))).settings.values;
+    assert.deepEqual([kept[15], kept[31]], [120, 200]);
 });
