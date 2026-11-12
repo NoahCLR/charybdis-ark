@@ -28,6 +28,11 @@ export const vocabulary = (model) => model?.vocabulary || NONE;
 /** @param {import("../../contracts/model.js").WordList<unknown> | null | undefined} list @param {unknown} key @returns {string} */
 export const word = (list, key) => ((list || []).find(([id]) => id === key)?.[1] ?? String(key ?? ""));
 
+// A locality as a sentence or a list says it, its first letter lowercase so
+// "All LEDs" reads "all LEDs" and "Left half" "left half".
+/** @param {VocabularyModel | null | undefined} model @param {string | undefined} locality */
+export const localityInText = (model, locality) => { const words = word(vocabulary(model).localities, locality); return words.charAt(0).toLowerCase() + words.slice(1); };
+
 // A branch by how many taps start it: "Double tap".
 /** @param {VocabularyModel | null | undefined} model @param {number} count */
 export const branchName = (model, count) => vocabulary(model).branches[count - 1] || `${count} taps`;

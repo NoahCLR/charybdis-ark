@@ -187,41 +187,77 @@ export const pdModeColour = (pointingMode, locality, colour) => ({type: "updateP
 export const comboFeedback = (locality, colour) => ({type: "updateComboFeedback", locality, ...hsvPayload(colour)});
 
 // Behaviour feedback is stored as one record, so any change posts the whole thing
-// with the one field replaced: `rowId` is a colour field or `branch:<n>`.
-/** @param {Partial<import("../../contracts/edits.js").KeyFeedback<Colour>>} [feedback] @param {import("../../contracts/edits.js").FeedbackRow | null} [rowId] @param {Colour} [next] @param {{tapCommitMode?: string, locality?: string}} [overrides] @returns {import("../../contracts/edits.js").EditOf<'updateKeyBehaviorFeedback'>} */
+// with the one field replaced: `rowId` is the case, a tier's colour field or
+// `branch:<n>`, whose colour `next` replaces; `overrides` the tap-commit
+// policy, the stage's own.
+/** @param {Partial<import("../../contracts/edits.js").KeyFeedback<Colour>>} [feedback] @param {import("../../contracts/edits.js").FeedbackRow | null} [rowId] @param {Colour | null} [next] @param {{tapCommitMode?: string}} [overrides] @returns {import("../../contracts/edits.js").EditOf<'updateKeyBehaviorFeedback'>} */
 export function keyFeedback(feedback = {}, rowId, next, overrides = {}) {
-    const config = {
-        tapBranchColors: (feedback.tapBranchColors || []).map(hsvPayload),
-        tapCommittedColor: hsvPayload(feedback.tapCommittedColor),
-        holdActiveColor: hsvPayload(feedback.holdActiveColor),
-        longHoldActiveColor: hsvPayload(feedback.longHoldActiveColor),
-        tapCommitMode: feedback.tapCommitMode,
-        locality: feedback.locality,
-        ...overrides,
-    };
+    const config = keyFeedbackConfig(feedback, overrides);
     if (rowId && next) {
-        const branch = /^branch:(\d+)$/.exec(rowId);
-        if (branch) config.tapBranchColors[Number(branch[1])] = hsvPayload(next);
+        const branch = tapBranchOf(rowId);
+        if (branch !== null) config.tapBranches[branch] = {...config.tapBranches[branch], color: hsvPayload(next)};
         else config[/** @type {import("../../contracts/edits.js").FeedbackColourField} */ (rowId)] = hsvPayload(next);
     }
     return {type: "updateKeyBehaviorFeedback", config};
 }
+// Where one case of behaviour feedback paints, the rest of the record as it
+// stands (D-L93).
+/** @param {Partial<import("../../contracts/edits.js").KeyFeedback<Colour>>} feedback @param {import("../../contracts/edits.js").FeedbackRow} rowId @param {string} locality @returns {import("../../contracts/edits.js").EditOf<'updateKeyBehaviorFeedback'>} */
+export function keyFeedbackLocality(feedback, rowId, locality) {
+    const config = keyFeedbackConfig(feedback);
+    const branch = tapBranchOf(rowId);
+    if (branch !== null) config.tapBranches[branch] = {...config.tapBranches[branch], locality};
+    else config[localityOf(/** @type {import("../../contracts/edits.js").FeedbackColourField} */ (rowId))] = locality;
+    return {type: "updateKeyBehaviorFeedback", config};
+}
+/** @param {Partial<import("../../contracts/edits.js").KeyFeedback<Colour>>} feedback @param {{tapCommitMode?: string}} [overrides] @returns {import("../../contracts/edits.js").KeyFeedback} */
+const keyFeedbackConfig = (feedback, overrides = {}) => ({
+    tapBranches: (feedback.tapBranches || []).map((branch) => ({color: hsvPayload(branch.color), locality: branch.locality})),
+    tapCommittedColor: hsvPayload(feedback.tapCommittedColor),
+    tapCommittedLocality: feedback.tapCommittedLocality,
+    holdActiveColor: hsvPayload(feedback.holdActiveColor),
+    holdActiveLocality: feedback.holdActiveLocality,
+    longHoldActiveColor: hsvPayload(feedback.longHoldActiveColor),
+    longHoldActiveLocality: feedback.longHoldActiveLocality,
+    tapCommitMode: feedback.tapCommitMode,
+    ...overrides,
+});
+// The tap branch a Behaviour feedback row is, by index from the double
+// tap's; null for a tier.
+/** @param {string} rowId */
+export const tapBranchOf = (rowId) => { const match = /^branch:(\d+)$/.exec(rowId); return match ? Number(match[1]) : null; };
+// The locality field beside a case's colour field ("holdActiveColor" →
+// "holdActiveLocality"), in either stage's record.
+/** @template {string} F @param {F} field @returns {F extends `${infer Case}Color` ? `${Case}Locality` : never} */
+export const localityOf = (field) => /** @type {any} */ (field.replace(/Color$/, "Locality"));
 
 // Replacement feedback is stored as one record too (D-L89): `field` is the
-// colour of the case changed, and HSV(0, 0, 0) switches that case off.
-/** @param {Partial<import("../../contracts/edits.js").AutocorrectFeedback<Colour>>} [feedback] @param {import("../../contracts/edits.js").AutocorrectFeedbackColourField | null} [field] @param {Colour} [next] @param {{locality?: string}} [overrides] @returns {import("../../contracts/edits.js").EditOf<'updateAutocorrectFeedback'>} */
-export function autocorrectFeedback(feedback = {}, field, next, overrides = {}) {
-    const config = {
-        textColor: hsvPayload(feedback.textColor),
-        macroColor: hsvPayload(feedback.macroColor),
-        undoColor: hsvPayload(feedback.undoColor),
-        leadingColor: hsvPayload(feedback.leadingColor),
-        locality: feedback.locality,
-        ...overrides,
-    };
+// colour of the case changed, and HSV(0, 0, 0) makes it passthrough (D-L94).
+/** @param {Partial<import("../../contracts/edits.js").AutocorrectFeedback<Colour>>} [feedback] @param {import("../../contracts/edits.js").AutocorrectFeedbackColourField | null} [field] @param {Colour} [next] @returns {import("../../contracts/edits.js").EditOf<'updateAutocorrectFeedback'>} */
+export function autocorrectFeedback(feedback = {}, field, next) {
+    const config = autocorrectFeedbackConfig(feedback);
     if (field && next) config[field] = hsvPayload(next);
     return {type: "updateAutocorrectFeedback", config};
 }
+// Where one case of replacement feedback paints, by its colour's field
+// (D-L93).
+/** @param {Partial<import("../../contracts/edits.js").AutocorrectFeedback<Colour>>} feedback @param {import("../../contracts/edits.js").AutocorrectFeedbackColourField} field @param {string} locality @returns {import("../../contracts/edits.js").EditOf<'updateAutocorrectFeedback'>} */
+export function autocorrectFeedbackLocality(feedback, field, locality) {
+    const config = autocorrectFeedbackConfig(feedback);
+    config[localityOf(field)] = locality;
+    return {type: "updateAutocorrectFeedback", config};
+}
+/** @param {Partial<import("../../contracts/edits.js").AutocorrectFeedback<Colour>>} feedback @returns {import("../../contracts/edits.js").AutocorrectFeedback} */
+const autocorrectFeedbackConfig = (feedback) => ({
+    textColor: hsvPayload(feedback.textColor),
+    textLocality: feedback.textLocality,
+    macroColor: hsvPayload(feedback.macroColor),
+    macroLocality: feedback.macroLocality,
+    undoColor: hsvPayload(feedback.undoColor),
+    undoLocality: feedback.undoLocality,
+    leadingColor: hsvPayload(feedback.leadingColor),
+    leadingLocality: feedback.leadingLocality,
+});
 
 // An accent (D-L77): the LEDs it lights, its colour (HSV(0, 0, 0) takes its
 // stage's) and who it lights for in its table, the owner that is all of them

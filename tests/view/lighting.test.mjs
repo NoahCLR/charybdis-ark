@@ -1,8 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {createRequire} from "node:module";
-import {isOff} from "../../webview/lib/colour.mjs";
-import {baseColour, feedbackColours, inheritsStageColour, keyLed, layerPaints, keyLight, mappedKeyCount, offWording, ownLight, pdColourRow, replacementPaints, replacementTrigger, stageEnabled, stageHeldOffBy, stageIdle, stageInEffect, stageOffDetail, trackballLed, trackballLight} from "../../webview/view/lighting.mjs";
+import {baseColour, colourPaints, feedbackColours, inheritsStageColour, isPassthrough, keyLed, keyLight, mappedKeyCount, offWording, ownLight, pdColourRow, replacementTrigger, stageEnabled, stageHeldOffBy, stageIdle, stageInEffect, stageOffDetail, trackballLed, trackballLight} from "../../webview/view/lighting.mjs";
 
 const colour = (h, s, v) => ({h: String(h), s: String(s), v: String(v)});
 const position = (layoutIndex, keycode) => ({layoutIndex, keycode});
@@ -44,7 +43,7 @@ function model(overrides = {}) {
             comboFeedback: {color: colour(0, 0, 0), locality: "RGB_KEYS_ONLY"},
             keyBehaviorFeedback: {
                 tapCommittedColor: colour(0, 0, 158), holdActiveColor: colour(18, 255, 200),
-                longHoldActiveColor: colour(148, 255, 200), tapBranchColors: [colour(169, 255, 200)],
+                longHoldActiveColor: colour(148, 255, 200), tapBranches: [{color: colour(169, 255, 200), locality: "RGB_KEY_HALF"}],
             },
             ...overrides.rgb,
         },
@@ -214,7 +213,7 @@ test("a layer stored as black paints nothing, and a disabled stage paints nothin
 test("with no base effect and nothing else painting, a key is simply unlit", () => {
     const dark = model({rgb: {...model().rgb, baseEffect: {state: "read", enabled: false}}});
     const light = keyLight(dark, {index: 0}, position(13, "KC_A"));
-    assert.equal(isOff(light.colour), true);
+    assert.equal(isPassthrough(light.colour), true);
     assert.equal(light.source, "off");
 });
 
@@ -244,7 +243,7 @@ test("feedback colours come back per semantic, missing ones as black", () => {
     const colours = feedbackColours(model());
     assert.deepEqual(colours.hold, colour(18, 255, 200));
     assert.deepEqual(colours.branches[0], colour(169, 255, 200));
-    assert.equal(isOff(feedbackColours({}).tap), true);
+    assert.equal(isPassthrough(feedbackColours({}).tap), true);
 });
 
 test("the trackball LED is lit like any other: base effect, and an all-keys wash", () => {
@@ -258,7 +257,7 @@ test("the trackball LED is lit like any other: base effect, and an all-keys wash
     assert.equal(wash.source, "layer");
 
     const dark = model({rgb: {...model().rgb, baseEffect: {state: "read", enabled: false}}});
-    assert.equal(isOff(trackballLight(dark, {index: 3}).colour), true);
+    assert.equal(isPassthrough(trackballLight(dark, {index: 3}).colour), true);
 
     const row = pdColourRow(m, 0);
     const held = trackballLight(m, {index: 3}, {pdActive: {color: row.color, locality: row.locality}});
@@ -273,7 +272,7 @@ const withRgb = (rgb) => { const m = model(); Object.assign(m.rgb, rgb); return 
 test("with the matrix off the keyboard is dark, whatever the layers hold", () => {
     const m = withRgb({baseEffect: {state: "read", enabled: false, effectId: 0}});
     assert.equal(keyLight(m, {index: 4}, position(13, "KC_UP")).source, "off", "an all-keys layer does not paint");
-    assert.equal(isOff(trackballLight(m, {index: 4}).colour), true);
+    assert.equal(isPassthrough(trackballLight(m, {index: 4}).colour), true);
 });
 
 test("the default layer's colour shows under a mapped-keys-only layer", () => {
@@ -313,8 +312,8 @@ test("accents paint their LEDs, taking their stage colour when stored as HSV(0, 
 
 test("zero brightness keeps explicit black distinct from layer pass-through and group inheritance", () => {
     const black = colour(140, 255, 0), skipped = colour(140, 0, 0);
-    assert.equal(layerPaints(black), true);
-    assert.equal(layerPaints(skipped), false);
+    assert.equal(colourPaints(black), true);
+    assert.equal(colourPaints(skipped), false);
     assert.equal(inheritsStageColour(black), false);
     assert.equal(inheritsStageColour(skipped), false, "group inheritance requires all three channels zero");
     assert.equal(inheritsStageColour(colour(0, 0, 0)), true);
@@ -339,13 +338,13 @@ test("a base-effect LED class the effect skips stays unlit; an animated effect i
     const animated = model({rgb: {...model().rgb, layerColors: [], baseEffect: {state: "read", enabled: true, effectId: 13, hue: 10, saturation: 200, brightness: 255, previewColor: undefined}}});
     const light = keyLight(animated, base, position(0, "KC_A"));
     assert.equal(light.source, "animated");
-    assert.ok(!isOff(light.colour), "lit, never drawn as off");
+    assert.ok(!isPassthrough(light.colour), "lit, never drawn as off");
     const skipped = {...model({rgb: {...model().rgb, layerColors: []}}), configDefaults: [baseSettings(4)]};
     assert.equal(keyLight(skipped, {index: 0, positions: []}, position(50, "KC_SPC")).source, "off");
     assert.equal(keyLight(skipped, {index: 0, positions: []}, position(0, "KC_A")).source, "base");
 });
 
-test("a trackball mode previews from its first placed key, and black paints dark", async () => {
+test("a trackball mode previews from its first placed key, black paints dark and passthrough paints nothing", async () => {
     const {pdTrigger} = await import("../../webview/view/lighting.mjs");
     const pd = {pdModes: [{id: 0, kind: 2, keys: {slot: 0, hold: "PD_MODE_0", lock: "PD_LOCK_0"}}]};
     const base = {index: 0, positions: [position(0, "KC_A"), {layoutIndex: 40, keycode: "QK_USER_16", semantic: "PD_MODE_0"}]};
@@ -354,37 +353,34 @@ test("a trackball mode previews from its first placed key, and black paints dark
     assert.deepEqual(pdTrigger(m, base, 0), {layoutIndex: 40, layer: 0});
     assert.deepEqual(pdTrigger(m, other, 0), {layoutIndex: 5, layer: 3}, "the viewed layer's key first");
     assert.equal(pdTrigger(m, base, 1), null);
-    const black = {mode: "POINTING_MODE_DRAGSCROLL", color: colour(0, 0, 0), locality: "RGB_RIGHT_HALF"};
+    const black = {mode: "POINTING_MODE_DRAGSCROLL", color: colour(0, 255, 0), locality: "RGB_RIGHT_HALF"};
     const light = keyLight(model(), {index: 0, positions: []}, position(11, "KC_A"), {pdActive: black});
     assert.equal(light.source, "pointing");
-    assert.ok(isOff(light.colour), "the right half goes dark");
+    assert.equal(Number(light.colour.v), 0, "the right half goes dark");
+    const through = keyLight(model(), {index: 0, positions: []}, position(11, "KC_A"), {pdActive: {...black, color: colour(90, 0, 0)}});
+    assert.notEqual(through.source, "pointing", "a passthrough mode paints nothing, at any hue (firmware D-F74)");
 });
 
 const words = {vocabulary: createRequire(import.meta.url)("../../core/model/vocabulary").VOCABULARY};
 
-test("Turn off says what black does: literal black for modes and feedback, nothing for a layer", () => {
-    for (const stage of ["pd", "combo", "key"]) {
-        const {offTip, offNote} = offWording(words, stage);
-        for (const words of [offTip, offNote]) {
-            assert.match(words, /black/);
-            assert.match(words, /Stage on/);
-            assert.doesNotMatch(words, /paints nothing|underneath|not repainted|flashes nothing/);
+// One rule (D-L94, firmware D-F74): every colour a layer, a pointing slot,
+// combo feedback or a feedback case owns is passthrough at saturation and
+// value 0, and Off, value 0 with saturation, is a choice of its own.
+test("every owned colour offers Make passthrough and Off, passthrough never called off; the fade end stays off", () => {
+    for (const stage of ["layers", "pd", "combo", "key", "autocorrect"]) {
+        const wording = offWording(words, stage);
+        assert.deepEqual([wording.offAction, wording.offWord], ["Make passthrough", "Passthrough"], stage);
+        assert.match(wording.offTip, /paints nothing/, stage);
+        assert.match(wording.offNote, /[Pp]assthrough.*shows/, stage);
+        assert.match(wording.ledsOffTip || "", /LEDs off|go dark/, stage);
+        assert.match(wording.ledsOffNote || "", /The colour is off/, stage);
+        for (const text of [wording.offTip, wording.offNote]) {
+            assert.doesNotMatch(text || "", /\boff\b|Turn off|Stage on/, `${stage}: neither off nor the stage switch stands for passthrough`);
         }
     }
-    assert.match(offWording(words, "auto").offTip, /black/);
-    assert.match(offWording(words, "layers").offTip, /paints nothing/);
-    assert.match(offWording(words, "layers").offNote, /passthrough.*shows through/);
-    assert.deepEqual([offWording(words, "layers").offAction, offWording(words, "layers").offWord], ["Make passthrough", "Passthrough"]);
-    for (const stage of ["auto", "pd", "combo", "key"]) assert.equal(offWording(words, stage).offWord, undefined, `${stage}: off is black, so it keeps Turn off and Off`);
+    assert.match(offWording(words, "auto").offTip, /LEDs off/);
+    assert.equal(offWording(words, "auto").offWord, undefined, "the fade end is literal: 0, 0, 0 turns the LEDs off there");
     assert.deepEqual(offWording(words, "base"), {});
-});
-
-test("Turn off switches a replacement case off: it does not flash, and off keeps its own words", () => {
-    const {offTip, offNote, offAction, offWord} = offWording(words, "autocorrect");
-    assert.match(offTip, /does not light for this case/);
-    assert.match(offNote, /This case is off.*other cases still light/);
-    for (const text of [offTip, offNote]) assert.doesNotMatch(text, /black|Stage on/, "off here is no black flash, and needs no stage switch");
-    assert.deepEqual([offAction, offWord], [undefined, undefined], "the colour editor's Turn off and Off");
 });
 
 test("a replacement flash paints its case's colour over everything, where its locality reaches against the key that caused it", () => {
@@ -436,7 +432,7 @@ test("a replacement flash's accents light for every case and then for its own; a
     assert.deepEqual(keyLight(base, layer, position(0, "KC_ESC"), flash(text)).colour, text, "a black accent takes the case's colour, outside its locality too");
     assert.deepEqual(keyLight(base, layer, position(14, "KC_B"), flash(colour(0, 255, 200), "AUTOCORRECT_FEEDBACK_GROUP_UNDO")).colour, colour(0, 255, 200));
     const dark = flash(colour(77, 0, 0));
-    assert.equal(replacementPaints(dark.replacementActive.color), false);
+    assert.equal(colourPaints(dark.replacementActive.color), false);
     assert.notEqual(keyLight(base, layer, position(7, "KC_U"), dark).source, "replacement", "a case that is off does not flash");
     assert.notEqual(keyLight(base, layer, position(0, "KC_ESC"), dark).source, "replacement", "nor does its black accent");
     assert.deepEqual(keyLight(base, layer, position(13, "KC_A"), dark).colour, narrower, "an accent in a colour of its own still lights");

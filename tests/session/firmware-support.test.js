@@ -19,12 +19,12 @@ const read = {...complete, featureFlags: 0, supportedDomainMask: DOMAINS.RGB | D
 const otherBases = [
     {protocol: {major: 1, minor: 0}, schema: {major: 3, minor: 0}},
     {protocol: {major: 2, minor: 1}}, {protocol: {major: 2, minor: 3}}, {protocol: {major: 3, minor: 1}}, {protocol: {major: 1, minor: 1}},
-    {schema: {major: 4, minor: 6}}, {schema: {major: 4, minor: 8}}, {schema: {major: 5, minor: 0}}, {schema: {major: 3, minor: 0}},
+    {schema: {major: 4, minor: 7}}, {schema: {major: 4, minor: 9}}, {schema: {major: 5, minor: 0}}, {schema: {major: 3, minor: 0}},
 ];
 
 test("reads accept reported capacities and require the exact current base", () => {
     assert.deepEqual(support.SUPPORTED_PROFILE_PROTOCOL, {major: 2, minor: 2});
-    assert.deepEqual(support.SUPPORTED_PROFILE_SCHEMA, {major: 4, minor: 7});
+    assert.deepEqual(support.SUPPORTED_PROFILE_SCHEMA, {major: 4, minor: 8});
     const partial = {...read, compiledLayerCount: 8, actionAbiDigest: 0, candidateChunkMax: 0};
     assert.equal(support.canRead(partial), true, "no feature bit is needed to read");
     assert.equal(support.canEdit(partial), false);
@@ -118,14 +118,14 @@ test("read diagnostic reasons and their order stay stable", () => {
     const result = support.evaluateProfileCompatibility({});
     assert.deepEqual(result.reasons, [
         "Profile Wire version is undefined.undefined; Charybdis Ark requires 2.2. Update both halves.",
-        "Profile schema is undefined.undefined; Charybdis Ark requires 4.7. Update both halves.",
+        "Profile schema is undefined.undefined; Charybdis Ark requires 4.8. Update both halves.",
         "Raw HID report size is undefined; Charybdis Ark requires 32.",
         "Status pages is undefined; at least 2 is required.",
         "Required profile domains mask 0x0 does not include required mask 0x3.",
     ]);
     assert.deepEqual(support.evaluateProfileCompatibility({...complete, ...otherBases[0]}).reasons, [
         "Profile Wire version is 1.0; Charybdis Ark requires 2.2. Update both halves.",
-        "Profile schema is 3.0; Charybdis Ark requires 4.7. Update both halves.",
+        "Profile schema is 3.0; Charybdis Ark requires 4.8. Update both halves.",
     ]);
 });
 

@@ -18,7 +18,7 @@
 // set on every one of them, and none folds.
 import {keptPer} from "../lib/once.mjs";
 import {layersAnyKeyTurnsOn} from "./key-identity.mjs";
-import {layerColourRow, layerPaints, mappedKeyCount} from "./lighting.mjs";
+import {layerColourRow, colourPaints, mappedKeyCount} from "./lighting.mjs";
 import {isLayerSwitch} from "./settings-layout.mjs";
 
 /** @typedef {import("../../contracts/panel.js").PublishedModel} Model */
@@ -44,7 +44,7 @@ export function emptyLayers(model) {
             const bit = 2 ** layer.index;
             return layer.index !== 0 && !layer.alwaysOn && !layer.named && !mappedKeyCount(model, layer)
                 && !(turnedOn & bit) && !(starts & bit) && layer.index !== model.pdModeEditing?.pointerLayer
-                && !matched.has(layer.index) && !layerPaints(layerColourRow(model, layer.index)?.color) && !overridden.has(layer.index)
+                && !matched.has(layer.index) && !colourPaints(layerColourRow(model, layer.index)?.color) && !overridden.has(layer.index)
                 && !placements[layer.index]?.bypass?.length && !placements[layer.index]?.exclude?.length;
         }).map((layer) => layer.index));
         // Each per-layer setting, judged among the empty layers.

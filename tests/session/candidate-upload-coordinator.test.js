@@ -28,10 +28,10 @@ const {testClock} = require("../fixtures/panel-loop");
 
 function representativeBlob(payloadSize = 41) {
     return encodeProfileBlob({
-        schema: {major: 4, minor: 7},
+        schema: {major: 4, minor: 8},
         domains: [{
             id: PROFILE_DOMAIN_IDS.RGB,
-            version: 6,
+            version: 7,
             payload: Buffer.from(Array.from({length: payloadSize}, (_, index) => index)),
         }],
     });

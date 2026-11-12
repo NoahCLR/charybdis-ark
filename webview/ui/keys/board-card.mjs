@@ -7,9 +7,9 @@
 // a layer preview, the info mark on its top-right corner whose list says the
 // board's shortcuts, and the legend that reads under the card.
 
-import {css, isOff} from "../../lib/colour.mjs";
+import {css} from "../../lib/colour.mjs";
 import {el, esc} from "../../lib/dom.mjs";
-import {feedbackColours, stageEnabled} from "../../view/lighting.mjs";
+import {feedbackColours, isPassthrough, stageEnabled} from "../../view/lighting.mjs";
 import {getModel, render, state} from "../../store.mjs";
 import {editGate} from "../../view/edit-gate.mjs";
 import {layersOnTop} from "../../view/vocabulary.mjs";
@@ -48,7 +48,7 @@ export function legend(model) {
     const colours = feedbackColours(model);
     const on = stageEnabled(model, "key");
     /** @param {import("../../../contracts/edits.js").Colour} colour */
-    const dot = (colour) => on && !isOff(colour) ? `<i class="ldot" style="background:${css(colour)}"></i>` : `<i class="ldot off"></i>`;
+    const dot = (colour) => on && !isPassthrough(colour) ? `<i class="ldot" style="background:${css(colour)}"></i>` : `<i class="ldot off"></i>`;
     return el(`<div class="board-legend">
         <span class="legend-item"><i class="lkey sel"></i> Selected key</span>
         <span class="legend-item"><i class="lkey indicated"></i> Keys of the picked row or new combo</span>

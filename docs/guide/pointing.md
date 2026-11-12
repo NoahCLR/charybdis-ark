@@ -191,7 +191,7 @@ While a mode runs, however it started, its colour paints beneath the lowest
 layer in either list that is on: those layers' own colours show over it, so
 a layer coloured to light only its mapped keys shows those keys on the mode's
 colour, and any higher layer covers both. To show only the layer, colour it
-on all keys. With none of them on, or with no link, a mode paints over the
+on all LEDs. With none of them on, or with no link, a mode paints over the
 layers as before.
 
 When the mode's key turns on a layer below the pointer layer and the mode

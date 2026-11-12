@@ -155,17 +155,19 @@ export interface Vocabulary {
     tapCommit: WordList<string>;
     /** Lighting's fields, as its tabs label them and the review names them. */
     lightingFields: Readonly<Record<LightingField, string>>;
-    /** What storing HSV(0, 0, 0) does, by lighting stage: Turn off's tip and the note once stored, and, where off has a name of its own (a layer's passthrough), the button's words and what the colour then reads. */
-    colourOff: Readonly<Record<string, {offTip: string; offNote?: string; offAction?: string; offWord?: string}>>;
+    /** What storing HSV(0, 0, 0) does, by lighting stage: the button's tip and the note once stored, and, for a colour an owner has (D-L94), the button's words (Make passthrough), what the colour then reads (Passthrough), and the Black choice's tip and note. */
+    colourOff: Readonly<Record<string, {offTip: string; offNote?: string; offAction?: string; offWord?: string; ledsOffTip?: string; ledsOffNote?: string}>>;
     feedbackOwners: WordList<string>;
     /** The behaviour tier each behaviour state flashes for, by its RGB_KEY_SEMANTICS name; the others have none. */
     feedbackTiers: Readonly<Partial<Record<string, Tier>>>;
     /** Accents by the table an accent edit names (D-L77): when they light, `{owner}` standing for the owner picked; the owner that is all of a table's, by its RGB enum name, where it has one, and what all of its owners are called; what an accent that takes its stage's colour takes. */
-    accents: Readonly<Record<AccentTable, {when: string; everyOwner?: string; every: string; stageColour: string}>>;
+    accents: Readonly<Record<AccentTable, {when: string; everyOwner?: string; every: string; stageColour: string;
+        /** An owner that stands for some of the table's owners (Every tap branch, D-L93): its RGB enum name, what it is called, and the owners it stands for. */
+        group?: {owner: string; words: string; members: readonly string[]}}>>;
     /** The accent editor's own fields. */
     accentFields: {lightsFor: string; ownColour: string};
-    /** The behaviour state (an RGB_KEY_SEMANTICS name) each Behaviour feedback colour flashes for, by the colour's field. */
-    feedbackColourOwners: Readonly<Record<'tapCommittedColor' | 'holdActiveColor' | 'longHoldActiveColor' | 'tapBranchColors', string>>;
+    /** The case (an RGB_KEY_SEMANTICS name) each Behaviour feedback row shows, by the row: a tier's colour field or `branch:<n>`. */
+    feedbackColourOwners: Readonly<Record<import('./edits.js').FeedbackRow, string>>;
     /** What Replacement feedback shows, by its RGB_AUTOCORRECT_SEMANTICS name: each case, and all of them. */
     replacementOwners: WordList<string>;
     /** When each Replacement feedback case shows, by its RGB_AUTOCORRECT_SEMANTICS name. */

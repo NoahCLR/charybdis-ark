@@ -2158,6 +2158,8 @@ select.input.pd-add { height: var(--h-chip); width: 124px; min-width: 0; padding
 /* An editor beside a list keeps its rows at the top: the workbench may be
    taller than it, for its tallest stage, and the space goes below. */
 .tab-grid.stage-detail { gap: var(--sp-6); align-content: start; }
+/* Two sections in the column beside a colour: a case's locality, then what the stage shares. */
+.tab-grid.stage-detail > .stage-side { display: flex; flex-direction: column; gap: var(--sp-6); min-width: 0; }
 .stage-about { max-width: 96ch; }
 /* Accents (ui/lighting/accents.mjs): a list under each stage's editor, one
    row per accent, and the accent being added or changed in its place. */

@@ -241,6 +241,8 @@ function editPointing(open, message) {
 function editLighting(rgb, message, maximumBrightness) {
     /** @param {ColourInput} value */
     const editColor = (value) => color(value, maximumBrightness);
+    /** @param {string | undefined} value */
+    const locality = (value) => enumValue(value, RGB_LOCALITIES, "locality");
     switch (message.type) {
         case "updateLayerColor": {
             const row = existing(rgb.layerColors, row => row.layerId === namedId(message.layer, "Layer"), "Layer");
@@ -249,20 +251,32 @@ function editLighting(rgb, message, maximumBrightness) {
         case "updatePdModeColor": {
             const id = enumValue(message.pointingMode, RGB_POINTING_MODE_IDS, "pointing mode");
             const row = existing(rgb.pdModeColors, row => row.pdModeId === id, "Pointing mode");
-            row.color = editColor(message); row.locality = enumValue(message.locality, RGB_LOCALITIES, "locality"); break;
+            row.color = editColor(message); row.locality = locality(message.locality); break;
         }
         case "updateAutomouseFade": rgb.automouseFade = {mode: enumValue(message.mode, RGB_AUTOMOUSE_MODES, "fade policy"), endColor: editColor(message)}; break;
-        case "updateComboFeedback": rgb.comboFeedback = {color: editColor(message), locality: enumValue(message.locality, RGB_LOCALITIES, "locality")}; break;
+        case "updateComboFeedback": rgb.comboFeedback = {color: editColor(message), locality: locality(message.locality)}; break;
+        // Each case of behaviour feedback, a colour and where it paints, and
+        // the stage's tap-commit policy, stored as one record (firmware D-F73).
         case "updateKeyBehaviorFeedback": {
             const feedback = message.config;
-            rgb.keyFeedback = {tapBranchColors: feedback.tapBranchColors.map(editColor), tapCommittedColor: editColor(feedback.tapCommittedColor), holdActiveColor: editColor(feedback.holdActiveColor), longHoldActiveColor: editColor(feedback.longHoldActiveColor), tapCommitMode: enumValue(feedback.tapCommitMode, RGB_TAP_COMMIT_MODES, "tap policy"), locality: enumValue(feedback.locality, RGB_LOCALITIES, "locality")}; break;
+            rgb.keyFeedback = {
+                tapBranches: feedback.tapBranches.map((branch) => ({color: editColor(branch.color), locality: locality(branch.locality)})),
+                tapCommittedColor: editColor(feedback.tapCommittedColor), tapCommittedLocality: locality(feedback.tapCommittedLocality),
+                holdActiveColor: editColor(feedback.holdActiveColor), holdActiveLocality: locality(feedback.holdActiveLocality),
+                longHoldActiveColor: editColor(feedback.longHoldActiveColor), longHoldActiveLocality: locality(feedback.longHoldActiveLocality),
+                tapCommitMode: enumValue(feedback.tapCommitMode, RGB_TAP_COMMIT_MODES, "tap policy")}; break;
         }
-        // The four colours of replacement feedback and where they paint,
-        // stored as one record like behaviour feedback's. A colour of
-        // HSV(0, 0, 0) switches its case off (firmware D-F70, D-F72).
+        // The four cases of replacement feedback, each a colour and where it
+        // paints, stored as one record like behaviour feedback's. A colour of
+        // HSV(0, 0, 0) is passthrough: the case paints nothing (firmware D-F70,
+        // D-F72, D-F73, D-F74).
         case "updateAutocorrectFeedback": {
             const feedback = message.config;
-            rgb.autocorrectFeedback = {textColor: editColor(feedback.textColor), macroColor: editColor(feedback.macroColor), undoColor: editColor(feedback.undoColor), leadingColor: editColor(feedback.leadingColor), locality: enumValue(feedback.locality, RGB_LOCALITIES, "locality")}; break;
+            rgb.autocorrectFeedback = {
+                textColor: editColor(feedback.textColor), textLocality: locality(feedback.textLocality),
+                macroColor: editColor(feedback.macroColor), macroLocality: locality(feedback.macroLocality),
+                undoColor: editColor(feedback.undoColor), undoLocality: locality(feedback.undoLocality),
+                leadingColor: editColor(feedback.leadingColor), leadingLocality: locality(feedback.leadingLocality)}; break;
         }
         case "updateRgbStages": rgb.stageEnableMask = integer(message.stageEnableMask, RGB_STAGE_MASK_ALL, "RGB stage mask"); break;
         // An accent is added at its table's end, changed where it stands

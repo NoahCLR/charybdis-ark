@@ -1,10 +1,11 @@
 // @ts-check
 import {DISCLOSURE, el, esc} from "../../lib/dom.mjs";
+
 import {foldOpen, keepFold} from "../disclosure.mjs";
 import {currentLayer, getModel, post, render, state} from "../../store.mjs";
-import {vocabulary, word} from "../../view/vocabulary.mjs";
+import {localityInText, vocabulary, word} from "../../view/vocabulary.mjs";
 import {editGate} from "../../view/edit-gate.mjs";
-import {stageEnabled} from "../../view/lighting.mjs";
+import {isOff, isPassthrough, stageEnabled} from "../../view/lighting.mjs";
 import * as edits from "../../view/edits.mjs";
 import {colourEditor} from "../colour-editor.mjs";
 import {sectionsIn} from "../../view/settings-layout.mjs";
@@ -100,6 +101,29 @@ export function stack(...nodes) {
 
 /** @param {string | undefined} value */
 export const localityLabel = value => word(vocabulary(getModel()).localities, value);
+
+// What a list says a colour an owner has paints, beside its name (D-L94):
+// passthrough, which paints nothing; off where its LEDs go dark; else where
+// it paints.
+/** @param {import("../../../contracts/edits.js").Colour | undefined} colour @param {string | undefined} locality */
+export function paintsCell(colour, locality) {
+    const where = localityInText(getModel(), locality);
+    return isPassthrough(colour) ? "passthrough" : isOff(colour) ? `off · ${where}` : where;
+}
+
+// A Locality field: where one owner's colour paints (a pointing slot's, a
+// feedback case's, D-L93), with what its trigger key is under it when that
+// depends on the owner.
+/** @param {import("../../../contracts/panel.js").PublishedModel} model @param {{f: string, value: string | undefined, canEdit: boolean, tip: string, hint?: string, onChange: (locality: string) => void}} options */
+export function localityField(model, {f, value, canEdit, tip, hint = "", onChange}) {
+    const words = vocabulary(model);
+    const node = el(`<label class="field"><span>${esc(words.lightingFields.locality)}</span>
+        <select data-f="${esc(f)}" class="input" ${canEdit ? "" : "disabled"} data-tip="${esc(tip)}">
+        ${words.localities.map(([id, text]) => `<option value="${esc(id)}" ${value === id ? "selected" : ""}>${esc(text)}</option>`).join("")}</select>
+        ${hint ? `<span class="hint">${esc(hint)}</span>` : ""}</label>`);
+    /** @type {HTMLSelectElement} */ (node.querySelector("select")).addEventListener("change", (event) => onChange(/** @type {HTMLSelectElement} */ (event.target).value));
+    return node;
+}
 
 // Keep each colour editor's identity tied to the same stored owner as before.
 /** @param {import("../../../contracts/panel.js").PublishedModel} model @param {Omit<Parameters<typeof colourEditor>[0], "identity">} options */

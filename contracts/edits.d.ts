@@ -41,23 +41,30 @@ export interface Combo {
     enabled?: boolean;
     allowedLayers?: number;
 }
+/** Behaviour feedback (D-L93, firmware D-F73): each case's colour and where it paints, a tap branch pending per tap count from 2 and the three tiers, and the stage's tap-commit policy. */
 export interface KeyFeedback<C = Hsv> {
-    tapBranchColors: C[];
+    tapBranches: {color: C; locality?: string}[];
     tapCommittedColor: C;
+    tapCommittedLocality?: string;
     holdActiveColor: C;
+    holdActiveLocality?: string;
     longHoldActiveColor: C;
+    longHoldActiveLocality?: string;
     tapCommitMode?: string;
-    locality?: string;
 }
 export type FeedbackColourField = 'tapCommittedColor' | 'holdActiveColor' | 'longHoldActiveColor';
+/** A Behaviour feedback case, as its row names it: a tier's colour field, or `branch:<n>` for the tap branch pending at tap count n + 2. */
 export type FeedbackRow = FeedbackColourField | `branch:${number}`;
-/** Replacement feedback (D-L89, D-L92, firmware D-F70, D-F72): the colour the keyboard flashes for an input replaced with text, one replaced by its macro and a replacement undone, the colour it holds while the leader waits, and where they paint. HSV(0, 0, 0) switches its case off. */
+/** Replacement feedback (D-L89, D-L92, D-L93, firmware D-F70, D-F72, D-F73): the colour the keyboard flashes for an input replaced with text, one replaced by its macro and a replacement undone, the colour it holds while the leader waits, and where each paints. HSV(0, 0, 0) is passthrough: the case paints nothing (D-L94). */
 export interface AutocorrectFeedback<C = Hsv> {
     textColor: C;
+    textLocality?: string;
     macroColor: C;
+    macroLocality?: string;
     undoColor: C;
+    undoLocality?: string;
     leadingColor: C;
-    locality?: string;
+    leadingLocality?: string;
 }
 export type AutocorrectFeedbackColourField = 'textColor' | 'macroColor' | 'undoColor' | 'leadingColor';
 export interface PdTap {keycode: Scalar; modifierPolicy: number; mask: number}

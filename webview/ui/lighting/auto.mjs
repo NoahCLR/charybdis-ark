@@ -1,9 +1,9 @@
 // @ts-check
 import {el, esc} from "../../lib/dom.mjs";
-import {css, isOff, label as hsvLabel} from "../../lib/colour.mjs";
+import {css, label as hsvLabel} from "../../lib/colour.mjs";
 import {post, render, state} from "../../store.mjs";
 import {editGate} from "../../view/edit-gate.mjs";
-import {offWording, stageIdle} from "../../view/lighting.mjs";
+import {isPassthrough, offWording, stageIdle} from "../../view/lighting.mjs";
 import {vocabulary} from "../../view/vocabulary.mjs";
 import {draftDot, draftMarks} from "../../view/review.mjs";
 import * as edits from "../../view/edits.mjs";
@@ -78,7 +78,7 @@ export function stageAuto(model) {
     const endColour = section(vocabulary(model).lightingFields.endColour);
     const unused = fade.mode === "FOLLOW_REAL_DESTINATION";
     endColour.append(unused
-        ? el(`<div class="row colour-head unused"><span class="swatch-lg ${isOff(fade.end_color) ? "swatch-off" : ""}" style="${isOff(fade.end_color) ? "" : `background:${css(fade.end_color)}`}"></span>
+        ? el(`<div class="row colour-head unused"><span class="swatch-lg ${isPassthrough(fade.end_color) ? "swatch-off" : ""}" style="${isPassthrough(fade.end_color) ? "" : `background:${css(fade.end_color)}`}"></span>
             <div><div class="colour-title">Unused in this mode</div><div class="note mono">${esc(hsvLabel(fade.end_color))}</div></div></div>`)
         : colourControl(model, {colour: fade.end_color, canEdit, title: "Fade destination", ...offWording(model, "auto"),
             onChange: (next) => { if (fade.mode !== undefined) post(edits.automouseFade(fade.mode, next)); }}));

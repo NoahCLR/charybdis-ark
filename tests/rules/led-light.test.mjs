@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {OFF, inheritsStageColour, layerPaints, ledColour, replacementPaints} from "../../rules/led-light.mjs";
+import {OFF, colourPaints, inheritsStageColour, ledColour} from "../../rules/led-light.mjs";
 
 const colour = (h, s, v) => ({h: String(h), s: String(s), v: String(v)});
 const stages = (more = {}) => ({off: false, base: {colour: colour(10, 20, 30), source: "base"}, layers: [], layerGroups: [], pointing: null, ...more});
@@ -37,7 +37,7 @@ test("a held combo whose output runs the pointing mode paints beneath it, so the
 });
 
 test("a layer colour with no saturation or value paints nothing, and a black group takes its stage's colour", () => {
-    assert.equal(layerPaints(colour(40, 0, 0)), false);
+    assert.equal(colourPaints(colour(40, 0, 0)), false);
     assert.equal(inheritsStageColour(colour(0, 0, 0)), true);
     const layers = [{layer: 1, colour: colour(40, 0, 0), paints: true}];
     assert.equal(ledColour(stages({layers})).source, "base");
@@ -64,10 +64,10 @@ test("a replacement flash paints last, where it reaches, then its accents: those
 });
 
 test("a replacement case whose colour has no saturation or value does not flash, nor do its black accents; a coloured accent still lights", () => {
-    assert.equal(replacementPaints(colour(0, 0, 0)), false);
-    assert.equal(replacementPaints(colour(77, 0, 0)), false, "at any hue");
-    assert.equal(replacementPaints(colour(0, 255, 0)), true, "brightness alone at zero flashes black");
-    assert.equal(replacementPaints(colour(0, 0, 1)), true);
+    assert.equal(colourPaints(colour(0, 0, 0)), false);
+    assert.equal(colourPaints(colour(77, 0, 0)), false, "at any hue");
+    assert.equal(colourPaints(colour(0, 255, 0)), true, "brightness alone at zero flashes black");
+    assert.equal(colourPaints(colour(0, 0, 1)), true);
     const layers = [{layer: 0, colour: colour(80, 255, 255), paints: true}];
     const dark = {colour: colour(77, 0, 0), reaches: true, every: [], own: []};
     assert.equal(ledColour(stages({layers, replacement: dark})).source, "layer", "the case paints nothing");
@@ -76,4 +76,40 @@ test("a replacement case whose colour has no saturation or value does not flash,
     assert.deepEqual(ledColour(stages({layers, replacement: {...dark, own: [accent]}})), {colour: accent, source: "replacement", layer: null});
     const black = {colour: colour(0, 255, 0), reaches: true, every: [], own: []};
     assert.deepEqual(ledColour(stages({layers, replacement: black})).colour, black.colour, "black is painted");
+});
+
+test("a behaviour feedback case paints after combo feedback and before a replacement flash, where it reaches, then its accents: every state's before its own", () => {
+    const layers = [{layer: 0, colour: colour(80, 255, 255), paints: true}];
+    const combo = {colour: colour(190, 255, 200), reaches: true, groups: []};
+    const hold = {colour: colour(18, 255, 200), reaches: true, every: [], own: []};
+    assert.deepEqual(ledColour(stages({layers, combo, behaviour: hold})), {colour: hold.colour, source: "behaviour", layer: null}, "over combo feedback");
+    assert.equal(ledColour(stages({layers, behaviour: hold, replacement: {colour: colour(106, 255, 200), reaches: true, every: [], own: []}})).source, "replacement", "a replacement flash covers it");
+    assert.equal(ledColour(stages({layers, behaviour: {...hold, reaches: false}})).source, "layer", "outside its locality what is beneath shows");
+    const accent = colour(20, 255, 200), narrower = colour(30, 255, 200);
+    assert.deepEqual(ledColour(stages({layers, behaviour: {...hold, reaches: false, every: [colour(0, 0, 0)]}})).colour, hold.colour, "a black accent takes the case's colour");
+    assert.deepEqual(ledColour(stages({layers, behaviour: {...hold, every: [accent], own: [narrower]}})).colour, narrower, "an accent naming the case repaints one for every state");
+    assert.deepEqual(ledColour(stages({layers, behaviour: {...hold, colour: colour(0, 255, 0)}})).colour, colour(0, 255, 0), "black, value 0 with saturation, flashes dark");
+});
+
+test("an owned colour of saturation and value 0 is passthrough wherever it is owned: a pointing mode, combo feedback and a behaviour case paint nothing, a coloured accent still paints (D-L94, firmware D-F74)", () => {
+    const layers = [{layer: 0, colour: colour(80, 255, 255), paints: true}];
+    const passthrough = colour(40, 0, 0), black = colour(40, 255, 0), accent = colour(20, 255, 200);
+    assert.deepEqual([colourPaints(passthrough), colourPaints(colour(0, 0, 0)), colourPaints(black), colourPaints(colour(0, 0, 1))], [false, false, true, true]);
+    for (const [stage, value] of /** @type {const} */ ([["pointing", {groups: []}], ["combo", {groups: []}], ["behaviour", {every: [], own: []}]])) {
+        const owned = {...value, colour: passthrough, reaches: true};
+        assert.equal(ledColour(stages({layers, [stage]: owned})).source, "layer", `${stage}: what is beneath shows`);
+        const accents = stage === "behaviour" ? {every: [colour(0, 0, 0)], own: []} : {groups: [colour(0, 0, 0)]};
+        assert.equal(ledColour(stages({layers, [stage]: {...owned, ...accents}})).source, "layer", `${stage}: an accent taking its colour paints nothing`);
+        const coloured = stage === "behaviour" ? {every: [], own: [accent]} : {groups: [accent]};
+        assert.deepEqual(ledColour(stages({layers, [stage]: {...owned, ...coloured}})).colour, accent, `${stage}: a coloured accent still paints`);
+        assert.deepEqual(ledColour(stages({layers, [stage]: {...owned, colour: black}})).colour, black, `${stage}: black paints dark`);
+    }
+});
+
+test("a behaviour case's accents paint widest first: every state's, then every tap branch's, then its own (firmware D-F75)", () => {
+    const layers = [{layer: 0, colour: colour(80, 255, 255), paints: true}];
+    const branch = {colour: colour(169, 255, 200), reaches: false, every: [colour(1, 255, 200)], group: [colour(2, 255, 200)], own: []};
+    assert.deepEqual(ledColour(stages({layers, behaviour: branch})).colour, colour(2, 255, 200), "every tap branch's over every state's");
+    assert.deepEqual(ledColour(stages({layers, behaviour: {...branch, own: [colour(3, 255, 200)]}})).colour, colour(3, 255, 200), "the branch's own over both");
+    assert.deepEqual(ledColour(stages({layers, behaviour: {...branch, group: [colour(0, 0, 0)]}})).colour, branch.colour, "black takes the branch's colour");
 });

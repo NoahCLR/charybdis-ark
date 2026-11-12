@@ -89,7 +89,8 @@ test("replacement feedback goes back apart from its stage switch and its accents
     const draft = new ProfileDraftSession(snapshotOf(pdDocument()), "board", capabilities);
     const stage = message => draft.stage({...message, draftId: draft.id, draftRevision: draft.revision});
     const before = validateSnapshot(draft.base.document).rgb;
-    stage({type: "updateAutocorrectFeedback", config: {textColor: {h: 106, s: 255, v: 200}, macroColor: {h: 0, s: 0, v: 0}, undoColor: {h: 0, s: 255, v: 200}, leadingColor: {h: 170, s: 255, v: 200}, locality: "RGB_KEY_HALF"}});
+    stage({type: "updateAutocorrectFeedback", config: {textColor: {h: 106, s: 255, v: 200}, textLocality: "RGB_KEY_HALF", macroColor: {h: 0, s: 0, v: 0}, macroLocality: "RGB_BOTH_HALVES",
+        undoColor: {h: 0, s: 255, v: 200}, undoLocality: "RGB_KEY_HALF", leadingColor: {h: 170, s: 255, v: 200}, leadingLocality: "RGB_KEY_HALF"}});
     stage({type: "updateRgbStages", stageEnableMask: before.stageEnableMask | 32});
     stage({type: "addRgbLedGroup", group: {target: "autocorrect", owner: "AUTOCORRECT_FEEDBACK_GROUP_ALL", ledIndices: [24, 25], h: 0, s: 0, v: 0}});
     const rows = profileReview(draft.base, draft.current);

@@ -168,21 +168,27 @@ export type PointingSlotInput = Partial<Omit<PointingSlot, 'directions' | 'diago
 
 export interface Hsv {h: number; s: number; v: number}
 export type RgbGroupRow<K extends 'selector' | 'semantic' = 'selector'> = Record<K, number> & {color: Hsv; groupId: number};
+/** Behaviour feedback (firmware D-F73): each case, a tap branch pending per tap count from 2 and the three tiers, with its own colour and locality; the tap-commit policy is the stage's. */
 export interface RgbKeyFeedback {
-    tapBranchColors: Hsv[];
+    tapBranches: {color: Hsv; locality: number}[];
     tapCommittedColor: Hsv;
+    tapCommittedLocality: number;
     holdActiveColor: Hsv;
+    holdActiveLocality: number;
     longHoldActiveColor: Hsv;
+    longHoldActiveLocality: number;
     tapCommitMode: number;
-    locality: number;
 }
-/** Replacement feedback (firmware D-F70, D-F72): a colour for an input replaced with text, one replaced by its macro, a replacement undone and the leader waiting, each painting nothing with saturation and value 0, and where the flash paints. */
+/** Replacement feedback (firmware D-F70, D-F72, D-F73): a colour and a locality for an input replaced with text, one replaced by its macro, a replacement undone and the leader waiting, each colour painting nothing with saturation and value 0. */
 export interface RgbAutocorrectFeedback {
     textColor: Hsv;
+    textLocality: number;
     macroColor: Hsv;
+    macroLocality: number;
     undoColor: Hsv;
+    undoLocality: number;
     leadingColor: Hsv;
-    locality: number;
+    leadingLocality: number;
 }
 export interface RgbProfile {
     formatVersion: number;

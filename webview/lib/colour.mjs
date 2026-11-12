@@ -12,8 +12,6 @@ export const hsv = (colour) => colour
     ? [Number(colour.h) || 0, Number(colour.s) || 0, Number(colour.v) || 0]
     : [0, 0, 0];
 
-/** @param {Colour} colour */
-export const isOff = (colour) => hsv(colour)[2] === 0;
 
 /** @param {Colour} colour */
 export function rgb(colour) {

@@ -3,7 +3,7 @@
 The keyboard replaces what is on the profile's
 [autocorrect list](profile-wire-v1/autocorrect-domain.md) as it is typed, on
 any computer, with nothing installed there (D-F69,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/7a3f6027ff66dba9b5b12698a7983dab89790a0b/docs/adr/0069-autocorrect-is-the-firmwares-own-and-corrects-at-the-word-end.md)):
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/1fc4a5b385a21daa2c4564812ecc0e20d6f4353a/docs/adr/0069-autocorrect-is-the-firmwares-own-and-corrects-at-the-word-end.md)):
 a typo with the right word, an abbreviation with a phone number or a
 sign-off, a typed form with a macro, and after its own
 [Leader key](#the-leader) what is typed with what it stands for. People know the feature as **text
@@ -18,7 +18,7 @@ replaces, the undo, when it forgets the word, how a replacement is typed or
 played and what happens to keys pressed meanwhile. The list's bytes are the
 [autocorrect domain](profile-wire-v1/autocorrect-domain.md)'s; the layouts
 are [host layouts](host-layouts-v1.md)'s; how it sits in the report path is
-[macro playback](https://github.com/NoahCLR/charybdis-4x6/blob/7a3f6027ff66dba9b5b12698a7983dab89790a0b/docs/architecture/macro-playback.md#corrections)'s.
+[macro playback](https://github.com/NoahCLR/charybdis-4x6/blob/1fc4a5b385a21daa2c4564812ecc0e20d6f4353a/docs/architecture/macro-playback.md#corrections)'s.
 
 `tests/fixtures/autocorrect_v1.json` holds a case for every rule here: a
 list, a host layout, the computer's Caps Lock, the keys typed and the text the
@@ -342,7 +342,7 @@ Held by: `tests/host/run_autocorrect_tests.sh` (`switched-off`; `test_the_stage_
 ## The leader
 
 The **Leader key**, QMK's `QK_LEADER`, is the firmware's own (D-F71,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/7a3f6027ff66dba9b5b12698a7983dab89790a0b/docs/adr/0071-the-leader-is-part-of-the-typing-stage.md)): an action kind
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/1fc4a5b385a21daa2c4564812ecc0e20d6f4353a/docs/adr/0071-the-leader-is-part-of-the-typing-stage.md)): an action kind
 of its own, which goes wherever a switch key goes, a key, a behaviour's tap
 or hold, a combo's output, acts at its tap or press and puts nothing in a
 report. When the list holds a replacement that fires after the leader

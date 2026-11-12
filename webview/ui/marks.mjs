@@ -14,14 +14,14 @@
 // layer (the layer bar, a list of layer chips), a screen shows the colour's
 // swatch instead (layerSwatch, slotLight), which is not a mark.
 
-import {css, isOff} from "../lib/colour.mjs";
+import {css} from "../lib/colour.mjs";
 import {esc} from "../lib/dom.mjs";
 import {visibleKeycode} from "../view/keyface.mjs";
 import {macroChips} from "../view/macro.mjs";
 import {sequenceFace} from "../view/macro-sequence.mjs";
 import {layerTapAction, namedAction} from "../view/named-action.mjs";
 import {keyIdentity, reachKind, slotKeycodeNames} from "../view/key-identity.mjs";
-import {feedbackColours, pdColourRow, stageEnabled} from "../view/lighting.mjs";
+import {feedbackColours, isPassthrough, pdColourRow, stageEnabled} from "../view/lighting.mjs";
 import {REACH_ICONS, SCREENS} from "../view/screens.mjs";
 import {layerAt, layerCalled, layerCalledAt, vocabulary} from "../view/vocabulary.mjs";
 import {boardOutlineMarkup} from "../view/geometry.mjs";
@@ -34,7 +34,7 @@ import {layerSwatch} from "./layerbar.mjs";
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {number} count @param {string} [className] */
 export function branchBadge(model, count, className = "") {
     const colour = feedbackColours(model).branches[count - 2];
-    const lit = count > 1 && stageEnabled(model, "key") && colour && !isOff(colour);
+    const lit = count > 1 && stageEnabled(model, "key") && colour && !isPassthrough(colour);
     return `<span class="bn${lit ? " lit" : ""}${className ? ` ${esc(className)}` : ""}"${lit ? ` style="--tint:${css(colour)}"` : ""}>${esc(count)}×</span>`;
 }
 
@@ -47,17 +47,17 @@ export function branchBadge(model, count, className = "") {
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model */
 export function branchesBadge(model) {
     const colours = feedbackColours(model).branches;
-    if (!stageEnabled(model, "key") || colours.every(isOff)) return `<span class="bn">N×</span>`;
+    if (!stageEnabled(model, "key") || colours.every(isPassthrough)) return `<span class="bn">N×</span>`;
     const share = 100 / colours.length;
     const stops = colours.map((colour, i) =>
-        `${isOff(colour) ? "transparent" : css(colour)} ${+(i * share).toFixed(2)}% ${+((i + 1) * share).toFixed(2)}%`).join(", ");
+        `${isPassthrough(colour) ? "transparent" : css(colour)} ${+(i * share).toFixed(2)}% ${+((i + 1) * share).toFixed(2)}%`).join(", ");
     return `<span class="bn lit all-counts" style="--tints:${esc(stops)}">N×</span>`;
 }
 
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} kind */
 export function tierDot(model, kind) {
     const colour = feedbackColours(model)[/** @type {import("../../contracts/edits.js").Tier} */ (kind)];
-    const lit = stageEnabled(model, "key") && !isOff(colour);
+    const lit = stageEnabled(model, "key") && !isPassthrough(colour);
     return `<i class="fbdot${lit ? "" : " off"}"${lit ? ` style="background:${css(colour)}"` : ""}></i>`;
 }
 
@@ -66,13 +66,13 @@ export function tierDot(model, kind) {
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model */
 export function comboTint(model) {
     const colour = model?.rgb?.comboFeedback?.color;
-    return stageEnabled(model, "combo") && colour && !isOff(colour) ? css(colour) : "";
+    return stageEnabled(model, "combo") && colour && !isPassthrough(colour) ? css(colour) : "";
 }
 
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} [badge] */
 export function comboBadge(model, badge = "C") {
     const colour = model?.rgb?.comboFeedback?.color;
-    const lit = stageEnabled(model, "combo") && colour && !isOff(colour);
+    const lit = stageEnabled(model, "combo") && colour && !isPassthrough(colour);
     return `<i class="mk-badge" style="${lit ? `border-color:${css(colour)}` : ""}">${esc(badge)}</i>`;
 }
 
@@ -81,7 +81,7 @@ export function comboBadge(model, badge = "C") {
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {{id: number}} slot */
 export function slotLight(model, slot) {
     const row = pdColourRow(model, slot.id);
-    const lit = Boolean(row && !isOff(row.color) && stageEnabled(model, "pd"));
+    const lit = Boolean(row && !isPassthrough(row.color) && stageEnabled(model, "pd"));
     return {row, lit, colour: lit && row ? css(row.color) : null, swatch: (klass = "") => `<span class="pd-swatch ${esc(klass)} ${lit ? "" : "swatch-off"}"
         ${lit && row ? `style="background:${css(row.color)}"` : ""}></span>`};
 }

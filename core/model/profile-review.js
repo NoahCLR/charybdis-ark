@@ -20,7 +20,7 @@ const {effectiveTimings} = require("./gesture-timing");
 const {REVIEW_AREAS: AREA, VOCABULARY, word, layerName: layerCalled, macroDefaultName, slotName, ledsCalled, modifierNames, protectionWords, settingsPath} = require("./vocabulary");
 const {macroName} = require("../../rules/qmk-keycodes.mjs");
 const {SHORTCUT_JOIN} = require("../../rules/shortcut-notation.mjs");
-const {layerPaints, replacementPaints} = require("../../rules/led-light.mjs");
+const {colourPaints} = require("../../rules/led-light.mjs");
 const {customKeyName} = require("../data/user-keycodes");
 const {ORDER_UNITS, UNIT, parseUnit} = require("./review-units");
 const {movedBanks} = require("./draft-order");
@@ -291,6 +291,12 @@ const V = VOCABULARY;
 const F = V.lightingFields;
 /** @param {import("../schema/types.js").Hsv} value @param {string} [off] */
 const colour = (value, off = "off") => ({text: value.v ? hsv(value) : off, key: hsv(value), colour: {h: value.h, s: value.s, v: value.v}});
+// A colour a layer, a pointing slot, combo feedback or a feedback case owns
+// (D-L94, firmware D-F74): passthrough at saturation and value 0, at any
+// hue; off at value 0 with saturation, its LEDs dark. A passthrough colour
+// keeps its stored hue as detail, so two that differ only in it read apart.
+/** @param {import("../schema/types.js").Hsv} value */
+const owned = value => colourPaints(value) ? colour(value, "off") : {...colour(value), text: "passthrough", detail: `passthrough · ${hsv(value)}`};
 
 /** @param {Decoded} value @returns {Map<string, LightingRecord>} */
 function lightingRecords(value) {
@@ -310,27 +316,33 @@ function lightingRecords(value) {
         return [stage.label, {text: on ? "on" : "off", key: on, mark: {kind: "stage", on}}];
     }));
     for (const row of r.layerColors) record(UNIT.rgbLayer(row.layerId), `${layerName(row.layerId)} colour`, "layers",
-        [[F.colour, layerPaints(row.color) ? colour(row.color, "black") : {...colour(row.color), text: "passthrough"}], [F.paintMode, nameIn(V.paintModes, rgbEnums.RGB_LAYER_MODES, row.mode)]], {layer: row.layerId}, {kind: "layer", layer: row.layerId});
+        [[F.colour, owned(row.color)], [F.paintMode, nameIn(V.paintModes, rgbEnums.RGB_LAYER_MODES, row.mode)]], {layer: row.layerId}, {kind: "layer", layer: row.layerId});
     for (const row of r.pdModeColors) record(UNIT.rgbPd(row.pdModeId), `Pointing mode colour · ${slotCalled(row.pdModeId)}`, "pd",
-        [[F.colour, colour(row.color)], [F.locality, nameIn(V.localities, rgbEnums.RGB_LOCALITIES, row.locality)]], {slot: row.pdModeId}, {kind: "pointing", slot: row.pdModeId});
+        [[F.colour, owned(row.color)], [F.locality, nameIn(V.localities, rgbEnums.RGB_LOCALITIES, row.locality)]], {slot: row.pdModeId}, {kind: "pointing", slot: row.pdModeId});
     record(UNIT.rgb("automouse"), "Auto-mouse fade", "auto", [[F.fadeMode, nameIn(V.fadeModes, rgbEnums.RGB_AUTOMOUSE_MODES, r.automouseFade.mode)], [F.endColour, colour(r.automouseFade.endColor)]]);
-    record(UNIT.rgb("combo"), "Combo feedback", "combo", [[F.colour, colour(r.comboFeedback.color)], [F.locality, nameIn(V.localities, rgbEnums.RGB_LOCALITIES, r.comboFeedback.locality)]]);
+    record(UNIT.rgb("combo"), "Combo feedback", "combo", [[F.colour, owned(r.comboFeedback.color)], [F.locality, nameIn(V.localities, rgbEnums.RGB_LOCALITIES, r.comboFeedback.locality)]]);
+    /** @param {number} value */
+    const where = value => nameIn(V.localities, rgbEnums.RGB_LOCALITIES, value);
+    // A case's colour by its name, and where it paints by its name and the
+    // Locality field's, so a change to one case says which (D-L93).
+    /** @param {string} name @param {Field} shade @param {number} locality @returns {[string, Field][]} */
+    const kase = (name, shade, locality) => [[name, shade], [`${name} · ${F.locality}`, where(locality)]];
     const k = r.keyFeedback;
     // Named and ordered as the Behaviour feedback tab lists them: the tiers, then
-    // the tap branches, then when and where.
+    // the tap branches, then the tap-commit policy.
     record(UNIT.rgb("key"), "Behaviour feedback", "key", [
-        ...(/** @type {const} */ (["tapCommittedColor", "holdActiveColor", "longHoldActiveColor"])).map(/** @returns {[string, Field]} */ (field) =>
-            [word(V.feedbackOwners, V.feedbackColourOwners[field]), colour(k[field])]),
-        ...k.tapBranchColors.map(/** @returns {[string, Field]} */ (value, i) => [V.branches[i + 1] || `${i + 2} taps`, colour(value)]),
-        [F.tapBranchCommit, nameIn(V.tapCommit, rgbEnums.RGB_TAP_COMMIT_MODES, k.tapCommitMode)], [F.locality, nameIn(V.localities, rgbEnums.RGB_LOCALITIES, k.locality)]]);
-    // Replacement feedback's four cases as its tab lists them, then where
-    // they paint. A colour that paints nothing reads off, as a layer's reads
-    // passthrough; one with brightness alone at zero shows black.
+        ...(/** @type {const} */ ([["tapCommittedColor", "tapCommittedLocality"], ["holdActiveColor", "holdActiveLocality"], ["longHoldActiveColor", "longHoldActiveLocality"]]))
+            .flatMap(([field, locality]) => kase(word(V.feedbackOwners, V.feedbackColourOwners[field]), owned(k[field]), k[locality])),
+        ...k.tapBranches.flatMap((branch, i) => kase(V.branches[i + 1] || `${i + 2} taps`, owned(branch.color), branch.locality)),
+        [F.tapBranchCommit, nameIn(V.tapCommit, rgbEnums.RGB_TAP_COMMIT_MODES, k.tapCommitMode)]]);
+    // Replacement feedback's four cases as its tab lists them, each with
+    // where it paints, in the words every owned colour reads by.
     const a = r.autocorrectFeedback;
-    record(UNIT.rgb("autocorrect"), "Replacement feedback", "autocorrect", [
-        ...(/** @type {(keyof typeof V.replacementColourOwners)[]} */ (Object.keys(V.replacementColourOwners))).map(/** @returns {[string, Field]} */ (field) =>
-            [word(V.replacementOwners, V.replacementColourOwners[field]), replacementPaints(a[field]) ? colour(a[field], "black") : colour(a[field])]),
-        [F.locality, nameIn(V.localities, rgbEnums.RGB_LOCALITIES, a.locality)]]);
+    /** @type {Record<keyof typeof V.replacementColourOwners, "textLocality" | "macroLocality" | "undoLocality" | "leadingLocality">} */
+    const replacementLocality = {textColor: "textLocality", macroColor: "macroLocality", undoColor: "undoLocality", leadingColor: "leadingLocality"};
+    record(UNIT.rgb("autocorrect"), "Replacement feedback", "autocorrect",
+        (/** @type {(keyof typeof V.replacementColourOwners)[]} */ (Object.keys(V.replacementColourOwners))).flatMap((field) =>
+            kase(word(V.replacementOwners, V.replacementColourOwners[field]), owned(a[field]), a[replacementLocality[field]])));
     // Accents are one record with the groups they light: a row names its
     // group by id, so a row put back without its group could point at one
     // that no longer exists. Each accent reads as Lighting lists it, by who

@@ -144,23 +144,31 @@ function rgbForView(domain) {
         pdModeAccents: groupRows(domain.pdModeGroupRows, (row) => row.selector === all ? RGB_EVERY_OWNER.pdMode : enumName(RGB_POINTING_MODE_IDS, row.selector)),
         comboFeedback: {color: colorForView(domain.comboFeedback.color), locality: enumName(RGB_LOCALITIES, domain.comboFeedback.locality)},
         comboAccents: groupRows(domain.comboGroupRows),
+        // Behaviour feedback (firmware D-F73): each case's colour and locality,
+        // a tap branch's together as a pointing slot's are.
         keyBehaviorFeedback: {
-            tapBranchColors: domain.keyFeedback.tapBranchColors.map(colorForView),
+            tapBranches: domain.keyFeedback.tapBranches.map((branch) => ({color: colorForView(branch.color), locality: enumName(RGB_LOCALITIES, branch.locality)})),
             tapCommittedColor: colorForView(domain.keyFeedback.tapCommittedColor),
+            tapCommittedLocality: enumName(RGB_LOCALITIES, domain.keyFeedback.tapCommittedLocality),
             holdActiveColor: colorForView(domain.keyFeedback.holdActiveColor),
+            holdActiveLocality: enumName(RGB_LOCALITIES, domain.keyFeedback.holdActiveLocality),
             longHoldActiveColor: colorForView(domain.keyFeedback.longHoldActiveColor),
+            longHoldActiveLocality: enumName(RGB_LOCALITIES, domain.keyFeedback.longHoldActiveLocality),
             tapCommitMode: enumName(RGB_TAP_COMMIT_MODES, domain.keyFeedback.tapCommitMode),
-            locality: enumName(RGB_LOCALITIES, domain.keyFeedback.locality),
         },
         keyFeedbackAccents: groupRows(domain.keyGroupRows, (row) => enumName(RGB_KEY_SEMANTICS, row.semantic)),
-        // Replacement feedback (firmware D-F70, D-F72): a colour for each case, one
-        // of saturation and value 0 painting nothing for its own.
+        // Replacement feedback (firmware D-F70, D-F72, D-F73): a colour and a
+        // locality for each case, a colour of saturation and value 0 painting
+        // nothing for its own.
         autocorrectFeedback: {
             textColor: colorForView(domain.autocorrectFeedback.textColor),
+            textLocality: enumName(RGB_LOCALITIES, domain.autocorrectFeedback.textLocality),
             macroColor: colorForView(domain.autocorrectFeedback.macroColor),
+            macroLocality: enumName(RGB_LOCALITIES, domain.autocorrectFeedback.macroLocality),
             undoColor: colorForView(domain.autocorrectFeedback.undoColor),
+            undoLocality: enumName(RGB_LOCALITIES, domain.autocorrectFeedback.undoLocality),
             leadingColor: colorForView(domain.autocorrectFeedback.leadingColor),
-            locality: enumName(RGB_LOCALITIES, domain.autocorrectFeedback.locality),
+            leadingLocality: enumName(RGB_LOCALITIES, domain.autocorrectFeedback.leadingLocality),
         },
         autocorrectFeedbackAccents: groupRows(domain.autocorrectGroupRows, (row) => enumName(RGB_AUTOCORRECT_SEMANTICS, row.semantic)),
     };

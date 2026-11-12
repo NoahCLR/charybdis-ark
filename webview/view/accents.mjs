@@ -8,7 +8,8 @@
 // and this module says which those are and what they are called, purely, so
 // the lists are tested without a screen.
 
-import {layerColourRow, layerPaints, pdColourRow, POINTING_MODE_IDS, replacementPaints} from "./lighting.mjs";
+import {colourPaints, layerColourRow, pdColourRow, POINTING_MODE_IDS} from "./lighting.mjs";
+import {localityOf, tapBranchOf} from "./edits.mjs";
 import {layerAt, layerCalled, slotCalled, vocabulary, word} from "./vocabulary.mjs";
 
 /**
@@ -29,21 +30,34 @@ export const ACCENT_STAGES = Object.freeze({layers: "layer", pd: "pdMode", combo
 /** @param {Model} model @param {AccentTable} target @returns {string | undefined} */
 export const everyOwner = (model, target) => vocabulary(model).accents[target]?.everyOwner;
 
-// The behaviour state a Behaviour feedback row is, by the colour it edits (a
-// tier's field, or any tap branch's, all of which wait as one state), and
-// the row that shows a state, a tap branch pending showing on the double
-// tap's; both read from vocabulary.feedbackColourOwners.
+// The owner that stands for a group of a table's owners, by the owner picked:
+// Every tap branch, for a tap branch of behaviour feedback (D-L93, firmware
+// D-F75); undefined for an owner in no group.
+/** @param {Model} model @param {AccentTable} target @param {string} owner @returns {string | undefined} */
+export function groupOwner(model, target, owner) {
+    const group = vocabulary(model).accents[target]?.group;
+    return group && (group.members.includes(owner) || group.owner === owner) ? group.owner : undefined;
+}
+
+// The case a Behaviour feedback row is (D-L93), by the row: a tier's colour
+// field, or a tap branch, each its own case, a tap count deeper than the
+// last case's taking it, as the keyboard does (firmware D-F73); and the row
+// that shows a case. Both read from vocabulary.feedbackColourOwners; a row
+// the tab does not have reads as its first.
 /** @param {Model} model @param {string | undefined} row */
 export function feedbackOwner(model, row) {
-    const owners = vocabulary(model).feedbackColourOwners;
-    if (String(row || "").startsWith("branch:")) return owners.tapBranchColors;
-    return owners[/** @type {keyof typeof owners} */ (String(row))] || owners.tapCommittedColor;
+    const owners = /** @type {Readonly<Record<string, string>>} */ (vocabulary(model).feedbackColourOwners);
+    const branch = tapBranchOf(String(row || ""));
+    if (branch !== null) {
+        const last = Object.keys(owners).filter((key) => tapBranchOf(key) !== null).length - 1;
+        return owners[`branch:${Math.min(branch, last)}`];
+    }
+    return owners[String(row)] || owners.tapCommittedColor;
 }
 /** @param {Model} model @param {string} owner */
 export function feedbackRowOf(model, owner) {
-    const owners = vocabulary(model).feedbackColourOwners;
-    if (owner === owners.tapBranchColors) return "branch:0";
-    return Object.keys(owners).find((field) => owners[/** @type {keyof typeof owners} */ (field)] === owner) || "tapCommittedColor";
+    const owners = /** @type {Readonly<Record<string, string>>} */ (vocabulary(model).feedbackColourOwners);
+    return Object.keys(owners).find((row) => owners[row] === owner) || "tapCommittedColor";
 }
 
 // The case a Replacement feedback row is, by the colour it edits, and the row
@@ -66,10 +80,13 @@ export function replacementRowOf(model, owner) {
  * or that it is all of them, which every one of those shows. The one reading of an owner's name the lists,
  * marks, colours and All accents' Open share.
  * @param {Model} model @param {AccentTable} target @param {string} owner
- * @returns {{every: boolean, layer?: number, slot?: number, feedbackRow?: string, replacementRow?: string}}
+ * @returns {{every: boolean, group?: boolean, layer?: number, slot?: number, feedbackRow?: string, replacementRow?: string}}
  */
 export function ownerPlace(model, target, owner) {
     if (owner && owner === everyOwner(model, target)) return {every: true};
+    // A group's accents light on each of its owners: they open on the first.
+    const group = vocabulary(model).accents[target]?.group;
+    if (group && owner === group.owner) return {every: false, group: true, feedbackRow: feedbackRowOf(model, group.members[0])};
     if (target === "layer") {
         const layer = (model?.layers || []).find((entry) => entry.name === owner);
         return layer ? {every: false, layer: layer.index} : {every: false};
@@ -134,10 +151,10 @@ export function accentOwner(model, stage, picked) {
  */
 export function accentsFor(model, target, owner) {
     const rows = accentRows(model, target);
-    const every = everyOwner(model, target);
+    const every = everyOwner(model, target), group = groupOwner(model, target, owner);
     const base = model?.layers?.[0]?.name;
     return {
-        here: target === "combo" ? [...rows] : rows.filter((row) => row.owner === owner || row.owner === every),
+        here: target === "combo" ? [...rows] : rows.filter((row) => row.owner === owner || row.owner === every || (group !== undefined && row.owner === group)),
         beneath: target === "layer" && owner !== base ? rows.filter((row) => row.owner === base) : [],
     };
 }
@@ -146,6 +163,7 @@ export function accentsFor(model, target, owner) {
 export function ownerCalled(model, target, owner) {
     const place = ownerPlace(model, target, owner);
     if (place.every) return vocabulary(model).accents[target]?.every || owner;
+    if (place.group) return vocabulary(model).accents[target]?.group?.words || owner;
     if (place.layer !== undefined) return layerCalled((model?.layers || []).find((layer) => layer.index === place.layer)) || owner;
     if (place.slot !== undefined) return slotCalled(model, place.slot) || owner;
     if (target === "keyBehavior") return word(vocabulary(model).feedbackOwners, owner);
@@ -167,7 +185,8 @@ export function accentsWhen(model, target, owner) {
  * The colour an accent that takes its stage's colour lights with: the layer's
  * where it paints (the shown layer's for every layer's), the mode's, combo
  * feedback's, the behaviour state's or the replacement case's where it
- * flashes; null when it would paint nothing.
+ * flashes; null when it would paint nothing, as for a passthrough owner
+ * (D-L94).
  * @param {Model} model @param {AccentTable} target @param {string} owner @param {Picked} picked @returns {Colour | null}
  */
 export function stageShade(model, target, owner, picked) {
@@ -175,18 +194,35 @@ export function stageShade(model, target, owner, picked) {
     if (target === "layer") {
         const layer = place.every ? picked.layer : place.layer;
         const colour = layer === undefined ? undefined : layerColourRow(model, layer)?.color;
-        return colour && layerPaints(colour) ? colour : null;
+        return colour && colourPaints(colour) ? colour : null;
     }
-    if (target === "pdMode") return pdColourRow(model, place.every ? picked.pointingSlot ?? 0 : place.slot ?? -1)?.color || null;
-    if (target === "combo") return model?.rgb?.comboFeedback?.color || null;
+    /** @param {Colour | undefined} colour */
+    const paints = (colour) => colour && colourPaints(colour) ? colour : null;
+    if (target === "pdMode") return paints(pdColourRow(model, place.every ? picked.pointingSlot ?? 0 : place.slot ?? -1)?.color);
+    if (target === "combo") return paints(model?.rgb?.comboFeedback?.color);
     if (target === "autocorrect") {
         const colour = model?.rgb?.autocorrectFeedback?.[replacementRowOf(model, place.every ? replacementOwner(model, picked.replacementRow) : owner)];
-        return colour && replacementPaints(colour) ? colour : null;
+        return colour && colourPaints(colour) ? colour : null;
     }
-    const row = place.every ? picked.feedbackRow : place.feedbackRow;
+    // Every behaviour state's takes the picked case's, every tap branch's the
+    // picked branch's, or the first's when a tier is picked.
+    const pickedBranch = String(picked.feedbackRow || "").startsWith("branch:") ? picked.feedbackRow : undefined;
+    return paints(feedbackCase(model, place.every ? picked.feedbackRow : place.group ? pickedBranch || place.feedbackRow : place.feedbackRow)?.color);
+}
+
+/**
+ * A Behaviour feedback case's colour and where it paints, by its row: a
+ * tier's, or a tap branch's (D-L93); the tab's first row when none is given.
+ * @param {Model} model @param {string | undefined} row @returns {{color: Colour, locality?: string} | null}
+ */
+export function feedbackCase(model, row) {
     const feedback = model?.rgb?.keyBehaviorFeedback;
-    if (String(row || "").startsWith("branch:")) return feedback?.tapBranchColors?.[0] || null;
-    return feedback?.[/** @type {"tapCommittedColor" | "holdActiveColor" | "longHoldActiveColor"} */ (row || "tapCommittedColor")] || null;
+    if (!feedback) return null;
+    const branch = tapBranchOf(String(row || ""));
+    if (branch !== null) return feedback.tapBranches?.[branch] || null;
+    const field = /** @type {import("../../contracts/edits.js").FeedbackColourField} */ (row || "tapCommittedColor");
+    const color = feedback[field];
+    return color ? {color, locality: feedback[localityOf(field)]} : null;
 }
 
 /**

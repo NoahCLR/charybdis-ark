@@ -70,7 +70,7 @@ function withPreviewReplacements(document) {
 /** @type {Partial<import("../core/session/types.js").DeviceCapabilities> & {brightnessMax: number}} */
 const capabilities = {
     protocol: {major: 2, minor: 2},
-    schema: {major: 4, minor: 7},
+    schema: {major: 4, minor: 8},
     compiledLayerCount: 16,
     supportedDomainMask: 255,
     actionAbiDigest: ACTION_ABI,

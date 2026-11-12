@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {createRequire} from "node:module";
 import {said} from "../../webview/view/vocabulary.mjs";
-import {ACCENT_STAGES, accentBudget, accentOwner, accentRows, accentsFor, accentsWhen, allAccents, everyOwner, feedbackOwner, feedbackRowOf, ownerCalled, ownerMark, ownerPlace, replacementOwner, replacementRowOf, stageShade} from "../../webview/view/accents.mjs";
+import {ACCENT_STAGES, accentBudget, accentOwner, accentRows, accentsFor, accentsWhen, allAccents, everyOwner, feedbackOwner, feedbackRowOf, groupOwner, ownerCalled, ownerMark, ownerPlace, replacementOwner, replacementRowOf, stageShade} from "../../webview/view/accents.mjs";
 
 const require = createRequire(import.meta.url);
 const {publishedModel} = require("../fixtures/published-model.js");
@@ -53,7 +53,7 @@ test("every owner the interface names is one the core publishes and reads", () =
     assert.deepEqual([all.layerAccents[0].owner, all.pdModeAccents[0].owner, all.keyFeedbackAccents[0].owner, all.autocorrectFeedbackAccents[0].owner],
         [everyOwner(published, "layer"), everyOwner(published, "pdMode"), everyOwner(published, "keyBehavior"), everyOwner(published, "autocorrect")]);
     // Each Replacement feedback row is a case the keyboard knows, and each case opens on the row that shows it.
-    for (const row of Object.keys(published.rgb.autocorrectFeedback).filter((field) => field !== "locality")) {
+    for (const row of Object.keys(published.rgb.autocorrectFeedback).filter((field) => field.endsWith("Color"))) {
         assert.ok(Object.keys(RGB_AUTOCORRECT_SEMANTICS).includes(replacementOwner(published, row)), row);
         assert.equal(replacementRowOf(published, replacementOwner(published, row)), row);
     }
@@ -62,10 +62,24 @@ test("every owner the interface names is one the core publishes and reads", () =
     for (const row of ["tapCommittedColor", "holdActiveColor", "longHoldActiveColor", "branch:0", "branch:3"]) {
         assert.ok(Object.keys(RGB_KEY_SEMANTICS).includes(feedbackOwner(published, row)), row);
     }
-    assert.equal(feedbackOwner(published, "branch:2"), "KEY_FEEDBACK_GROUP_TAP_BRANCH_PENDING", "every tap branch waits as one state");
-    for (const owner of ["KEY_FEEDBACK_GROUP_TAP_COMMITTED", "KEY_FEEDBACK_GROUP_HOLD_ACTIVE", "KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE", "KEY_FEEDBACK_GROUP_TAP_BRANCH_PENDING"]) {
+    // Each tap branch is a case of its own (D-L93, firmware D-F73).
+    assert.deepEqual(["branch:0", "branch:1", "branch:2", "branch:3"].map((row) => feedbackOwner(published, row)),
+        ["KEY_FEEDBACK_GROUP_TAP_COUNT_2", "KEY_FEEDBACK_GROUP_TAP_COUNT_3", "KEY_FEEDBACK_GROUP_TAP_COUNT_4", "KEY_FEEDBACK_GROUP_TAP_COUNT_5"]);
+    assert.equal(feedbackOwner(published, "branch:5"), "KEY_FEEDBACK_GROUP_TAP_COUNT_5", "a deeper tap count takes the last branch's");
+    // Every case has a row; all of them and every tap branch have none of their own.
+    for (const owner of Object.keys(RGB_KEY_SEMANTICS).filter((name) => name !== "KEY_FEEDBACK_GROUP_ALL" && name !== "KEY_FEEDBACK_GROUP_TAP_BRANCH_ANY")) {
         assert.equal(feedbackOwner(published, feedbackRowOf(published, owner)), owner, `${owner} opens on a row that shows it`);
     }
+    assert.equal(feedbackRowOf(published, "KEY_FEEDBACK_GROUP_TAP_COUNT_4"), "branch:2");
+    assert.equal(ownerCalled(published, "keyBehavior", "KEY_FEEDBACK_GROUP_TAP_COUNT_3"), "Triple tap", "named as its row is");
+    assert.deepEqual(ownerPlace(published, "keyBehavior", "KEY_FEEDBACK_GROUP_TAP_COUNT_3"), {every: false, feedbackRow: "branch:1"});
+    // Every tap branch stands for the four (D-L93, firmware D-F75), and opens on the first.
+    for (const owner of ["KEY_FEEDBACK_GROUP_TAP_COUNT_2", "KEY_FEEDBACK_GROUP_TAP_COUNT_5", "KEY_FEEDBACK_GROUP_TAP_BRANCH_ANY"]) assert.equal(groupOwner(published, "keyBehavior", owner), "KEY_FEEDBACK_GROUP_TAP_BRANCH_ANY", owner);
+    for (const owner of ["KEY_FEEDBACK_GROUP_HOLD_ACTIVE", "KEY_FEEDBACK_GROUP_ALL"]) assert.equal(groupOwner(published, "keyBehavior", owner), undefined, owner);
+    assert.equal(groupOwner(published, "pdMode", "POINTING_MODE_VOLUME"), undefined);
+    assert.ok(Object.keys(RGB_KEY_SEMANTICS).includes("KEY_FEEDBACK_GROUP_TAP_BRANCH_ANY"));
+    assert.deepEqual(ownerPlace(published, "keyBehavior", "KEY_FEEDBACK_GROUP_TAP_BRANCH_ANY"), {every: false, group: true, feedbackRow: "branch:0"});
+    assert.equal(ownerCalled(published, "keyBehavior", "KEY_FEEDBACK_GROUP_TAP_BRANCH_ANY"), "Every tap branch");
 });
 
 test("each Lighting stage with accents edits one of core's accent tables", () => {
@@ -124,6 +138,8 @@ test("an accent that takes its stage's colour takes the layer's where it paints,
     assert.equal(stageShade(published, "layer", "Layer 0", {}), null, "a layer with no colour paints nothing");
     assert.deepEqual(stageShade(published, "layer", "RGB_LAYER_GROUP_ALL", {layer: 2}), colour(90, 255, 200), "every layer's takes the shown layer's");
     assert.deepEqual(stageShade(published, "keyBehavior", "KEY_FEEDBACK_GROUP_HOLD_ACTIVE", {}), published.rgb.keyBehaviorFeedback.holdActiveColor);
+    assert.deepEqual(stageShade(published, "keyBehavior", "KEY_FEEDBACK_GROUP_TAP_COUNT_4", {}), published.rgb.keyBehaviorFeedback.tapBranches[2].color, "a tap branch's own colour");
+    assert.deepEqual(stageShade(published, "keyBehavior", "KEY_FEEDBACK_GROUP_ALL", {feedbackRow: "branch:1"}), published.rgb.keyBehaviorFeedback.tapBranches[1].color, "every state's takes the picked case's");
     assert.deepEqual(stageShade(published, "combo", "", {}), published.rgb.comboFeedback.color);
     // A replacement case's colour, the picked case's for every flash, and nothing for a case that is off.
     published.rgb.autocorrectFeedback = {textColor: colour(106, 255, 200), macroColor: colour(9, 0, 0), undoColor: colour(0, 255, 0), locality: "RGB_KEY_HALF"};
@@ -145,4 +161,22 @@ test("the budget counts accents and LED sets against the keyboard, and All accen
         owners: [{owner: "AUTOCORRECT_FEEDBACK_GROUP_ALL", rows: published.rgb.autocorrectFeedbackAccents}]}, "the demo's accent for every replacement flash");
     assert.deepEqual(listed[0].owners.map((entry) => [entry.owner, entry.rows.map((row) => row.index)]),
         [["Layer 0", [0]], ["Layer 2", [1, 3]], ["RGB_LAYER_GROUP_ALL", [2]]]);
+});
+
+test("an accent for every tap branch lists on each tap branch, not on a tier, and takes the picked branch's colour", () => {
+    const published = model();
+    published.rgb.keyFeedbackAccents = [
+        accent(0, "KEY_FEEDBACK_GROUP_TAP_BRANCH_ANY", [5], colour(0, 0, 0)),
+        accent(1, "KEY_FEEDBACK_GROUP_TAP_COUNT_3", [6]),
+        accent(2, "KEY_FEEDBACK_GROUP_ALL", [7]),
+        accent(3, "KEY_FEEDBACK_GROUP_HOLD_ACTIVE", [8]),
+    ];
+    assert.deepEqual(accentsFor(published, "keyBehavior", "KEY_FEEDBACK_GROUP_TAP_COUNT_3").here.map((row) => row.index), [0, 1, 2]);
+    assert.deepEqual(accentsFor(published, "keyBehavior", "KEY_FEEDBACK_GROUP_TAP_COUNT_5").here.map((row) => row.index), [0, 2]);
+    assert.deepEqual(accentsFor(published, "keyBehavior", "KEY_FEEDBACK_GROUP_HOLD_ACTIVE").here.map((row) => row.index), [2, 3], "a tier lists none of it");
+    const branches = published.rgb.keyBehaviorFeedback.tapBranches;
+    assert.deepEqual(stageShade(published, "keyBehavior", "KEY_FEEDBACK_GROUP_TAP_BRANCH_ANY", {feedbackRow: "branch:2"}), branches[2].color, "the picked branch's colour");
+    assert.deepEqual(stageShade(published, "keyBehavior", "KEY_FEEDBACK_GROUP_TAP_BRANCH_ANY", {feedbackRow: "holdActiveColor"}), branches[0].color, "the first's from a tier");
+    assert.deepEqual(allAccents(published).find((entry) => entry.target === "keyBehavior")?.owners.map((entry) => entry.owner),
+        ["KEY_FEEDBACK_GROUP_TAP_BRANCH_ANY", "KEY_FEEDBACK_GROUP_TAP_COUNT_3", "KEY_FEEDBACK_GROUP_ALL", "KEY_FEEDBACK_GROUP_HOLD_ACTIVE"]);
 });

@@ -59,7 +59,9 @@ export interface LightOptions {held?: number[];
     pdActive?: null | {locality: string; triggerIndex?: number | readonly number[]; color: import('../../contracts/edits.js').Colour; mode: string};
     /** A held combo's feedback: its colour, locality, the keys of its inputs in the view, and whether it paints beneath the pointing mode its output runs (comboHeld). */
     comboActive?: null | {locality: string; inputs: readonly number[]; color: import('../../contracts/edits.js').Colour; beneath?: boolean};
-    /** A replacement flash showing: its case (an RGB_AUTOCORRECT_SEMANTICS name), that case's colour, the locality, and the key that caused it, when one is known. */
+    /** A behaviour feedback case showing (D-L93): its case (an RGB_KEY_SEMANTICS name), that case's colour and locality, and the key that shows it, when the view has one. */
+    behaviourActive?: null | {owner: string; locality: string; triggerIndex?: number; color: import('../../contracts/edits.js').Colour};
+    /** A replacement flash showing: its case (an RGB_AUTOCORRECT_SEMANTICS name), that case's colour and locality, and the key that caused it, when one is known. */
     replacementActive?: null | {owner: string; locality: string; triggerIndex?: number; color: import('../../contracts/edits.js').Colour}}
 export interface LedLight {colour: import('../../contracts/edits.js').Colour; source: string; layer?: number | null}
 

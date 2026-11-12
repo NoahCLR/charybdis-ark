@@ -13,7 +13,7 @@ import {editGate} from "../../view/edit-gate.mjs";
 import {editWords} from "../../view/edit-mode.mjs";
 import * as edits from "../../view/edits.mjs";
 import {vocabulary} from "../../view/vocabulary.mjs";
-import {accentBudget, accentOwner, accentsFor, accentsWhen, allAccents, everyOwner, ownerCalled, ownerMark, ownerPlace, stageShade} from "../../view/accents.mjs";
+import {accentBudget, accentOwner, accentsFor, accentsWhen, allAccents, everyOwner, groupOwner, ownerCalled, ownerMark, ownerPlace, stageShade} from "../../view/accents.mjs";
 import {inheritsStageColour} from "../../view/lighting.mjs";
 import {colourEditor} from "../colour-editor.mjs";
 import {pickButton} from "../groups.mjs";
@@ -41,13 +41,15 @@ export function editingOn(model, stage) {
     return whose && accentsFor(model, whose.target, whose.owner).here.some((row) => row.index === editing.index) ? editing : null;
 }
 
-// Whose the accent being edited is: the owner that is all of them, or the
-// layer, mode or state the tab has picked now, so a new accent follows the
-// tab as it moves on before it is kept.
+// Whose the accent being edited is: the owner that is all of them, the group
+// the picked owner is in, or the layer, mode or state the tab has picked now,
+// so a new accent follows the tab as it moves on before it is kept.
 /** @param {Model} model @param {Editing} editing */
-const editingOwner = (model, editing) => editing.every
-    ? everyOwner(model, editing.target) || ""
-    : accentOwner(model, editing.stage, picked())?.owner || "";
+function editingOwner(model, editing) {
+    if (editing.every) return everyOwner(model, editing.target) || "";
+    const mine = accentOwner(model, editing.stage, picked())?.owner || "";
+    return editing.group ? groupOwner(model, editing.target, mine) || mine : mine;
+}
 
 // What the board shows of the accent being edited: the LEDs picked and the
 // colour it would light them, the stage's when it takes the stage's.
@@ -160,10 +162,11 @@ export function accentsSection(model, stage) {
     // Accents for every layer, mode or state are edited wherever they light,
     // tagged as such; Base's, which light over the layers above it, on Base.
     const {here, beneath} = accentsFor(model, target, owner);
-    const every = everyOwner(model, target);
+    const every = everyOwner(model, target), group = groupOwner(model, target, owner);
     const list = el(`<div class="accent-list"></div>`);
     for (const row of here) {
-        const tag = every && row.owner === every ? vocabulary(model).accents[target].every : undefined;
+        const tag = every && row.owner === every ? vocabulary(model).accents[target].every
+            : group && row.owner === group && group !== owner ? vocabulary(model).accents[target].group?.words : undefined;
         list.append(editing?.index === row.index ? accentEditor(model, editing, owner) : accentRow(model, stage, target, row, {editable: canEdit && !editing, tag}));
     }
     if (editing && editing.index === null) list.append(accentEditor(model, editing, owner));
@@ -207,7 +210,7 @@ function accentRow(model, stage, target, row, {editable = false, tag, go}) {
     /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="change"]'))?.addEventListener("click", () => {
         const stageColour = inheritsStageColour(row.color);
         const [h, s, v] = hsv(row.color);
-        state.accent = {stage, target, every: row.owner === everyOwner(model, target), index: row.index, leds: [...row.ledIndices],
+        state.accent = {stage, target, every: row.owner === everyOwner(model, target), group: row.owner === groupOwner(model, target, row.owner), index: row.index, leds: [...row.ledIndices],
             colour: stageColour ? standingOut(model, stageShade(model, target, row.owner, picked())) : {h, s, v}, stageColour, adding: true};
         render();
     });
@@ -216,8 +219,8 @@ function accentRow(model, stage, target, row, {editable = false, tag, go}) {
 }
 
 // The accent being added or changed: the LEDs picked on the board, whose it
-// is (the tab's owner, `mine`, or all of them), and its colour, its own or
-// its stage's. Nothing posts until it is kept.
+// is (the tab's owner, `mine`, the group it is in, or all of them), and its
+// colour, its own or its stage's. Nothing posts until it is kept.
 /** @param {Model} model @param {Editing} editing @param {string} mine */
 function accentEditor(model, editing, mine) {
     const {target} = editing;
@@ -235,10 +238,11 @@ function accentEditor(model, editing, mine) {
         choices: [["own", fields.ownColour], ["stage", words.stageColour]]}));
     colourFrom.addEventListener("change", () => { editing.stageColour = choiceValue(colourFrom) === "stage"; render(); });
     choices.append(colourFrom);
+    const group = groupOwner(model, target, mine);
     if (every) {
-        const whose = el(choiceField({label: fields.lightsFor, f: "lighting:accent:owner", current: editing.every ? "every" : "mine",
-            choices: [["mine", ownerCalled(model, target, mine)], ["every", words.every]]}));
-        whose.addEventListener("change", () => { editing.every = choiceValue(whose) === "every"; render(); });
+        const whose = el(choiceField({label: fields.lightsFor, f: "lighting:accent:owner", current: editing.every ? "every" : editing.group && group ? "group" : "mine",
+            choices: [["mine", ownerCalled(model, target, mine)], ...(group ? [/** @type {[string, string]} */ (["group", words.group?.words || ""])] : []), ["every", words.every]]}));
+        whose.addEventListener("change", () => { const value = choiceValue(whose); editing.every = value === "every"; editing.group = value === "group"; render(); });
         choices.append(whose);
     }
     if (editing.stageColour) node.append(el(`<p class="note">These LEDs take the colour their stage paints.</p>`));

@@ -235,38 +235,45 @@ test("a colour travels as a colour, and an off one says what off means there", (
     assert.deepEqual(accent.afterColour,{h:0,s:0,v:0},"drawn as off, as Lighting draws it");
     assert.ok(!accents.fields.some(field=>/Group/.test(`${field.label} ${field.after} ${field.before}`)),"no group is named");
 });
-test("a layer colour that paints nothing reads passthrough, and one with only brightness at zero reads black", () => {
+test("an owned colour that paints nothing reads passthrough, and one with only brightness at zero reads off, a layer's and a mode's alike (D-L94)", () => {
     const base=pdDocument(), before=snapshot(base);
     const colours={0:{h:30,s:200,v:150},2:{h:30,s:0,v:0},3:{h:30,s:200,v:0}};
     const after=snapshot(lighting(base,rgb=>({...rgb,
         layerColors:rgb.layerColors.map(row=>colours[row.layerId]?{...row,color:colours[row.layerId]}:row),
-        pdModeColors:rgb.pdModeColors.map(row=>({...row,color:{h:0,s:0,v:0}}))})));
+        pdModeColors:rgb.pdModeColors.map(row=>({...row,color:row.pdModeId===1?{h:5,s:255,v:0}:{h:0,s:0,v:0}}))})));
     const items=profileReview(before,after), field=unit=>items.find(entry=>entry.unit===unit)?.fields[0];
     assert.equal(field("rgb:layer:0").before,"passthrough","Base too, in the same word");
     assert.equal(field("rgb:layer:2").after,"passthrough","any hue with no saturation or brightness");
-    assert.equal(field("rgb:layer:3").after,"black","saturation without brightness paints black");
-    assert.equal(field("rgb:pd:0").after,"off","outside a layer, black is no passthrough");
+    assert.equal(field("rgb:layer:3").after,"off","saturation without brightness turns the LEDs off");
+    assert.equal(field("rgb:pd:0").after,"passthrough","a mode's too (firmware D-F74)");
+    assert.equal(field("rgb:pd:1").after,"off");
+    // Two passthrough colours that differ only in hue read apart by their detail.
+    const rehued=snapshot(lighting(after.document,rgb=>({...rgb,layerColors:rgb.layerColors.map(row=>row.layerId===2?{...row,color:{h:90,s:0,v:0}}:row)})));
+    const [hue]=profileReview(after,rehued).find(entry=>entry.unit==="rgb:layer:2").fields;
+    assert.deepEqual([hue.before,hue.after],["passthrough · HSV(30, 0, 0)","passthrough · HSV(90, 0, 0)"]);
 });
-test("replacement feedback reads by its cases as its tab lists them, a case off as off and a black one as black", () => {
+test("replacement feedback reads by its cases as its tab lists them, each with where it paints, a passthrough case as passthrough and an off one as off", () => {
     const {VOCABULARY: V} = require("../../core/model/vocabulary");
     const base=pdDocument(), before=snapshot(base);
     const after=snapshot(lighting(base,rgb=>({...rgb,
-        autocorrectFeedback:{textColor:{h:106,s:255,v:200},macroColor:{h:234,s:255,v:0},undoColor:{h:0,s:255,v:200},leadingColor:{h:170,s:255,v:200},locality:3}})));
+        autocorrectFeedback:{textColor:{h:106,s:255,v:200},textLocality:3,macroColor:{h:234,s:255,v:0},macroLocality:0,undoColor:{h:0,s:255,v:200},undoLocality:3,leadingColor:{h:170,s:255,v:200},leadingLocality:4}})));
     const item=profileReview(before,after).find(entry=>entry.unit==="rgb:autocorrect");
     assert.equal(item.title,"Replacement feedback");
     assert.equal(item.area,"Lighting");
     assert.deepEqual(item.place,{kind:"lighting",stage:"autocorrect"},"Show opens its tab");
     assert.deepEqual(item.fields.map(field=>[field.label,field.before,field.after]),[
-        ["Replaced with text","off","HSV(106, 255, 200)"],
-        ["Replaced by a macro","off","black"],
-        ["Replacement undone","off","HSV(0, 255, 200)"],
-        ["Leader waiting","off","HSV(170, 255, 200)"],
-        [V.lightingFields.locality,"Both halves","The half holding the trigger key"]],"each case, then where they paint");
+        ["Replaced with text","passthrough","HSV(106, 255, 200)"],
+        [`Replaced with text · ${V.lightingFields.locality}`,"All LEDs","The half holding the trigger key"],
+        ["Replaced by a macro","passthrough","off"],
+        ["Replacement undone","passthrough","HSV(0, 255, 200)"],
+        [`Replacement undone · ${V.lightingFields.locality}`,"All LEDs","The half holding the trigger key"],
+        ["Leader waiting","passthrough","HSV(170, 255, 200)"],
+        [`Leader waiting · ${V.lightingFields.locality}`,"All LEDs","Only the trigger key"]],"each case, then where it paints, a locality unchanged not listed");
     assert.deepEqual(item.fields[0].afterColour,{h:106,s:255,v:200},"a colour travels as a colour");
-    // Any hue with no saturation or brightness paints nothing: the case is off.
+    // Any hue with no saturation or brightness paints nothing: the case is passthrough.
     const dark=snapshot(lighting(after.document,rgb=>({...rgb,autocorrectFeedback:{...rgb.autocorrectFeedback,textColor:{h:40,s:0,v:0}}})));
     const [off]=profileReview(after,dark);
-    assert.deepEqual(off.fields.map(field=>[field.label,field.before,field.after]),[["Replaced with text","HSV(106, 255, 200)","off"]]);
+    assert.deepEqual(off.fields.map(field=>[field.label,field.before,field.after]),[["Replaced with text","HSV(106, 255, 200)","passthrough"]]);
     // Its stage switch is named as its tab is.
     const [stage]=profileReview(before,snapshot(lighting(base,rgb=>({...rgb,stageEnableMask:rgb.stageEnableMask | 32}))));
     assert.deepEqual(stage.fields,[{label:"Replacement feedback",status:"changed",before:"off",after:"on",beforeMark:{kind:"stage",on:false},afterMark:{kind:"stage",on:true}}]);
@@ -306,14 +313,18 @@ test("every Lighting field reads in the review as its Lighting tab labels it", (
         automouseFade:{...rgb.automouseFade,mode:other(RGB_AUTOMOUSE_MODES,rgb.automouseFade.mode),endColor:hue(rgb.automouseFade.endColor)},
         comboFeedback:{...rgb.comboFeedback,color:hue(rgb.comboFeedback.color),locality:other(RGB_LOCALITIES,rgb.comboFeedback.locality)},
         keyFeedback:{...rgb.keyFeedback,tapCommittedColor:hue(rgb.keyFeedback.tapCommittedColor),holdActiveColor:hue(rgb.keyFeedback.holdActiveColor),
-            longHoldActiveColor:hue(rgb.keyFeedback.longHoldActiveColor),tapBranchColors:rgb.keyFeedback.tapBranchColors.map(hue),
-            tapCommitMode:other(RGB_TAP_COMMIT_MODES,rgb.keyFeedback.tapCommitMode),locality:other(RGB_LOCALITIES,rgb.keyFeedback.locality)}})));
+            longHoldActiveColor:hue(rgb.keyFeedback.longHoldActiveColor),tapBranches:rgb.keyFeedback.tapBranches.map(branch=>({color:hue(branch.color),locality:other(RGB_LOCALITIES,branch.locality)})),
+            tapCommittedLocality:other(RGB_LOCALITIES,rgb.keyFeedback.tapCommittedLocality),holdActiveLocality:other(RGB_LOCALITIES,rgb.keyFeedback.holdActiveLocality),
+            longHoldActiveLocality:other(RGB_LOCALITIES,rgb.keyFeedback.longHoldActiveLocality),tapCommitMode:other(RGB_TAP_COMMIT_MODES,rgb.keyFeedback.tapCommitMode)}})));
     const items=profileReview(before,after).filter(entry=>/^rgb:(layer|pd|automouse|combo|key)/.test(entry.unit));
-    const words=new Set([...Object.values(V.lightingFields),...V.branches,...V.feedbackOwners.map(([,text])=>text)]);
+    const cases=[...V.branches,...V.feedbackOwners.map(([,text])=>text)];
+    // A case's locality reads by the case and the Locality field (D-L93).
+    const words=new Set([...Object.values(V.lightingFields),...cases,...cases.map(name=>`${name} · ${V.lightingFields.locality}`)]);
     for (const entry of items) for (const field of entry.fields) assert.ok(words.has(field.label),`${entry.title}: "${field.label}" is not a Lighting word`);
     const key=items.find(entry=>entry.unit==="rgb:key");
-    assert.deepEqual(key.fields.map(field=>field.label),["Tap committed","Hold active","Long hold active",...V.branches.slice(1,1+key.fields.length-5),
-        V.lightingFields.tapBranchCommit,V.lightingFields.locality],"listed as the Behaviour feedback tab lists them");
+    const where=name=>[name,`${name} · ${V.lightingFields.locality}`];
+    assert.deepEqual(key.fields.map(field=>field.label),[...["Tap committed","Hold active","Long hold active",...V.branches.slice(1,5)].flatMap(where),
+        V.lightingFields.tapBranchCommit],"listed as the Behaviour feedback tab lists them, each case with where it paints");
     for (const unit of ["rgb:layer","rgb:pd","rgb:automouse","rgb:combo"]) assert.ok(items.some(entry=>entry.unit.startsWith(unit)),`${unit} changed`);
 });
 test("every behaviour, combo and pointing mode field reads in the review as its editor labels it", () => {

@@ -483,7 +483,7 @@ test("a pointing-mode colour keeps the locality posted beside it", () => {
     assert.deepEqual(row.color, {h: 21, s: 255, v: 180});
 });
 
-test("behaviour feedback posts the whole record with one colour or policy replaced", () => {
+test("behaviour feedback posts the whole record with one case's colour or locality, or the policy, replaced", () => {
     const draft = session();
     // the screen redraws from the new model after each edit, so each message
     // is built from the record as it stands then
@@ -492,24 +492,42 @@ test("behaviour feedback posts the whole record with one colour or policy replac
     stage(draft, edits.keyFeedback(feedback(), "branch:0", {h: 12, s: 200, v: 100}));
     const stored = decoded(draft).rgb.keyFeedback;
     assert.deepEqual(stored.holdActiveColor, {h: 99, s: 255, v: 150});
-    assert.deepEqual(stored.tapBranchColors[0], {h: 12, s: 200, v: 100});
-    stage(draft, edits.keyFeedback(feedback(), null, null, {locality: "RGB_BOTH_HALVES"}));
+    assert.deepEqual(stored.tapBranches[0].color, {h: 12, s: 200, v: 100});
+    stage(draft, edits.keyFeedback(feedback(), null, null, {tapCommitMode: "KEY_FEEDBACK_TAP_COMMIT_OFF"}));
     assert.deepEqual(decoded(draft).rgb.keyFeedback.holdActiveColor, {h: 99, s: 255, v: 150}, "and earlier edits survive the next one");
-    assert.equal(decoded(draft).rgb.keyFeedback.locality, RGB_LOCALITIES.RGB_BOTH_HALVES);
+    assert.equal(decoded(draft).rgb.keyFeedback.tapCommitMode, 0);
+    // A locality changes its own case alone (D-L93).
+    const before = decoded(draft).rgb.keyFeedback;
+    const hold = edits.keyFeedbackLocality(feedback(), "holdActiveColor", "RGB_BOTH_HALVES");
+    const unchanged = edits.keyFeedback(feedback()).config;
+    assert.deepEqual(Object.entries(hold.config).filter(([field, value]) => JSON.stringify(value) !== JSON.stringify(unchanged[field])).map(([field]) => field), ["holdActiveLocality"], "only the hold's locality changes");
+    stage(draft, hold);
+    stage(draft, edits.keyFeedbackLocality(feedback(), "branch:2", "RGB_KEYS_ONLY"));
+    const after = decoded(draft).rgb.keyFeedback;
+    assert.equal(after.holdActiveLocality, RGB_LOCALITIES.RGB_BOTH_HALVES);
+    assert.deepEqual(after.tapBranches.map((branch) => branch.locality), before.tapBranches.map((branch, index) => index === 2 ? RGB_LOCALITIES.RGB_KEYS_ONLY : branch.locality));
+    assert.deepEqual([after.tapCommittedLocality, after.longHoldActiveLocality], [before.tapCommittedLocality, before.longHoldActiveLocality]);
+    assert.deepEqual(after.tapBranches[0].color, {h: 12, s: 200, v: 100});
 });
 
-test("replacement feedback posts the whole record with one case's colour or the locality replaced, and off as HSV(0, 0, 0)", () => {
+test("replacement feedback posts the whole record with one case's colour or locality replaced, and off as HSV(0, 0, 0)", () => {
     const draft = session();
     const feedback = () => buildSnapshotModel(draft.current, draft.capabilities, {editable: true, reason: ""}).rgb.autocorrectFeedback;
-    assert.deepEqual(edits.autocorrectFeedback({textColor: {h: "1", s: "2", v: "3"}, macroColor: {h: "4", s: "5", v: "6"}, undoColor: {h: "7", s: "8", v: "9"}, leadingColor: {h: "10", s: "11", v: "12"}, locality: "RGB_KEY_HALF"}, "macroColor", {h: 0, s: 0, v: 0}),
-        {type: "updateAutocorrectFeedback", config: {textColor: {h: 1, s: 2, v: 3}, macroColor: {h: 0, s: 0, v: 0}, undoColor: {h: 7, s: 8, v: 9}, leadingColor: {h: 10, s: 11, v: 12}, locality: "RGB_KEY_HALF"}});
+    const shown = {textColor: {h: "1", s: "2", v: "3"}, textLocality: "RGB_KEY_HALF", macroColor: {h: "4", s: "5", v: "6"}, macroLocality: "RGB_LEFT_HALF",
+        undoColor: {h: "7", s: "8", v: "9"}, undoLocality: "RGB_KEYS_ONLY", leadingColor: {h: "10", s: "11", v: "12"}, leadingLocality: "RGB_BOTH_HALVES"};
+    const posted = {textColor: {h: 1, s: 2, v: 3}, textLocality: "RGB_KEY_HALF", macroColor: {h: 4, s: 5, v: 6}, macroLocality: "RGB_LEFT_HALF",
+        undoColor: {h: 7, s: 8, v: 9}, undoLocality: "RGB_KEYS_ONLY", leadingColor: {h: 10, s: 11, v: 12}, leadingLocality: "RGB_BOTH_HALVES"};
+    assert.deepEqual(edits.autocorrectFeedback(shown, "macroColor", {h: 0, s: 0, v: 0}), {type: "updateAutocorrectFeedback", config: {...posted, macroColor: {h: 0, s: 0, v: 0}}});
+    assert.deepEqual(edits.autocorrectFeedbackLocality(shown, "undoColor", "RGB_RIGHT_HALF"), {type: "updateAutocorrectFeedback", config: {...posted, undoLocality: "RGB_RIGHT_HALF"}}, "one case's locality alone");
     stage(draft, edits.autocorrectFeedback(feedback(), "textColor", {h: 99, s: 255, v: 150}));
     stage(draft, edits.autocorrectFeedback(feedback(), "undoColor", {h: 0, s: 0, v: 0}));
     assert.deepEqual(decoded(draft).rgb.autocorrectFeedback.textColor, {h: 99, s: 255, v: 150});
     assert.deepEqual(decoded(draft).rgb.autocorrectFeedback.undoColor, {h: 0, s: 0, v: 0}, "a case switched off");
-    stage(draft, edits.autocorrectFeedback(feedback(), null, undefined, {locality: "RGB_KEYS_ONLY"}));
+    const before = decoded(draft).rgb.autocorrectFeedback;
+    stage(draft, edits.autocorrectFeedbackLocality(feedback(), "leadingColor", "RGB_KEYS_ONLY"));
     const stored = decoded(draft).rgb.autocorrectFeedback;
-    assert.deepEqual([stored.textColor, stored.undoColor, stored.locality], [{h: 99, s: 255, v: 150}, {h: 0, s: 0, v: 0}, RGB_LOCALITIES.RGB_KEYS_ONLY], "earlier edits survive the next one");
+    assert.deepEqual([stored.textColor, stored.undoColor, stored.leadingLocality], [{h: 99, s: 255, v: 150}, {h: 0, s: 0, v: 0}, RGB_LOCALITIES.RGB_KEYS_ONLY], "earlier edits survive the next one");
+    assert.deepEqual([stored.textLocality, stored.macroLocality, stored.undoLocality], [before.textLocality, before.macroLocality, before.undoLocality], "the other cases keep theirs");
     assert.ok(reviewAreas(draft).includes("Lighting"));
     assert.throws(() => stage(session(), edits.autocorrectFeedback(feedback(), "textColor", {h: 1, s: 1, v: 201})), /Brightness must be between 0 and 200/);
 });

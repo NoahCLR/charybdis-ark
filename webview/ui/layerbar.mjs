@@ -2,12 +2,12 @@
 // The layer tabs, and the swatch a layer shows its colour with.
 
 // Selector assertions refer to elements created by this module's authored markup.
-import {css, isOff, label as hsvLabel} from "../lib/colour.mjs";
+import {css, label as hsvLabel} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {scrollMotion} from "../lib/scroll.mjs";
 import {currentView, getModel, render, showLayer, state, toggleLayerOn} from "../store.mjs";
 import {layerCalled} from "../view/vocabulary.mjs";
-import {layerColourRow, stageEnabled} from "../view/lighting.mjs";
+import {isPassthrough, layerColourRow, stageEnabled} from "../view/lighting.mjs";
 import {draftMarks} from "../view/review.mjs";
 import {editWords} from "../view/edit-mode.mjs";
 import {modifierKey} from "../view/shortcuts.mjs";
@@ -21,7 +21,7 @@ import {rovingTabs} from "../lib/tabs.mjs";
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {Pick<import("../../contracts/panel.js").Layer, "index"> & Partial<import("../../contracts/panel.js").Layer>} layer @param {string} [className] */
 export function layerSwatch(model, layer, className = "") {
     const row = layerColourRow(model, layer.index);
-    const lit = stageEnabled(model, "layers") && row && !isOff(row.color);
+    const lit = stageEnabled(model, "layers") && row && !isPassthrough(row.color);
     return {
         html: `<span class="${className ? `${esc(className)} ` : ""}swatch ${lit ? "" : "swatch-off"}" style="${lit ? `background:${css(row.color)}` : ""}"></span>`,
         tip: `${layerCalled(layer)} · ${lit ? hsvLabel(row.color) : "no layer colour"}`,
