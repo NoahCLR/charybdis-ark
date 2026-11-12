@@ -46,6 +46,16 @@ test("a key wears its behaviour's dots only where the behaviour runs, judged on 
     assert.deepEqual([throughBase.from, dots(throughBase)], [model.layers[0], []], "answered by Base's C, it marks nothing: C's row does not run on Base");
 });
 
+test("without glass, as on Lighting, every key and the trackball is solid: the keyboard shows its light the same whichever layer paints it", () => {
+    const transparent = keyOf(model, 2, [], 0, {glass: false});
+    assert.deepEqual([transparent.kind, transparent.glass], ["transparent", false], "a transparent key shown alone");
+    const answered = keyOf(model, 2, [1], 0, {glass: false});
+    assert.deepEqual([answered.from, answered.glass, answered.light], [model.layers[1], false, keyOf(model, 2, [1], 0).light],
+        "a key answered from below keeps that layer's light and legend");
+    assert.equal(boardTrackball(layerView(model, 2)).glass, true, "the trackball is seen through Symbols on Keymap");
+    assert.equal(boardTrackball(layerView(model, 2), {glass: false}).glass, false, "and solid on Lighting");
+});
+
 test("a dot carries the colour its tier flashes, none while behaviour feedback is off", () => {
     assert.notEqual(keyOf(model, 0, [], 1).tiers[0].colour, null);
     const off = modelOf([rgbStages(model.rgb.stageEnableMask, 16, false)]);

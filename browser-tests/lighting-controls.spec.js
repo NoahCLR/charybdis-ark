@@ -384,6 +384,19 @@ test("a key opens its hover card on the Keymap and none on Lighting, whose board
     await expect(page.locator(".hovercard-side")).toBeHidden();
 });
 
+test("the Keymap frosts a transparent key and Lighting draws it solid, as the keyboard lights it", async ({page}) => {
+    const caps = (selector) => page.locator(`.board ${selector} .kc-rect`).evaluateAll((rects) => rects.map((rect) => getComputedStyle(rect).filter));
+    await openControls(page, "keys", {layer: 1}, "dark", "shell=demo");
+    const frosted = await caps(".kc-trns");
+    expect(frosted.length).toBeGreaterThan(0);
+    expect(frosted.every((filter) => filter.startsWith("blur"))).toBe(true);
+    await page.locator('[data-screen="lighting"]').click();
+    await page.evaluate(async () => { const store = await import("/webview/store.mjs"); Object.assign(store.state, {stage: "layers", layer: 1}); store.render(); });
+    await expect(page.locator('.board [data-led="0"] .kc-led')).toHaveText("0");
+    await expect(page.locator(".board .kc-glass, .board .kc-ball.glass, .board .kc-glow-trns")).toHaveCount(0);
+    expect(await caps(".kc-trns")).toEqual(frosted.map(() => "none"));
+});
+
 test("a key's LED number keeps clear of its legends", async ({page}) => {
     await openControls(page, "lighting", {stage: "layers", layer: 0}, "dark", "shell=demo");
     // In the cap's own coordinates, before a thumb key's turn.

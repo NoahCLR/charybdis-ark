@@ -20,6 +20,8 @@ export interface BoardOptions {
     ledIndex?: boolean;
     /** The LEDs picked for the accent being edited and the colour it lights them (view/board-keys.mjs). */
     accent?: import('../view/board-keys.mjs').AccentPicks | null;
+    /** Frost a transparent key, a key answered from below and a trackball lit from below (Keymap, the default); false draws them solid, as the keyboard shows their light (Lighting). */
+    glass?: boolean;
     picking?: boolean;
     onKey?: (index: number) => void;
     onOpen?: (index: number) => void;
