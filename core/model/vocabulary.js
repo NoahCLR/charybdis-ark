@@ -355,6 +355,10 @@ const TEXT_REPLACEMENT_KEYS = Object.freeze({QK_AUTOCORRECT_ON: "Text replacemen
 /** @type {import("../../contracts/model.js").WordList<"auto" | "on" | "off">} */
 const MACRO_PROTECTION = [["auto", "Automatic"], ["on", "On"], ["off", "Off"]];
 
+// A branch by how many taps start it, as the behaviour grid heads its rows;
+// Behaviour feedback names each tap branch's case by the same words.
+const BRANCHES = Object.freeze(["Single tap", "Double tap", "Triple tap", "Quadruple tap", "Quintuple tap"]);
+
 /** @type {Readonly<import("../../contracts/model.js").Vocabulary>} */
 const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.js").Vocabulary} */ ({
     phases: PHASE_WORDS,
@@ -475,65 +479,82 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     // What lands a press in each tier, said on the grid's headings.
     tierTips: {tap: "Let go before the Tap / hold threshold.", hold: "Held past the Tap / hold threshold.", long: "Held past the Long hold threshold."},
     // A behaviour's branch by how many taps start it.
-    branches: ["Single tap", "Double tap", "Triple tap", "Quadruple tap", "Quintuple tap"],
+    branches: BRANCHES,
 
     localities: [
-        ["RGB_BOTH_HALVES", "Both halves"], ["RGB_LEFT_HALF", "Left half"], ["RGB_RIGHT_HALF", "Right half"],
+        ["RGB_BOTH_HALVES", "All LEDs"], ["RGB_LEFT_HALF", "Left half"], ["RGB_RIGHT_HALF", "Right half"],
         ["RGB_KEY_HALF", "The half holding the trigger key"], ["RGB_KEYS_ONLY", "Only the trigger key"],
     ],
-    paintModes: [["KEYS_MAPPED_ON_THIS_LAYER_ONLY", "Keys mapped on this layer only"], ["ALL_KEYS", "All keys"]],
+    paintModes: [["KEYS_MAPPED_ON_THIS_LAYER_ONLY", "Keys mapped on this layer only"], ["ALL_KEYS", "All LEDs"]],
     // The same modes in two words, for a list's cell.
-    paintModesBrief: [["KEYS_MAPPED_ON_THIS_LAYER_ONLY", "mapped keys"], ["ALL_KEYS", "all keys"]],
+    paintModesBrief: [["KEYS_MAPPED_ON_THIS_LAYER_ONLY", "mapped keys"], ["ALL_KEYS", "all LEDs"]],
     fadeModes: [
         ["FOLLOW_REAL_DESTINATION", "Follow the real destination"],
         ["END_COLOR_WHERE_BASE_EFFECT_WOULD_SHOW", "End colour where the background effect would show"],
-        ["END_COLOR_ON_ALL_KEYS", "End colour on all keys"],
+        ["END_COLOR_ON_ALL_KEYS", "End colour on all LEDs"],
     ],
     tapCommit: [["KEY_FEEDBACK_TAP_COMMIT_OFF", "Off"], ["KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS", "Double taps and more"]],
     // Lighting's fields, as its tabs label them and the review names them.
-    lightingFields: {colour: "Colour", locality: "Locality", paintMode: "Which keys light up", fadeMode: "Fade mode", endColour: "End colour",
+    lightingFields: {colour: "Colour", locality: "Locality", paintMode: "Which LEDs light up", fadeMode: "Fade mode", endColour: "End colour",
         tapBranchCommit: "Tap branch commit"},
-    // What the colour editor says about HSV(0, 0, 0) in each stage: the tip on
-    // Turn off and the note shown once it is stored. Outside a layer colour,
-    // a replacement feedback colour and a group row black is literal black
-    // (firmware RGB domain spec, "Black"), so there only the Stage on switch
-    // paints nothing. The background effect offers no Turn off. A layer
-    // colour that paints nothing is passthrough, so its button and its
-    // reading say so in place of Turn off and Off; a replacement feedback
-    // colour that paints nothing switches its case off, which Turn off and
-    // Off already say (D-L89).
+    // What the colour editor says about HSV(0, 0, 0) in each stage (D-L94,
+    // firmware D-F74): every colour a layer, a pointing slot, combo feedback
+    // or a feedback case owns is passthrough at saturation and value 0, at
+    // any hue, painting nothing so what is beneath shows; Off, value 0 with
+    // saturation, is a choice of its own that turns its LEDs dark. The
+    // auto-mouse fade's end colour is literal, so 0, 0, 0 is off there; the
+    // background effect offers neither.
     colourOff: {
         layers: {
             offTip: "Store HSV(0, 0, 0): this layer then paints nothing, and what is beneath shows through.",
             offNote: "This layer is passthrough: it paints nothing, so what is beneath shows through wherever it would paint.",
             offAction: "Make passthrough", offWord: "Passthrough",
+            ledsOffTip: "Store brightness 0 with saturation: this layer's keys then go dark, covering what is beneath.",
+            ledsOffNote: "The colour is off: this layer's keys go dark, covering what is beneath. Make it passthrough to let what is beneath show.",
         },
         auto: {
-            offTip: "Store HSV(0, 0, 0): the fade then ends on black.",
+            offTip: "Store HSV(0, 0, 0): the fade then ends with the LEDs off.",
         },
         pd: {
-            offTip: "Store HSV(0, 0, 0): this mode then paints its locality black while it runs. To paint nothing, switch Stage on off.",
-            offNote: "The colour is black, so this mode paints its locality black while it runs. To paint nothing, switch Stage on off; that turns off every pointing mode's colour.",
+            offTip: "Store HSV(0, 0, 0): this mode then paints nothing while it runs, and what is beneath shows. Its accents in a colour of their own still light.",
+            offNote: "This mode is passthrough: it paints nothing while it runs, so what is beneath shows. Its accents in a colour of their own still light.",
+            offAction: "Make passthrough", offWord: "Passthrough",
+            ledsOffTip: "Store brightness 0 with saturation: this mode then turns its area's LEDs off while it runs, covering what is beneath.",
+            ledsOffNote: "The colour is off: this mode turns its area's LEDs off while it runs, covering what is beneath. Make it passthrough to let what is beneath show.",
         },
         combo: {
-            offTip: "Store HSV(0, 0, 0): combo feedback then paints its locality black while a combo's inputs are held. To paint nothing, switch Stage on off.",
-            offNote: "The colour is black, so combo feedback paints its locality black while a combo's inputs are held. To paint nothing, switch Stage on off.",
+            offTip: "Store HSV(0, 0, 0): combo feedback then paints nothing while a combo's inputs are held, and what is beneath shows. Its accents in a colour of their own still light.",
+            offNote: "Combo feedback is passthrough: it paints nothing while a combo's inputs are held, so what is beneath shows. Its accents in a colour of their own still light.",
+            offAction: "Make passthrough", offWord: "Passthrough",
+            ledsOffTip: "Store brightness 0 with saturation: combo feedback then turns its area's LEDs off while a combo's inputs are held, covering what is beneath.",
+            ledsOffNote: "The colour is off: combo feedback turns its area's LEDs off while a combo's inputs are held, covering what is beneath. Make it passthrough to let what is beneath show.",
         },
         key: {
-            offTip: "Store HSV(0, 0, 0): this state then flashes black. To flash nothing, switch Stage on off.",
-            offNote: "The colour is black, so the keyboard flashes black for this state. To flash nothing, switch Stage on off; that turns off every feedback colour.",
+            offTip: "Store HSV(0, 0, 0): this case then paints nothing, and what is beneath shows. The other cases still light, and so do its accents in a colour of their own.",
+            offNote: "This case is passthrough: it paints nothing, so what is beneath shows. The other cases still light, and so do its accents in a colour of their own.",
+            offAction: "Make passthrough", offWord: "Passthrough",
+            ledsOffTip: "Store brightness 0 with saturation: this case then turns its area's LEDs off, covering what is beneath.",
+            ledsOffNote: "The colour is off: this case turns its area's LEDs off, covering what is beneath. Make it passthrough to let what is beneath show.",
         },
         autocorrect: {
-            offTip: "Store HSV(0, 0, 0): the keyboard then does not light for this case. The other cases still do.",
-            offNote: "This case is off: the keyboard does not light for it, and its accents that take its colour stay dark. The other cases still light.",
+            offTip: "Store HSV(0, 0, 0): this case then paints nothing, and what is beneath shows. The other cases still light, and so do its accents in a colour of their own.",
+            offNote: "This case is passthrough: it paints nothing, so what is beneath shows, and its accents that take its colour stay dark. The other cases still light.",
+            offAction: "Make passthrough", offWord: "Passthrough",
+            ledsOffTip: "Store brightness 0 with saturation: this case then turns its area's LEDs off, covering what is beneath.",
+            ledsOffNote: "The colour is off: this case turns its area's LEDs off, covering what is beneath. Make it passthrough to let what is beneath show.",
         },
     },
+    // What Behaviour feedback shows (D-L93; the firmware's behaviour-feedback
+    // semantics, D-F73): the tiers, then each tap branch pending, named as
+    // the behaviour grid names its tap count (the last for every deeper one
+    // too), and all of them, which an accent may light for.
     feedbackOwners: [
         ["KEY_FEEDBACK_GROUP_ALL", "Every behaviour state"],
-        ["KEY_FEEDBACK_GROUP_TAP_BRANCH_PENDING", "Tap branch pending"],
         ["KEY_FEEDBACK_GROUP_TAP_COMMITTED", "Tap committed"],
         ["KEY_FEEDBACK_GROUP_HOLD_ACTIVE", "Hold active"],
         ["KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE", "Long hold active"],
+        ...[2, 3, 4, 5].map((count) => /** @type {[string, string]} */ ([`KEY_FEEDBACK_GROUP_TAP_COUNT_${count}`, BRANCHES[count - 1]])),
+        ["KEY_FEEDBACK_GROUP_TAP_BRANCH_ANY", "Every tap branch"],
     ],
     // The behaviour tier each behaviour state flashes for, which marks its
     // rows with that tier's dot, as the review does; the other states have
@@ -580,18 +601,23 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
         combo: {when: "LEDs that light in a colour of their own while a combo's inputs are held: the same LEDs for every combo.",
             every: "Every combo", stageColour: "Same as combo feedback"},
         keyBehavior: {when: "LEDs that light in a colour of their own while a key shows {owner}, with those for every behaviour state: the same LEDs whichever key it is.",
-            everyOwner: RGB_EVERY_OWNER.keyBehavior, every: "Every behaviour state", stageColour: "Same as the feedback colour"},
+            everyOwner: RGB_EVERY_OWNER.keyBehavior, every: "Every behaviour state", stageColour: "Same as the feedback colour",
+            // Each tap branch's accents may light for all of them at once
+            // (D-L93, firmware D-F75), in the colour of the branch showing.
+            group: {owner: "KEY_FEEDBACK_GROUP_TAP_BRANCH_ANY", words: "Every tap branch", members: ["KEY_FEEDBACK_GROUP_TAP_COUNT_2", "KEY_FEEDBACK_GROUP_TAP_COUNT_3", "KEY_FEEDBACK_GROUP_TAP_COUNT_4", "KEY_FEEDBACK_GROUP_TAP_COUNT_5"]}},
         autocorrect: {when: "LEDs that light in a colour of their own while the keyboard shows {owner}, with those for every case: the same LEDs whichever key caused it, or none.",
             everyOwner: RGB_EVERY_OWNER.autocorrect, every: "Every case", stageColour: "Same as the case's colour"},
     },
     // The accent editor's own fields; its colour field is lightingFields.colour.
     accentFields: {lightsFor: "Lights for", ownColour: "Its own"},
-    // The behaviour state each Behaviour feedback colour flashes for, by the
-    // colour's field: the tiers', then the tap branches', which all wait as
-    // one state. Behaviour feedback lists its colours by it, the review names them
-    // by it, and an accent of the state is found by it.
+    // The case each Behaviour feedback row shows (D-L93), by the row: a
+    // tier's colour field, then each tap branch's, `branch:0` the double
+    // tap's. Behaviour feedback lists its cases by it, the review names them
+    // by it, and an accent of the case is found by it.
     feedbackColourOwners: {tapCommittedColor: "KEY_FEEDBACK_GROUP_TAP_COMMITTED", holdActiveColor: "KEY_FEEDBACK_GROUP_HOLD_ACTIVE",
-        longHoldActiveColor: "KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE", tapBranchColors: "KEY_FEEDBACK_GROUP_TAP_BRANCH_PENDING"},
+        longHoldActiveColor: "KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE",
+        "branch:0": "KEY_FEEDBACK_GROUP_TAP_COUNT_2", "branch:1": "KEY_FEEDBACK_GROUP_TAP_COUNT_3",
+        "branch:2": "KEY_FEEDBACK_GROUP_TAP_COUNT_4", "branch:3": "KEY_FEEDBACK_GROUP_TAP_COUNT_5"},
     // The groups of Lighting's lists beside an editor (webview/ui/groups.mjs
     // groupedTable): the layers and slots in use, ahead of the empty ones;
     // Behaviour feedback's two groups of colours, as the behaviour grid's columns

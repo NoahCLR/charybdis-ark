@@ -12,7 +12,7 @@ import {behaviourEditorRow, behaviourHasTiming, behaviourThresholds} from "./beh
 import {comboBehaviours} from "./combo-reach.mjs";
 import {customKeyOf, customKeyShortcutOnly, hasShortcut} from "./custom-key.mjs";
 import {pdColourRow} from "./lighting.mjs";
-import {phrasesJoined, vocabulary, word} from "./vocabulary.mjs";
+import {localityInText, phrasesJoined, vocabulary, word} from "./vocabulary.mjs";
 
 /**
  * @typedef {import("../../contracts/panel.js").PublishedModel | null} Model
@@ -76,7 +76,7 @@ export function keyReach(view, layer, position, index, combos = view.combos.show
 /** @param {Model} model @param {number} slot */
 const paintsWhere = (model, slot) => {
     const locality = pdColourRow(model, slot)?.locality;
-    return locality ? word(vocabulary(model).localities, locality).toLowerCase() : "its locality";
+    return locality ? localityInText(model, locality) : "its locality";
 };
 
 // `layer` supplies the key, so its switches decide whether the row runs. The

@@ -10,7 +10,7 @@ import {keyIdentity, sameKey} from "./key-identity.mjs";
 import {keyMeaning} from "./keyface.mjs";
 import {masterOff} from "./participation.mjs";
 import {vocabulary} from "./vocabulary.mjs";
-import {OFF, inheritsStageColour, layerPaints, ledColour, replacementPaints} from "../../rules/led-light.mjs";
+import {OFF, colourPaints, inheritsStageColour, ledColour, ledsOff} from "../../rules/led-light.mjs";
 
 /**
  * @typedef {Partial<import("../../contracts/panel.js").PublishedModel> | null | undefined} Model
@@ -184,7 +184,7 @@ export function feedbackColours(model) {
         tap: feedback?.tapCommittedColor || OFF,
         hold: feedback?.holdActiveColor || OFF,
         long: feedback?.longHoldActiveColor || OFF,
-        branches: feedback?.tapBranchColors || [],
+        branches: (feedback?.tapBranches || []).map((branch) => branch.color),
     };
 }
 
@@ -203,7 +203,14 @@ const isMapped = (model, position) => {
 export const mappedKeyCount = (model, layer) => (layer?.positions || []).filter((position) => isMapped(model, position)).length;
 
 // The firmware's rules for "no colour" (rules/led-light.mjs).
-export {inheritsStageColour, layerPaints, replacementPaints};
+export {colourPaints, inheritsStageColour};
+// Passthrough, as the keyboard means it for every colour a layer, a pointing
+// slot, combo feedback or a feedback case owns (D-L94, firmware D-F74), and
+// off, value 0 with saturation, its LEDs dark: the shared rule, said as the
+// screens ask it.
+/** @param {import("../../contracts/edits.js").Colour | null | undefined} colour */
+export const isPassthrough = (colour) => !colourPaints(colour);
+export const isOff = ledsOff;
 
 // The key a replacement case's preview follows (D-L89, D-L92). On the
 // keyboard it is the key that ended the word, the Backspace that undid the
@@ -227,7 +234,7 @@ export function replacementTrigger(model, layer, keycode) {
 // vocabulary's words (colourOff), spread into its options. A layer colour is
 // the one stage colour where black is not black (an accent's black takes its
 // stage's colour, which the accent editor offers as a choice of its own).
-/** @param {import("./vocabulary.mjs").VocabularyModel | null | undefined} model @param {string} stage @returns {{offTip?: string, offNote?: string, offAction?: string, offWord?: string}} */
+/** @param {import("./vocabulary.mjs").VocabularyModel | null | undefined} model @param {string} stage @returns {{offTip?: string, offNote?: string, offAction?: string, offWord?: string, ledsOffTip?: string, ledsOffNote?: string}} */
 export const offWording = (model, stage) => vocabulary(model).colourOff[stage] || {};
 
 
@@ -249,11 +256,12 @@ function mappedOn(model, layer, l, position) {
  *   so the default layer shows through a mapped-keys-only layer above it) →
  *   the layers' accents → a held combo whose output runs the pointing mode →
  *   a previewed pointing mode by locality → its accents → any other held
- *   combo by locality → its accents → a previewed replacement flash by
+ *   combo by locality → its accents → a previewed behaviour feedback case
+ *   by its locality → its accents → a previewed replacement flash by
  *   locality → its accents (rules/led-light.mjs).
  *
  * The answer says what painted the LED last: `source` is the stage ("off",
- * "base", "layer", "pointing", "combo" or "replacement") and, for a layer,
+ * "base", "layer", "pointing", "combo", "behaviour" or "replacement") and, for a layer,
  * `layer` is its id.
  *
  * `options.held` names the layers previewed on as well (by layer id); they
@@ -279,6 +287,8 @@ function ledLight(model, layer, led, position, options = {}) {
     const held = options.comboActive;
     const flash = options.replacementActive;
     const flashAccents = flash ? (model?.rgb?.autocorrectFeedbackAccents || []).filter(lit) : [];
+    const shows = options.behaviourActive;
+    const showsAccents = shows ? (model?.rgb?.keyFeedbackAccents || []).filter(lit) : [];
     return ledColour({
         off: lightingOff(model),
         base: base ? {colour: base, source: animated ? "animated" : "base"} : null,
@@ -294,6 +304,11 @@ function ledLight(model, layer, led, position, options = {}) {
         combo: held && stageEnabled(model, "combo") ? {colour: held.color,
             reaches: position ? inLocality(position.layoutIndex, held.locality, held.inputs) : trackballInLocality(held.locality, held.inputs),
             groups: (model?.rgb?.comboAccents || []).filter(lit).map((group) => group.color), beneath: Boolean(held.beneath)} : null,
+        behaviour: shows && stageEnabled(model, "key") ? {colour: shows.color,
+            reaches: position ? inLocality(position.layoutIndex, shows.locality, shows.triggerIndex) : trackballInLocality(shows.locality, shows.triggerIndex),
+            every: showsAccents.filter((group) => group.owner === vocabulary(model).accents.keyBehavior?.everyOwner).map((group) => group.color),
+            group: showsAccents.filter((group) => group.owner === vocabulary(model).accents.keyBehavior?.group?.owner && vocabulary(model).accents.keyBehavior?.group?.members.includes(shows.owner)).map((group) => group.color),
+            own: showsAccents.filter((group) => group.owner === shows.owner).map((group) => group.color)} : null,
         replacement: flash && stageEnabled(model, "autocorrect") ? {colour: flash.color,
             reaches: position ? inLocality(position.layoutIndex, flash.locality, flash.triggerIndex) : trackballInLocality(flash.locality, flash.triggerIndex),
             every: flashAccents.filter((group) => group.owner === vocabulary(model).accents.autocorrect?.everyOwner).map((group) => group.color),
@@ -319,10 +334,10 @@ export function trackballLight(model, layer, options = {}) {
 }
 
 // Whether an LED's light is the viewed layer's own rather than seen through it
-// from beneath: that layer, a previewed pointing mode or a previewed
-// replacement flash, the last stage, painted it last, or the viewed layer is
+// from beneath: that layer, a previewed pointing mode, a previewed behaviour
+// feedback case or a previewed replacement flash painted it last, or the viewed layer is
 // base, which nothing lies under — the background effect is the floor base
 // sits on, always on with it, not a layer below it.
 /** @param {import("./types.js").LedLight | null | undefined} light @param {number} [layerId] */
 export const ownLight = (light, layerId = 0) =>
-    layerId === 0 || light?.source === "pointing" || light?.source === "replacement" || (light?.source === "layer" && light.layer === layerId);
+    layerId === 0 || light?.source === "pointing" || light?.source === "behaviour" || light?.source === "replacement" || (light?.source === "layer" && light.layer === layerId);

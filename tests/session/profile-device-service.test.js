@@ -131,7 +131,7 @@ function readPages(options = {}) {
     const capabilityIdentity = Buffer.alloc(25);
     const featureFlags = (PROFILE_WIRE_FEATURES.SPLIT_KEYBOARD | PROFILE_WIRE_FEATURES.POINTING
         | (options.mutation ? PROFILE_WIRE_KNOWN_MASKS.CURRENT_MUTATION_FEATURES : 0)) >>> 0;
-    capabilityIdentity.set([options.capabilityLayout ?? 3, PROFILE_WIRE_V1.CAPABILITY_PAGE_COUNT, PROFILE_WIRE_V1.PROTOCOL_MAJOR, PROFILE_WIRE_V1.PROTOCOL_MINOR, options.schemaMajor || 4, options.schemaMajor ? 0 : 7, 32, options.mutation ? 20 : 0, 2], 0);
+    capabilityIdentity.set([options.capabilityLayout ?? 3, PROFILE_WIRE_V1.CAPABILITY_PAGE_COUNT, PROFILE_WIRE_V1.PROTOCOL_MAJOR, PROFILE_WIRE_V1.PROTOCOL_MINOR, options.schemaMajor || 4, options.schemaMajor ? 0 : 8, 32, options.mutation ? 20 : 0, 2], 0);
     capabilityIdentity.writeUInt32LE(featureFlags, 9);
     capabilityIdentity.writeUInt32LE(options.actionAbiDigest ?? 0x12345678, 13);
     const capacity = Buffer.from([
@@ -351,7 +351,7 @@ test("compatibility reports a schema blocker, and the diagnostic says what was c
     const scanned = await service.enumerate();
     const connected = await service.connect(scanned.devices[0].id);
     assert.equal(connected.compatibility.compatible, false);
-    assert.match(connected.compatibility.reasons.join("\n"), /Profile schema is 1\.0; Charybdis Ark requires 4\.7/);
+    assert.match(connected.compatibility.reasons.join("\n"), /Profile schema is 1\.0; Charybdis Ark requires 4\.8/);
     assert.match(connected.diagnostics.join("\n"), /found \d+ blocking issue/);
 });
 

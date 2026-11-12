@@ -12,7 +12,7 @@ import {currentView, getModel, render, state} from "../../store.mjs";
 import {draftDot, draftMarks} from "../../view/review.mjs";
 import {attachReachRows, reachAttrs, reachTable, rowPick} from "../groups.mjs";
 import {mark, slotNamedWithKeycodes} from "../marks.mjs";
-import {slotNamed, vocabulary, word} from "../../view/vocabulary.mjs";
+import {localityInText, slotNamed, vocabulary, word} from "../../view/vocabulary.mjs";
 import {layersNamed, layersOfMask, pointingReachLines} from "./reach.mjs";
 
 /** @param {HTMLElement} body @param {HTMLElement} right */
@@ -50,7 +50,7 @@ export function tabPointing(body, right) {
         /** @type {[string, string | null][]} */
         const keycodes = /** @type {[string, string][]} */ ([["hold", hold], ["lock", lock]]).filter(([how, code]) => code && (!variants || variants.includes(how)));
         if (started) keycodes.push([words.linkLabels.started, null]);
-        const paints = slot.kind ? `Its colour paints ${row?.locality ? word(vocabulary(model).localities, row.locality).toLowerCase() : "its locality"} while the mode runs.` : "";
+        const paints = slot.kind ? `Its colour paints ${row?.locality ? localityInText(model, row.locality) : "its locality"} while the mode runs.` : "";
         return `<tr${reachAttrs("pointing", group, slot.id)}>
             <td>${rowPick("pointing", group, slot.id, `<span class="slot-named"><span${paints ? ` data-tip="${esc(paints)}"` : ""}>${mark(model, {kind: "pointing", slot: slot.id})}</span>
                 ${slotNamedWithKeycodes(slotNamed(slot), keycodes)}${changedSlots.has(slot.id) ? draftDot(model?.draft) : ""}</span>`)}</td>

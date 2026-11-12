@@ -12,7 +12,7 @@ const fixture = require("../fixtures/portable-profile");
 
 test("one canonical registry pins every current domain's identity, version, wire bit and model names", () => {
     assert.deepEqual(PROFILE_DOMAINS.map(({name, id, key, readKey, version, wireBit, area}) => ({name, id, key, readKey, version, wireBit, area})), [
-        {name: "RGB", id: 16, key: "rgb", readKey: "rgb", version: 6, wireBit: 1, area: "lighting"},
+        {name: "RGB", id: 16, key: "rgb", readKey: "rgb", version: 7, wireBit: 1, area: "lighting"},
         {name: "KEY_BEHAVIORS", id: 32, key: "behaviors", readKey: "keyBehaviors", version: 2, wireBit: 2, area: "behaviours"},
         {name: "COMBOS", id: 48, key: "combos", readKey: "combos", version: 3, wireBit: 4, area: "combos"},
         {name: "SETTINGS", id: 64, key: "settings", readKey: "settings", version: 13, wireBit: 8, area: "settings"},

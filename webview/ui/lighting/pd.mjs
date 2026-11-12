@@ -1,13 +1,13 @@
 // @ts-check
 import {el, esc} from "../../lib/dom.mjs";
-import {css, isOff} from "../../lib/colour.mjs";
+import {css} from "../../lib/colour.mjs";
 import {post, render, state} from "../../store.mjs";
 import {editGate} from "../../view/edit-gate.mjs";
-import {offWording, POINTING_MODE_IDS, pdColourRow} from "../../view/lighting.mjs";
+import {isOff, isPassthrough, offWording, pdColourRow, POINTING_MODE_IDS} from "../../view/lighting.mjs";
 import {slotCalled as slotName, slotNamed, vocabulary} from "../../view/vocabulary.mjs";
 import {draftDot, draftMarks} from "../../view/review.mjs";
 import * as edits from "../../view/edits.mjs";
-import {aboutStage, colourControl, lightingGroup, localityLabel, paintsSection, section, stack} from "./common.mjs";
+import {aboutStage, colourControl, lightingGroup, localityField, paintsCell, paintsSection, section, stack} from "./common.mjs";
 import {accentsSection} from "./accents.mjs";
 import {attachPickRows, groupedTable, pickButton, pickableRow} from "../groups.mjs";
 import {EMPTY_SLOTS_TIP, EMPTY_SLOTS_TITLE} from "../../view/slot-bank.mjs";
@@ -33,11 +33,11 @@ export function stagePointing(model) {
     /** @param {import("../../../contracts/panel.js").PublishedModel["pdModes"][number]} slot */
     const slotRow = (slot) => {
         const row = pdColourRow(model, slot.id);
-        const lit = row && !isOff(row.color);
+        const lit = row && !isPassthrough(row.color) && !isOff(row.color);
         const on = slot.id === state.pointingSlot;
         return pickableRow(`${slot.id}`, on, [
             pickButton(`lighting-pointing:${slot.id}`, on, `<span class="mk-swatch lead ${lit ? "" : "swatch-off"}" style="${lit ? `background:${css(row.color)}` : ""}"></span>${esc(slotNamed(slot))}${marks.lightingSlots.has(slot.id) ? draftDot(model?.draft) : ""}`),
-            `<span class="muted">${esc(!row ? "not reported" : `${lit ? "" : "black · "}${localityLabel(row.locality).toLowerCase()}`)}</span>`,
+            `<span class="muted">${esc(!row ? "not reported" : paintsCell(row.color, row.locality))}</span>`,
         ], {data: {slot: slot.id}, quiet: !slot.kind});
     };
     const list = groupedTable({scroll: "pd", draft: model?.draft, columns: [["Pointing mode", "52%"], ["Paints", "48%"]], groups: [
@@ -55,13 +55,9 @@ export function stagePointing(model) {
         onChange: (next) => { if (row) post(edits.pdModeColour(POINTING_MODE_IDS[state.pointingSlot], row.locality, next)); },
     }));
     const where = paintsSection(model, "pd", "Where it paints");
-    const locality = el(`<label class="field"><span>${esc(vocabulary(model).lightingFields.locality)}</span>
-        <select data-f="lighting:pointing:${esc(state.pointingSlot)}:locality" class="input" ${canEdit ? "" : "disabled"}
-            data-tip="Where the colour paints while the mode runs. The trigger key choices follow the key that started it, and paint every key when no key did.">
-        ${vocabulary(model).localities.map(([id, text]) => `<option value="${esc(id)}" ${row?.locality === id ? "selected" : ""}>${esc(text)}</option>`).join("")}</select></label>`);
-    /** @type {HTMLSelectElement} */ (locality.querySelector("select")).addEventListener("change", (event) =>
-        { if (row) post(edits.pdModeColour(POINTING_MODE_IDS[state.pointingSlot], /** @type {HTMLSelectElement} */ (event.target).value, row.color)); });
-    where.append(stack(locality));
+    where.append(stack(localityField(model, {f: `lighting:pointing:${state.pointingSlot}:locality`, value: row?.locality, canEdit,
+        tip: "Where the colour paints while the mode runs. The trigger key choices follow the key that started it, and paint every key when no key did.",
+        onChange: (locality) => { if (row) post(edits.pdModeColour(POINTING_MODE_IDS[state.pointingSlot], locality, row.color)); }})));
     main.append(colour, where, aboutStage("While the mode runs, its colour paints over the layer's colour in the area chosen above. The board shows it running, as it paints with no layer it is linked to on."));
     const accents = accentsSection(model, "pd");
     if (accents) main.append(accents);

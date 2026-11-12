@@ -6,11 +6,13 @@
 // its colour where it paints, then the layers' accents, then a held combo's
 // feedback where its output runs the pointing mode, then a running pointing
 // mode's colour where it reaches and its accents, then any other held
-// combo's feedback where it reaches and its accents, and last a replacement
+// combo's feedback where it reaches and its accents, then a behaviour
+// feedback case where it reaches and its accents, and last a replacement
 // flash where it reaches and its accents. The interface's lighting preview
 // runs it as a person turns layers on, holds a pointing mode, holds a combo
-// or picks a replacement flash (webview/view/lighting.mjs); what it paints
-// with it reads from the model (D-L73).
+// or picks a behaviour feedback case or a replacement flash
+// (webview/view/lighting.mjs); what it paints with it reads from the model
+// (D-L73).
 
 /** @typedef {{h?: string | number, s?: string | number, v?: string | number}} Colour */
 /**
@@ -21,21 +23,25 @@
  * @property {{colour: Colour | null | undefined, owners: number[]}[]} layerGroups The layer accents that light this LED, in stored order, with the layers on that own each.
  * @property {{colour: Colour, reaches: boolean, groups: (Colour | null | undefined)[]} | null} pointing A running pointing mode's stage, null when none runs or it is off: its colour, whether its locality reaches this LED, and its groups that hold this LED.
  * @property {{colour: Colour, reaches: boolean, groups: (Colour | null | undefined)[], beneath?: boolean} | null} [combo] A held combo's feedback, null when none is held, it holds a momentary layer (the layer stage shows the hold) or the stage is off: its colour, whether its locality reaches this LED, its accents that hold this LED, and whether it paints beneath the pointing mode, as one whose output runs that mode does (firmware stage 3).
+ * @property {{colour: Colour, reaches: boolean, every: (Colour | null | undefined)[], group?: (Colour | null | undefined)[], own: (Colour | null | undefined)[]} | null} [behaviour] A behaviour feedback case showing (firmware stage 7), null when none shows or the stage is off: its colour, whether its own locality reaches this LED (firmware D-F73), and its accents that hold this LED, those for every state (`every`), for every tap branch when it is one (`group`, firmware D-F75) and for its own (`own`), each in stored order.
  * @property {{colour: Colour, reaches: boolean, every: (Colour | null | undefined)[], own: (Colour | null | undefined)[]} | null} [replacement] A replacement flash showing (firmware stage 8), null when none shows or the stage is off: its case's colour, whether its locality reaches this LED, and its accents that hold this LED, those for every case (`every`) and those for its own (`own`), each in stored order.
  */
 
 export const OFF = Object.freeze({h: "0", s: "0", v: "0"});
 
-// Two firmware rules for "no colour": a layer colour is skipped only when both
-// saturation and value are 0 (rgb_layer_stage.c), and a group row stored as
-// HSV(0, 0, 0) inherits its stage colour instead of painting black
-// (rgb_helpers.h rgb_hsv_is_inherit_color).
+// Two firmware rules for "no colour" (firmware D-F74): a colour a layer, a
+// pointing slot, combo feedback or a feedback case owns is passthrough when
+// its saturation and value are 0, at any hue, and paints nothing; value 0
+// with saturation is off, which turns its LEDs dark. A group row stored as
+// HSV(0, 0, 0) takes its owner's colour instead of painting black
+// (rgb_helpers.h rgb_hsv_is_inherit_color). The auto-mouse end colour is
+// neither: it is literal.
 /** @param {Colour | null | undefined} colour */
-export const layerPaints = (colour) => Boolean(colour) && !(Number(colour?.s) === 0 && Number(colour?.v) === 0);
-// A replacement feedback colour follows the layer colour's rule (firmware
-// D-F70): with saturation and value 0, at any hue, its case does not flash;
-// with brightness alone at zero it flashes black.
-export const replacementPaints = layerPaints;
+export const colourPaints = (colour) => Boolean(colour) && !(Number(colour?.s) === 0 && Number(colour?.v) === 0);
+// Off: value 0 with saturation above 0, which turns an owned colour's LEDs
+// off, dark over what is beneath (black, in HSV's words).
+/** @param {Colour | null | undefined} colour */
+export const ledsOff = (colour) => Boolean(colour) && Number(colour?.s) > 0 && Number(colour?.v) === 0;
 /** @param {Colour | null | undefined} colour */
 export const inheritsStageColour = (colour) => !colour || (Number(colour?.h) === 0 && Number(colour?.s) === 0 && Number(colour?.v) === 0);
 
@@ -43,7 +49,7 @@ export const inheritsStageColour = (colour) => !colour || (Number(colour?.h) ===
  * The colour one LED shows, which stage painted it, and the layer that did.
  * @param {LedStages} stages @returns {{colour: Colour, source: string, layer?: number | null}}
  */
-export function ledColour({off, base, layers, layerGroups, pointing, combo = null, replacement = null}) {
+export function ledColour({off, base, layers, layerGroups, pointing, combo = null, behaviour = null, replacement = null}) {
     if (off) return {colour: OFF, source: "off"};
     /** @type {Colour} */
     let colour = base?.colour || OFF;
@@ -53,43 +59,49 @@ export function ledColour({off, base, layers, layerGroups, pointing, combo = nul
     /** @param {Colour} next @param {string} from @param {number | null} [by] */
     const paint = (next, from, by = null) => { colour = next; source = from; painter = by; };
     if (layers) {
-        for (const {layer, colour: own, paints} of layers) if (own && layerPaints(own) && paints) paint(own, "layer", layer);
+        for (const {layer, colour: own, paints} of layers) if (own && colourPaints(own) && paints) paint(own, "layer", layer);
         for (const group of layerGroups) {
             for (const layer of group.owners) {
                 const own = layers.find((row) => row.layer === layer)?.colour;
                 if (!inheritsStageColour(group.colour)) paint(/** @type {Colour} */ (group.colour), "layer", layer);
-                else if (own && layerPaints(own)) paint(own, "layer", layer);
+                else if (own && colourPaints(own)) paint(own, "layer", layer);
             }
         }
     }
-    /** @param {NonNullable<LedStages["combo"]>} held */
-    const paintCombo = (held) => {
-        if (held.reaches) paint(held.colour, "combo");
-        for (const group of held.groups) paint(inheritsStageColour(group) ? held.colour : /** @type {Colour} */ (group), "combo");
+    // An owner's stage: its colour where it reaches, then its accents in
+    // order, a black one in its colour. A passthrough owner paints nothing,
+    // nor do its accents that take its colour; a coloured accent still does.
+    /** @param {{colour: Colour, reaches: boolean}} owner @param {(Colour | null | undefined)[]} groups @param {string} from */
+    const paintOwned = (owner, groups, from) => {
+        const paints = colourPaints(owner.colour);
+        if (paints && owner.reaches) paint(owner.colour, from);
+        for (const group of groups) {
+            if (!inheritsStageColour(group)) paint(/** @type {Colour} */ (group), from);
+            else if (paints) paint(owner.colour, from);
+        }
     };
+    /** @param {NonNullable<LedStages["combo"]>} held */
+    const paintCombo = (held) => paintOwned(held, held.groups, "combo");
     // A combo whose output runs the pointing mode paints beneath it (stage
     // 3), so the mode covers it where it paints.
     if (combo?.beneath) paintCombo(combo);
     if (pointing) {
-        // Black is black: outside layer colours HSV(0, 0, 0) paints the LEDs
-        // dark while the mode runs.
-        if (pointing.reaches) paint(pointing.colour, "pointing");
-        for (const group of pointing.groups) paint(inheritsStageColour(group) ? pointing.colour : /** @type {Colour} */ (group), "pointing");
+        // A passthrough mode paints nothing; black paints its area dark.
+        paintOwned(pointing, pointing.groups, "pointing");
     }
-    // Any other combo paints above them all (stage 6); black is black here
-    // too.
+    // Any other combo paints above them all (stage 6).
     if (combo && !combo.beneath) paintCombo(combo);
+    // A behaviour feedback case paints next (stage 7). Its accents paint
+    // widest first, those for every state, then for every tap branch, then
+    // those naming it (firmware D-F75), and a black one takes the case's
+    // colour.
+    if (behaviour) paintOwned(behaviour, [...behaviour.every, ...(behaviour.group || []), ...behaviour.own], "behaviour");
     // A replacement flash paints last. A case whose colour paints nothing
     // does not flash, and neither do its accents that take its colour; an
     // accent in a colour of its own still lights. Accents for every case
     // paint before those naming one, so the narrower repaints them.
     if (replacement) {
-        const flashes = replacementPaints(replacement.colour);
-        if (flashes && replacement.reaches) paint(replacement.colour, "replacement");
-        for (const group of [...replacement.every, ...replacement.own]) {
-            if (!inheritsStageColour(group)) paint(/** @type {Colour} */ (group), "replacement");
-            else if (flashes) paint(replacement.colour, "replacement");
-        }
+        paintOwned(replacement, [...replacement.every, ...replacement.own], "replacement");
     }
     return {colour, source, layer: painter};
 }

@@ -7,24 +7,31 @@
 
 // Selector assertions refer to elements created by this module's authored markup.
 import {brightnessLimit, clampHsv, css, hsv, label as hsvLabel, rgb, valuePercent} from "../lib/colour.mjs";
-import {inheritsStageColour} from "../view/lighting.mjs";
+import {inheritsStageColour, isPassthrough} from "../view/lighting.mjs";
 import {el, esc} from "../lib/dom.mjs";
 
 // `offTip` offers Turn off, storing HSV(0, 0, 0), and says what that does in
 // this stage (`offWording` in view/lighting.mjs); without it there is no Turn
 // off, as for the background effect. A colour turned off reads "Off", never
-// its stored numbers; the callout says what off means here. Where off has a
-// name of its own (a layer's passthrough), `offAction` and `offWord` replace
-// Turn off and Off. `off` says the colour is off where the stage has a rule
-// of its own for that (a replacement case's, off at any hue with no
-// saturation or brightness); otherwise it is off as HSV(0, 0, 0).
-/** @param {{identity: string, colour: import("../../contracts/edits.js").Colour | null | undefined, title: string, canEdit?: boolean, onChange?: (colour: import("../../contracts/edits.js").Colour) => void, offNote?: string, offTip?: string, offAction?: string, offWord?: string, off?: boolean, maximumBrightness?: number}} options */
-export function colourEditor({identity, colour, title, canEdit = true, onChange, offNote, offTip, offAction = "Turn off", offWord = "Off", off = inheritsStageColour(colour), maximumBrightness}) {
+// its stored numbers; the callout says what off means here. A colour an
+// owner has (a layer's, a pointing slot's, combo feedback's or a feedback
+// case's, D-L94) comes with `ledsOffTip`: there off is passthrough, at any hue
+// with no saturation or brightness (firmware D-F74), `offAction` and
+// `offWord` say so (Make passthrough, Passthrough), and an Off choice beside
+// it stores brightness 0 with saturation, which `ledsOffNote` explains once
+// stored. Otherwise the colour is off as HSV(0, 0, 0).
+/** @param {{identity: string, colour: import("../../contracts/edits.js").Colour | null | undefined, title: string, canEdit?: boolean, onChange?: (colour: import("../../contracts/edits.js").Colour) => void, offNote?: string, offTip?: string, offAction?: string, offWord?: string, ledsOffTip?: string, ledsOffNote?: string, off?: boolean, maximumBrightness?: number}} options */
+export function colourEditor({identity, colour, title, canEdit = true, onChange, offNote, offTip, offAction = "Turn off", offWord = "Off", ledsOffTip, ledsOffNote,
+    off = ledsOffTip ? isPassthrough(colour) : inheritsStageColour(colour), maximumBrightness}) {
     const [h, s, v] = hsv(colour);
     const maximum = brightnessLimit(maximumBrightness);
     const node = el(`<div class="stack gap-12"></div>`);
     /** @param {number[]} next */
     const commit = (next) => onChange?.(clampHsv(next, maximum));
+    // Off keeps the hue, and the saturation when there is one.
+    const ledsOffChoice = () => el(`<button class="btn tiny ghost" data-leds-off data-tip="${esc(ledsOffTip || "")}">Off</button>`);
+    /** @param {HTMLElement} button */
+    const onLedsOff = (button) => button.addEventListener("click", () => commit([h, s || 255, 0]));
 
     if (off) {
         node.append(el(`<div class="row colour-head"><span class="swatch-lg swatch-off"></span>
@@ -33,7 +40,12 @@ export function colourEditor({identity, colour, title, canEdit = true, onChange,
         if (canEdit) {
             const give = el(`<button class="btn self-start">Give it a colour</button>`);
             give.addEventListener("click", () => commit([140, 255, Math.min(200, maximum)]));
-            node.append(give);
+            if (ledsOffTip) {
+                const row = el(`<div class="row gap-8"></div>`), choice = ledsOffChoice();
+                onLedsOff(choice);
+                row.append(give, choice);
+                node.append(row);
+            } else node.append(give);
         }
         return node;
     }
@@ -42,10 +54,17 @@ export function colourEditor({identity, colour, title, canEdit = true, onChange,
         <span class="swatch-lg" style="background:${css(colour)}"></span>
         <div><div class="colour-title">${esc(title)}</div>
             <div class="note mono">${esc(hsvLabel(colour))} · rgb(${esc(rgb(colour).join(", "))})</div></div>
-        ${canEdit && offTip ? `<button class="btn tiny ghost" data-off data-tip="${esc(offTip)}">${esc(offAction)}</button>` : ""}</div>`);
+        ${canEdit && offTip && !ledsOffTip ? `<button class="btn tiny ghost" data-off data-tip="${esc(offTip)}">${esc(offAction)}</button>` : ""}</div>`);
     node.append(head);
-    if (v === 0) node.append(el(`<p class="note">Brightness is zero. Hue and saturation are retained; raise brightness to use this colour again.</p>`));
-    /** @type {HTMLElement | null} */ (head.querySelector("[data-off]"))?.addEventListener("click", () => commit([0, 0, 0]));
+    // An owner's colour offers its two choices on a row of their own under
+    // its name: Make passthrough, and Off while it is not already off.
+    if (canEdit && ledsOffTip) {
+        const actions = el(`<div class="row gap-8">${offTip ? `<button class="btn tiny ghost" data-off data-tip="${esc(offTip)}">${esc(offAction)}</button>` : ""}</div>`);
+        if (v !== 0) { const choice = ledsOffChoice(); onLedsOff(choice); actions.append(choice); }
+        node.append(actions);
+    }
+    if (v === 0) node.append(el(`<p class="note">${esc(ledsOffTip && ledsOffNote ? ledsOffNote : "Brightness is zero. Hue and saturation are retained; raise brightness to use this colour again.")}</p>`));
+    /** @type {HTMLElement | null} */ (node.querySelector("[data-off]"))?.addEventListener("click", () => commit([0, 0, 0]));
 
     const topWhite = css({h: "0", s: "0", v: String(maximum)});
     const topHue = css({h: String(h), s: "255", v: String(maximum)});

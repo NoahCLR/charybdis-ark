@@ -10,7 +10,7 @@ Replacement feedback tab (D-L89) as the other three cases are edited, with
 nothing of its own. It arrives in lighting domain version 6 under profile
 schema 4.7, the only ones Ark reads (D-L64): the record gains the leading
 colour after the undone colour (`leadingColor`), and a replacement accent may
-name the new case.
+name the new case. Amended by D-L93: Leader waiting has its own locality, as every case does (lighting version 7, schema 4.8).
 
 ## The name
 

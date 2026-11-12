@@ -473,15 +473,15 @@ test("Settings marks the Multi tap window with an N× badge in every tap-branch 
     expect(offsets).toHaveLength(3);
     expect(offsets.every((offset) => offset < 1)).toBe(true);
 
-    // Red, an off colour, blue and green: four tap counts, so four quarters,
-    // the off one left empty. Drawn on its own and large, on a known ground,
+    // Red, a passthrough colour, blue and green: four tap counts, so four
+    // quarters, the passthrough one left empty. Drawn on its own and large, on a known ground,
     // so each quarter is many pixels wide.
     await page.evaluate(async () => {
         const {getModel} = await import("/webview/store.mjs");
         const {mark} = await import("/webview/ui/marks.mjs");
         const {html} = await import("/webview/lib/dom.mjs");
         const model = structuredClone(getModel());
-        model.rgb.keyBehaviorFeedback.tapBranchColors = [{h: "0", s: "255", v: "255"}, {h: "0", s: "255", v: "0"}, {h: "170", s: "255", v: "255"}, {h: "85", s: "255", v: "255"}];
+        model.rgb.keyBehaviorFeedback.tapBranches = [{h: "0", s: "255", v: "255"}, {h: "0", s: "0", v: "0"}, {h: "170", s: "255", v: "255"}, {h: "85", s: "255", v: "255"}].map(color => ({color, locality: "RGB_KEY_HALF"}));
         const box = Object.assign(document.createElement("div"), {id: "drawn", innerHTML: html(`<span class="mk">${mark(model, {kind: "branches"})}</span>`)});
         box.style.cssText = "position: fixed; left: 0; top: 0; z-index: 999; padding: 8px; background: rgb(20, 20, 20); zoom: 4";
         document.body.appendChild(box);

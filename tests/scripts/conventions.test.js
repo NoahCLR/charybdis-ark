@@ -384,7 +384,7 @@ test("the posting check catches an object assembled inline", () => {
     }
     for (const sample of ["post(edits.setKey(layer.name, index, keycode));", "post(controls.control(\"refresh\"));",
         "if (message) post(message);", "post(leave.message);", "postLeavingDemo(chooseKeyboard());",
-        "post(edits.keyFeedback(feedback, null, null, {locality: value}));", "post(live ? controls.saveDraft(true) : controls.applyDraft(true));",
+        "post(edits.keyFeedback(feedback, null, null, {tapCommitMode: value}));", "post(live ? controls.saveDraft(true) : controls.applyDraft(true));",
         "post(edits.settingsSection(section, (field) => { return field.macro === \"x\"; }));", "post(controls.control(\"{\"));"]) {
         assert.deepEqual(postsInlineObjects(sample), [], sample);
     }

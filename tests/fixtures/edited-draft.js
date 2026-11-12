@@ -46,10 +46,15 @@ function editedDraft() {
     const feedback = validateSnapshot(draft.document).rgb.keyFeedback;
     /** @param {Record<string, number>} names @param {number} value */
     const named = (names, value) => Object.keys(names).find((name) => names[name] === value);
+    /** @param {number} value */
+    const where = (value) => named(RGB_LOCALITIES, value);
     stage({type: "updateKeyBehaviorFeedback", config: {...feedback, holdActiveColor: {h: 5, s: 6, v: 7},
-        tapCommitMode: named(RGB_TAP_COMMIT_MODES, feedback.tapCommitMode), locality: named(RGB_LOCALITIES, feedback.locality)}});
+        tapBranches: feedback.tapBranches.map((branch) => ({...branch, locality: where(branch.locality)})),
+        tapCommittedLocality: where(feedback.tapCommittedLocality), holdActiveLocality: "RGB_BOTH_HALVES", longHoldActiveLocality: where(feedback.longHoldActiveLocality),
+        tapCommitMode: named(RGB_TAP_COMMIT_MODES, feedback.tapCommitMode)}});
     const replacement = validateSnapshot(draft.document).rgb.autocorrectFeedback;
-    stage({type: "updateAutocorrectFeedback", config: {...replacement, undoColor: {h: 8, s: 9, v: 10}, locality: named(RGB_LOCALITIES, replacement.locality)}});
+    stage({type: "updateAutocorrectFeedback", config: {...replacement, undoColor: {h: 8, s: 9, v: 10}, textLocality: where(replacement.textLocality),
+        macroLocality: where(replacement.macroLocality), undoLocality: "RGB_KEYS_ONLY", leadingLocality: where(replacement.leadingLocality)}});
     stage({type: "updateRgbStages", stageEnableMask: validateSnapshot(draft.document).rgb.stageEnableMask ^ 1});
     stage({type: "addRgbLedGroup", group: {target: "layer", owner: "Layer 3", ledIndices: [1, 2, 3], h: 0, s: 0, v: 0}});
     const slot = validateSnapshot(draft.document).pdModes[1];

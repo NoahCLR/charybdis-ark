@@ -1,6 +1,6 @@
 {
   "profile": {
-    "formatVersion": 6,
+    "formatVersion": 7,
     "stageEnableMask": 31,
     "groups": [
       {"id": 0, "leds": []},
@@ -34,17 +34,19 @@
       {"color": {"h": 0, "s": 0, "v": 0}, "groupId": 2}
     ],
     "keyFeedback": {
-      "tapBranchColors": [
-        {"h": 90, "s": 91, "v": 92},
-        {"h": 100, "s": 101, "v": 102},
-        {"h": 110, "s": 111, "v": 112},
-        {"h": 120, "s": 121, "v": 122}
+      "tapBranches": [
+        {"color": {"h": 90, "s": 91, "v": 92}, "locality": 3},
+        {"color": {"h": 100, "s": 101, "v": 102}, "locality": 3},
+        {"color": {"h": 110, "s": 111, "v": 112}, "locality": 3},
+        {"color": {"h": 120, "s": 121, "v": 122}, "locality": 3}
       ],
       "tapCommittedColor": {"h": 0, "s": 0, "v": 130},
+      "tapCommittedLocality": 3,
       "holdActiveColor": {"h": 18, "s": 200, "v": 200},
+      "holdActiveLocality": 3,
       "longHoldActiveColor": {"h": 148, "s": 200, "v": 200},
-      "tapCommitMode": 1,
-      "locality": 3
+      "longHoldActiveLocality": 3,
+      "tapCommitMode": 1
     },
     "keyGroupRows": [
       {"semantic": 255, "color": {"h": 0, "s": 0, "v": 0}, "groupId": 2},
@@ -52,10 +54,13 @@
     ],
     "autocorrectFeedback": {
       "textColor": {"h": 0, "s": 0, "v": 0},
+      "textLocality": 0,
       "macroColor": {"h": 0, "s": 0, "v": 0},
+      "macroLocality": 0,
       "undoColor": {"h": 0, "s": 0, "v": 0},
+      "undoLocality": 0,
       "leadingColor": {"h": 0, "s": 0, "v": 0},
-      "locality": 0
+      "leadingLocality": 0
     },
     "autocorrectGroupRows": []
   },
@@ -109,17 +114,19 @@
         {"color": {"h": "0", "s": "0", "v": "0"}, "ledGroup": "RGB_LED_GROUP_THUMBS", "ledIndices": [0, 1], "ledGroupKind": "reusable"}
       ],
       "keyBehaviorFeedback": {
-        "tapBranchColors": [
-          {"h": "90", "s": "91", "v": "92"},
-          {"h": "100", "s": "101", "v": "102"},
-          {"h": "110", "s": "111", "v": "112"},
-          {"h": "120", "s": "121", "v": "122"}
+        "tapBranches": [
+          {"color": {"h": "90", "s": "91", "v": "92"}, "locality": "RGB_KEY_HALF"},
+          {"color": {"h": "100", "s": "101", "v": "102"}, "locality": "RGB_KEY_HALF"},
+          {"color": {"h": "110", "s": "111", "v": "112"}, "locality": "RGB_KEY_HALF"},
+          {"color": {"h": "120", "s": "121", "v": "122"}, "locality": "RGB_KEY_HALF"}
         ],
         "tapCommittedColor": {"h": "0", "s": "0", "v": "130"},
+        "tapCommittedLocality": "RGB_KEY_HALF",
         "holdActiveColor": {"h": "18", "s": "200", "v": "RGB_MATRIX_MAXIMUM_BRIGHTNESS"},
+        "holdActiveLocality": "RGB_KEY_HALF",
         "longHoldActiveColor": {"h": "148", "s": "200", "v": "RGB_MATRIX_MAXIMUM_BRIGHTNESS"},
-        "tapCommitMode": "KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS",
-        "locality": "RGB_KEY_HALF"
+        "longHoldActiveLocality": "RGB_KEY_HALF",
+        "tapCommitMode": "KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS"
       },
       "keyBehaviorFeedbackLedGroups": [
         {"owner": "KEY_FEEDBACK_GROUP_ALL", "color": {"h": "0", "s": "0", "v": "0"}, "ledGroup": "RGB_LED_GROUP_THUMBS", "ledIndices": [0, 1], "ledGroupKind": "reusable"},

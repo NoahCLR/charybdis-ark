@@ -53,8 +53,8 @@ export interface PanelState {
     macroClipboard: MacroStep[] | null;
     recording: {slot: string; before: string} | null; lastTake: {slot: string; before: string; after: string} | null;
     recordDelays: boolean; recordPreserveHoldTiming: boolean; recordDelayThreshold: number; recordDelayRound: number;
-    /** The accent being added or changed (D-L77): its stage and table, whether it lights for all of the table's owners (else for the one the tab has picked), its place in its table (null for a new one), the LEDs picked, whether a drag on the board adds them or takes them back, its colour and whether it takes its stage's instead. */
-    accent: {stage: string; target: import('../contracts/model.js').AccentTable; every: boolean; index: number | null; leds: number[]; adding: boolean; colour: {h: number; s: number; v: number}; stageColour: boolean} | null;
+    /** The accent being added or changed (D-L77): its stage and table, whether it lights for all of the table's owners, or for the group the picked owner is in (Every tap branch, D-L93; else for the one the tab has picked), its place in its table (null for a new one), the LEDs picked, whether a drag on the board adds them or takes them back, its colour and whether it takes its stage's instead. */
+    accent: {stage: string; target: import('../contracts/model.js').AccentTable; every: boolean; group?: boolean; index: number | null; leds: number[]; adding: boolean; colour: {h: number; s: number; v: number}; stageColour: boolean} | null;
     /** The accent clicked in a Lighting list, glowing on the board until clicked again: the stage it was clicked on, and its key, `table:place` on a stage's tab or `table:owner` on All accents. */
     accentShown: {stage: string; key: string} | null;
 

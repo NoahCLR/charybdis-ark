@@ -23,17 +23,17 @@ test("depth eight survives complete-profile read, edit, history, reorder and par
     const row = {target: {kind: 1, operand: 4}, tapHoldTerm: decoded.settings.values[1], longHoldTerm: 0, multiTapTerm: 0,
         steps: Array.from({length: 8}, (_, tapIndex) => ({tapIndex, tap: {kind: 1, operand: 5}}))};
     blob.domains[1].payload = encodeKeyBehaviorDomain({rows: [row]}, {limits: {maxTapStepsPerBehavior: 8, maxPopulatedSteps: 1024}});
-    decoded.rgb.keyFeedback.tapBranchColors = Array.from({length: 7}, (_, h) => ({h, s: 255, v: 10}));
+    decoded.rgb.keyFeedback.tapBranches = Array.from({length: 7}, (_, h) => ({color: {h, s: 255, v: 10}, locality: 3}));
     blob.domains[0].payload = encodeRgbDomainV1(decoded.rgb, {tapBranchColorCount: 7});
     source.profile = encodeProfileBlob(blob).toString("base64");
     assert.equal(validateSnapshot(source, caps).behaviors.populatedStepCount, 8);
     assert.throws(() => validateSnapshot(source, {...caps, maxTapStepsPerBehavior: 5, maxPopulatedBehaviorSteps: 640}));
     const draft = new ProfileDraftSession({document: source, fingerprint: fingerprint(source), summary: summary(source)}, "test", caps);
-    draft.stage({type: "updateKeyBehaviorFeedback", draftRevision: draft.revision, config: {tapBranchColors: Array.from({length: 7}, (_, h) => ({h: h + 1, s: 255, v: 10})),
-        tapCommittedColor: decoded.rgb.keyFeedback.tapCommittedColor, holdActiveColor: decoded.rgb.keyFeedback.holdActiveColor,
-        longHoldActiveColor: decoded.rgb.keyFeedback.longHoldActiveColor, tapCommitMode: "KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS",
-        locality: "RGB_BOTH_HALVES"}});
-    assert.equal(draft.current.decoded.rgb.keyFeedback.tapBranchColors[6].h, 7);
+    draft.stage({type: "updateKeyBehaviorFeedback", draftRevision: draft.revision, config: {tapBranches: Array.from({length: 7}, (_, h) => ({color: {h: h + 1, s: 255, v: 10}, locality: "RGB_KEYS_ONLY"})),
+        tapCommittedColor: decoded.rgb.keyFeedback.tapCommittedColor, tapCommittedLocality: "RGB_BOTH_HALVES", holdActiveColor: decoded.rgb.keyFeedback.holdActiveColor,
+        holdActiveLocality: "RGB_BOTH_HALVES", longHoldActiveColor: decoded.rgb.keyFeedback.longHoldActiveColor, longHoldActiveLocality: "RGB_BOTH_HALVES",
+        tapCommitMode: "KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS"}});
+    assert.deepEqual(draft.current.decoded.rgb.keyFeedback.tapBranches[6], {color: {h: 7, s: 255, v: 10}, locality: 4});
     draft.undo(draft.revision); assert.equal(draft.current.fingerprint, fingerprint(source));
     draft.redo(draft.revision);
     const item = draft.changes().find(item => item.unit === "rgb:key");

@@ -67,14 +67,14 @@ test("representative RGB payload and whole-profile blob match the shared C/JavaS
     assert.equal(payload.toString("hex"), golden.payloadHex);
     assert.deepEqual(decodeRgbDomainV1(payload, golden.codecOptions), golden.profile);
 
-    const blob = encodeProfileBlob({schema: {major: 4, minor: 7}, domains: [createRgbDomainV1(golden.profile, golden.codecOptions)]});
+    const blob = encodeProfileBlob({schema: {major: 4, minor: 8}, domains: [createRgbDomainV1(golden.profile, golden.codecOptions)]});
     assert.equal(blob.toString("hex"), golden.blobHex);
     assert.equal(fnv1a32(blob), Number.parseInt(golden.fnv1a32, 16));
     assert.equal(crc32(blob), Number.parseInt(golden.crc32, 16));
     const decoded = decodeProfileBlob(blob);
     assert.equal(decoded.domains.length, 1);
     assert.equal(decoded.domains[0].id, PROFILE_DOMAIN_IDS.RGB);
-    assert.equal(decoded.domains[0].version, 6);
+    assert.equal(decoded.domains[0].version, 7);
     assert.deepEqual(decodeRgbDomainV1(decoded.domains[0].payload, golden.codecOptions), golden.profile);
 });
 
@@ -160,7 +160,7 @@ test("complete RGB surfaces and negotiated feature inclusion are enforced", () =
     missingPdMode.pdModeColors.pop();
     assertCode("INCOMPLETE_SURFACE", () => encodeRgbDomainV1(missingPdMode, golden.codecOptions));
     const missingTapColor = clone(golden.profile);
-    missingTapColor.keyFeedback.tapBranchColors.pop();
+    missingTapColor.keyFeedback.tapBranches.pop();
     assertCode("INCOMPLETE_SURFACE", () => encodeRgbDomainV1(missingTapColor, golden.codecOptions));
 
     const unsupportedEnable = clone(golden.profile);
@@ -183,15 +183,18 @@ test("complete RGB surfaces and negotiated feature inclusion are enforced", () =
     layerOnly.comboFeedback = {color: {h: 0, s: 0, v: 0}, locality: 0};
     layerOnly.comboGroupRows = [];
     layerOnly.keyFeedback = {
-        tapBranchColors: [],
+        tapBranches: [],
         tapCommittedColor: {h: 0, s: 0, v: 0},
+        tapCommittedLocality: 0,
         holdActiveColor: {h: 0, s: 0, v: 0},
+        holdActiveLocality: 0,
         longHoldActiveColor: {h: 0, s: 0, v: 0},
+        longHoldActiveLocality: 0,
         tapCommitMode: 0,
-        locality: 0,
     };
     layerOnly.keyGroupRows = [];
-    layerOnly.autocorrectFeedback = {textColor: {h: 0, s: 0, v: 0}, macroColor: {h: 0, s: 0, v: 0}, undoColor: {h: 0, s: 0, v: 0}, leadingColor: {h: 0, s: 0, v: 0}, locality: 0};
+    layerOnly.autocorrectFeedback = {textColor: {h: 0, s: 0, v: 0}, textLocality: 0, macroColor: {h: 0, s: 0, v: 0}, macroLocality: 0,
+        undoColor: {h: 0, s: 0, v: 0}, undoLocality: 0, leadingColor: {h: 0, s: 0, v: 0}, leadingLocality: 0};
     layerOnly.autocorrectGroupRows = [];
     const layerOptions = {...golden.codecOptions, compiledStageMask: RGB_STAGE_BITS.LAYER};
     assert.deepEqual(decodeRgbDomainV1(encodeRgbDomainV1(layerOnly, layerOptions), layerOptions), layerOnly);
@@ -239,7 +242,7 @@ test("fixed v1 group, row, tap-color, LED, and payload boundaries are enforced",
     assert.throws(() => encodeRgbDomainV1(olderRows, olderKeyboard), (error) => error.code === "CAPACITY_EXCEEDED" && error.limit === "lightingGroupRows" && error.most === 32);
     assert.throws(() => encodeRgbDomainV1(maximum, {...golden.codecOptions, maxGroupRows: 641}), RangeError);
     const tooManyTapColors = clone(golden.profile);
-    tooManyTapColors.keyFeedback.tapBranchColors.push({h: 0, s: 0, v: 0});
+    tooManyTapColors.keyFeedback.tapBranches.push({color: {h: 0, s: 0, v: 0}, locality: 0});
     assertCode("CAPACITY_EXCEEDED", () => encodeRgbDomainV1(tooManyTapColors, golden.codecOptions));
     const badLed = clone(golden.profile);
     badLed.groups[0].leds = [58];

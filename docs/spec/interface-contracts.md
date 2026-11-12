@@ -1366,8 +1366,9 @@ first; never the other default layers, which the keyboard's lighting does
 not read), then their accents, a layer's own by the layer core publishes
 it for (`ownerLayer`), following the firmware's membership, pass-through and
 inheritance rules. The order the stages paint in, and the
-"no colour" rules (a layer's passthrough, an accent that takes its stage's
-colour, a replacement case that is off), are the shared compositor
+"no colour" rules (passthrough for every colour a layer, a pointing slot,
+combo feedback or a feedback case owns, D-L94; an accent that takes its
+owner's colour), are the shared compositor
 (`rules/led-light.mjs`, D-L73); `webview/view/lighting.mjs` gathers what each stage paints from the
 model (`tests/rules/led-light.test.mjs`, `tests/view/lighting.test.mjs`). The caption
 on the board names those layers as the Keymap's layer preview does, top
@@ -1393,18 +1394,28 @@ lights nothing of its own and the board turns them on over the view, as the
 layer strip would, since the firmware shows the layers instead
 (`viewWhileHeld`); one whose output runs a pointing mode runs it from those
 keys and paints beneath it (the compositor's combo stage `beneath`). On
+Behaviour feedback (D-L93) the board shows the case picked in its list, in
+its colour where its own locality reaches, then its accents, those for every
+state, then for every tap branch when it is one, then for the case (the
+compositor's `behaviour` stage, after combo feedback and before replacement
+feedback), from the first key on the layer shown and then the others whose
+behaviour would show that case: one that runs there, a hold that is no layer
+or pointing key, tap committed on a tap with no hold or as the tap-commit
+pulse (`showsCase`), ringed while
+the locality follows a key; with none the keyboard never shows it, so the
+board shows nothing for it and the line says so. On
 Replacement feedback (D-L89) the board shows the flash of the case picked
 in its list, painted last, over every other stage, in that case's colour
-where the stage's locality reaches, then its accents, those for every case
+where that case's own locality (D-L93) reaches, then its accents, those for every case
 before those for the case. The key the flash follows is the keyboard's to
 know as a word ends, so one stands in for it: the first key that sends
 Space, on the layer shown and then from the base up, or Backspace for
 Replacement undone (`replacementTrigger`, `webview/view/lighting.mjs`),
 ringed while the locality follows a key and named in the line under the
 board; with none, the flash paints as the keyboard paints one whose key it
-cannot tell, both halves or every key. A case whose colour paints nothing
-(`replacementPaints`) shows no flash, its accents in a colour of their own
-still lit, and the line says it is off; with the stage off no flash shows.
+cannot tell, both halves or every key. A passthrough case (`colourPaints`)
+shows no flash, its accents in a colour of their own still lit, and the line
+says it is passthrough; with the stage off no flash shows.
 Leader waiting (D-L92) follows the Leader key that began it: the first key
 that sends Leader stands in and is ringed (`replacementTrigger`), or with none
 it paints as a case whose key the keyboard cannot tell, and the line says it
@@ -1439,11 +1450,22 @@ place, so a replaced draft lets it go, and none is shown while an accent is
 added or changed.
 
 Brightness is absolute HSV; the reported limit constrains editing and never
-rescales a read (`tests/session/base-rgb.test.js`). Pass-through is zero
-saturation and brightness; LED-row inheritance is all three channels zero,
-distinct from an explicit black (`tests/view/lighting.test.mjs`). Zero
-brightness never hides the stored hue and saturation
-(`browser-tests/review-regressions.spec.js`).
+rescales a read (`tests/session/base-rgb.test.js`). Passthrough is zero
+saturation and brightness, at any hue, for every owned colour
+(`colourPaints`, `isPassthrough`, D-L94); off is zero brightness with
+saturation, its LEDs dark (`isOff`), which the colour editor stores with
+**Off** beside **Make passthrough**, and lists and Review say
+**passthrough** or **off**; LED-row
+inheritance is all three channels zero, distinct from an explicit black
+(`tests/view/lighting.test.mjs`, `tests/view/colour.test.mjs`); the auto-mouse
+end colour is literal. Zero brightness never hides the stored hue and
+saturation (`browser-tests/review-regressions.spec.js`).
+Each Behaviour feedback and Replacement feedback case has its own Locality
+under **Where it paints**, posted with only that case's locality changed
+(`keyFeedbackLocality`, `autocorrectFeedbackLocality`,
+`tests/view/edits.test.mjs`, `browser-tests/lighting-controls.spec.js`),
+and each tap branch is an accent owner of its own (D-L93), with **Every tap
+branch** for all four at once (`groupOwner`, `tests/view/accents.test.mjs`).
 
 ## Macro editor
 

@@ -119,11 +119,12 @@ test("replacement feedback is named for what a person calls the feature, and nev
     const read = [...VOCABULARY.replacementOwners.map(([, words]) => words), stage.label, ...Object.values(VOCABULARY.colourOff.autocorrect), ...Object.values(VOCABULARY.lightingLists.replacements),
         VOCABULARY.accents.autocorrect.when, VOCABULARY.accents.autocorrect.every, VOCABULARY.accents.autocorrect.stageColour];
     for (const words of read) assert.doesNotMatch(words, /autocorrect|typo|correction|typed form/i, words);
-    // Off is the colour editor's own word: a case switched off does not light,
-    // whether it flashes or, as Leader waiting does, holds.
-    assert.equal(VOCABULARY.colourOff.autocorrect.offAction, undefined);
-    assert.equal(VOCABULARY.colourOff.autocorrect.offWord, undefined);
-    assert.match(VOCABULARY.colourOff.autocorrect.offNote, /does not light/);
+    // A case of saturation and value 0 is passthrough, as every owned colour
+    // is (D-L94, firmware D-F74), whether it flashes or, as Leader waiting
+    // does, holds.
+    assert.equal(VOCABULARY.colourOff.autocorrect.offAction, "Make passthrough");
+    assert.equal(VOCABULARY.colourOff.autocorrect.offWord, "Passthrough");
+    assert.match(VOCABULARY.colourOff.autocorrect.offNote, /paints nothing/);
 });
 
 test("an accent's LEDs read by index, a run of three or more as a range", () => {

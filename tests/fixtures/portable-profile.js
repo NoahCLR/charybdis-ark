@@ -1,7 +1,7 @@
 // @ts-check
 "use strict";
 // Current firmware's profile as Ark's tests build it: the firmware's frozen
-// populated profile (populated_profile_v4.fixture: schema 4.7, RGB 6, key
+// populated profile (populated_profile_v4.fixture: schema 4.8, RGB 7, key
 // behaviours 2, combos 3, settings 13, sparse PD 4, slots 0-5 configured,
 // keymap 1 and macros 1), materialized the way a keyboard read does, with
 // these settings and a combo table standing in for the live readbacks, and

@@ -55,15 +55,17 @@ test("an accent lights some LEDs, and every accent edit drops the groups no acce
     for (const row of accents(rgb(removed))) assert.ok(rgb(removed).groups.some(group => group.id === row.groupId), "every accent still names a group");
 });
 
-test("replacement feedback saves its four colours and its locality as one record, a case off included", () => {
+test("replacement feedback saves its four cases, a colour and a locality each, as one record, a case off included", () => {
     const before = rgb(base);
-    const config = {textColor: {h: 1, s: 2, v: 3}, macroColor: {h: 0, s: 0, v: 0}, undoColor: {h: "7", s: "8", v: "9"}, leadingColor: {h: "170", s: "255", v: "100"}, locality: "RGB_KEYS_ONLY"};
+    const config = {textColor: {h: 1, s: 2, v: 3}, textLocality: "RGB_KEYS_ONLY", macroColor: {h: 0, s: 0, v: 0}, macroLocality: "RGB_BOTH_HALVES",
+        undoColor: {h: "7", s: "8", v: "9"}, undoLocality: "RGB_LEFT_HALF", leadingColor: {h: "170", s: "255", v: "100"}, leadingLocality: "RGB_KEY_HALF"};
     const edited = edit(base, {type: "updateAutocorrectFeedback", config});
-    assert.deepEqual(rgb(edited).autocorrectFeedback, {textColor: {h: 1, s: 2, v: 3}, macroColor: {h: 0, s: 0, v: 0}, undoColor: {h: 7, s: 8, v: 9}, leadingColor: {h: 170, s: 255, v: 100}, locality: 4});
+    assert.deepEqual(rgb(edited).autocorrectFeedback, {textColor: {h: 1, s: 2, v: 3}, textLocality: 4, macroColor: {h: 0, s: 0, v: 0}, macroLocality: 0,
+        undoColor: {h: 7, s: 8, v: 9}, undoLocality: 1, leadingColor: {h: 170, s: 255, v: 100}, leadingLocality: 3});
     assert.deepEqual({...rgb(edited), autocorrectFeedback: before.autocorrectFeedback}, before, "nothing else in lighting moves");
     assert.deepEqual(payloads(edited).filter(domain => domain.id !== 0x10), payloads(base).filter(domain => domain.id !== 0x10));
-    assert.throws(() => edit(base, {type: "updateAutocorrectFeedback", config: {...config, locality: "RGB_NOWHERE"}}), /Unknown locality/);
-    assert.throws(() => edit(base, {type: "updateAutocorrectFeedback", config: {...config, locality: undefined}}), /Unknown locality/);
+    assert.throws(() => edit(base, {type: "updateAutocorrectFeedback", config: {...config, macroLocality: "RGB_NOWHERE"}}), /Unknown locality/);
+    assert.throws(() => edit(base, {type: "updateAutocorrectFeedback", config: {...config, leadingLocality: undefined}}), /Unknown locality/);
     assert.throws(() => edit(base, {type: "updateAutocorrectFeedback", config: {...config, undoColor: {h: 0, s: 0, v: 256}}}), /Brightness/);
     assert.throws(() => edit(base, {type: "updateAutocorrectFeedback", config: {...config, undoColor: {h: 0, s: 0, v: 201}}}, {limits: {brightnessMax: 200}}), /Brightness must be between 0 and 200/);
     assert.throws(() => edit(base, {type: "updateAutocorrectFeedback", config: {...config, textColor: {h: "", s: 0, v: 0}}}));

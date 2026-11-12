@@ -7,7 +7,7 @@
 // the portable document's single profile blob; editors use decoded views.
 /** @typedef {import("./profile-domains-types.js").DomainOptions} DomainOptions */
 const PROFILE_DOMAINS = Object.freeze([
-    Object.freeze({name: "RGB", id: 0x10, key: "rgb", readKey: "rgb", version: 6, wireBit: 1 << 0, area: "lighting", document: "profile",
+    Object.freeze({name: "RGB", id: 0x10, key: "rgb", readKey: "rgb", version: 7, wireBit: 1 << 0, area: "lighting", document: "profile",
         /** @param {import("./types.js").RgbInput} value @param {DomainOptions} [options] @returns {Buffer} */
         encode: (value, options = {}) => require("./rgb-domain-v1").encodeRgbDomainV1(value, options.rgb),
         /** @param {Uint8Array} bytes @param {DomainOptions} [options] @returns {import("./profile-domains-types.js").DomainModels["rgb"]} */

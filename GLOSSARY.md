@@ -216,8 +216,9 @@ _Avoid_: leader term, leader window
 **Leader waiting**:
 The case of replacement feedback the keyboard shows
 while the leader waits for what is typed after the Leader key (D-L92): a
-colour held, not flashed, until the leader sends or gives up, on every key of
-the halves its locality names, since it follows no key. The firmware calls it
+colour held, not flashed, until the leader sends or gives up, where its own
+locality names (D-L93), following the Leader key that began it; when no key
+began it, on every key of the halves its locality names. The firmware calls it
 leading, replacement-feedback semantic `3` (firmware D-F72).
 _Avoid_: leading (in anything a person reads), leader flash, leader state
 
@@ -317,20 +318,34 @@ different sets of LEDs accents light are **LED sets**; Ark keeps them.
 _Avoid_: LED group, LED override, group row, assignment
 
 **Passthrough**:
-A layer colour that paints nothing, so what is beneath it shows through: the
-layers on under it, or the background effect. Ark stores it as HSV(0, 0, 0);
-the keyboard treats any layer colour with no saturation or brightness so. It
-is a layer's alone: a case of replacement feedback with such a colour is
-off, and black in every other stage is black.
-_Avoid_: no colour, off (for a layer), transparent (that is a key)
+A colour that paints nothing, so what is beneath it shows through: for a
+layer, the layers on under it or the background effect; for a pointing mode,
+combo feedback or a feedback case, whatever the stages before it paint
+(D-L94, firmware D-F74). Ark stores it as HSV(0, 0, 0) with **Make
+passthrough**; the keyboard treats any colour a layer, a pointing slot, combo
+feedback or a feedback case owns with no saturation or brightness so, at any
+hue. Its accents in a colour of their own still light. It is not **off**,
+brightness zero with some saturation, whose LEDs go dark. An accent's
+HSV(0, 0, 0) takes its owner's colour instead, and the auto-mouse fade's end
+colour is literal, so HSV(0, 0, 0) turns the LEDs off there.
+_Avoid_: no colour, off (for passthrough), transparent (that is a key)
+
+**Off** (a colour):
+Brightness zero with some saturation: a colour whose LEDs go dark, covering
+what is beneath, stored with the **Off** choice beside **Make passthrough**
+(D-L94). Not passthrough, which paints nothing and lets what is beneath show.
+_Avoid_: black (in anything a person reads)
 
 **Behaviour feedback**:
 The lighting stage that shows the state of a key's behaviour, and its tab on
 Lighting (D-L89): a key flashes, or holds, the colour of what its behaviour
-is doing. Its **behaviour states** are the tiers (**Tap committed**, **Hold
-active**, **Long hold active**) and **Tap branch pending**, the tap
-branches' colours; its accents light for one state or for **Every behaviour
-state**. Its **Flash interval** is how long one on or off phase lasts. The
+is doing. Its **behaviour states**, its **cases**, are the tiers (**Tap
+committed**, **Hold active**, **Long hold active**) and each tap branch
+pending (**Double tap**, **Triple tap**, **Quadruple tap**, **Quintuple tap**,
+the last for every deeper count too), each with its own colour, locality and
+accents (D-L93, firmware D-F73); an accent lights for one case, for **Every
+tap branch** (firmware D-F75), or for **Every behaviour state**. Its tap-commit policy and **Flash interval**, how long one
+on or off phase lasts, are one setting for every case. The
 firmware's code and Ark's keep the stage's old name: the stage id `key`, the
 record `keyFeedback`, the accent table `keyBehavior`, the edit
 `updateKeyBehaviorFeedback`.
@@ -340,15 +355,15 @@ feedback (the spelling)
 **Replacement feedback**:
 The lighting stage that flashes once as text replacement changes what was
 typed, and holds a colour while the leader waits, painted last, and its tab
-on Lighting (D-L89, D-L92). It has four **cases**, each with a colour of its
-own: **Replaced with text**, **Replaced by a macro** and **Replacement
-undone** (with Backspace), which flash, and **Leader waiting**, held from
-the Leader key until the leader sends or gives up. A case whose colour is
-turned off does not light; the others still do. Its accents light for one
-case or for **Every case**. A flash follows the key that ended the word, or
-the Backspace that undid the replacement, and lasts its **Flash length**,
-apart from behaviour feedback's Flash interval; Leader waiting follows no
-key. The firmware's
+on Lighting (D-L89, D-L92). It has four **cases**, each with its own colour
+and locality (D-L93): **Replaced with text**, **Replaced by a macro** and
+**Replacement undone** (with Backspace), which flash, and **Leader
+waiting**, held from the Leader key until the leader sends or gives up. A
+passthrough case does not light; the others still do (D-L94). Its accents
+light for one case or for **Every case**. A flash follows the key that ended
+the word, or the Backspace that undid the replacement, and lasts its **Flash
+length**, one for every case, apart from behaviour feedback's Flash
+interval; Leader waiting follows the Leader key that began it. The firmware's
 code and Ark's call the stage `autocorrect` feedback
 (`autocorrectFeedback`, the accent table `autocorrect`).
 _Avoid_: autocorrect feedback, autocorrect flash, typo light, correction

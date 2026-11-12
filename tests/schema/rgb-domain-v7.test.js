@@ -1,21 +1,22 @@
 "use strict";
-// RGB format 6, a colour row for each of the 16 layers and the 32 pointing
-// slots and the replacement feedback stage's record and rows (firmware
-// D-F70), leading among its cases (firmware D-F72), against the firmware's
-// golden vectors (rgb_domain_v6.json), then
+// RGB format 7, a colour row for each of the 16 layers and the 32 pointing
+// slots, the replacement feedback stage's record and rows (firmware D-F70),
+// leading among its cases (firmware D-F72), and a locality for every
+// feedback case, each tap branch a case of its own (firmware D-F73), against
+// the firmware's golden vectors (rgb_domain_v7.json), then
 // Ark's own further cases built from the compiled profile's lighting.
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const {RGB_AUTOCORRECT_SEMANTICS, RGB_DOMAIN_V1, RGB_EVERY_OWNER, RGB_POINTING_MODE_IDS, RGB_STAGE_BITS, decodeRgbDomainV1, encodeRgbDomainV1} = require("../../core/schema/rgb-domain-v1");
+const {RGB_AUTOCORRECT_SEMANTICS, RGB_DOMAIN_V1, RGB_EVERY_OWNER, RGB_KEY_SEMANTICS, RGB_LOCALITIES, RGB_POINTING_MODE_IDS, RGB_STAGE_BITS, RGB_TAP_BRANCH_SEMANTICS, decodeRgbDomainV1, encodeRgbDomainV1} = require("../../core/schema/rgb-domain-v1");
 const {decodeProfileBlob, encodeProfileBlob} = require("../../core/schema/profile-blob-v1");
 const {validateSnapshot} = require("../../core/model/portable-profile");
 const {document} = require("../fixtures/pd-profile");
-const golden = require("../../upstream/firmware/tests/fixtures/rgb_domain_v6.json");
+const golden = require("../../upstream/firmware/tests/fixtures/rgb_domain_v7.json");
 const limits = {compiledStageMask: golden.limits.compiledStageMask, logicalLayerCount: golden.limits.logicalLayerCount,
     maximumBrightness: golden.limits.maximumBrightness, tapBranchColorCount: golden.limits.tapBranchColorCount};
 const vector = name => Buffer.from([...golden.valid, ...golden.invalid].find(entry => entry.name === name).hex, "hex");
 
-test("the firmware's format-6 vectors decode and re-encode byte for byte", () => {
+test("the firmware's format-7 vectors decode and re-encode byte for byte", () => {
     assert.equal(golden.limits.supportedPdModeMask, 0xffffffff, "all 32 slots coloured");
     assert.equal(golden.limits.compiledStageMask, 0x3f, "every stage compiled, replacement feedback among them");
     for (const entry of golden.valid) {
@@ -35,7 +36,8 @@ test("the firmware's replacement feedback vectors read as its record and rows", 
     // for every case.
     const compiled = decodeRgbDomainV1(vector("compiled"), limits);
     assert.equal(compiled.stageEnableMask & RGB_STAGE_BITS.AUTOCORRECT, RGB_STAGE_BITS.AUTOCORRECT);
-    assert.deepEqual(compiled.autocorrectFeedback, {textColor: {h: 106, s: 255, v: 200}, macroColor: {h: 234, s: 255, v: 200}, undoColor: {h: 0, s: 255, v: 200}, leadingColor: {h: 170, s: 255, v: 200}, locality: 3});
+    assert.deepEqual(compiled.autocorrectFeedback, {textColor: {h: 106, s: 255, v: 200}, textLocality: 3, macroColor: {h: 234, s: 255, v: 200}, macroLocality: 3,
+        undoColor: {h: 0, s: 255, v: 200}, undoLocality: 3, leadingColor: {h: 170, s: 255, v: 200}, leadingLocality: 3});
     assert.deepEqual(compiled.autocorrectGroupRows.map(row => [row.semantic, row.color]), [[0xff, {h: 0, s: 0, v: 0}]]);
     const every = decodeRgbDomainV1(vector("replacement-rows-every-semantic"), limits);
     assert.deepEqual(every.autocorrectGroupRows.map(row => row.semantic).sort((a, b) => a - b), [0, 1, 2, 3, 0xff], "text, macro, undo, leading and all");
@@ -54,7 +56,7 @@ test("the firmware's replacement feedback vectors read as its record and rows", 
     assert.deepEqual([dark.textColor, dark.macroColor, dark.undoColor, dark.leadingColor], Array.from({length: 4}, () => ({h: 0, s: 0, v: 0})));
 });
 
-test("the firmware's format-6 rejections are refused with its codes", () => {
+test("the firmware's format-7 rejections are refused with its codes", () => {
     // Ark reports RGB failures by table and row, not by byte offset, so the
     // firmware's offsets are not compared here.
     for (const entry of golden.invalid) {
@@ -68,7 +70,15 @@ test("the firmware's format-6 rejections are refused with its codes", () => {
         assert.deepEqual({table: error.table, row: error.row, field: error.field}, where, name);
         return true;
     });
-    at("replacement-locality-5", {table: "autocorrectFeedback", row: 0, field: "locality"});
+    at("replacement-text-locality-5", {table: "autocorrectFeedback", row: 0, field: "textLocality"});
+    at("replacement-macro-locality-5", {table: "autocorrectFeedback", row: 0, field: "macroLocality"});
+    at("replacement-undo-locality-5", {table: "autocorrectFeedback", row: 0, field: "undoLocality"});
+    at("replacement-leading-locality-5", {table: "autocorrectFeedback", row: 0, field: "leadingLocality"});
+    for (const branch of [0, 1, 2, 3]) at(`tap-branch-${branch}-locality-5`, {table: "keyFeedback.tapBranches", row: branch, field: "locality"});
+    at("key-tap-committed-locality-5", {table: "keyFeedback", row: 0, field: "tapCommittedLocality"});
+    at("key-hold-locality-5", {table: "keyFeedback", row: 0, field: "holdActiveLocality"});
+    at("key-long-hold-locality-5", {table: "keyFeedback", row: 0, field: "longHoldActiveLocality"});
+    at("key-row-semantic-8", {table: "keyGroupRows", row: 0, field: "semantic"});
     at("replacement-value-over-limit", {table: "autocorrectFeedback", row: 0, field: "macroColor.v"});
     at("replacement-leading-value-over-limit", {table: "autocorrectFeedback", row: 0, field: "leadingColor.v"});
     at("replacement-row-semantic-4", {table: "autocorrectGroupRows", row: 0, field: "semantic"});
@@ -77,35 +87,37 @@ test("the firmware's format-6 rejections are refused with its codes", () => {
 
 const reject = (fn, code) => assert.throws(fn, error => error.code === code, `expected ${code}`);
 // The compiled profile's lighting: a row for every slot.
-const v6 = () => validateSnapshot(document()).rgb;
+const v7 = () => validateSnapshot(document()).rgb;
 const black = {h: 0, s: 0, v: 0};
+const RGB_STAGE_MASK_ALL_BUT_KEY = 0x3f & ~RGB_STAGE_BITS.KEY_BEHAVIOR;
 
-test("format 6 colours 16 layers and 32 pointing slots and round-trips", () => {
+test("format 7 colours 16 layers and 32 pointing slots and round-trips", () => {
     assert.equal(RGB_DOMAIN_V1.POINTING_SLOTS, 32);
     assert.equal(RGB_POINTING_MODE_IDS.POINTING_MODE_31, 31);
-    const encoded = encodeRgbDomainV1(v6());
-    assert.equal(encoded[0], 6);
+    const encoded = encodeRgbDomainV1(v7());
+    assert.equal(encoded[0], 7);
     assert.equal(encoded[5], 16, "header byte 5 counts the layer colours");
     assert.equal(encoded[7], 32, "header byte 7 counts the PD colours");
     const decoded = decodeRgbDomainV1(encoded);
-    assert.equal(decoded.formatVersion, 6);
+    assert.equal(decoded.formatVersion, 7);
     assert.deepEqual(decoded.layerColors.map(row => row.layerId), Array.from({length: 16}, (_, id) => id));
     assert.deepEqual(decoded.pdModeColors.map(row => row.pdModeId), Array.from({length: 32}, (_, id) => id));
     assert.deepEqual(encodeRgbDomainV1(decoded), encoded);
-    const blob = encodeProfileBlob({schema: {major: 4, minor: 7}, domains: [{id: 0x10, version: 6, payload: encoded}]});
-    assert.equal(decodeProfileBlob(blob).domains[0].version, 6);
+    const blob = encodeProfileBlob({schema: {major: 4, minor: 8}, domains: [{id: 0x10, version: 7, payload: encoded}]});
+    assert.equal(decodeProfileBlob(blob).domains[0].version, 7);
 });
 
-test("format 6 ends with the replacement record and its rows, counted in header byte 14", () => {
-    const profile = v6();
+test("format 7 ends with the replacement record and its rows, counted in header byte 14", () => {
+    const profile = v7();
     profile.stageEnableMask |= RGB_STAGE_BITS.AUTOCORRECT;
-    profile.autocorrectFeedback = {textColor: {h: 1, s: 2, v: 3}, macroColor: {h: 4, s: 5, v: 6}, undoColor: {h: 7, s: 8, v: 9}, leadingColor: {h: 13, s: 14, v: 15}, locality: 4};
+    profile.autocorrectFeedback = {textColor: {h: 1, s: 2, v: 3}, textLocality: 4, macroColor: {h: 4, s: 5, v: 6}, macroLocality: 0,
+        undoColor: {h: 7, s: 8, v: 9}, undoLocality: 1, leadingColor: {h: 13, s: 14, v: 15}, leadingLocality: 2};
     profile.autocorrectGroupRows = [];
     const bare = encodeRgbDomainV1(profile);
     assert.equal(bare[2] & 0x20, 0x20, "stage bit 5");
     assert.equal(bare[14], 0);
     assert.equal(bare[15], 0, "byte 15 stays reserved");
-    assert.deepEqual([...bare.subarray(bare.length - 13)], [1, 2, 3, 4, 5, 6, 7, 8, 9, 13, 14, 15, 4], "text, macro, undo and leading colours, then the locality");
+    assert.deepEqual([...bare.subarray(bare.length - 16)], [1, 2, 3, 4, 5, 6, 7, 8, 9, 13, 14, 15, 4, 0, 1, 2], "text, macro, undo and leading colours, then a locality each in the same order");
     profile.autocorrectGroupRows = [
         {semantic: RGB_AUTOCORRECT_SEMANTICS.AUTOCORRECT_FEEDBACK_GROUP_LEADING, color: {h: 10, s: 11, v: 12}, groupId: 0},
         {semantic: RGB_AUTOCORRECT_SEMANTICS.AUTOCORRECT_FEEDBACK_GROUP_ALL, color: black, groupId: 1},
@@ -118,15 +130,15 @@ test("format 6 ends with the replacement record and its rows, counted in header 
     assert.deepEqual(decoded.autocorrectFeedback, profile.autocorrectFeedback);
     assert.deepEqual(decoded.autocorrectGroupRows, profile.autocorrectGroupRows);
     assert.deepEqual(encodeRgbDomainV1(decoded), encoded);
-    // The payload is 48 + 9G + 5L + 5LG + 5P + 5PG + 4CG + 3T + 5KG + 5RG bytes.
+    // The payload is 53 + 9G + 5L + 5LG + 5P + 5PG + 4CG + 4T + 5KG + 5RG bytes.
     const d = decoded;
-    assert.equal(encoded.length, 48 + 9 * d.groups.length + 5 * d.layerColors.length + 5 * d.layerGroupRows.length + 5 * d.pdModeColors.length + 5 * d.pdModeGroupRows.length
-        + 4 * d.comboGroupRows.length + 3 * d.keyFeedback.tapBranchColors.length + 5 * d.keyGroupRows.length + 5 * d.autocorrectGroupRows.length);
+    assert.equal(encoded.length, 53 + 9 * d.groups.length + 5 * d.layerColors.length + 5 * d.layerGroupRows.length + 5 * d.pdModeColors.length + 5 * d.pdModeGroupRows.length
+        + 4 * d.comboGroupRows.length + 4 * d.keyFeedback.tapBranches.length + 5 * d.keyGroupRows.length + 5 * d.autocorrectGroupRows.length);
     assert.equal(RGB_EVERY_OWNER.autocorrect, "AUTOCORRECT_FEEDBACK_GROUP_ALL");
 });
 
-test("the largest format-6 domain is 4,652 bytes", () => {
-    const profile = v6();
+test("the largest format-7 domain is 4,661 bytes", () => {
+    const profile = v7();
     const ledsOf = id => Array.from({length: 7}, (unused, led) => led).filter(led => (id >> led) & 1);
     profile.groups = Array.from({length: RGB_DOMAIN_V1.MAX_GROUPS}, (_, id) => ({id, leds: id === 0 ? [57] : ledsOf(id)}));
     const rows = (length, field) => Array.from({length}, (unused, row) => ({[field]: 255, color: black, groupId: row % RGB_DOMAIN_V1.MAX_GROUPS}));
@@ -135,7 +147,7 @@ test("the largest format-6 domain is 4,652 bytes", () => {
     profile.comboGroupRows = [];
     profile.keyGroupRows = [];
     profile.autocorrectGroupRows = rows(130, "semantic");
-    assert.equal(encodeRgbDomainV1(profile).length, 4652);
+    assert.equal(encodeRgbDomainV1(profile).length, 4661);
     profile.autocorrectGroupRows = rows(131, "semantic");
     assert.throws(() => encodeRgbDomainV1(profile), error => error.code === "CAPACITY_EXCEEDED" && error.limit === "lightingGroupRows" && error.most === 640, "the replacement rows count toward the 640");
     profile.layerGroupRows = []; profile.pdModeGroupRows = [];
@@ -144,9 +156,9 @@ test("the largest format-6 domain is 4,652 bytes", () => {
 });
 
 test("the replacement record and its rows are refused as the firmware refuses them", () => {
-    const base = () => { const profile = v6(); profile.autocorrectGroupRows = [{semantic: 0, color: black, groupId: 0}]; return profile; };
+    const base = () => { const profile = v7(); profile.autocorrectGroupRows = [{semantic: 0, color: black, groupId: 0}]; return profile; };
     const bytes = () => encodeRgbDomainV1(base());
-    const record = bytes().length - 18, row = bytes().length - 5;
+    const record = bytes().length - 21, row = bytes().length - 5;
     /** @param {(bytes: Buffer) => void} change @param {string} code @param {{table?: string, row?: number, field?: string}} [where] */
     const refused = (change, code, where) => {
         const changed = bytes(); change(changed);
@@ -164,7 +176,9 @@ test("the replacement record and its rows are refused as the firmware refuses th
         const changed = bytes(); changed[record + colour * 3 + 2] = 201;
         assert.throws(() => decodeRgbDomainV1(changed, {maximumBrightness: 200}), error => error.code === "BRIGHTNESS_EXCEEDED" && error.table === "autocorrectFeedback" && error.field === field, field);
     }
-    refused(b => { b[record + 12] = 5; }, "INVALID_ENUM", {table: "autocorrectFeedback", row: 0, field: "locality"});
+    for (const [at, field] of [[12, "textLocality"], [13, "macroLocality"], [14, "undoLocality"], [15, "leadingLocality"]]) {
+        refused(b => { b[record + at] = 5; }, "INVALID_ENUM", {table: "autocorrectFeedback", row: 0, field});
+    }
     refused(b => { b[row] = 4; }, "INVALID_SELECTOR", {table: "autocorrectGroupRows", row: 0, field: "semantic"});
     refused(b => { b[row] = 0xfe; }, "INVALID_SELECTOR", {table: "autocorrectGroupRows", row: 0, field: "semantic"});
     refused(b => { b[row + 4] = b[4]; }, "INVALID_REFERENCE", {table: "autocorrectGroupRows", row: 0, field: "groupId"});
@@ -177,7 +191,7 @@ test("the replacement record and its rows are refused as the firmware refuses th
     refused(b => { b[14] = 0; }, "TRAILING_BYTES");
     // The encoder refuses the same.
     for (const [change, code] of /** @type {[((profile: any) => void), string][]} */ ([
-        [profile => { profile.autocorrectFeedback.locality = 5; }, "INVALID_ENUM"],
+        [profile => { profile.autocorrectFeedback.leadingLocality = 5; }, "INVALID_ENUM"],
         [profile => { profile.autocorrectGroupRows[0].semantic = 4; }, "INVALID_SELECTOR"],
         [profile => { profile.autocorrectGroupRows[0].groupId = profile.groups.length; }, "INVALID_REFERENCE"],
         [profile => { profile.stageEnableMask |= 0x40; }, "RESERVED_BITS"],
@@ -191,9 +205,9 @@ test("the replacement record and its rows are refused as the firmware refuses th
 
 test("a build without the stage takes the zero record and no rows, and refuses its bit", () => {
     const without = {compiledStageMask: 0x1f};
-    const profile = v6();
+    const profile = v7();
     profile.stageEnableMask &= ~RGB_STAGE_BITS.AUTOCORRECT;
-    profile.autocorrectFeedback = {textColor: black, macroColor: black, undoColor: black, leadingColor: black, locality: 0};
+    profile.autocorrectFeedback = {textColor: black, textLocality: 0, macroColor: black, macroLocality: 0, undoColor: black, undoLocality: 0, leadingColor: black, leadingLocality: 0};
     profile.autocorrectGroupRows = [];
     const encoded = encodeRgbDomainV1(profile, without);
     assert.deepEqual(decodeRgbDomainV1(encoded, without).autocorrectFeedback, profile.autocorrectFeedback);
@@ -205,7 +219,8 @@ test("a build without the stage takes the zero record and no rows, and refuses i
         value => { value.autocorrectFeedback.macroColor = {h: 0, s: 1, v: 0}; },
         value => { value.autocorrectFeedback.undoColor = {h: 0, s: 0, v: 1}; },
         value => { value.autocorrectFeedback.leadingColor = {h: 0, s: 0, v: 1}; },
-        value => { value.autocorrectFeedback.locality = 1; },
+        value => { value.autocorrectFeedback.textLocality = 1; },
+        value => { value.autocorrectFeedback.leadingLocality = 1; },
         value => { value.autocorrectGroupRows = [{semantic: 0xff, color: black, groupId: 0}]; },
     ])) {
         const changed = structuredClone(profile); change(changed);
@@ -214,27 +229,76 @@ test("a build without the stage takes the zero record and no rows, and refuses i
     }
 });
 
-test("format 6 needs every layer's and slot's row once, and selectors in range", () => {
-    const missing = v6(); missing.pdModeColors.splice(20, 1);
+test("format 7 needs every layer's and slot's row once, and selectors in range", () => {
+    const missing = v7(); missing.pdModeColors.splice(20, 1);
     reject(() => encodeRgbDomainV1(missing), "INCOMPLETE_SURFACE");
-    const doubled = v6(); doubled.pdModeColors[20].pdModeId = 21;
+    const doubled = v7(); doubled.pdModeColors[20].pdModeId = 21;
     reject(() => encodeRgbDomainV1(doubled), "DUPLICATE_ID");
-    const high = v6(); high.pdModeColors[31].pdModeId = 32;
+    const high = v7(); high.pdModeColors[31].pdModeId = 32;
     reject(() => encodeRgbDomainV1(high), "INVALID_ID");
-    const selector = v6(); selector.pdModeGroupRows.push({selector: 31, color: {h: 0, s: 0, v: 0}, groupId: 0});
+    const selector = v7(); selector.pdModeGroupRows.push({selector: 31, color: {h: 0, s: 0, v: 0}, groupId: 0});
     assert.equal(decodeRgbDomainV1(encodeRgbDomainV1(selector)).pdModeGroupRows.at(-1).selector, 31);
     selector.pdModeGroupRows.at(-1).selector = 32;
     reject(() => encodeRgbDomainV1(selector), "INVALID_SELECTOR");
-    const layerMissing = v6(); layerMissing.layerColors.splice(12, 1);
+    const layerMissing = v7(); layerMissing.layerColors.splice(12, 1);
     reject(() => encodeRgbDomainV1(layerMissing), "INCOMPLETE_SURFACE");
-    const layerSelector = v6(); layerSelector.layerGroupRows.push({selector: 15, color: {h: 0, s: 0, v: 0}, groupId: 0});
+    const layerSelector = v7(); layerSelector.layerGroupRows.push({selector: 15, color: {h: 0, s: 0, v: 0}, groupId: 0});
     assert.equal(decodeRgbDomainV1(encodeRgbDomainV1(layerSelector)).layerGroupRows.at(-1).selector, 15);
     layerSelector.layerGroupRows.at(-1).selector = 16;
     reject(() => encodeRgbDomainV1(layerSelector), "INVALID_SELECTOR");
-    // The retired formats 1 to 5, and any later one, are refused.
-    for (const version of [1, 2, 3, 4, 5, 7]) {
-        const bytes = encodeRgbDomainV1(v6()); bytes[0] = version;
+    // The retired formats 1 to 6, and any later one, are refused.
+    for (const version of [1, 2, 3, 4, 5, 6, 8]) {
+        const bytes = encodeRgbDomainV1(v7()); bytes[0] = version;
         reject(() => decodeRgbDomainV1(bytes), "INVALID_VERSION");
-        reject(() => encodeRgbDomainV1({...v6(), formatVersion: version}), "INVALID_VERSION");
+        reject(() => encodeRgbDomainV1({...v7(), formatVersion: version}), "INVALID_VERSION");
     }
+});
+
+test("the firmware's per-case vectors read as a locality for each case", () => {
+    const cases = decodeRgbDomainV1(vector("key-localities-per-case"), limits).keyFeedback;
+    const compiled = decodeRgbDomainV1(vector("compiled"), limits).keyFeedback;
+    // The compiled defaults keep the one locality they had, the half of the key, on every case.
+    assert.deepEqual([...compiled.tapBranches.map(branch => branch.locality), compiled.tapCommittedLocality, compiled.holdActiveLocality, compiled.longHoldActiveLocality],
+        Array.from({length: 7}, () => RGB_LOCALITIES.RGB_KEY_HALF));
+    const localities = [...cases.tapBranches.map(branch => branch.locality), cases.tapCommittedLocality, cases.holdActiveLocality, cases.longHoldActiveLocality];
+    assert.ok(new Set(localities).size > 1, "the vector gives cases different localities");
+    assert.deepEqual(decodeRgbDomainV1(vector("key-row-tap-count-3"), limits).keyGroupRows.map(row => row.semantic), [RGB_KEY_SEMANTICS.KEY_FEEDBACK_GROUP_TAP_COUNT_3]);
+    assert.deepEqual(decodeRgbDomainV1(vector("key-row-tap-count-5"), limits).keyGroupRows.map(row => row.semantic), [RGB_KEY_SEMANTICS.KEY_FEEDBACK_GROUP_TAP_COUNT_5]);
+    // Semantic 7 names every tap branch at once (firmware D-F75).
+    assert.equal(RGB_KEY_SEMANTICS.KEY_FEEDBACK_GROUP_TAP_BRANCH_ANY, 7);
+    assert.deepEqual(decodeRgbDomainV1(vector("key-row-tap-branch-any"), limits).keyGroupRows.map(row => row.semantic), [RGB_KEY_SEMANTICS.KEY_FEEDBACK_GROUP_TAP_BRANCH_ANY]);
+});
+
+test("each tap branch and tier stores its own locality, and a row may name one tap branch", () => {
+    const profile = v7();
+    profile.keyFeedback.tapBranches = [0, 1, 2, 3].map(index => ({color: {h: index, s: 10, v: 20}, locality: index}));
+    Object.assign(profile.keyFeedback, {tapCommittedLocality: 4, holdActiveLocality: 0, longHoldActiveLocality: 1});
+    profile.keyGroupRows = RGB_TAP_BRANCH_SEMANTICS.map((semantic, index) => ({semantic, color: black, groupId: index % profile.groups.length}));
+    profile.autocorrectGroupRows = [];
+    const encoded = encodeRgbDomainV1(profile);
+    // From the end: the replacement record, the behaviour rows, the behaviour record, then the tap branches.
+    const behaviour = encoded.length - 16 - 5 * profile.keyGroupRows.length - 13;
+    assert.deepEqual([...encoded.subarray(behaviour - 16, behaviour)], [0, 10, 20, 0, 1, 10, 20, 1, 2, 10, 20, 2, 3, 10, 20, 3], "h s v and a locality for each tap branch");
+    assert.deepEqual([...encoded.subarray(behaviour + 9, behaviour + 13)], [profile.keyFeedback.tapCommitMode, 4, 0, 1], "the tap-commit policy, then tap committed's, hold's and long hold's localities");
+    assert.deepEqual(RGB_TAP_BRANCH_SEMANTICS, [0, 4, 5, 6], "tap counts 2, 3, 4 and 5 or more");
+    const decoded = decodeRgbDomainV1(encoded);
+    assert.deepEqual(decoded.keyFeedback, profile.keyFeedback);
+    assert.deepEqual(decoded.keyGroupRows.map(row => row.semantic), [0, 4, 5, 6]);
+    for (const semantic of [8, 0xfe]) {
+        const changed = structuredClone(profile); changed.keyGroupRows[0].semantic = semantic;
+        reject(() => encodeRgbDomainV1(changed), "INVALID_SELECTOR");
+    }
+    const branch = structuredClone(profile); branch.keyFeedback.tapBranches[2].locality = 5;
+    assert.throws(() => encodeRgbDomainV1(branch), error => error.code === "INVALID_ENUM" && error.table === "keyFeedback.tapBranches" && error.row === 2 && error.field === "locality");
+    const tier = structuredClone(profile); tier.keyFeedback.holdActiveLocality = 5;
+    assert.throws(() => encodeRgbDomainV1(tier), error => error.code === "INVALID_ENUM" && error.table === "keyFeedback" && error.field === "holdActiveLocality");
+    // A build without the stage takes zero localities.
+    const without = {compiledStageMask: RGB_STAGE_MASK_ALL_BUT_KEY};
+    const off = v7();
+    off.stageEnableMask &= ~RGB_STAGE_BITS.KEY_BEHAVIOR;
+    off.keyFeedback = {tapBranches: [], tapCommittedColor: black, tapCommittedLocality: 0, holdActiveColor: black, holdActiveLocality: 0, longHoldActiveColor: black, longHoldActiveLocality: 0, tapCommitMode: 0};
+    off.keyGroupRows = [];
+    assert.deepEqual(decodeRgbDomainV1(encodeRgbDomainV1(off, without), without).keyFeedback, off.keyFeedback);
+    off.keyFeedback.longHoldActiveLocality = 1;
+    reject(() => encodeRgbDomainV1(off, without), "UNSUPPORTED_STAGE_DATA");
 });

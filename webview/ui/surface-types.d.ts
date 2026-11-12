@@ -4,11 +4,12 @@ import type {LightOptions} from '../view/types.js';
 
 export interface BoardOptions {
     selected?: number;
-    /** Keys held on the board (a combo previewed held on Combo feedback, the key a replacement flash follows on Replacement feedback): ringed as the selected key is. */
+    /** Keys held on the board (a combo previewed held on Combo feedback, the key a behaviour feedback case or a replacement flash follows on its tab): ringed as the selected key is. */
     holding?: readonly number[];
     reach?: number[];
     pdActive?: LightOptions['pdActive'] | null;
     comboActive?: LightOptions['comboActive'] | null;
+    behaviourActive?: LightOptions['behaviourActive'] | null;
     replacementActive?: LightOptions['replacementActive'] | null;
     /** The keys the draft changed, and what a screen reader hears after such a key's name (view/edit-mode.mjs editWords `after`). */
     drafted?: {keys: ReadonlySet<number | undefined> | undefined; after: string} | null;

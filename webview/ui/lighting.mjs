@@ -4,9 +4,9 @@
 // tabs are the stages in the order the firmware paints them.
 
 // Selector assertions refer to elements created by this module's authored markup.
-import {css, isOff} from "../lib/colour.mjs";
+import {css} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
-import {baseColour, feedbackColours, layerColourRow, lightingOff, pdColourRow, stageEnabled, stageIdle, stageInEffect} from "../view/lighting.mjs";
+import {baseColour, feedbackColours, isPassthrough, layerColourRow, lightingOff, pdColourRow, stageEnabled, stageIdle, stageInEffect} from "../view/lighting.mjs";
 import {said, stageOrder} from "../view/vocabulary.mjs";
 import {currentLayer, currentView, getModel, post, render, state} from "../store.mjs";
 import {editGate} from "../view/edit-gate.mjs";
@@ -50,10 +50,11 @@ export function screenLighting() {
     const card = el(`<div class="board-card"></div>`);
     // On Pointing modes the board shows the picked mode running, and on
     // Combo feedback a combo held that fires in this view, its keys ringed
-    // as the Keymap rings them; a ringed key holds its input. On Replacement
-    // feedback it shows the picked case's flash, the key standing in for
-    // the one that caused it ringed solid (view/lighting-board.mjs).
-    const shows = lightingBoard(view, {stage: state.stage, pointingSlot: state.pointingSlot, comboPreview: state.comboPreview, replacementRow: state.replacementRow});
+    // as the Keymap rings them; a ringed key holds its input. On Behaviour
+    // feedback and Replacement feedback it shows the picked case, the key
+    // standing in for the one that shows it ringed solid
+    // (view/lighting-board.mjs).
+    const shows = lightingBoard(view, {stage: state.stage, pointingSlot: state.pointingSlot, comboPreview: state.comboPreview, feedbackRow: state.feedbackRow, replacementRow: state.replacementRow});
     const held = shows.held;
     const editing = editingOn(model, state.stage);
     const stage = state.stage;
@@ -63,6 +64,7 @@ export function screenLighting() {
         accent: accentPicks(model, stage),
         pdActive: shows.pdActive,
         comboActive: shows.comboActive,
+        behaviourActive: shows.behaviourActive,
         replacementActive: shows.replacementActive,
         reach: held && !editing ? held.ring : [],
         holding: editing ? [] : held ? held.held : shows.standIn === undefined ? [] : [shows.standIn],
@@ -102,7 +104,7 @@ export function screenLighting() {
     const stages = stageOrder(model);
     /** @param {{id: string, label: string}} stage @param {number} index */
     const stageTab = (stage, index) => {
-        const on = stageInEffect(model, stage.id), colour = stageColour(model, stage.id), lit = on && colour && !isOff(colour);
+        const on = stageInEffect(model, stage.id), colour = stageColour(model, stage.id), lit = on && colour && !isPassthrough(colour);
         const idle = stageIdle(model, stage.id);
         return `<button role="tab" id="stage-tab-${esc(stage.id)}" class="${on ? "" : "off"}" data-ltab="${esc(stage.id)}" aria-selected="${state.stage === stage.id}"
             data-tip="Painted ${esc(index + 1)} of ${stages.length}${on ? "" : ` · ${esc(lightingOff(model) ? "All lighting is off, so nothing paints" : idle || "this stage is off")}`}">

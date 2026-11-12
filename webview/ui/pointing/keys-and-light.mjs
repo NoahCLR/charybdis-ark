@@ -1,7 +1,8 @@
 // @ts-check
 import {el, esc} from "../../lib/dom.mjs";
+
 import {holdKeyName} from "../../view/pointing-reach.mjs";
-import {stageEnabled} from "../../view/lighting.mjs";
+import {isOff, isPassthrough, stageEnabled} from "../../view/lighting.mjs";
 import {slotNamed, vocabulary, word} from "../../view/vocabulary.mjs";
 import {render, state} from "../../store.mjs";
 import {slotLight} from "../marks.mjs";
@@ -39,7 +40,7 @@ export function lightRow(model, slot) {
     const {row} = light;
     // The swatch shows the colour; the words say where it paints.
     const lightText = row
-        ? `${esc(`${light.lit || !stageEnabled(model, "pd") ? "" : "Black · "}${word(vocabulary(model).localities, row.locality)}`)}${stageEnabled(model, "pd") ? "" : " · stage off"}`
+        ? `${esc(isPassthrough(row.color) ? "Passthrough" : `${isOff(row.color) ? "Off · " : ""}${word(vocabulary(model).localities, row.locality)}`)}${stageEnabled(model, "pd") ? "" : " · stage off"}`
         : "No colour reported";
     const node = el(`<div class="field pd-light"><span>Light</span><div class="pd-light-row">
         <div class="val" data-tip="While the mode runs, its colour paints where this says. A mode linked to layers paints beneath the lowest of them that is on, so those layers' own colours show over it.">${light.swatch()}<span class="note">${lightText}</span></div>

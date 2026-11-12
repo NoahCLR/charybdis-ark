@@ -16,10 +16,11 @@ const {PROFILE_BLOB_V1} = require("./profile-blob-v1");
 
 const RGB_DOMAIN_V1 = Object.freeze({
     DOMAIN_ID: PROFILE_DOMAIN_IDS.RGB,
-    // Format 5, the only one the keyboard stores: a colour row per pointing
-    // slot, 32 of them, and per layer of the sixteen-layer bank (D-F14), and
-    // the replacement feedback stage, its record and rows at the payload's
-    // end (firmware D-F70).
+    // Format 7, the only one the keyboard stores: a colour row per pointing
+    // slot, 32 of them, and per layer of the sixteen-layer bank (D-F14), the
+    // replacement feedback stage, its record and rows at the payload's end
+    // (firmware D-F70), and a locality for every feedback case, each tap
+    // branch a case of its own (firmware D-F73).
     DOMAIN_VERSION: PROFILE_DOMAIN_VERSIONS[PROFILE_DOMAIN_IDS.RGB],
     FORMAT_VERSION: PROFILE_DOMAIN_VERSIONS[PROFILE_DOMAIN_IDS.RGB],
     POINTING_SLOTS: POINTING_SLOT_COUNT,
@@ -73,13 +74,29 @@ const RGB_TAP_COMMIT_MODES = Object.freeze({
     KEY_FEEDBACK_TAP_COMMIT_OFF: 0,
     KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS: 1,
 });
+// What a behaviour feedback group row lights for (firmware D-F73): the tap
+// branch pending for tap count 2, the three tiers, kept at 1 to 3, the tap
+// branches for tap counts 3, 4 and 5 or more, any tap branch (firmware
+// D-F75), or every case.
 const RGB_KEY_SEMANTICS = Object.freeze({
-    KEY_FEEDBACK_GROUP_TAP_BRANCH_PENDING: 0,
+    KEY_FEEDBACK_GROUP_TAP_COUNT_2: 0,
     KEY_FEEDBACK_GROUP_TAP_COMMITTED: 1,
     KEY_FEEDBACK_GROUP_HOLD_ACTIVE: 2,
     KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE: 3,
+    KEY_FEEDBACK_GROUP_TAP_COUNT_3: 4,
+    KEY_FEEDBACK_GROUP_TAP_COUNT_4: 5,
+    KEY_FEEDBACK_GROUP_TAP_COUNT_5: 6,
+    KEY_FEEDBACK_GROUP_TAP_BRANCH_ANY: 7,
     KEY_FEEDBACK_GROUP_ALL: RGB_DOMAIN_V1.SELECTOR_ALL,
 });
+// The semantic each tap branch's accents name, by the branch's index (tap
+// count 2 first); the last stands for every deeper tap count too.
+const RGB_TAP_BRANCH_SEMANTICS = Object.freeze([
+    RGB_KEY_SEMANTICS.KEY_FEEDBACK_GROUP_TAP_COUNT_2,
+    RGB_KEY_SEMANTICS.KEY_FEEDBACK_GROUP_TAP_COUNT_3,
+    RGB_KEY_SEMANTICS.KEY_FEEDBACK_GROUP_TAP_COUNT_4,
+    RGB_KEY_SEMANTICS.KEY_FEEDBACK_GROUP_TAP_COUNT_5,
+]);
 // What a replacement feedback group row lights for: an input replaced with
 // text, one replaced by its macro, a replacement undone, the leader waiting
 // (firmware D-F72), or every case.
@@ -129,7 +146,7 @@ function encodeRgbDomainV1(profile, options = {}) {
     header[7] = value.pdModeColors.length;
     header[8] = value.pdModeGroupRows.length;
     header[9] = value.comboGroupRows.length;
-    header[10] = value.keyFeedback.tapBranchColors.length;
+    header[10] = value.keyFeedback.tapBranches.length;
     header[11] = value.keyGroupRows.length;
     header[12] = RGB_DOMAIN_V1.PHYSICAL_LED_COUNT;
     header[13] = RGB_DOMAIN_V1.LED_BITMAP_SIZE;
@@ -166,8 +183,8 @@ function encodeRgbDomainV1(profile, options = {}) {
     for (const row of value.comboGroupRows) {
         chunks.push(Buffer.from([row.color.h, row.color.s, row.color.v, row.groupId]));
     }
-    for (const color of value.keyFeedback.tapBranchColors) {
-        chunks.push(Buffer.from([color.h, color.s, color.v]));
+    for (const branch of value.keyFeedback.tapBranches) {
+        chunks.push(Buffer.from([branch.color.h, branch.color.s, branch.color.v, branch.locality]));
     }
     chunks.push(Buffer.from([
         value.keyFeedback.tapCommittedColor.h,
@@ -180,7 +197,9 @@ function encodeRgbDomainV1(profile, options = {}) {
         value.keyFeedback.longHoldActiveColor.s,
         value.keyFeedback.longHoldActiveColor.v,
         value.keyFeedback.tapCommitMode,
-        value.keyFeedback.locality,
+        value.keyFeedback.tapCommittedLocality,
+        value.keyFeedback.holdActiveLocality,
+        value.keyFeedback.longHoldActiveLocality,
     ]));
     for (const row of value.keyGroupRows) {
         chunks.push(Buffer.from([row.semantic, row.color.h, row.color.s, row.color.v, row.groupId]));
@@ -198,7 +217,10 @@ function encodeRgbDomainV1(profile, options = {}) {
         value.autocorrectFeedback.leadingColor.h,
         value.autocorrectFeedback.leadingColor.s,
         value.autocorrectFeedback.leadingColor.v,
-        value.autocorrectFeedback.locality,
+        value.autocorrectFeedback.textLocality,
+        value.autocorrectFeedback.macroLocality,
+        value.autocorrectFeedback.undoLocality,
+        value.autocorrectFeedback.leadingLocality,
     ]));
     for (const row of value.autocorrectGroupRows) {
         chunks.push(Buffer.from([row.semantic, row.color.h, row.color.s, row.color.v, row.groupId]));
@@ -298,25 +320,44 @@ function decodeRgbDomainV1(value, options = {}) {
             groupId: reader.groupId(counts.groups, "comboGroupRows", index),
         });
     }
-    const tapBranchColors = [];
+    const tapBranches = [];
     for (let index = 0; index < counts.branchColors; index += 1) {
-        tapBranchColors.push(reader.hsv(limits, "keyFeedback.tapBranchColors", index, "color"));
+        tapBranches.push({
+            color: reader.hsv(limits, "keyFeedback.tapBranches", index, "color"),
+            locality: reader.enumValue(4, "keyFeedback.tapBranches", index, "locality"),
+        });
     }
+    // The tiers' colours and the tap-commit policy, then a locality per tier.
+    const tapCommittedColor = reader.hsv(limits, "keyFeedback", 0, "tapCommittedColor");
+    const holdActiveColor = reader.hsv(limits, "keyFeedback", 0, "holdActiveColor");
+    const longHoldActiveColor = reader.hsv(limits, "keyFeedback", 0, "longHoldActiveColor");
+    const tapCommitMode = reader.enumValue(1, "keyFeedback", 0, "tapCommitMode");
     const keyFeedback = {
-        tapBranchColors,
-        tapCommittedColor: reader.hsv(limits, "keyFeedback", 0, "tapCommittedColor"),
-        holdActiveColor: reader.hsv(limits, "keyFeedback", 0, "holdActiveColor"),
-        longHoldActiveColor: reader.hsv(limits, "keyFeedback", 0, "longHoldActiveColor"),
-        tapCommitMode: reader.enumValue(1, "keyFeedback", 0, "tapCommitMode"),
-        locality: reader.enumValue(4, "keyFeedback", 0, "locality"),
+        tapBranches,
+        tapCommittedColor,
+        tapCommittedLocality: reader.enumValue(4, "keyFeedback", 0, "tapCommittedLocality"),
+        holdActiveColor,
+        holdActiveLocality: reader.enumValue(4, "keyFeedback", 0, "holdActiveLocality"),
+        longHoldActiveColor,
+        longHoldActiveLocality: reader.enumValue(4, "keyFeedback", 0, "longHoldActiveLocality"),
+        tapCommitMode,
     };
     const keyGroupRows = readGroupRows(reader, counts.keyGroups, counts.groups, (semantic, row) => assertKeySemantic(semantic, "keyGroupRows", row), "keyGroupRows", limits, "semantic");
+    // The four colours in semantic order, then a locality per case in the
+    // same order.
+    const textColor = reader.hsv(limits, "autocorrectFeedback", 0, "textColor");
+    const macroColor = reader.hsv(limits, "autocorrectFeedback", 0, "macroColor");
+    const undoColor = reader.hsv(limits, "autocorrectFeedback", 0, "undoColor");
+    const leadingColor = reader.hsv(limits, "autocorrectFeedback", 0, "leadingColor");
     const autocorrectFeedback = {
-        textColor: reader.hsv(limits, "autocorrectFeedback", 0, "textColor"),
-        macroColor: reader.hsv(limits, "autocorrectFeedback", 0, "macroColor"),
-        undoColor: reader.hsv(limits, "autocorrectFeedback", 0, "undoColor"),
-        leadingColor: reader.hsv(limits, "autocorrectFeedback", 0, "leadingColor"),
-        locality: reader.enumValue(4, "autocorrectFeedback", 0, "locality"),
+        textColor,
+        textLocality: reader.enumValue(4, "autocorrectFeedback", 0, "textLocality"),
+        macroColor,
+        macroLocality: reader.enumValue(4, "autocorrectFeedback", 0, "macroLocality"),
+        undoColor,
+        undoLocality: reader.enumValue(4, "autocorrectFeedback", 0, "undoLocality"),
+        leadingColor,
+        leadingLocality: reader.enumValue(4, "autocorrectFeedback", 0, "leadingLocality"),
     };
     const autocorrectGroupRows = readGroupRows(reader, counts.autocorrectGroups, counts.groups, (semantic, row) => assertAutocorrectSemantic(semantic, "autocorrectGroupRows", row), "autocorrectGroupRows", limits, "semantic");
     if (reader.offset !== bytes.length) {
@@ -394,12 +435,16 @@ function normalizeProfile(profile, limits) {
     const comboGroupRows = normalizeComboRows(profile.comboGroupRows, groupState, limits);
     const keyFeedback = normalizeKeyFeedback(profile.keyFeedback, limits);
     const keyGroupRows = normalizeGroupRows(profile.keyGroupRows, groupState, limits, "keyGroupRows", (semantic, row) => assertKeySemantic(semantic, "keyGroupRows", row), "semantic");
+    const replacement = profile.autocorrectFeedback;
     const autocorrectFeedback = {
-        textColor: normalizeHsv(profile.autocorrectFeedback?.textColor, limits, "autocorrectFeedback", 0, "textColor"),
-        macroColor: normalizeHsv(profile.autocorrectFeedback?.macroColor, limits, "autocorrectFeedback", 0, "macroColor"),
-        undoColor: normalizeHsv(profile.autocorrectFeedback?.undoColor, limits, "autocorrectFeedback", 0, "undoColor"),
-        leadingColor: normalizeHsv(profile.autocorrectFeedback?.leadingColor, limits, "autocorrectFeedback", 0, "leadingColor"),
-        locality: assertEnum(profile.autocorrectFeedback?.locality, 4, "autocorrectFeedback", 0, "locality"),
+        textColor: normalizeHsv(replacement?.textColor, limits, "autocorrectFeedback", 0, "textColor"),
+        textLocality: assertEnum(replacement?.textLocality, 4, "autocorrectFeedback", 0, "textLocality"),
+        macroColor: normalizeHsv(replacement?.macroColor, limits, "autocorrectFeedback", 0, "macroColor"),
+        macroLocality: assertEnum(replacement?.macroLocality, 4, "autocorrectFeedback", 0, "macroLocality"),
+        undoColor: normalizeHsv(replacement?.undoColor, limits, "autocorrectFeedback", 0, "undoColor"),
+        undoLocality: assertEnum(replacement?.undoLocality, 4, "autocorrectFeedback", 0, "undoLocality"),
+        leadingColor: normalizeHsv(replacement?.leadingColor, limits, "autocorrectFeedback", 0, "leadingColor"),
+        leadingLocality: assertEnum(replacement?.leadingLocality, 4, "autocorrectFeedback", 0, "leadingLocality"),
     };
     const autocorrectGroupRows = normalizeGroupRows(profile.autocorrectGroupRows, groupState, limits, "autocorrectGroupRows", (semantic, row) => assertAutocorrectSemantic(semantic, "autocorrectGroupRows", row), "semantic");
     for (const [table, rows] of /** @type {const} */ ([["layerGroupRows", layerGroupRows], ["pdModeGroupRows", pdModeGroupRows], ["comboGroupRows", comboGroupRows], ["keyGroupRows", keyGroupRows], ["autocorrectGroupRows", autocorrectGroupRows]])) {
@@ -535,20 +580,25 @@ function normalizeComboRows(input, groupState, limits) {
 
 /** @param {Partial<import("./types.js").RgbKeyFeedback> | undefined} value @param {Limits} limits */
 function normalizeKeyFeedback(value, limits) {
-    const branches = requiredArray(value?.tapBranchColors, "keyFeedback.tapBranchColors");
+    const branches = requiredArray(value?.tapBranches, "keyFeedback.tapBranches");
     if (branches.length > limits.tapBranchColorCount) {
-        throw rgbError("CAPACITY_EXCEEDED", `Key-feedback tap-branch color count ${branches.length}; maximum is ${limits.tapBranchColorCount}.`, {table: "keyFeedback.tapBranchColors"});
+        throw rgbError("CAPACITY_EXCEEDED", `Key-feedback tap-branch count ${branches.length}; maximum is ${limits.tapBranchColorCount}.`, {table: "keyFeedback.tapBranches"});
     }
     if ((limits.compiledStageMask & RGB_STAGE_BITS.KEY_BEHAVIOR) !== 0 && branches.length !== limits.tapBranchColorCount) {
-        throw rgbError("INCOMPLETE_SURFACE", `Key-feedback tap-branch colors must contain exactly ${limits.tapBranchColorCount} compiled entries.`, {table: "keyFeedback.tapBranchColors"});
+        throw rgbError("INCOMPLETE_SURFACE", `Key-feedback tap branches must contain exactly ${limits.tapBranchColorCount} compiled entries.`, {table: "keyFeedback.tapBranches"});
     }
     return {
-        tapBranchColors: branches.map((color, index) => normalizeHsv(color, limits, "keyFeedback.tapBranchColors", index, "color")),
+        tapBranches: branches.map((branch, index) => ({
+            color: normalizeHsv(branch?.color, limits, "keyFeedback.tapBranches", index, "color"),
+            locality: assertEnum(branch?.locality, 4, "keyFeedback.tapBranches", index, "locality"),
+        })),
         tapCommittedColor: normalizeHsv(value?.tapCommittedColor, limits, "keyFeedback", 0, "tapCommittedColor"),
+        tapCommittedLocality: assertEnum(value?.tapCommittedLocality, 4, "keyFeedback", 0, "tapCommittedLocality"),
         holdActiveColor: normalizeHsv(value?.holdActiveColor, limits, "keyFeedback", 0, "holdActiveColor"),
+        holdActiveLocality: assertEnum(value?.holdActiveLocality, 4, "keyFeedback", 0, "holdActiveLocality"),
         longHoldActiveColor: normalizeHsv(value?.longHoldActiveColor, limits, "keyFeedback", 0, "longHoldActiveColor"),
+        longHoldActiveLocality: assertEnum(value?.longHoldActiveLocality, 4, "keyFeedback", 0, "longHoldActiveLocality"),
         tapCommitMode: assertEnum(value?.tapCommitMode, 1, "keyFeedback", 0, "tapCommitMode"),
-        locality: assertEnum(value?.locality, 4, "keyFeedback", 0, "locality"),
     };
 }
 
@@ -575,11 +625,16 @@ function assertCompiledSurfaces(profile, limits) {
     if ((compiled & RGB_STAGE_BITS.COMBO) === 0 && (profile.comboGroupRows.length || profile.comboFeedback.locality !== 0 || !isBlack(profile.comboFeedback.color))) {
         throw rgbError("UNSUPPORTED_STAGE_DATA", "Combo RGB data must be canonical zero when the stage is not compiled.");
     }
-    if ((compiled & RGB_STAGE_BITS.KEY_BEHAVIOR) === 0 && (profile.keyGroupRows.length || profile.keyFeedback.tapBranchColors.length || profile.keyFeedback.tapCommitMode !== 0 || profile.keyFeedback.locality !== 0 || !isBlack(profile.keyFeedback.tapCommittedColor) || !isBlack(profile.keyFeedback.holdActiveColor) || !isBlack(profile.keyFeedback.longHoldActiveColor))) {
+    const key = profile.keyFeedback;
+    if ((compiled & RGB_STAGE_BITS.KEY_BEHAVIOR) === 0 && (profile.keyGroupRows.length || key.tapBranches.length || key.tapCommitMode !== 0
+        || key.tapCommittedLocality !== 0 || key.holdActiveLocality !== 0 || key.longHoldActiveLocality !== 0
+        || !isBlack(key.tapCommittedColor) || !isBlack(key.holdActiveColor) || !isBlack(key.longHoldActiveColor))) {
         throw rgbError("UNSUPPORTED_STAGE_DATA", "Key-feedback RGB data must be canonical zero when the stage is not compiled.");
     }
     const replacement = profile.autocorrectFeedback;
-    if ((compiled & RGB_STAGE_BITS.AUTOCORRECT) === 0 && (profile.autocorrectGroupRows.length || replacement.locality !== 0 || !isBlack(replacement.textColor) || !isBlack(replacement.macroColor) || !isBlack(replacement.undoColor) || !isBlack(replacement.leadingColor))) {
+    if ((compiled & RGB_STAGE_BITS.AUTOCORRECT) === 0 && (profile.autocorrectGroupRows.length
+        || replacement.textLocality !== 0 || replacement.macroLocality !== 0 || replacement.undoLocality !== 0 || replacement.leadingLocality !== 0
+        || !isBlack(replacement.textColor) || !isBlack(replacement.macroColor) || !isBlack(replacement.undoColor) || !isBlack(replacement.leadingColor))) {
         throw rgbError("UNSUPPORTED_STAGE_DATA", "Replacement-feedback RGB data must be canonical zero when the stage is not compiled.", {table: "autocorrectFeedback", row: 0, field: "textColor"});
     }
 }
@@ -723,7 +778,7 @@ function assertPdSelector(value, limits, table, row) {
 
 /** @param {number} value @param {string} table @param {number} row */
 function assertKeySemantic(value, table, row) {
-    if (value !== RGB_DOMAIN_V1.SELECTOR_ALL && value > RGB_KEY_SEMANTICS.KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE) throw rgbError("INVALID_SELECTOR", `${table}[${row}] semantic ${value} is unknown.`, {table, row, field: "semantic"});
+    if (value !== RGB_DOMAIN_V1.SELECTOR_ALL && value > RGB_KEY_SEMANTICS.KEY_FEEDBACK_GROUP_TAP_BRANCH_ANY) throw rgbError("INVALID_SELECTOR", `${table}[${row}] semantic ${value} is unknown.`, {table, row, field: "semantic"});
     return value;
 }
 
@@ -819,6 +874,7 @@ module.exports = {
     RGB_POINTING_MODE_IDS,
     RGB_STAGE_BITS,
     RGB_STAGE_MASK_ALL,
+    RGB_TAP_BRANCH_SEMANTICS,
     RGB_TAP_COMMIT_MODES,
     RgbDomainProtocolError,
     createRgbDomainV1,

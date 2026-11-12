@@ -1,14 +1,18 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {brightnessLimit, clampHsv, css, hsv, idealText, isOff, label, rgb, valuePercent} from "../../webview/lib/colour.mjs";
+import {brightnessLimit, clampHsv, css, hsv, idealText, label, rgb, valuePercent} from "../../webview/lib/colour.mjs";
+import {isOff, isPassthrough} from "../../webview/view/lighting.mjs";
 
 const colour = (h, s, v) => ({h: String(h), s: String(s), v: String(v)});
 
 test("device colours are read as QMK's 0-255 HSV, strings included", () => {
     assert.deepEqual(hsv(colour(140, 210, 180)), [140, 210, 180]);
     assert.deepEqual(hsv(undefined), [0, 0, 0]);
-    assert.equal(isOff(colour(140, 255, 0)), true, "value zero is off whatever the hue says");
-    assert.equal(isOff(colour(0, 0, 1)), false);
+    assert.equal(isPassthrough(colour(140, 0, 0)), true, "saturation and value zero is passthrough whatever the hue says (firmware D-F74)");
+    assert.equal(isPassthrough(colour(140, 255, 0)), false, "value zero with saturation is black, which paints");
+    assert.equal(isOff(colour(140, 255, 0)), true);
+    assert.equal(isOff(colour(0, 0, 0)), false, "passthrough is not black");
+    assert.equal(isPassthrough(colour(0, 0, 1)), false);
     assert.equal(label(colour(18, 255, 200)), "HSV(18, 255, 200)");
 });
 
