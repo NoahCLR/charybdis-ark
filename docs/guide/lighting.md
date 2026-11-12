@@ -3,7 +3,9 @@
 The **Lighting** screen sets what the keyboard lights, and when. The board on
 screen is painted the way the keyboard will light up with your draft, for the
 layer you pick under it, and numbers each key by its LED for
-[accents](#accents).
+[accents](#accents). Nothing on it is frosted as on the Keymap: a
+transparent key, or one answered from a layer below, shows the light the
+keyboard does, as solid as any other.
 
 ## All lighting and the idle timeout
 

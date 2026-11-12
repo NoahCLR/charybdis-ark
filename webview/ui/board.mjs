@@ -7,7 +7,8 @@
 // says each key shows it: with layers previewed under the viewed layer, a key
 // answered from below is frosted like any transparent key, keeps its legend
 // sharp and shows the answering layer's light, its dots and its badges; dots
-// and badges mark only what runs. Selection and edits still name this layer's
+// and badges mark only what runs. Lighting draws it without glass, every key
+// solid, as the keyboard shows its light. Selection and edits still name this layer's
 // own position.
 
 // Selector assertions refer to elements created by this module's authored markup.
@@ -50,26 +51,26 @@ const ledLabelAt = (cx, cy, led) => ledLabel(cx - ledLabelWidth(led) / 2 + LED_L
 
 /** @param {import("../view/keyface-types.js").LayerView} view @param {import("./surface-types.js").BoardOptions} [options] */
 export function board(view, options = {}) {
-    const {selected, holding = [], reach = [], pdActive = null, comboActive = null, behaviourActive = null, replacementActive = null, drafted = null, faces = true, ledIndex = false, accent = null, card = true,
+    const {selected, holding = [], reach = [], pdActive = null, comboActive = null, behaviourActive = null, replacementActive = null, drafted = null, faces = true, ledIndex = false, accent = null, glass = true, card = true,
         onKey, onOpen, onSwap, onLed} = options;
 
     const measure = pageTextMeasure() ?? estimateWidth;
     let glow = "", keys = "";
-    for (const key of boardKeys(view, {faces, pdActive, comboActive, behaviourActive, replacementActive, accent})) {
-        const {index, from, glass, tiers, badges, icons, sub, led, picked} = key;
+    for (const key of boardKeys(view, {faces, pdActive, comboActive, behaviourActive, replacementActive, accent, glass})) {
+        const {index, from, tiers, badges, icons, sub, led, picked} = key;
         const visual = keyVisual(index);
         const cx = visual.x + GEO.keyW / 2, cy = visual.y + GEO.keyH / 2;
         const transform = visual.angle ? ` transform="rotate(${visual.angle} ${cx} ${cy})"` : "";
         const classes = ["kc",
             key.kind === "transparent" ? "kc-trns" : "",
             key.kind === "disabled" ? "kc-none" : "",
-            from ? "kc-under" : "",
+            key.glass ? "kc-glass" : "",
             options.picking ? "pickable" : ""].filter(Boolean).join(" ");
 
         const text = idealText(key.light);
         const paint = css(key.light);
-        const fill = ` style="fill:${paint};stroke:${glass ? "none" : "var(--light-outline)"}"`;
-        glow += `<rect class="kc-glow${glass ? " kc-glow-trns" : ""}" x="${visual.x}" y="${visual.y}" width="${GEO.keyW}" height="${GEO.keyH}" rx="${GEO.radius}" fill="${paint}"${transform}></rect>`;
+        const fill = ` style="fill:${paint};stroke:${key.glass ? "none" : "var(--light-outline)"}"`;
+        glow += `<rect class="kc-glow${key.glass ? " kc-glow-trns" : ""}" x="${visual.x}" y="${visual.y}" width="${GEO.keyW}" height="${GEO.keyH}" rx="${GEO.radius}" fill="${paint}"${transform}></rect>`;
 
         const rows = keyFaceRows(visual.y,
             {tiers: tiers.length > 0, combos: badges.length > 0, sub: Boolean(sub), icons: icons.length > 0});
@@ -147,7 +148,7 @@ export function board(view, options = {}) {
     // The trackball LED is index 56 and belongs to no key, but it is lit like
     // every other LED, so it is drawn with the light it emits rather than as an
     // outline of where the ball sits.
-    const ball = trackballGlyph(boardTrackball(view, {pdActive, comboActive, behaviourActive, replacementActive, accent}), {ledIndex, picking: Boolean(accent), clickable: Boolean(onLed)});
+    const ball = trackballGlyph(boardTrackball(view, {pdActive, comboActive, behaviourActive, replacementActive, accent, glass}), {ledIndex, picking: Boolean(accent), clickable: Boolean(onLed)});
     if (ball.glow) glow += ball.glow;
     const node = /** @type {import("./surface-types.js").BoardNode} */ (el(`<div class="board ${options.picking ? "picking" : ""}">
         <svg viewBox="${GEO.viewBox}" xmlns="http://www.w3.org/2000/svg">${glow}${ball.markup}${keys}</svg></div>`));
@@ -250,8 +251,8 @@ function pickByDrag(group, onLed) {
 // solid when its light is the viewed layer's own — an all-keys colour or one
 // of its accents, a previewed pointing mode, or anything at all on base,
 // which nothing lies under — and frosted when it is seen through the viewed
-// layer from underneath (view/board-keys.mjs). A mapped-keys-only layer never
-// reaches it, since no key maps to it. Like a key, it carries its LED's number
+// layer from underneath (view/board-keys.mjs), on a board drawn with glass.
+// A mapped-keys-only layer never reaches it, since no key maps to it. Like a key, it carries its LED's number
 // on Lighting, in its middle since it has no corner, and a ring while it is
 // picked for an accent.
 /** @param {ReturnType<typeof boardTrackball>} ball @param {import("./surface-types.js").TrackballOptions} options */

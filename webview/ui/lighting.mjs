@@ -44,9 +44,10 @@ export function screenLighting() {
     const content = el(`<div class="content"><div class="pad keys-pad"></div></div>`);
     const pad = /** @type {HTMLElement} */ (content.firstElementChild);
     // The board, what it is showing and the layer tabs under them are one
-    // card, as on Keys. Each key carries its LED's index (D-L77); while an
-    // accent is added or changed, a press or a drag picks its LEDs and the
-    // board shows them in its colour.
+    // card, as on Keys. Nothing on it is frosted: a key falling through
+    // shows the light the keyboard does, solid. Each key carries its LED's
+    // index (D-L77); while an accent is added or changed, a press or a drag
+    // picks its LEDs and the board shows them in its colour.
     const card = el(`<div class="board-card"></div>`);
     // On Pointing modes the board shows the picked mode running, and on
     // Combo feedback a combo held that fires in this view, its keys ringed
@@ -60,6 +61,7 @@ export function screenLighting() {
     const stage = state.stage;
     const drawn = card.appendChild(board(shows.shown, {
         ledIndex: true,
+        glass: false,
         card: false,
         accent: accentPicks(model, stage),
         pdActive: shows.pdActive,

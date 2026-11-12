@@ -38,7 +38,9 @@ On a key face:
   many macros or pointing modes the key reaches; hover it to see which. A
   behaviour a switch keeps off on this layer adds no icon, as it adds no
   dots.
-- A frosted key is transparent: it falls through to the layer below.
+- A frosted key is transparent: it falls through to the layer below. The
+  Lighting screen frosts nothing, since the keyboard lights a transparent key
+  like any other.
 - A small dot in the corner marks a key changed in your draft. In the live
   modes the change already runs on the keyboard, so the dot marks an
   **unsaved change**; in Live edit it goes once the keyboard saves.
