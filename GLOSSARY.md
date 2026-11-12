@@ -172,7 +172,8 @@ _Avoid_: correction (in anything a person reads), word, expansion, output
 
 **Input**:
 What is typed to get a replacement: one word of letters and digits, a
-misspelling or an abbreviation such as `pnumber`. A replacement has one or
+misspelling or an abbreviation such as `pnumber`, typed as you type or after
+the Leader key as its replacement **fires**. A replacement has one or
 more. A heading, a count and a label read **Inputs** ("15 of 1,024 inputs",
 "+ Input"), a sentence says "an input" or "its inputs", and a list file names
 them `inputs`. It belongs to one replacement. The firmware and Ark's code
@@ -183,6 +184,34 @@ _Avoid_: typed, typed form, what is typed for it (Ark's words before; a file
 that says `typed` is still read), typo (as the term; a misspelling is still a
 typo, and "typo fixes" says so), variation, trigger, abbreviation (as the
 term), pattern
+
+**Fires** (how a replacement fires):
+Whether a replacement's inputs fire **As you type** (as a word ends), **After
+Leader**, or **Both** (D-L91): the replacement's, never an input's, so
+switching it leaves its inputs as they are. The switch is **Fires** on its
+editor; a file says `fires`. The firmware calls it the correction's trigger,
+bits 1–2 of its row's kind byte.
+_Avoid_: mode, trigger (in anything a person reads), input kind
+
+**Leader**:
+Text replacement's own key, QMK's `QK_LEADER` (firmware D-F71): after it, what
+is typed is held on the keyboard and sent only as the replacement of an
+input that fires after it. It goes wherever a switch key goes, and the
+picker offers it in **Other QMK**, **Text replacement**, beside **Switch
+keys**; it is not a switch key.
+_Avoid_: leader sequence, Leader mode, QMK Leader
+
+**Leader input**:
+An input of a replacement that fires after the Leader key: a word like any
+input, typed whole after the key, `recieve*` sent by `recieve` (D-L91). Not a
+kind of input of its own.
+_Avoid_: leader sequence, leader typo, shortcut, code
+
+**Leader waits** (the leader timeout):
+How long the leader waits after its last key before it sends an input that a
+longer one begins with, or drops what is held: settings scalar 32,
+1000 to 10000 ms, on Host under **Text replacement**.
+_Avoid_: leader term, leader window
 
 **`*`** (in an input):
 Where other letters may go. An input is the whole word unless it is

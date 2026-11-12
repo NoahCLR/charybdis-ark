@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {createRequire} from "node:module";
 import {isOff} from "../../webview/lib/colour.mjs";
-import {baseColour, feedbackColours, inheritsStageColour, keyLed, layerPaints, keyLight, mappedKeyCount, offWording, ownLight, pdColourRow, replacementPaints, replacementTrigger, stageEnabled, stageHeldOffBy, stageIdle, stageInEffect, trackballLed, trackballLight} from "../../webview/view/lighting.mjs";
+import {baseColour, feedbackColours, inheritsStageColour, keyLed, layerPaints, keyLight, mappedKeyCount, offWording, ownLight, pdColourRow, replacementPaints, replacementTrigger, stageEnabled, stageHeldOffBy, stageIdle, stageInEffect, stageOffDetail, trackballLed, trackballLight} from "../../webview/view/lighting.mjs";
 
 const colour = (h, s, v) => ({h: String(h), s: String(s), v: String(v)});
 const position = (layoutIndex, keycode) => ({layoutIndex, keycode});
@@ -125,6 +125,15 @@ test("replacement feedback is in effect only while Text replacement is on", () =
     assert.equal(stageInEffect(off, "key"), true, "behaviour feedback does not depend on text replacement");
     const stored = {...off, rgb: {...off.rgb, stages: off.rgb.stages.map((row) => row.id === "autocorrect" ? {...row, enabled: false} : row)}};
     assert.equal(stageIdle(stored, "autocorrect"), null, "a stage switched off is off, not idle");
+    // With a leader input on the list the leader still sends, switch off or
+    // not, and its sends flash (D-L91): the banner stays, the tab is live.
+    const leads = {...off, autocorrect: {entries: [], usage: {leaders: 1}}};
+    assert.equal(stageHeldOffBy(leads, "autocorrect"), "autocorrect");
+    assert.equal(stageIdle(leads, "autocorrect"), null);
+    assert.equal(stageInEffect(leads, "autocorrect"), true);
+    // Its banner then says what still flashes, colours and all.
+    assert.equal(stageOffDetail(leads, "autocorrect"), "Words you finish never flash; what the Leader key sends still flashes, in the text or macro colour.");
+    assert.equal(stageOffDetail(off, "autocorrect"), "This stage paints nothing.");
     const unread = withSwitch(true); delete unread.configDefaults;
     assert.equal(stageInEffect(unread, "autocorrect"), true, "without settings readback nothing is claimed");
 });

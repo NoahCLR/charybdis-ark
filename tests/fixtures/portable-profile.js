@@ -1,8 +1,8 @@
 // @ts-check
 "use strict";
 // Current firmware's profile as Ark's tests build it: the firmware's frozen
-// populated profile (populated_profile_v4.fixture: schema 4.5, RGB 5, key
-// behaviours 2, combos 3, settings 12, sparse PD 4, slots 0-5 configured,
+// populated profile (populated_profile_v4.fixture: schema 4.6, RGB 5, key
+// behaviours 2, combos 3, settings 13, sparse PD 4, slots 0-5 configured,
 // keymap 1 and macros 1), materialized the way a keyboard read does, with
 // these settings and a combo table standing in for the live readbacks, and
 // the given layers, empty macros and the autocorrect entries US types in
@@ -31,18 +31,18 @@ const CURRENT_BASE = Object.freeze({protocol: {major: PROFILE_WIRE_V1.PROTOCOL_M
     schema: {major: PROFILE_BLOB_V1.SCHEMA_MAJOR, minor: PROFILE_BLOB_V1.SCHEMA_MINOR}, compiledLayerCount: 16, supportedDomainMask: 255, actionAbiDigest: ACTION_ABI});
 const CURRENT_CAPABILITIES = Object.freeze({...CURRENT_BASE, featureFlags: PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES});
 
-// Settings v12: values 10..14 are the retired pointing DPI and 27 the retired
-// combo references, all zero; each flash lasts 200 ms; auto-sniping follows Navigation (layer 3)
+// Settings v13: values 10..14 are the retired pointing DPI and 27 the retired
+// combo references, all zero; each flash lasts 200 ms; the leader waits 2 s; auto-sniping follows Navigation (layer 3)
 // alone; behaviours and combos are on everywhere; every
 // layer refers combos to itself; every macro and custom key name is empty,
 // and so is the keyboard's own name (the firmware's built-in one); no custom
 // key has a shortcut.
 /** @returns {import("../../core/schema/types.js").SettingsDomain} */
 function settings() {
-    const values = [200, 150, 400, 150, 1, 4, 1200, 25, 1, 1 << 3, 0, 0, 0, 0, 0, 200, 400, 900000, 1200, 200, 1, 257, 0xc8ff00, 1, 0, 200, 10, 0, 1, 0xffff, 0xffff, 200];
+    const values = [200, 150, 400, 150, 1, 4, 1200, 25, 1, 1 << 3, 0, 0, 0, 0, 0, 200, 400, 900000, 1200, 200, 1, 257, 0xc8ff00, 1, 0, 200, 10, 0, 1, 0xffff, 0xffff, 200, 2000];
     const layers = Array.from({length: 16}, (_, layer) => ({...defaultLayerRecord(layer), reference: layer}));
     return {values, names: ["Base", "Numbers", "Symbols", "Navigation", "Pointer", "Extra 1", "Extra 2", "Extra 3", ...Array(8).fill("")], layers,
-        macroNames: Array(128).fill(""), customKeyNames: Array(128).fill(""), customKeyShortcuts: Array.from({length: 128}, () => ({mods: 0, keys: [], layers: 0, layerKind: 0})), keyboardName: "", formatVersion: 12};
+        macroNames: Array(128).fill(""), customKeyNames: Array(128).fill(""), customKeyShortcuts: Array.from({length: 128}, () => ({mods: 0, keys: [], layers: 0, layerKind: 0})), keyboardName: "", formatVersion: 13};
 }
 // The fixture's autocorrect list without the entries its US host layout
 // cannot type (café, über), so a draft of this profile starts with no check

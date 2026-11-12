@@ -53,15 +53,15 @@ export function stageAutocorrect(model) {
     const policy = paintsSection(model, "autocorrect", "When and where");
     const locality = el(`<label class="field"><span>${esc(words.lightingFields.locality)}</span>
         <select data-f="lighting:autocorrect:locality" class="input" ${canEdit ? "" : "disabled"}
-            data-tip="Where the flash paints. The trigger key choices follow the key that ended the word, or the Backspace that undid the replacement.">
+            data-tip="Where the flash paints. The trigger key choices follow the key that ended the word, the Backspace that undid the replacement, or the key that ended what you typed after the Leader key.">
         ${words.localities.map(([id, text]) => `<option value="${esc(id)}" ${feedback.locality === id ? "selected" : ""}>${esc(text)}</option>`).join("")}</select>
-        <span class="hint">Here the trigger key is the key that ended the word (Space, Enter, a punctuation key), or the Backspace that undid the replacement; for a combo, every key of it. When the keyboard cannot tell which key it was, the flash paints both halves, or every key.</span></label>`);
+        <span class="hint">Here the trigger key is the key that ended the word (Space, Enter, a punctuation key), or the Backspace that undid the replacement; for what the Leader key sends, the key that sent it, the last character or Enter. For a combo, every key of it. When the keyboard cannot tell which key it was, or the leader's wait sent it, the flash paints both halves, or every key.</span></label>`);
     /** @type {HTMLSelectElement} */ (locality.querySelector("select")).addEventListener("change", (event) =>
         post(edits.autocorrectFeedback(model.rgb.autocorrectFeedback, null, undefined, {locality: /** @type {HTMLSelectElement} */ (event.target).value})));
     // Where it paints, with which key that is here under it, then how long
     // a flash lasts, as Behaviour feedback lists its locality and its flash.
     policy.append(stack(locality, flashSetting(model, "replacementFeedback")));
-    main.append(colour, policy, aboutStage("As text replacement changes what you typed, the keyboard flashes once, in the colour of what it did and in the area chosen above: an input replaced with text, one replaced by a macro, or a replacement undone with Backspace. The flash begins as the replacement starts to be typed and paints over every other stage; a word left as you typed it never flashes. The board shows the flash picked in the list. Where it follows a key, Space stands in for the key that ended the word and Backspace for the one that undid it, ringed on the board."));
+    main.append(colour, policy, aboutStage("As text replacement changes what you typed, the keyboard flashes once, in the colour of what it did and in the area chosen above: an input replaced with text, one replaced by a macro, or a replacement undone with Backspace. What the Leader key sends flashes as a replacement does, in the text or macro colour: that is how you see it went. The flash begins as the replacement starts to be typed and paints over every other stage; a word left as you typed it never flashes, and nor does a leader input that sends nothing. The board shows the flash picked in the list. Where it follows a key, Space stands in for the key that ended the word and Backspace for the one that undid it, ringed on the board."));
     const accents = accentsSection(model, "autocorrect");
     if (accents) main.append(accents);
     node.append(list, main);

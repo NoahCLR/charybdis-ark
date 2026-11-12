@@ -78,8 +78,8 @@ export interface ControlPayloads {
     inspect: {
         validateMacro: Omit<Extract<PanelEdit, {type: 'validateMacro'}>, 'type'>;
         validateAutocorrect: Omit<Extract<PanelEdit, {type: 'validateAutocorrect'}>, 'type'>;
-        /** Try it: what the keyboard would leave on screen for `typed` (the characters a computer would show, `\b` for Backspace) after `before`, text already there; answered with `autocorrectTry`. */
-        tryAutocorrect: {requestId: number; before: string; typed: string; capsLock: boolean};
+        /** Try it: what the keyboard would leave on screen for `typed` (the characters a computer would show, `\b` for Backspace) after `before`, text already there, and with `leader` what it would do with that text typed after the Leader key; answered with `autocorrectTry`. */
+        tryAutocorrect: {requestId: number; before: string; typed: string; capsLock: boolean; leader?: string};
         /** What a dropped list file would do to the draft's list; answered with `autocorrectImportPreview`. */
         previewAutocorrectImport: {requestId: number; text: string; name: string};
         /** The same for a file the shell's chooser picks. */
@@ -108,7 +108,13 @@ export type MacroValidation = MacroInspection | {error: string; code: string};
 /** What an autocorrect edit would be refused for (`error`, '' when it would be taken) and what it would newly warn about. For an edit that names a replacement to add to or to change to: the id that replacement's entry has in the list once the edit is kept (`entry`), what it is called there (`label`, as an entry's is), and whether the list already has it (`listed`): an add then adds to that entry, which `listedSaid` says in a sentence for a replacement being made, and a change joins it, which a warning says. A refused edit says these too, where its replacement can be one. */
 export interface AutocorrectValidation {error: string; code: string; warnings: string[]; entry?: string; label?: string; listed?: boolean; listedSaid?: string}
 /** What the keyboard would leave on screen for a try: the text, the replacements that fired and still stand, in order (each its entry's id, its text or '' with the macro slot it played, and the input's stored letters), where each of those stands in the text (`marks`, by its offsets; a part deleted since is no longer marked), and whether the last key undid one. */
-export interface AutocorrectTryResult {text: string; fired: {entry: string; correction: string; typo: string; macro?: number}[]; marks: {entry: string; correction: string; typo: string; macro?: number; start: number; end: number}[]; undone: boolean}
+export interface AutocorrectTryResult {text: string; fired: {entry: string; correction: string; typo: string; macro?: number; leader?: true}[]; marks: {entry: string; correction: string; typo: string; macro?: number; leader?: true; start: number; end: number}[]; undone: boolean; leader?: AutocorrectLeaderTry}
+/** What the leader would do with text typed after the Leader key (firmware D-F71): nothing, with no leader input on the list; send the replacement of `input` (`label` as the list names it, `entry` its id), on Enter when `finishing`, and nothing when `passedOver` (this host cannot type it, or its macro cannot play); wait, with what Enter or the wait would send (`sends`, a label, or null) and the inputs that could still follow; or drop what was typed, which never reaches the computer. */
+export type AutocorrectLeaderTry =
+    | {state: 'none'}
+    | {state: 'sends'; input: string; entry: string; label: string; macro?: number; finishing: boolean; passedOver: boolean}
+    | {state: 'waits'; sends: string | null; longer: string[]}
+    | {state: 'drops'; held: string};
 export type AutocorrectFileFormat = 'txt' | 'csv' | 'json';
 /** A line a list file or the list refused, and why; `line` is the file's line, row or entry number. */
 export interface AutocorrectImportRefused {line: number | null; text: string; reason: string}

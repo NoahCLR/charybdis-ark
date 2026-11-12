@@ -156,7 +156,9 @@ it is typed, refuses one the computer's layout can't type, and marks the
 ones that would misfire. A list comes in from, and goes out to, QMK's
 autocorrect format, a spreadsheet's CSV or JSON. **Try it** previews what the keyboard would type
 for a sentence before anything is saved, and a key on the keyboard switches it off
-for a password or a terminal.
+for a password or a terminal. A replacement can fire after the **Leader** key
+instead, or both ways: Leader then `pn` sends your phone number, and nothing you typed
+reaches the computer; **Try it** tries those too.
 
 ### Pointing modes
 

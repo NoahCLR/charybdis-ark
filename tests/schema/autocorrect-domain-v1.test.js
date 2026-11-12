@@ -3,9 +3,9 @@ const {test} = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const {AUTOCORRECT_DOMAIN_V1, AUTOCORRECT_KIND, AUTOCORRECT_MATCH, entryKey, entryOfKey, encodeAutocorrectDomain, decodeAutocorrectDomain, autocorrectDomainSize, foldTypo, typoProblem, correctionProblem} = require("../../core/schema/autocorrect-domain-v1");
+const {AUTOCORRECT_DOMAIN_V1, AUTOCORRECT_KIND, AUTOCORRECT_MATCH, AUTOCORRECT_TRIGGER, entryKey, entryOfKey, encodeAutocorrectDomain, decodeAutocorrectDomain, autocorrectDomainSize, foldTypo, typoProblem, correctionProblem} = require("../../core/schema/autocorrect-domain-v1");
 const {decodeProfileBlob} = require("../../core/schema/profile-blob-v1");
-const fixture = require("../../upstream/firmware/tests/fixtures/autocorrect_domain_v1.json");
+const fixture = require("../../upstream/firmware/tests/fixtures/autocorrect_domain_v2.json");
 
 /** @param {string} name */
 const fixtureDomain = name => {
@@ -13,19 +13,23 @@ const fixtureDomain = name => {
     return decodeProfileBlob(Buffer.from(/** @type {RegExpMatchArray} */ (text.match(/^profile\.hex=(.+)$/m))[1], "hex")).domains.find(domain => domain.id === 0x80);
 };
 const reject = (fn, code) => assert.throws(fn, error => error.code === code, code);
-// The fixture's entries, their matches as the stored numbers; a macro entry
-// names its slot and has no text.
+// The fixture's entries, their matches and triggers as the stored numbers (an
+// entry that fires as a word ends says nothing of it); a macro entry names
+// its slot and has no text.
 const listOf = entries => ({entries: entries.map(entry => ({correction: entry.correction ?? "", ...(entry.macro === undefined ? {} : {macro: entry.macro}),
+    ...(entry.trigger === undefined || fixture.triggers.indexOf(entry.trigger) === 0 ? {} : {trigger: fixture.triggers.indexOf(entry.trigger)}),
     typos: entry.typos.map(({typo, match}) => ({typo, match: fixture.matches.indexOf(match)}))}))});
 // Entries compared whatever order they are written in.
 const sorted = list => list.entries.map(entry => ({...entry, typos: entry.typos.slice().sort((a, b) => Buffer.compare(Buffer.from(a.typo), Buffer.from(b.typo)))}))
     .sort((a, b) => Buffer.compare(Buffer.from(entryKey(a)), Buffer.from(entryKey(b))));
 
-test("the ceilings and the match numbers are the firmware's", () => {
+test("the ceilings, the match numbers and the trigger numbers are the firmware's", () => {
     assert.deepEqual({corrections: AUTOCORRECT_DOMAIN_V1.MAX_CORRECTIONS, typos: AUTOCORRECT_DOMAIN_V1.MAX_TYPOS, bytesPerTypo: AUTOCORRECT_DOMAIN_V1.TEXT_MAX,
         bytesPerCorrection: AUTOCORRECT_DOMAIN_V1.CORRECTION_MAX, macroSlots: AUTOCORRECT_DOMAIN_V1.MACRO_SLOTS, textBytes: AUTOCORRECT_DOMAIN_V1.MAX_TEXT_BYTES, domainBytes: AUTOCORRECT_DOMAIN_V1.MAX_SIZE}, fixture.ceilings);
     assert.deepEqual([AUTOCORRECT_MATCH.WHOLE_WORD, AUTOCORRECT_MATCH.START, AUTOCORRECT_MATCH.END, AUTOCORRECT_MATCH.ANYWHERE],
         ["whole word", "start of word", "end of word", "anywhere"].map(word => fixture.matches.indexOf(word)));
+    assert.equal(fixture.matches.length, 4, "no match after the leader: a replacement fires there");
+    assert.deepEqual([AUTOCORRECT_TRIGGER.AS_TYPED, AUTOCORRECT_TRIGGER.AFTER_LEADER, AUTOCORRECT_TRIGGER.BOTH], ["as a word ends", "after the leader", "both"].map(word => fixture.triggers.indexOf(word)));
 });
 
 test("every valid vector encodes to the firmware's bytes, whatever order its entries are written in, and decodes back", () => {
@@ -107,7 +111,15 @@ test("the encoder refuses what the keyboard would, by the keyboard's reason", ()
     reject(() => encodeAutocorrectDomain(one("the", "t-h")), "NOT_A_WORD");
     reject(() => encodeAutocorrectDomain(one("the", "teh'")), "NOT_A_WORD");
     reject(() => encodeAutocorrectDomain(one("the", "the")), "TYPO_IS_CORRECTION");
+    reject(() => encodeAutocorrectDomain(one("the", "teh", 5)), "INVALID_MATCH");
+    // A replacement that fires after the leader keeps words for inputs, a
+    // macro too; a trigger there is not is refused as the firmware's kind byte.
+    const {AFTER_LEADER, BOTH} = AUTOCORRECT_TRIGGER;
+    assert.doesNotThrow(() => encodeAutocorrectDomain({entries: [{correction: "Kind regards", trigger: AFTER_LEADER, typos: [{typo: "kr", match: 0}]}]}));
+    assert.doesNotThrow(() => encodeAutocorrectDomain({entries: [{correction: "", macro: 3, trigger: BOTH, typos: [{typo: "sig", match: 0}]}]}));
+    reject(() => encodeAutocorrectDomain({entries: [{correction: "Kind regards", trigger: AFTER_LEADER, typos: [{typo: "k r", match: 0}]}]}), "NOT_A_WORD");
     reject(() => encodeAutocorrectDomain(one("the", "teh", 4)), "INVALID_MATCH");
+    reject(() => encodeAutocorrectDomain({entries: [{correction: "the", trigger: 3, typos: [{typo: "teh", match: 0}]}]}), "INVALID_KIND");
     reject(() => encodeAutocorrectDomain({entries: [{correction: "the", typos: [{typo: "teh", match: 0}]}, {correction: "the", typos: [{typo: "hte", match: 0}]}]}), "ORDER");
     reject(() => encodeAutocorrectDomain({entries: [{correction: "the", typos: [{typo: "teh", match: 0}]}, {correction: "ten", typos: [{typo: "teh", match: 0}]}]}), "ORDER");
     assert.doesNotThrow(() => encodeAutocorrectDomain(one("iPhone", "iphone")));

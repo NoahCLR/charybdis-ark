@@ -38,7 +38,7 @@ test("all 128 custom keys are listed, and a name changes nothing else", () => {
     assert.equal(view.shortcutKeyLimits.words, "up to 6 keys held together, at most one media key and one system key");
     const named = draftEdit(before, {type: "updateCustomKey", keycode: "CUSTOM_KEY_2", name: " Click Spam "}, capabilities);
     const after = validateSnapshot(named, capabilities);
-    assert.equal(after.settings.formatVersion, 12);
+    assert.equal(after.settings.formatVersion, 13);
     assert.equal(after.settings.customKeyNames[2], "Click Spam", "trimmed");
     assert.deepEqual(after.settings.macroNames, validateSnapshot(before.document).settings.macroNames, "the macros keep their names");
     assert.deepEqual(profileLayers(named), profileLayers(before.document));
@@ -58,7 +58,7 @@ test("a macro name edit keeps the custom-key names", () => {
     current = snapshot(draftEdit(current, {type: "updateCustomKey", keycode: "CUSTOM_KEY_0", name: "Right Thumb"}, capabilities));
     current = snapshot(draftEdit(current, {type: "updateMacro", keycode: "MACRO_3", name: "OCR Copy"}, capabilities));
     const settings = validateSnapshot(current.document).settings;
-    assert.equal(settings.formatVersion, 12);
+    assert.equal(settings.formatVersion, 13);
     assert.equal(settings.customKeyNames[0], "Right Thumb");
     assert.equal(macroEditorView(current).macros[3].name, "OCR Copy");
 });
@@ -72,7 +72,7 @@ test("an imported profile without custom-key names can take one name back from t
     assert.deepEqual(profileReview(keyboard, imported).filter(row => row.unit.startsWith("customKey:")).map(row => row.unit), ["customKey:0", "customKey:1"]);
     const kept = snapshot(revertUnits(keyboard, imported, new Set(["customKey:0"]), capabilities));
     const settings = validateSnapshot(kept.document, capabilities).settings;
-    assert.equal(settings.formatVersion, 12);
+    assert.equal(settings.formatVersion, 13);
     assert.deepEqual(settings.customKeyNames.slice(0, 2), ["Right Thumb", ""]);
     assert.deepEqual(settings.macroNames, validateSnapshot(imported.document).settings.macroNames, "the imported macro names stay");
     assert.deepEqual(profileReview(keyboard, kept).filter(row => row.unit.startsWith("customKey:")).map(row => row.unit), ["customKey:1"]);

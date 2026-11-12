@@ -1,6 +1,6 @@
 "use strict";
 const test = require("node:test"), assert = require("node:assert/strict");
-const {actionName, nativeCode, keycodeAction, pointingSlotOfCode, layerRef, layerOfRef, knownActionAbi} = require("../../core/schema/actions");
+const {actionName, nativeCode, keycodeAction, pointingSlotOfCode, layerRef, layerOfRef, knownActionAbi, isLeaderKey, isSwitchKey, sendsLeader, LEADER_KEY_NAME} = require("../../core/schema/actions");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../../core/schema/profile-blob-v1");
 
 test("an action has one name and one native keycode", () => {
@@ -41,8 +41,8 @@ test("one action vocabulary is known, and a layer reference reads back", () => {
     assert.equal(layerRef(3), "Layer 3");
     assert.equal(layerOfRef("Layer 3"), 3);
     assert.equal(layerOfRef("Numbers"), undefined);
-    assert.equal(knownActionAbi(0xa6abaa9a), true, "the vocabulary with the keycode blocks and 32 pointing slots");
-    for (const retired of [0x837cf479, 0xf79c6151, 0x1d3fcacc, 0x61072732, 0xeb80829c, 0xdcb00959, 0x67df11b3, 0xb2205fc3, 0x91fcd248, 0x3c9e17ff]) assert.equal(knownActionAbi(retired), false, `0x${retired.toString(16)} is retired`);
+    assert.equal(knownActionAbi(0x951f1b61), true, "the vocabulary with the keycode blocks and 32 pointing slots");
+    for (const retired of [0x837cf479, 0xf79c6151, 0x1d3fcacc, 0x61072732, 0xeb80829c, 0xdcb00959, 0x67df11b3, 0xb2205fc3, 0x91fcd248, 0x3c9e17ff, 0xa6abaa9a]) assert.equal(knownActionAbi(retired), false, `0x${retired.toString(16)} is retired`);
     assert.equal(knownActionAbi(1), false);
 });
 
@@ -106,7 +106,7 @@ test("the keyboard has the 32 pointing slots of the keycode blocks", () => {
     const {ACTION_ABI, KNOWN_ACTION_ABIS} = require("../../core/schema/actions");
     const {POINTING_SLOT_COUNT} = require("../../core/data/pd-mode-keys");
     assert.deepEqual(KNOWN_ACTION_ABIS, [ACTION_ABI]);
-    assert.equal(ACTION_ABI, 0xa6abaa9a);
+    assert.equal(ACTION_ABI, 0x951f1b61);
     assert.equal(POINTING_SLOT_COUNT, 32);
     assert.equal(pointingSlotOfCode(0x7e94), 20);
     assert.equal(pointingSlotOfCode(0x7ebf), 31);
@@ -119,4 +119,19 @@ test("a lock of a layer the keyboard lacks is refused wherever it is placed", ()
     const {PROFILE_ACTION_KINDS: ACTION} = require("../../core/schema/profile-blob-v1");
     assert.equal(placementProblem({kind: ACTION.LAYER_LOCK, operand: 10}, PLACEMENT.KEY, {layerCount: 8}), "LOCK_LAYER(10) locks a layer this keyboard does not have.");
     assert.equal(placementProblem({kind: ACTION.LAYER_LOCK, operand: 5}, PLACEMENT.TAP, {layerCount: 8}), undefined);
+});
+
+// The Leader key (firmware D-F71): QMK's QK_LEADER, which no layer or slot
+// form claims, and which is no switch key.
+test("the Leader key is QMK's QK_LEADER, sent by a stored keycode action and by nothing else", () => {
+    const keycodes = require("../../core/schema/keycodes");
+    const code = keycodes.encode(LEADER_KEY_NAME);
+    assert.equal(code, 0x7c58);
+    assert.equal(isLeaderKey(code), true);
+    assert.equal(isSwitchKey(code), false, "it switches nothing");
+    for (const other of [0x7c57, 0x7c59, keycodes.encode("QK_AUTOCORRECT_ON")]) assert.equal(isLeaderKey(other), false);
+    assert.equal(sendsLeader(keycodeAction(code)), true);
+    assert.equal(sendsLeader({kind: ACTION.MACRO, operand: code & 0x7f}), false);
+    assert.equal(sendsLeader(undefined), false);
+    assert.equal(actionName(keycodeAction(code)), "QK_LEADER");
 });

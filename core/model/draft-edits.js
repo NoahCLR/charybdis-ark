@@ -67,6 +67,7 @@ const DRAFT_EDIT_TYPES = Object.freeze(/** @satisfies {{[K in DraftEditType]: En
     updateConfigDefaults: {editor: "settings", label: "Saved a settings section"},
     updateMacro: {editor: "macro", label: "Edited a macro"},
     addAutocorrectTypos: {editor: "autocorrect", label: (message, document) => require("./autocorrect-editor").addLabel(message, document)},
+    updateAutocorrectTrigger: {editor: "autocorrect", label: "Changed how a replacement fires"},
     updateAutocorrectCorrection: {editor: "autocorrect", label: "Changed a replacement"},
     updateAutocorrectTypo: {editor: "autocorrect", label: "Edited an input"},
     deleteAutocorrectTypo: {editor: "autocorrect", label: "Removed an input"},

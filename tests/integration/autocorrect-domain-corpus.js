@@ -2,14 +2,14 @@
 "use strict";
 const fs = require("node:fs"), path = require("node:path"), assert = require("node:assert/strict");
 const {execFileSync} = require("node:child_process");
-const {AUTOCORRECT_DOMAIN_V1, AUTOCORRECT_MATCH, encodeAutocorrectDomain, decodeAutocorrectDomain, foldTypo} = require("../../core/schema/autocorrect-domain-v1");
+const {AUTOCORRECT_DOMAIN_V1, AUTOCORRECT_TRIGGER, firesAfterLeader, firesAsTyped, matchesPart, triggerOf, encodeAutocorrectDomain, decodeAutocorrectDomain, foldTypo} = require("../../core/schema/autocorrect-domain-v1");
 const probe = process.argv[2], dir = process.argv[3], firmware = process.argv[4];
 // The selected firmware's own vectors, which may be newer than Ark's pin.
-const fixture = JSON.parse(fs.readFileSync(path.join(firmware, "tests/fixtures/autocorrect_domain_v1.json"), "utf8"));
+const fixture = JSON.parse(fs.readFileSync(path.join(firmware, "tests/fixtures/autocorrect_domain_v2.json"), "utf8"));
 
 // The validator's reason numbers, as its field ids (autocorrect-domain.md).
 const REASONS = ["OK", "INVALID_ARGUMENT", "READ_ERROR", "INVALID_LENGTH", "CAPACITY_EXCEEDED", "INVALID_OFFSET", "INVALID_TEXT_LENGTH", "INVALID_KIND", "INVALID_TEXT",
-    "ORDER", "INVALID_MATCH", "INVALID_REFERENCE", "FIRST_TYPO", "NOT_A_WORD", "NOT_FOLDED", "TYPO_IS_CORRECTION", "PART_INDEX", "INVALID_MACRO"];
+    "ORDER", "INVALID_MATCH", "INVALID_REFERENCE", "FIRST_TYPO", "NOT_A_WORD", "NOT_FOLDED", "TYPO_IS_CORRECTION", "PART_INDEX", "INVALID_MACRO", "LEADER_INDEX"];
 
 let runs = 0;
 // What the firmware makes of these bytes: its refusal, or the list as its
@@ -24,11 +24,11 @@ function firmwareReads(bytes) {
         const [, code, table, row] = lines[0].split(" ").map(Number);
         return {error: {code: REASONS[code], table: table === 255 ? null : table, row: row === 65535 ? null : row}};
     }
-    const parts = /** @type {string} */ (lines.at(-1)).split(" ").slice(1).map(Number);
-    return {parts, typos: lines.slice(1, -1).map(line => {
+    const parts = /** @type {string} */ (lines.at(-2)).split(" ").slice(1).map(Number), leaders = /** @type {string} */ (lines.at(-1)).split(" ").slice(1).map(Number);
+    return {parts, leaders, typos: lines.slice(1, -2).map(line => {
         // A macro correction is `m` and its slot; a text one its bytes.
-        const [typo, match, correction] = line.split(" ");
-        return {typo: Buffer.from(typo, "hex").toString("utf8"), match: Number(match), ...(correction.startsWith("m") ? {macro: Number(correction.slice(1))} : {correction: Buffer.from(correction, "hex").toString("utf8")})};
+        const [typo, match, trigger, correction] = line.split(" ");
+        return {typo: Buffer.from(typo, "hex").toString("utf8"), match: Number(match), trigger: Number(trigger), ...(correction.startsWith("m") ? {macro: Number(correction.slice(1))} : {correction: Buffer.from(correction, "hex").toString("utf8")})};
     })};
 }
 // The same of Ark's decoder.
@@ -39,9 +39,9 @@ function arkReads(bytes) {
         const refusal = /** @type {{code: string, table?: number, row?: number}} */ (error);
         return {error: {code: refusal.code, table: refusal.table ?? null, row: refusal.row ?? null}};
     }
-    const typos = list.entries.flatMap(entry => entry.typos.map(typo => ({...typo, ...(entry.macro === undefined ? {correction: entry.correction} : {macro: entry.macro})})))
+    const typos = list.entries.flatMap(entry => entry.typos.map(typo => ({...typo, trigger: triggerOf(entry), ...(entry.macro === undefined ? {correction: entry.correction} : {macro: entry.macro})})))
         .sort((a, b) => Buffer.compare(Buffer.from(a.typo), Buffer.from(b.typo)));
-    return {typos, parts: typos.flatMap((typo, row) => typo.match === AUTOCORRECT_MATCH.WHOLE_WORD ? [] : [row])};
+    return {typos, parts: typos.flatMap((typo, row) => matchesPart(typo.match) && firesAsTyped(typo.trigger) ? [row] : []), leaders: typos.flatMap((typo, row) => firesAfterLeader(typo.trigger) ? [row] : [])};
 }
 /** @param {Buffer} bytes @param {string} label */
 function agree(bytes, label) {
@@ -53,8 +53,12 @@ function agree(bytes, label) {
 }
 
 const match = /** @param {string} word */ word => fixture.matches.indexOf(word);
-/** @param {{correction?: string, macro?: number, typos: {typo: string, match: string}[]}[]} entries */
-const listOf = entries => ({entries: entries.map(entry => ({correction: entry.correction ?? "", ...(entry.macro === undefined ? {} : {macro: entry.macro}), typos: entry.typos.map(typo => ({typo: typo.typo, match: match(typo.match)}))}))});
+// A fixture entry as the codec's model: how it fires, when not as a word
+// ends, among its fields.
+/** @param {{correction?: string, macro?: number, trigger?: string, typos: {typo: string, match: string}[]}[]} entries */
+const listOf = entries => ({entries: entries.map(entry => ({correction: entry.correction ?? "", ...(entry.macro === undefined ? {} : {macro: entry.macro}),
+    ...(entry.trigger === undefined || fixture.triggers.indexOf(entry.trigger) === 0 ? {} : {trigger: fixture.triggers.indexOf(entry.trigger)}),
+    typos: entry.typos.map(typo => ({typo: typo.typo, match: match(typo.match)}))}))});
 
 // The firmware's vectors: Ark encodes each valid one to its bytes, and both
 // sides judge every one alike, refusals by reason, table and row.
@@ -89,20 +93,40 @@ const macroRefused = (change, code, label) => {
     change(bytes);
     assert.equal(agree(bytes, label).error?.code, code, label);
 };
-// Rows: the header's 8 bytes, the text correction's row at 8, the macro's at 14, then the typos' at 20 and 26.
-macroRefused(bytes => bytes.writeUInt16LE(AUTOCORRECT_DOMAIN_V1.MACRO_SLOTS, 14), "INVALID_MACRO", "a macro slot past the slots");
-macroRefused(bytes => {bytes[17] = 2;}, "INVALID_KIND", "a kind that is neither");
-macroRefused(bytes => {bytes[16] = 1;}, "INVALID_TEXT_LENGTH", "a macro with a text length");
-macroRefused(bytes => {bytes[23] = 1;}, "INVALID_MATCH", "a macro's typo matched at the start of a word");
+// Rows: the header's 10 bytes, the text correction's row at 10, the macro's at 16, then the typos' at 22 and 28.
+macroRefused(bytes => bytes.writeUInt16LE(AUTOCORRECT_DOMAIN_V1.MACRO_SLOTS, 16), "INVALID_MACRO", "a macro slot past the slots");
+macroRefused(bytes => {bytes[19] = 7;}, "INVALID_KIND", "a kind byte with a trigger there is not");
+macroRefused(bytes => {bytes[19] = 9;}, "INVALID_KIND", "a kind byte with a bit above the trigger");
+macroRefused(bytes => {bytes[18] = 1;}, "INVALID_TEXT_LENGTH", "a macro with a text length");
+macroRefused(bytes => {bytes[25] = 1;}, "INVALID_MATCH", "a macro's typo matched at the start of a word");
+// Replacements Ark writes to fire after the leader (firmware D-F71): alone or
+// both ways, one input the start of another, a part-of-word input of one
+// that fires both ways (in both indexes), letters outside ASCII and a macro,
+// beside one that fires as you type; the firmware reads each where its
+// indexes list it and finds it by the leader's search.
+const {AFTER_LEADER, BOTH} = AUTOCORRECT_TRIGGER;
+const leading = encodeAutocorrectDomain({entries: [
+    {correction: "+31 6 1234 5678", trigger: AFTER_LEADER, typos: [{typo: "pn", match: 0}]},
+    {correction: "Kind regards, Sam", trigger: AFTER_LEADER, typos: [{typo: "kr", match: 0}]},
+    {correction: "alpha", trigger: AFTER_LEADER, typos: [{typo: "abc", match: 0}]}, {correction: "delta", trigger: AFTER_LEADER, typos: [{typo: "abcd", match: 0}]},
+    {correction: "café", trigger: BOTH, typos: [{typo: /** @type {string} */ (foldTypo("Éé")), match: 0}, {typo: "cafe", match: 3}]},
+    {correction: "and", typos: [{typo: "adn", match: 0}]},
+    {correction: "", macro: 9, trigger: AFTER_LEADER, typos: [{typo: "sig", match: 0}]},
+]});
+const leaders = agree(leading, "leader");
+assert.deepEqual(leaders.leaders?.map(row => leaders.typos?.[row].typo), ["abc", "abcd", "cafe", "kr", "pn", "sig", "éé"], "the leader index, in byte order");
+assert.deepEqual(leaders.parts?.map(row => leaders.typos?.[row].typo), ["cafe"], "a part-of-word input that fires both ways is in both indexes");
 const {MAX_CORRECTIONS, MAX_TYPOS, MAX_TEXT_BYTES, MAX_SIZE} = AUTOCORRECT_DOMAIN_V1;
 const text = MAX_TEXT_BYTES / (MAX_CORRECTIONS + MAX_TYPOS);
 /** @param {string} lead @param {number} index */
 const word = (lead, index) => lead + String(index).padStart(4, "0").replace(/\d/g, digit => "abcdefghij"[Number(digit)]) + "x".repeat(text - 5);
-const maximum = encodeAutocorrectDomain({entries: Array.from({length: MAX_CORRECTIONS}, (_, index) => ({correction: word("c", index), typos: [{typo: word("t", index), match: 3}]}))});
+// Every input part of a word, of a replacement that fires both ways: in both
+// indexes, so the list is the domain's ceiling.
+const maximum = encodeAutocorrectDomain({entries: Array.from({length: MAX_CORRECTIONS}, (_, index) => ({correction: word("c", index), trigger: BOTH, typos: [{typo: word("t", index), match: 3}]}))});
 assert.equal(maximum.length, MAX_SIZE, "a list at every ceiling is the domain's ceiling");
 assert.equal(agree(maximum, "maximum").typos?.length, MAX_TYPOS);
 for (const [label, grow] of /** @type {[string, (bytes: Buffer) => void][]} */ ([["one correction more", bytes => bytes.writeUInt16LE(MAX_CORRECTIONS + 1, 0)],
-    ["one typo more", bytes => bytes.writeUInt16LE(MAX_TYPOS + 1, 2)], ["one text byte more", bytes => bytes.writeUInt16LE(MAX_TEXT_BYTES + 1, 6)]])) {
+    ["one typo more", bytes => bytes.writeUInt16LE(MAX_TYPOS + 1, 2)], ["one text byte more", bytes => bytes.writeUInt16LE(MAX_TEXT_BYTES + 1, 8)]])) {
     const over = Buffer.from(maximum); grow(over);
     assert.equal(agree(over, label).error?.code, "CAPACITY_EXCEEDED", label);
 }
@@ -110,17 +134,19 @@ for (const [label, grow] of /** @type {[string, (bytes: Buffer) => void][]} */ (
 // Every byte of a small list changed three ways: the two sides refuse the
 // same changes for the same reason at the same row, and read the rest alike.
 const small = Buffer.from(fixture.valid.find(/** @param {{name: string}} vector */ vector => vector.name === "small").hex, "hex");
+// And of the firmware's list of typos after the leader, its leader index among them.
+const leader = Buffer.from(fixture.valid.find(/** @param {{name: string}} vector */ vector => vector.name === "leader").hex, "hex");
 let accepted = 0, refused = 0;
-for (let at = 0; at < small.length; at++) {
-    for (const value of new Set([0, 0xff, (small[at] + 1) & 0xff])) {
-        if (value === small[at]) continue;
-        const bytes = Buffer.from(small); bytes[at] = value;
-        if (agree(bytes, `small byte ${at} = ${value}`).error) refused++; else accepted++;
+for (const [name, list] of /** @type {const} */ ([["small", small], ["leader", leader]])) for (let at = 0; at < list.length; at++) {
+    for (const value of new Set([0, 0xff, (list[at] + 1) & 0xff])) {
+        if (value === list[at]) continue;
+        const bytes = Buffer.from(list); bytes[at] = value;
+        if (agree(bytes, `${name} byte ${at} = ${value}`).error) refused++; else accepted++;
     }
 }
 assert.ok(accepted > 0 && refused > 0);
 // Cut short and run long.
-for (const length of [0, 7, 8, small.length - 1]) agree(small.subarray(0, length), `small cut to ${length}`);
+for (const length of [0, 9, 10, small.length - 1]) agree(small.subarray(0, length), `small cut to ${length}`);
 agree(Buffer.concat([small, Buffer.from([0])]), "small with a byte after it");
 
 console.log(`Autocorrect domain C↔JS: the firmware's ${fixture.valid.length} valid and ${fixture.invalid.length} invalid vectors, Ark's own lists, a list at every ceiling and ${accepted + refused} single-byte changes (${refused} refused) are judged alike, by reason, table and row; the firmware's lookups read what Ark decodes; wide read offsets are lossless.`);

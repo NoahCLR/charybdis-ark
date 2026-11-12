@@ -1,8 +1,8 @@
 "use strict";
 const {test} = require("node:test");
 const assert = require("node:assert/strict");
-const {addTypos, changeReplacement, changeTypo, findEntry, findTypo, listUsage, listWarnings, removeEntry, removeTypo, replacementCalled, replacementSaid, splitInputs, inputForm, inputOf, WARNING} = require("../../core/model/autocorrect-list");
-const {AUTOCORRECT_MATCH: MATCH, encodeAutocorrectDomain, autocorrectDomainSize, entryKey} = require("../../core/schema/autocorrect-domain-v1");
+const {addTypos, changeReplacement, changeTypo, findEntry, findTypo, listUsage, listWarnings, removeEntry, removeTypo, replacementCalled, replacementSaid, setTrigger, splitInputs, inputForm, inputOf, WARNING} = require("../../core/model/autocorrect-list");
+const {AUTOCORRECT_MATCH: MATCH, AUTOCORRECT_TRIGGER: TRIGGER, encodeAutocorrectDomain, autocorrectDomainSize, entryKey} = require("../../core/schema/autocorrect-domain-v1");
 const {hostLayouts, US_HOST_LAYOUT} = require("../../core/data/host-layouts");
 
 const US = {layout: US_HOST_LAYOUT};
@@ -70,7 +70,7 @@ test("a replacement may play a macro: named by its slot, for whole words only, b
     assert.deepEqual(findEntry(value, {macro: 5}), {correction: "", macro: 5, typos: [{typo: "sig", match: 0}, {typo: "sgi", match: 0}]});
     assert.equal(findEntry(value, entryKey({macro: 5}))?.macro, 5, "found by its key too");
     assert.doesNotThrow(() => encodeAutocorrectDomain(value));
-    says(() => addTypos(value, {macro: 5}, [{typo: "sig*"}], US), /A macro plays for a whole word only: take the \* out of “sig\*”/);
+    says(() => addTypos(value, {macro: 5}, [{typo: "sig*"}], US), /A macro plays for a whole word: take the \* out of “sig\*”/);
     says(() => addTypos(value, {macro: 128}, [{typo: "x"}], US), /Choose one of the keyboard's macros/);
     says(() => addTypos(value, {macro: 5, correction: "both"}, [{typo: "x"}], US), /text or a macro, not both/);
     says(() => addTypos(value, {macro: 6}, [{typo: "sig"}], {...US, macroNames: Object.assign([], {5: "Sign-off"})}), /“sig” is already an input for the macro “Sign-off”/);
@@ -86,7 +86,7 @@ test("a replacement may play a macro: named by its slot, for whole words only, b
     assert.deepEqual(shape(value), [["the", "teh"], [7, "sig", "sgi", "addr"]]);
     changeTypo(value, "teh", "teh*", US);
     says(() => changeReplacement(value, text("the"), {macro: 3}, US), /take the \* out of “teh\*” first/);
-    says(() => changeTypo(value, "sig", "*sig", US), /A macro plays for a whole word only/);
+    says(() => changeTypo(value, "sig", "*sig", US), /A macro plays for a whole word/);
     removeEntry(value, {macro: 7}, US);
     says(() => removeEntry(value, {macro: 7}, US), /the macro “Macro 7” is no longer in the list/);
     assert.deepEqual(shape(value), [["the", ["teh", MATCH.START]]]);
@@ -164,7 +164,7 @@ test("an input is written anew where it is, with or without *", () => {
     assert.deepEqual(shape(value), [["the", ["tthe", MATCH.START], "hte"], ["then", "tehn"]], "it stays with its replacement");
 });
 
-test("removing a replacement's last input removes the entry; removing an entry removes its inputs", () => {
+test("removing a replacement's last input removes the entry from the list (the editor keeps it open as one being made); removing an entry removes its inputs", () => {
     const value = list(["the", "teh", "hte"], ["then", "tehn"]);
     removeTypo(value, "TEH");
     assert.deepEqual(shape(value), [["the", "hte"], ["then", "tehn"]]);
@@ -178,12 +178,18 @@ test("removing a replacement's last input removes the entry; removing an entry r
 
 test("usage counts what the keyboard stores: replacements, inputs, text and the domain's bytes", () => {
     const value = list(["the", "teh", "hte"], ["thing", ["tihng", MATCH.ANYWHERE]], ["café", "cafe"]);
-    assert.deepEqual(listUsage(value), {corrections: 3, typos: 4, textBytes: 3 + 5 + 5 + 3 + 3 + 5 + 4, bytes: autocorrectDomainSize(value)});
+    assert.deepEqual(listUsage(value), {corrections: 3, typos: 4, leaders: 0, textBytes: 3 + 5 + 5 + 3 + 3 + 5 + 4, bytes: autocorrectDomainSize(value)});
     // A macro replacement has a row and no text of its own.
     const played = list(["the", "teh"], [5, "sig"]);
-    assert.deepEqual(listUsage(played), {corrections: 2, typos: 2, textBytes: 3 + 3 + 3, bytes: 8 + 6 * 4 + 9});
+    assert.deepEqual(listUsage(played), {corrections: 2, typos: 2, leaders: 0, textBytes: 3 + 3 + 3, bytes: 10 + 6 * 4 + 9});
+    // An input of a replacement that fires after the Leader key takes a row
+    // and a leader index entry; one of a part of a word, of a replacement that
+    // fires both ways, an entry in each index.
+    const leading = {entries: [{correction: "the", trigger: TRIGGER.BOTH, typos: [{typo: "teh", match: MATCH.WHOLE_WORD}, {typo: "tthe", match: MATCH.START}]}]};
+    assert.deepEqual(listUsage(leading), {corrections: 1, typos: 2, leaders: 2, textBytes: 3 + 3 + 4, bytes: 10 + 6 * 3 + 2 * 3 + 10});
+    assert.equal(listUsage(leading).bytes, encodeAutocorrectDomain(leading).length);
     assert.equal(listUsage(value).bytes, encodeAutocorrectDomain(value).length);
-    assert.deepEqual(listUsage(list()), {corrections: 0, typos: 0, textBytes: 0, bytes: 8});
+    assert.deepEqual(listUsage(list()), {corrections: 0, typos: 0, leaders: 0, textBytes: 0, bytes: 10});
 });
 
 test("warnings are found on the list and never refuse it", () => {
@@ -296,4 +302,39 @@ test("an entry is put back with its inputs, each taken from wherever it went, in
     const texted = list(["the", "sig"]);
     restoreEntry(texted, list([5, "sig"]), entryKey({macro: 5}), "the");
     assert.deepEqual(shape(texted), [[5, "sig"]]);
+});
+
+// How a replacement fires (firmware D-F71, D-L91): its own, as you type,
+// after the Leader key, or both; its inputs are one list whichever.
+test("a replacement fires as you type, after Leader or both, set on it alone, its inputs untouched", () => {
+    const value = list(["the", "teh", ["recieve", MATCH.START]], ["and", "adn"]);
+    setTrigger(value, text("the"), "leader", US);
+    assert.equal(value.entries[0].trigger, TRIGGER.AFTER_LEADER);
+    assert.deepEqual(shape(value), [["the", "teh", ["recieve", MATCH.START]], ["and", "adn"]], "its inputs stay as they are");
+    setTrigger(value, text("the"), TRIGGER.BOTH, US);
+    assert.equal(value.entries[0].trigger, TRIGGER.BOTH, "by number too");
+    setTrigger(value, text("the"), "word", US);
+    assert.equal("trigger" in value.entries[0], false, "one that fires as you type says nothing of it");
+    says(() => setTrigger(value, text("the"), "sometimes", US), /fires as you type, after the Leader key, or both/);
+    says(() => setTrigger(value, text("then"), "leader", US), /no longer in the list/);
+    // A new replacement fires as its first input's add says; inputs added to
+    // one the list has leave it as it fires.
+    addTypos(value, text("+31 6 1234 5678"), [{typo: "pn"}], US, "leader");
+    addTypos(value, text("+31 6 1234 5678"), [{typo: "pnr"}], US, "word");
+    assert.equal(findEntry(value, text("+31 6 1234 5678"))?.trigger, TRIGGER.AFTER_LEADER);
+    // An input is a word however its replacement fires, and one text is one input.
+    says(() => addTypos(value, text("Kind regards"), [{typo: "k r"}], US, "leader"), /one word/);
+    says(() => addTypos(value, text("then"), [{typo: "teh"}], US, "leader"), /“teh” is already an input for “the”/);
+    assert.doesNotThrow(() => encodeAutocorrectDomain(value));
+});
+
+test("a macro fires after the Leader key as text does, and a * matters only as you type", () => {
+    const value = list([5, "sig"]);
+    setTrigger(value, {macro: 5}, "leader", US);
+    changeReplacement(value, {macro: 5}, {macro: 6}, US);
+    assert.equal(findEntry(value, {macro: 6})?.trigger, TRIGGER.AFTER_LEADER, "it keeps how it fires");
+    const shortly = list(["thing", ["tih", MATCH.ANYWHERE]]);
+    assert.deepEqual(listWarnings(shortly, US).map(warning => warning.kind), [WARNING.SHORT_PART]);
+    setTrigger(shortly, text("thing"), "leader", US);
+    assert.deepEqual(listWarnings(shortly, US), [], "after the Leader key alone it is typed whole");
 });

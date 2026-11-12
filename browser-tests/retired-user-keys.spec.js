@@ -111,3 +111,28 @@ test("a switch key for text replacement is picked beside those for combos, found
     expect(await posted(page)).toEqual([expect.objectContaining({type: "updateLayoutKeys",
         changes: [expect.objectContaining({layoutIndex: 0, keycode: "QK_AUTOCORRECT_TOGGLE"})]})]);
 });
+
+// The Leader key (D-L91) is text replacement's key but switches nothing: it
+// sits in Other QMK in a group of its own, right after Switch keys, is found
+// by its name and QMK's, and posts by QMK's name.
+test("the Leader key is picked from Text replacement, after Switch keys, found by its name, and posts by name", async ({page}) => {
+    await openControls(page, "keys", {tab: "key", selected: 0});
+    await page.locator('[data-act="pick"]').click();
+    const picker = page.getByRole("dialog", {name: "Pick a keycode"});
+    await picker.locator('[data-sec="other"]').click();
+    const labels = await picker.locator(".pk-label").allTextContents();
+    expect(labels.slice(labels.indexOf("Switch keys"), labels.indexOf("Switch keys") + 2)).toEqual(["Switch keys", "Text replacement"]);
+    const group = picker.locator(".pk-group", {has: page.locator('.pk-label:text-is("Text replacement")')});
+    await expect(group.locator("[data-pick]")).toHaveCount(1);
+    await expect(group.locator('[data-pick="QK_LEADER"]')).toContainText("Leader");
+    await expect(picker.locator('.pk-group:has(.pk-label:text-is("Switch keys")) [data-pick="QK_LEADER"]')).toHaveCount(0);
+    for (const query of ["leader", "QK_LEADER"]) {
+        await picker.locator("#pickerSearch").fill(query);
+        await expect(picker.locator('[data-pick="QK_LEADER"]')).toBeVisible();
+    }
+    await clearPosts(page);
+    await picker.locator('[data-pick="QK_LEADER"]').click();
+    await picker.locator('[data-act="use"]').click();
+    expect(await posted(page)).toEqual([expect.objectContaining({type: "updateLayoutKeys",
+        changes: [expect.objectContaining({layoutIndex: 0, keycode: "QK_LEADER"})]})]);
+});

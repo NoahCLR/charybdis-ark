@@ -22,7 +22,7 @@ const PROFILE_DOMAINS = Object.freeze([
         encode: value => require("./combo-domain-v1").encodeComboDomain(value),
         /** @param {Uint8Array} bytes @param {DomainOptions} [_options] @returns {import("./profile-domains-types.js").DomainModels["combos"]} */
         decode: (bytes, _options = {}) => require("./combo-domain-v1").decodeComboDomain(bytes)}),
-    Object.freeze({name: "SETTINGS", id: 0x40, key: "settings", readKey: "settings", version: 12, wireBit: 1 << 3, area: "settings", document: "profile",
+    Object.freeze({name: "SETTINGS", id: 0x40, key: "settings", readKey: "settings", version: 13, wireBit: 1 << 3, area: "settings", document: "profile",
         /** @param {import("./types.js").SettingsDomain} value @returns {Buffer} */
         encode: value => require("./settings-domain-v1").encodeSettings(value),
         /** @param {Buffer} bytes @param {DomainOptions} [_options] @returns {import("./profile-domains-types.js").DomainModels["settings"]} */
@@ -46,7 +46,7 @@ const PROFILE_DOMAINS = Object.freeze([
         decode: (bytes, _options = {}) => require("./macro-domain-v1").decodeMacroDomain(bytes)}),
     // The autocorrect list is read from the document like the keymap and the
     // macros: the keyboard read has no readback of its own for it.
-    Object.freeze({name: "AUTOCORRECT", id: 0x80, key: "autocorrect", readKey: undefined, version: 1, wireBit: 1 << 7, area: "autocorrect", document: "profile",
+    Object.freeze({name: "AUTOCORRECT", id: 0x80, key: "autocorrect", readKey: undefined, version: 2, wireBit: 1 << 7, area: "autocorrect", document: "profile",
         /** @param {import("./autocorrect-domain-v1.js").AutocorrectList} value @param {DomainOptions} [options] @returns {Buffer} */
         encode: (value, options = {}) => require("./autocorrect-domain-v1").encodeAutocorrectDomain(value, options.autocorrect),
         /** @param {Uint8Array} bytes @param {DomainOptions} [_options] @returns {import("./profile-domains-types.js").DomainModels["autocorrect"]} */

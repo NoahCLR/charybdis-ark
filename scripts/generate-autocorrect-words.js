@@ -4,7 +4,7 @@
 
 // Generates core/data/autocorrect-words.json from the firmware's autocorrect
 // domain fixture, pinned in
-// upstream/firmware/tests/fixtures/autocorrect_domain_v1.json.
+// upstream/firmware/tests/fixtures/autocorrect_domain_v2.json.
 //
 // A typo in the autocorrect list holds word characters only, each already
 // case-folded, and the keyboard folds a typed word with the same table before
@@ -18,7 +18,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const APP_ROOT = path.resolve(__dirname, "..");
-const FIXTURE_RELATIVE_PATH = path.join("upstream", "firmware", "tests", "fixtures", "autocorrect_domain_v1.json");
+const FIXTURE_RELATIVE_PATH = path.join("upstream", "firmware", "tests", "fixtures", "autocorrect_domain_v2.json");
 const OUTPUT_RELATIVE_PATH = path.join("core", "data", "autocorrect-words.json");
 const AUTOCORRECT_WORDS_FORMAT = "charybdis-autocorrect-words-v1";
 
@@ -26,7 +26,7 @@ const AUTOCORRECT_WORDS_FORMAT = "charybdis-autocorrect-words-v1";
  * @param {import("./contract-types.js").AutocorrectDomainFixture} fixture
  */
 function buildAutocorrectWords(fixture) {
-    if (fixture?.version !== 1 || !Array.isArray(fixture.wordCharacters) || typeof fixture.apostrophe !== "string") throw new Error("Unsupported autocorrect domain fixture.");
+    if (fixture?.version !== 2 || !Array.isArray(fixture.wordCharacters) || typeof fixture.apostrophe !== "string") throw new Error("Unsupported autocorrect domain fixture.");
     const pairs = fixture.wordCharacters;
     if (pairs.some(pair => !Array.isArray(pair) || pair.length !== 2 || pair.some(character => typeof character !== "string" || [...character].length !== 1))) throw new Error("A word character and its fold are one character each.");
     return {

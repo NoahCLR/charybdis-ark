@@ -72,11 +72,12 @@ test("other key families and non-keycode targets inherit nothing", () => {
     for (const target of others) assert.deepEqual(builtInActions(target), {});
 });
 
-// The firmware taps them itself (firmware D-F66): an empty Tap locks the mode
-// or switches, and with no hold of their own they act on release.
-test("a pointing mode's lock key and a switch key tap themselves, with no hold of their own", () => {
+// The firmware taps them itself (firmware D-F66, D-F71): an empty Tap locks
+// the mode, switches or leads, and with no hold of their own they act on
+// release.
+test("a pointing mode's lock key, a switch key and the Leader key tap themselves, with no hold of their own", () => {
     const keycodes = require("../../core/schema/keycodes");
-    for (const code of [0x7ea0, 0x7ebf, 0x7ee0, 0x7ee1, 0x7ee2, 0x7ef0, 0x7ef1, 0x7ef2, ...["QK_COMBO_ON", "QK_COMBO_OFF", "QK_COMBO_TOGGLE", "QK_AUTOCORRECT_ON", "QK_AUTOCORRECT_OFF", "QK_AUTOCORRECT_TOGGLE"].map(keycodes.encode)]) {
+    for (const code of [0x7ea0, 0x7ebf, 0x7ee0, 0x7ee1, 0x7ee2, 0x7ef0, 0x7ef1, 0x7ef2, ...["QK_COMBO_ON", "QK_COMBO_OFF", "QK_COMBO_TOGGLE", "QK_AUTOCORRECT_ON", "QK_AUTOCORRECT_OFF", "QK_AUTOCORRECT_TOGGLE", "QK_LEADER"].map(keycodes.encode)]) {
         assert.deepEqual(builtInActions(key(code)), {tap: key(code), releaseTaps: true}, `0x${code.toString(16)}`);
     }
     const lock = {kind: ACTION.POINTING_MODE_LOCK, operand: 3};

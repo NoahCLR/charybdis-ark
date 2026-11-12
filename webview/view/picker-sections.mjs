@@ -32,6 +32,9 @@ const isCustom = inGroups("Custom keys");
 // The switch keys, in core's group for them: QMK's for combos and
 // autocorrect, and the keyboard's for behaviours and auto-mouse.
 const isSwitchKey = inGroups("Switch keys");
+// The Leader key (D-L91): text replacement's, offered beside the switch keys
+// though it is none.
+const isTextReplacementKey = inGroups("Text replacement");
 /** @param {Entry} entry */
 const isSymbol = (entry) => entry.group === "shifted" || (entry.group === "basic" && SYMBOLS.has(valueOf(entry)));
 /** @param {Entry} entry */
@@ -105,7 +108,7 @@ export function pickerSections() {
         {id: "lighting", label: "Lighting", kind: "catalogue", filter: inGroups("backlight", "led_matrix", "underglow", "rgb", "rgb_matrix"), groups: [
             group("Switch", named(/_(?:ON|OFF|TOGGLE)$/)), group("Effect", named(/MODE|FLAG/)), group("Colour", rest),
         ]},
-        {id: "other", label: "Other QMK", kind: "catalogue", filter: (entry) => isSwitchKey(entry) || inGroups(
+        {id: "other", label: "Other QMK", kind: "catalogue", filter: (entry) => isSwitchKey(entry) || isTextReplacementKey(entry) || inGroups(
             "connection", "joystick", "magic", "midi", "programmable_button", "quantum", "sequencer", "steno", "swap_hands", "system",
         )(entry), groups: [
             group("Magic swaps", (entry) => entry.group === "magic" && /SWAP|TOGGLE_(?:CONTROL|BACKSLASH|ALT_GUI|CTL_GUI|ESCAPE)/.test(valueOf(entry))),
@@ -115,6 +118,7 @@ export function pickerSections() {
             // keyboard's for behaviours and for auto-mouse, each in the order
             // its catalogue gives them.
             group("Switch keys", isSwitchKey),
+            group("Text replacement", isTextReplacementKey),
             group("Features", rest),
         ]},
         {id: "all", label: "All keycodes", kind: "all"},

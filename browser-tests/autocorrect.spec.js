@@ -31,7 +31,7 @@ const openDemo = async (page) => {
 // leaves it, under another identity, which is how the screen knows it landed.
 const accept = (page, change = () => {}) => publish(page, (model) => { model.autocorrectEditing.identity = `${model.autocorrectEditing.identity}+`; change(model); });
 // An entry as core publishes one.
-const published = (correction, ...inputs) => ({id: correction, label: correction, correction, warnings: [], typos: inputs.map((input) => ({typo: input.replace(/\*/g, ""), input, warnings: []}))});
+const published = (correction, ...inputs) => ({id: correction, label: correction, correction, fires: "word", warnings: [], typos: inputs.map((input) => ({typo: input.replace(/\*/g, ""), input, warnings: []}))});
 // Publishes a model as core would, changed by `change` (run in the page).
 const publish = async (page, change) => {
     const model = await page.evaluate(async () => structuredClone((await import("/webview/store.mjs")).getModel()));
@@ -68,7 +68,7 @@ test("the screen is a bank of replacements beside the editor of the one picked, 
     await expect(bank(page).locator('[data-act="ac-add"]')).toHaveText("+ New replacement");
     await expect(bank(page).locator(".ac-files button")).toHaveText(["Import…", "Export"]);
     await expect(bank(page).locator(".memory-h h4")).toHaveText("Text replacement memory");
-    await expect(page.locator("[data-ac-memory]")).toHaveText("375 / 34,824 bytes");
+    await expect(page.locator("[data-ac-memory]")).toHaveText("377 / 36,874 bytes");
     await expect(page.locator("[data-ac-meter]")).toBeVisible();
     // What is free, as Macro memory says its own, and the list's size.
     await expect(page.locator("[data-ac-free]")).toHaveText(/^[\d,]+ bytes free$/);
@@ -89,7 +89,7 @@ test("the screen is a bank of replacements beside the editor of the one picked, 
     await expect(editor(page).locator("[data-ac-kind]")).toHaveText("Text");
     await expect(editor(page).locator('.name-titlebar [data-act="ac-delete"]')).toHaveText("Delete replacement");
     await expect(editor(page).locator('[data-act="place"]')).toHaveCount(0);
-    await expect(editor(page).locator(".macro-sequence-heading h4, .editor-section .card-h h3")).toHaveText(["Replacement", "Inputs", "Try it"]);
+    await expect(editor(page).locator(".macro-sequence-heading h4, .editor-section .card-h h3")).toHaveText(["Replacement", "Fires", "Inputs", "Try it"]);
     // No switch here, no menu of macros, and nothing says typo, correction, typed form or a match by name.
     await expect(page.locator('.pad.autocorrect [data-macro="autocorrect"]')).toHaveCount(0);
     await expect(page.locator(".pad.autocorrect select")).toHaveCount(0);
@@ -177,7 +177,7 @@ test("New replacement opens an editor with its text focused, and it joins the li
     await first.press("Enter");
     await expectEdits(page, [expect.objectContaining({type: "addAutocorrectTypos", correction: "definitely", inputs: "definately definitly recieve*", expectedFingerprint: identity})]);
     // The list takes it: it is the entry open from then on, the field for its next input ready.
-    await accept(page, (model) => { model.autocorrect.entries.push({id: "definitely", label: "definitely", correction: "definitely", warnings: [],
+    await accept(page, (model) => { model.autocorrect.entries.push({id: "definitely", label: "definitely", correction: "definitely", fires: "word", warnings: [],
         typos: ["definately", "definitly", "recieve*"].map((input) => ({typo: input.replace("*", ""), input, warnings: []}))}); });
     await expect(editor(page)).toHaveAttribute("data-ac-editor", "definitely");
     await expect(page.locator("[data-ac-new], [data-ac-new-item]")).toHaveCount(0);
@@ -203,7 +203,7 @@ test("New replacement opens an editor with its text focused, and it joins the li
     await expect(page.locator('[data-ac-new] [data-ac-feedback="new"]')).toBeHidden();
     await item(page, "the").click();
     await expectEdits(page, [expect.objectContaining({type: "addAutocorrectTypos", correction: "separate", inputs: "seprate"})]);
-    await accept(page, (model) => { model.autocorrect.entries.push({id: "separate", label: "separate", correction: "separate", warnings: [], typos: [{typo: "seprate", input: "seprate", warnings: []}]}); });
+    await accept(page, (model) => { model.autocorrect.entries.push({id: "separate", label: "separate", correction: "separate", fires: "word", warnings: [], typos: [{typo: "seprate", input: "seprate", warnings: []}]}); });
     await expect(editor(page)).toHaveAttribute("data-ac-editor", "the");
     await expect(page.locator("[data-ac-new], [data-ac-new-item]")).toHaveCount(0);
     await expect(item(page, "separate")).toBeVisible();
@@ -366,7 +366,7 @@ test("inputs are chips: + Input adds one or several and stays for the next, and 
     await info.locator(".info-button").hover();
     await expect(list).toBeVisible();
     await expect(list.locator(".info-lead")).toHaveText("An input matches a whole word. Add *, the wildcard, where other letters may go: one input then catches every form of a word, and only the part you wrote is replaced.");
-    await expect(list.locator("dt")).toHaveText(["teh", "recieve*", "*mnet", "*tihng*", "Where * goes", "Short inputs", "Capitals", "Characters", "Several", "Overlaps", "Macros"]);
+    await expect(list.locator("dt")).toHaveText(["teh", "recieve*", "*mnet", "*tihng*", "Where * goes", "Short inputs", "Capitals", "Characters", "Several", "Overlaps", "Macros", "After Leader"]);
     await expect(list).toContainText("For receive, it also fixes recieved and recieving.");
     // Its figures are the keyboard's own, as the list publishes them.
     await expect(list).toContainText("With *, an input under 4 letters can catch real words");
@@ -459,8 +459,8 @@ test("a replacement that plays a macro is named by its macro, told apart, and ed
     // As core publishes a list with one: its id is no text's, its macro a slot.
     await publish(page, (model) => {
         model.macros[5] = {...model.macros[5], name: "Sign-off", empty: false};
-        model.autocorrect.entries.push({id: "\u0001macro:5", label: "Sign-off", correction: "", macro: 5, warnings: [], typos: [{typo: "sig", input: "sig", warnings: []}]},
-            {id: "\u0001macro:6", label: "Macro 6", correction: "", macro: 6, warnings: ["“Macro 6” has no steps, so this replacement does nothing yet. Add steps in Macros, or choose another replacement."], typos: [{typo: "addr", input: "addr", warnings: []}]});
+        model.autocorrect.entries.push({id: "\u0001macro:5", label: "Sign-off", correction: "", macro: 5, fires: "word", warnings: [], typos: [{typo: "sig", input: "sig", warnings: []}]},
+            {id: "\u0001macro:6", label: "Macro 6", correction: "", macro: 6, fires: "word", warnings: ["“Macro 6” has no steps, so this replacement does nothing yet. Add steps in Macros, or choose another replacement."], typos: [{typo: "addr", input: "addr", warnings: []}]});
     });
     // It is called what the core calls it, in the bank and in its editor's title; its field names the macro.
     const played = bank(page).locator('[data-ac-entry$="macro:5"]');
@@ -500,7 +500,7 @@ test("what the host layout cannot type is said once across the screen and on its
     // As core publishes a list after the host layout changed under it.
     await publish(page, (model) => {
         const warning = "US cannot type “é”, so this replacement will not be typed.";
-        model.autocorrect.entries.push({id: "café", label: "café", correction: "café", warnings: [warning], typos: [{typo: "cafe", input: "cafe", warnings: []}]});
+        model.autocorrect.entries.push({id: "café", label: "café", correction: "café", fires: "word", warnings: [warning], typos: [{typo: "cafe", input: "cafe", warnings: []}]});
         model.autocorrect.notices = ["US cannot type 1 replacement, so the keyboard skips it. Change Host settings → Your computer back, or edit the replacements marked."];
         model.configDefaults.find((section) => section.id === "autocorrect").fields.find((field) => field.macro === "autocorrect").enabled = false;
     });
@@ -569,7 +569,7 @@ test("every control of the screen has a name, and the keyboard reaches them in r
         if (order.at(-1) !== at) order.push(at);
     }
     expect(order.map((name) => name.replace(/^autocorrect:entry:because:/, ""))).toEqual(["item", "ac-add", "ac-import", "ac-export-menu", "ac-delete", "ⓘ How a replacement works", "kind:text", "replacement",
-        "ⓘ How inputs are written, and the * wildcard", "ac-chip", "input:becasue", "ac-remove-input", "ac-chip", "ac-more", "ⓘ About the preview", "autocorrect:try:text", "autocorrect:try:caps"]);
+        "fires:word", "ⓘ How inputs are written, and the * wildcard", "ac-chip", "input:becasue", "ac-remove-input", "ac-chip", "ac-more", "ⓘ About the preview", "autocorrect:try:text", "autocorrect:try:caps"]);
     // Clear is off with nothing to clear, as Clear take is, and a replaced part of the preview is no tab stop.
     await expect(editor(page).locator('[data-act="ac-try-clear"]')).toBeDisabled();
 });
@@ -583,17 +583,31 @@ test("the switch is a Host setting that says where its list is, and the list's s
     // After Your computer, whose layout it types through, and before the key swaps.
     await expect(page.locator(".settings-pad > .settings-group")).toHaveCount(3);
     expect(await page.locator(".settings-pad > .settings-group").evaluateAll((cards) => cards.map((node) => node.getAttribute("data-section")))).toEqual(["host", "autocorrect", "keyboardOptions"]);
-    const setting = card.locator(".setrow");
+    const setting = card.locator(".setrow").first();
     await expect(setting.locator(".nm")).toContainText("Enabled");
     await expect(setting.locator(".kk-mark")).toHaveText(["↺ keyboard keys change this too"]);
     await expect(setting.locator(".hint")).toHaveText("Off, the keyboard types every word as you typed it and keeps your list. Replacements and their inputs are in Text replacement.");
-    // A row and nothing else, as the switches of combos and behaviours are: no link of its own.
-    await expect(card.locator("button, a")).toHaveCount(0);
+    // Under it, how long the leader waits (D-L91), which works with the switch off.
+    const waits = card.locator(".setrow").nth(1);
+    await expect(waits.locator(".nm")).toHaveText("Leader waits");
+    await expect(waits.locator(".hint")).toContainText("It works with the switch off, and when a key turned it off.");
+    // Rows and nothing else, as the switches of combos and behaviours are: no link of its own.
+    await expect(card.locator("a")).toHaveCount(0);
     const toggle = card.locator('[data-macro="autocorrect"]');
     await expect(toggle).not.toBeChecked();
     await clearPosts(page);
     await toggle.check({force: true});
-    await expectPost(page, {type: "updateConfigDefaults", sectionId: "autocorrect", fields: [{macro: "autocorrect", enabled: true}], expectedFingerprint: identity});
+    await expectPost(page, {type: "updateConfigDefaults", sectionId: "autocorrect", fields: [{macro: "autocorrect", enabled: true}, {macro: "leaderTimeout", value: "2000"}], expectedFingerprint: identity});
+    // Leader waits is typed in milliseconds, like the keyboard's other times:
+    // its unit is in the input, and it offers no other.
+    await clearPosts(page);
+    const wait = card.locator('input[data-macro="leaderTimeout"]');
+    await expect(wait).toHaveValue("2000");
+    await expect(waits.locator(".affix.unit i")).toHaveText("ms");
+    await expect(waits.locator('[data-f^="setting:leaderTimeout:unit"]')).toHaveCount(0);
+    await wait.fill("3500");
+    await wait.press("Tab");
+    await expect.poll(async () => (await posted(page)).filter((message) => message.type === "updateConfigDefaults").at(-1)?.fields.find((field) => field.macro === "leaderTimeout")).toEqual({macro: "leaderTimeout", value: "3500"});
     // Key swaps & typing does not list it.
     await expect(page.locator('.settings-group[data-section="keyboardOptions"] [data-macro="autocorrect"]')).toHaveCount(0);
     await expect(page.locator('[data-macro="autocorrect"]')).toHaveCount(1);
@@ -908,7 +922,7 @@ test("the Keyboard screen's Memory panel counts the inputs of text replacements 
     await expect(counted).toHaveAttribute("data-tip", /Every input of every text replacement/);
     const memory = usage.locator('[data-usage="replacements"]');
     await expect(memory.locator("h4")).toHaveText("Text replacement memory");
-    await expect(memory.locator(".sect-h .note")).toHaveText("375 of 34,824 bytes used");
+    await expect(memory.locator(".sect-h .note")).toHaveText("377 of 36,874 bytes used");
     await expect(memory.locator(".meter i")).toBeVisible();
     await expect(memory.locator(".meter-note")).toHaveText("Replacements and their inputs are part of the profile above, within their own limit, and listed on Text replacement.");
     await expect(usage.locator(".card-b > .note")).toContainText("Behaviours, combos, macros, text replacements, custom keys, pointing modes, lighting, settings and names are stored together here");
@@ -1088,7 +1102,7 @@ test("in the demo a replacement is made to play a macro, Try it says which, and 
     // A * is refused for a macro, in plain words.
     const first = fresh.locator("[data-ac-first]");
     await first.fill("spot*");
-    await expect(fresh.locator('[data-ac-feedback="new"]')).toContainText("A macro plays for a whole word only: take the * out of “spot*”.");
+    await expect(fresh.locator('[data-ac-feedback="new"]')).toContainText("A macro plays for a whole word: take the * out of “spot*”.");
     await first.fill("spot");
     await first.press("Enter");
     await expect(count(page)).toHaveText("9 replacements · 15 inputs");
@@ -1285,4 +1299,153 @@ test("in the demo a list is imported in each format by picker and by drop, summe
     // One undo takes the whole import back.
     await page.locator('.rail [data-act="undo"]').click();
     await expect(count(page)).toHaveText("0 replacements · 0 inputs");
+});
+
+// ── the leader (D-L91) ─────────────────────────────────────────────────
+
+test("a replacement fires as you type, after Leader or both, its inputs one list whichever, and the Leader key is said", async ({page}) => {
+    await openControls(page, "autocorrect");
+    await item(page, "because").click();
+    const fires = editor(page).locator('.seg[aria-label="How it fires"]');
+    await expect(fires.locator("label")).toHaveText(["As you type", "After Leader", "Both"]);
+    await expect(fires.locator('input[value="word"]')).toBeChecked();
+    for (const kind of ["word", "leader", "both"]) await expect(fires.locator(`input[value="${kind}"]`)).toBeEnabled();
+    await expect(editor(page).locator("[data-ac-leader-note]")).toHaveCount(0);
+    // Every replacement in the bank is tagged with how it fires, in the switch's words.
+    await expect(item(page, "because").locator("[data-ac-fires]")).toHaveText("As you type");
+    const inputs = () => editor(page).locator("[data-ac-chip]");
+    await expect(inputs()).toHaveText(["beacuse", "becasue", "becuase"]);
+    // Switching posts the replacement's trigger alone; its inputs stay as they are.
+    for (const [kind, label] of [["leader", "After Leader"], ["both", "Both"]]) {
+        await clearPosts(page);
+        await fires.locator(`label:has-text("${label}")`).click();
+        await expectEdits(page, [expect.objectContaining({type: "updateAutocorrectTrigger", correction: "because", trigger: kind, expectedFingerprint: identity})]);
+        await accept(page, (model) => { model.autocorrect.entries.find((entry) => entry.id === "because").fires = kind; model.autocorrect.usage.leaders = 3; });
+        await expect(fires.locator(`input[value="${kind}"]`)).toBeChecked();
+        await expect(inputs()).toHaveText(["beacuse", "becasue", "becuase"]);
+        await expect(editor(page).locator("[data-ac-leader-note]")).toContainText("Press the Leader key, then type one of its inputs: the keyboard sends this replacement, and the computer never sees what you typed.");
+        await expect(editor(page).locator('[data-ac-leader-note] [data-act="ac-place-leader"]')).toHaveText("Place on a key →");
+        await expect(item(page, "because").locator("[data-ac-fires]")).toHaveText(label);
+    }
+    // Back to As you type: the note goes, and the bank's tag says so.
+    await clearPosts(page);
+    await fires.locator('label:has-text("As you type")').click();
+    await expectEdits(page, [expect.objectContaining({type: "updateAutocorrectTrigger", correction: "because", trigger: "word"})]);
+    await accept(page, (model) => { model.autocorrect.entries.find((entry) => entry.id === "because").fires = "word"; model.autocorrect.usage.leaders = 0; });
+    await expect(editor(page).locator("[data-ac-leader-note]")).toHaveCount(0);
+    await expect(item(page, "because").locator("[data-ac-fires]")).toHaveText("As you type");
+    // + Input adds an input to the one list, however it fires.
+    await editor(page).locator('[data-act="ac-more"]').click();
+    await expect(editor(page).locator("[data-ac-more]")).toBeFocused();
+});
+
+// Where the Leader key is placed is said under Fires, as Pointer says where
+// its sniping keys are, and Place on a key → puts it on one, as a macro's and
+// a pointing mode's editors do.
+test("while a replacement fires after Leader its editor says where the Leader key is, and places it on a key", async ({page}) => {
+    await openControls(page, "autocorrect");
+    await publish(page, (model) => { model.autocorrect.entries.find((entry) => entry.id === "because").fires = "leader"; });
+    await item(page, "because").click();
+    const row = editor(page).locator('[data-ac-leader-note] [role="group"]');
+    await expect(row).toHaveAttribute("aria-label", "Where the Leader key is");
+    await expect(row.locator(".ac-leader-key")).toHaveText("Leader");
+    await expect(row.locator("[data-ac-leader-placed]")).toHaveText("Not placed");
+    await publish(page, (model) => { for (const at of [0, 1]) model.layers[0].positions[at].keycode = "QK_LEADER"; });
+    await expect(row.locator("[data-ac-leader-placed]")).toHaveText("Base · 2 keys");
+    // The layer by its mark, as everywhere a layer is named.
+    await expect(row.locator("[data-ac-leader-placed] .mk .kind-icon.layer")).toHaveCount(1);
+    await clearPosts(page);
+    await row.locator('[data-act="ac-place-leader"]').click();
+    expect(await page.evaluate(async () => { const {state} = await import("/webview/store.mjs"); return [state.screen, state.tab, state.placement]; })).toEqual(["keys", "key", {keycode: "QK_LEADER"}]);
+    expect(await edits(page)).toEqual([]);
+});
+
+test("Try it's After Leader field asks the core what the leader would do with what follows the key, and says it", async ({page}) => {
+    await openControls(page, "autocorrect");
+    await expect(page.locator("[data-ac-try-leader]")).toHaveCount(0);
+    await publish(page, (model) => { model.autocorrect.entries[0].fires = "leader"; model.autocorrect.usage.leaders += model.autocorrect.entries[0].typos.length; });
+    const field = page.locator("[data-ac-try-leader]"), said = page.locator("[data-ac-try-leader-said]");
+    await expect(field).toBeVisible();
+    await field.fill("pn");
+    await expect.poll(async () => (await posted(page)).filter((message) => message.type === "tryAutocorrect").at(-1)).toEqual(expect.objectContaining({type: "tryAutocorrect", before: "", typed: "", leader: "pn"}));
+    await answer(page, {text: "", fired: [], marks: [], undone: false, leader: {state: "sends", input: "pn", entry: "+31", label: "+31 6 1234 5678", finishing: false, passedOver: false}});
+    await expect(said).toHaveText("“pn” sends “+31 6 1234 5678”, and that is all the computer sees.");
+    await answer(page, {text: "", fired: [], marks: [], undone: false, leader: {state: "waits", sends: "alpha", longer: ["abcd"]}});
+    await expect(said).toHaveText("Waiting: Enter, or a pause, sends “alpha”; “abcd” could still follow.");
+    await answer(page, {text: "", fired: [], marks: [], undone: false, leader: {state: "drops", held: "ax"}});
+    await expect(said).toHaveText("No leader input begins with “ax”: the keyboard drops what you typed, and nothing reaches the computer.");
+    // The box itself was never written into.
+    await expect(page.locator('[data-f="autocorrect:try:text"]')).toHaveValue("");
+});
+
+test("in the demo a replacement made to fire after Leader is marked in the bank, tried after Leader by the core, and reviewed", async ({page}) => {
+    await openDemo(page);
+    await bank(page).locator('[data-act="ac-add"]').click();
+    await editor(page).locator("[data-ac-text]").fill("Kind regards, Sam");
+    await editor(page).locator("[data-ac-text]").press("Enter");
+    await page.locator('[data-ac-new] .seg[aria-label="How it fires"] label:has-text("After Leader")').click();
+    await expect(page.locator("[data-ac-new] [data-ac-leader-note]")).toBeVisible();
+    const first = editor(page).locator("[data-ac-first]");
+    await first.fill("kr");
+    await first.press("Enter");
+    await expect(item(page, "Kind regards, Sam").locator(".n")).toHaveText("kr");
+    await expect(item(page, "Kind regards, Sam").locator("[data-ac-fires]")).toHaveText("After Leader");
+    const field = page.locator("[data-ac-try-leader]"), said = page.locator("[data-ac-try-leader-said]");
+    await field.fill("k");
+    await expect(said).toHaveText("Waiting for more: it could become “kr”.");
+    await field.fill("kr");
+    await expect(said).toHaveText("“kr” sends “Kind regards, Sam”, and that is all the computer sees.");
+    await field.fill("k r");
+    await expect(said).toHaveText("No leader input begins with “k ”: the keyboard drops what you typed, and nothing reaches the computer.");
+    // Review says how it fires.
+    await page.locator('.commit [data-act="review"]').click();
+    await expect(page.locator('.sheet[aria-label="Review changes"]')).toContainText("After Leader");
+});
+
+// The keyboard keeps no replacement without an input, so its last one
+// removed takes it off the list; the editor keeps it open as one being made,
+// what it is and how it fires kept, for the input that puts it back.
+test("in the demo a replacement whose only input is removed stays open off the list, a new input puts it back, and Undo opens it as it was", async ({page}) => {
+    await openDemo(page);
+    await bank(page).locator('[data-act="ac-add"]').click();
+    await editor(page).locator("[data-ac-text]").fill("Kind regards, Sam");
+    await editor(page).locator("[data-ac-text]").press("Enter");
+    await page.locator('[data-ac-new] .seg[aria-label="How it fires"] label:has-text("Both")').click();
+    const first = editor(page).locator("[data-ac-first]");
+    await first.fill("kr");
+    await first.press("Enter");
+    await expect(item(page, "Kind regards, Sam").locator(".n")).toHaveText("kr");
+    const listed = await count(page).textContent();
+    await editor(page).locator('[data-ac-chip="kr"]').click();
+    const remove = editor(page).locator('[data-act="ac-remove-input"]');
+    await expect(remove).toHaveAttribute("data-tip", "Its only input: the replacement leaves your list but stays open, for a new input that puts it back. Undo takes it back.");
+    await remove.click();
+    const made = page.locator("[data-ac-new]");
+    await expect(made.locator("[data-ac-text]")).toHaveValue("Kind regards, Sam");
+    // Its sections in a listed replacement's order: Fires, then Inputs.
+    expect((await made.locator(".macro-sequence-heading h4").allTextContents()).slice(0, 3)).toEqual(["Replacement", "Fires", "Inputs"]);
+    await expect(made.locator('.seg[aria-label="How it fires"] input[value="both"]')).toBeChecked();
+    await expect(made.locator("[data-ac-joins-with]")).toHaveText("Its last input was removed, so it is off your list: give it an input to put it back.");
+    await expect(first).toBeFocused();
+    await expect(item(page, "Kind regards, Sam")).toHaveCount(0);
+    await expect(count(page)).not.toHaveText(listed);
+    await expect(page.locator("[data-ac-new-item]")).toContainText("Kind regards, Sam");
+    await expect(page.locator("[data-ac-new-item] [data-ac-fires]")).toHaveText("Both");
+    await expect(page.locator("[data-ac-joins]")).toHaveCount(0);
+    // A new input puts it back, firing as it did.
+    await first.fill("ksam");
+    await first.press("Enter");
+    await expect(item(page, "Kind regards, Sam").locator(".n")).toHaveText("ksam");
+    await expect(item(page, "Kind regards, Sam").locator("[data-ac-fires]")).toHaveText("Both");
+    await expect(editor(page)).toHaveAttribute("data-ac-editor", "Kind regards, Sam");
+    await expect(count(page)).toHaveText(listed);
+    // Removed again and undone, it is the entry it was, open.
+    await editor(page).locator('[data-ac-chip="ksam"]').click();
+    await editor(page).locator('[data-act="ac-remove-input"]').click();
+    await expect(item(page, "Kind regards, Sam")).toHaveCount(0);
+    await page.locator('.rail [data-act="undo"]').click();
+    await expect(item(page, "Kind regards, Sam").locator(".n")).toHaveText("ksam");
+    await expect(page.locator("[data-ac-new], [data-ac-new-item]")).toHaveCount(0);
+    await expect(editor(page)).toHaveAttribute("data-ac-editor", "Kind regards, Sam");
+    await expect(chips(page)).toHaveText(["ksam"]);
 });

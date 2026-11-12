@@ -140,3 +140,23 @@ export function triedWords(tried, macros) {
     if (!last) return "";
     return last.macro === undefined ? `“${last.typo}” was replaced with “${last.correction}”.` : `“${last.typo}” plays the macro “${macroNamed(macros?.[last.macro])}”.`;
 }
+
+
+// How many inputs a waiting leader's line names before it counts the rest.
+const LEADER_NEXT_SHOWN = 3;
+// What the line under the After Leader field says the keyboard would do with
+// what is typed there (firmware D-F71, D-L91). Nothing for an empty field.
+/** @param {string} typed @param {import("../../contracts/messages.js").AutocorrectLeaderTry | null | undefined} result */
+export function leaderTriedWords(typed, result) {
+    if (!typed || !result) return "";
+    if (result.state === "none") return "Nothing on your list fires after Leader, so the Leader key does nothing.";
+    if (result.state === "drops") return `No leader input begins with “${result.held}”: the keyboard drops what you typed, and nothing reaches the computer.`;
+    if (result.state === "waits") {
+        const next = result.longer.slice(0, LEADER_NEXT_SHOWN).map((input) => `“${input}”`).join(", ") + (result.longer.length > LEADER_NEXT_SHOWN ? ` and ${result.longer.length - LEADER_NEXT_SHOWN} more` : "");
+        if (result.sends) return `Waiting: Enter, or a pause, sends “${result.sends}”; ${next} could still follow.`;
+        return result.longer.length ? `Waiting for more: it could become ${next}.` : "Type a leader input.";
+    }
+    const sends = result.macro === undefined ? `sends “${result.label}”` : `plays the macro “${result.label}”`;
+    if (result.passedOver) return `“${result.input}” is a leader input, but the keyboard cannot ${result.macro === undefined ? "type its replacement here" : "play its macro"}: nothing is sent.`;
+    return `${result.finishing ? "Enter" : `“${result.input}”`} ${sends}, and that is all the computer sees.`;
+}

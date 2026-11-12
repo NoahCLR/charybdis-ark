@@ -9,14 +9,14 @@
 // a typo.
 
 const {decodedOf, editProfileDomains, autocorrectCeilings} = require("./portable-profile");
-const {AUTOCORRECT_DOMAIN_V1, entryKey} = require("../schema/autocorrect-domain-v1");
+const {AUTOCORRECT_DOMAIN_V1, autocorrectCounts, entryKey, triggerOf} = require("../schema/autocorrect-domain-v1");
 const {parsePayload} = require("../schema/macro-payload");
 const {inspectMacroPlayback, readStoredMacro} = require("./macro-input");
 const {PROFILE_BLOB_V1} = require("../schema/profile-blob-v1");
 const {MACOS, hostSettings} = require("../schema/host-settings");
 const {hostLayout} = require("../data/host-layouts");
-const {typedText} = require("./autocorrect-matcher");
-const {SHORT_INPUT_LETTERS, WARNING, addTypos, changeReplacement, changeTypo, findEntry, listUsage, listWarnings, removeEntry, removeTypo, replacementCalled, replacementSaid, splitInputs, targetOf, inputForm, untypableFix} = require("./autocorrect-list");
+const {LEADER, leaderOutcome, typedText} = require("./autocorrect-matcher");
+const {SHORT_INPUT_LETTERS, TRIGGER_NAMES, WARNING, addTypos, changeReplacement, changeTypo, findEntry, listUsage, listWarnings, removeEntry, removeTypo, replacementCalled, replacementSaid, setTrigger, splitInputs, targetOf, inputForm, untypableFix} = require("./autocorrect-list");
 const {exportAutocorrect, planImport, previewImport, rowsOf} = require("./autocorrect-import");
 const {VOCABULARY, word} = require("./vocabulary");
 
@@ -114,12 +114,13 @@ function autocorrectEditorView(snapshot, capabilities) {
     const used = listUsage(list), room = roomOf(decoded, capabilities);
     const notice = untypableNotice(warnings, host.layoutName);
     return {identity: snapshot.fingerprint,
-        entries: list.entries.map(entry => ({id: entryKey(entry), label: replacementCalled(entry, host.macroNames), correction: entry.correction, ...(entry.macro === undefined ? {} : {macro: entry.macro}), warnings: said(entryKey(entry)),
+        entries: list.entries.map(entry => ({id: entryKey(entry), label: replacementCalled(entry, host.macroNames), correction: entry.correction, ...(entry.macro === undefined ? {} : {macro: entry.macro}),
+            fires: TRIGGER_NAMES[triggerOf(entry)], warnings: said(entryKey(entry)),
             typos: entry.typos.map(typo => ({typo: typo.typo, input: inputForm(typo), warnings: said(entryKey(entry), typo.typo)}))})),
         // `share` is the list's bytes of its own limit, the one figure both
         // memory meters draw; `free` is what it can still grow by, which its
         // text's ceiling and the profile's shared room may bound sooner.
-        usage: {corrections: used.corrections, typos: used.typos, maxTypos: room.maxTypos,
+        usage: {corrections: used.corrections, typos: used.typos, leaders: used.leaders, maxTypos: room.maxTypos,
             textBytes: used.textBytes, maxTextBytes: room.maxTextBytes, bytes: used.bytes, capacity: room.capacity, share: room.capacity > 0 ? Math.min(1, used.bytes / room.capacity) : 0,
             free: Math.max(0, Math.min(room.capacity - used.bytes, room.maxTextBytes - used.textBytes, room.sharedFree)), textMax: capabilities?.autocorrectTextMax ?? AUTOCORRECT_DOMAIN_V1.TEXT_MAX,
             correctionMax: capabilities?.autocorrectCorrectionMax ?? AUTOCORRECT_DOMAIN_V1.CORRECTION_MAX, shortInput: SHORT_INPUT_LETTERS},
@@ -134,7 +135,10 @@ function autocorrectEditorView(snapshot, capabilities) {
 const addedTypos = message => typeof message.inputs === "string" ? splitInputs(message.inputs).map(typo => ({typo})) : message.typos || [];
 /** @type {{[K in AutocorrectEditType]: (list: AutocorrectList, message: import("../../contracts/edits.js").EditOf<K>, host: Host, room: ReturnType<typeof roomOf>) => void}} */
 const CHANGES = {
-    addAutocorrectTypos: (list, message, host) => addTypos(list, message, addedTypos(message), host),
+    // A new replacement fires as the add says; one the list has keeps how it
+    // fires.
+    addAutocorrectTypos: (list, message, host) => addTypos(list, message, addedTypos(message), host, message.trigger),
+    updateAutocorrectTrigger: (list, message, host) => setTrigger(list, message, message.trigger, host),
     updateAutocorrectCorrection: (list, message, host) => changeReplacement(list, message, message.toMacro === undefined ? {correction: message.to} : {macro: message.toMacro}, host),
     updateAutocorrectTypo: (list, message, host) => changeTypo(list, message.typo, message.to, host),
     deleteAutocorrectTypo: (list, message) => removeTypo(list, message.typo),
@@ -220,20 +224,35 @@ function importPreview(snapshot, file, capabilities) {
 
 // The most text a try runs: what was there and what was typed, each.
 const TRY_TEXT_MAX = 4096;
+// What the leader would do with text typed after the Leader key, for Try it's
+// After Leader field (D-L91): the matcher's outcome, and for a send whether
+// this host and its macros let it out, as typing it after the key shows.
+/** @param {AutocorrectList} list @param {Host & {plays: ({text: string | null} | null)[]}} host @param {boolean} capsLock @param {string} typed @returns {import("../../contracts/messages.js").AutocorrectLeaderTry} */
+function leaderTry(list, host, capsLock, typed) {
+    if (!autocorrectCounts(list).leaders) return {state: "none"};
+    const outcome = leaderOutcome(list, typed);
+    if (outcome.state === "waits") return {state: "waits", sends: outcome.exact ? replacementCalled(outcome.exact.entry, host.macroNames) : null, longer: outcome.longer.map(listed => listed.typo.typo)};
+    if (outcome.state === "drops") return {state: "drops", held: typed.slice(0, outcome.at + 1)};
+    const sent = typedText(list, host, capsLock, `${LEADER}${typed.slice(0, outcome.at + 1)}`, "", slot => host.plays[slot] ?? null).fired;
+    return {state: "sends", input: outcome.typo.typo, entry: entryKey(outcome.entry), label: replacementCalled(outcome.entry, host.macroNames),
+        ...(outcome.entry.macro === undefined ? {} : {macro: outcome.entry.macro}), finishing: outcome.finishing, passedOver: !sent.length};
+}
 // Try it: what the keyboard would leave on screen for text typed against a
 // snapshot's list, on its host layout and under the Caps Lock given
-// (autocorrect-matcher.js), after text that was already there.
-/** @param {import("./types.js").CompleteSnapshot} snapshot @param {{before?: unknown, typed?: unknown, capsLock?: unknown}} tried */
+// (autocorrect-matcher.js), after text that was already there; and, given
+// `leader`, what it would do with that typed after the Leader key.
+/** @param {import("./types.js").CompleteSnapshot} snapshot @param {{before?: unknown, typed?: unknown, capsLock?: unknown, leader?: unknown}} tried */
 function tryText(snapshot, tried) {
     /** @param {string} message */
     const refuse = message => Object.assign(new Error(message), {code: "AUTOCORRECT_TRY_REFUSED"});
-    const {before, typed, capsLock} = tried;
-    if (typeof before !== "string" || typeof typed !== "string") throw refuse("Try it takes text.");
+    const {before, typed, capsLock, leader} = tried;
+    if (typeof before !== "string" || typeof typed !== "string" || (leader !== undefined && typeof leader !== "string")) throw refuse("Try it takes text.");
     if (typeof capsLock !== "boolean") throw refuse("Try it needs Caps Lock on or off.");
-    if (before.length > TRY_TEXT_MAX || typed.length > TRY_TEXT_MAX) throw refuse("This text is too long to try. Clear the box and type again.");
+    if (before.length > TRY_TEXT_MAX || typed.length > TRY_TEXT_MAX || (leader?.length ?? 0) > TRY_TEXT_MAX) throw refuse("This text is too long to try. Clear the box and type again.");
     const decoded = decodedOf(snapshot);
     const host = hostOf(decoded, snapshot.hostOs);
-    return typedText(decoded.autocorrect, host, capsLock, typed, before, slot => host.plays[slot] ?? null);
+    const result = typedText(decoded.autocorrect, host, capsLock, typed, before, slot => host.plays[slot] ?? null);
+    return leader === undefined ? result : {...result, leader: leaderTry(decoded.autocorrect, host, capsLock, leader)};
 }
 
 // A snapshot's list as a file in one of the three formats, and the name a

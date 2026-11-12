@@ -69,8 +69,8 @@ function withPreviewReplacements(document) {
 
 /** @type {Partial<import("../core/session/types.js").DeviceCapabilities> & {brightnessMax: number}} */
 const capabilities = {
-    protocol: {major: 2, minor: 1},
-    schema: {major: 4, minor: 5},
+    protocol: {major: 2, minor: 2},
+    schema: {major: 4, minor: 6},
     compiledLayerCount: 16,
     supportedDomainMask: 255,
     actionAbiDigest: ACTION_ABI,
@@ -93,7 +93,7 @@ const capabilities = {
     maxAutocorrectCorrections: 1024,
     maxAutocorrectTypos: 1024,
     autocorrectTextBytes: 20480,
-    autocorrectBytes: 34824,
+    autocorrectBytes: 36874,
     autocorrectTextMax: 32,
     autocorrectCorrectionMax: 128,
 };

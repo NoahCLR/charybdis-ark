@@ -15,11 +15,11 @@ test("one canonical registry pins every current domain's identity, version, wire
         {name: "RGB", id: 16, key: "rgb", readKey: "rgb", version: 5, wireBit: 1, area: "lighting"},
         {name: "KEY_BEHAVIORS", id: 32, key: "behaviors", readKey: "keyBehaviors", version: 2, wireBit: 2, area: "behaviours"},
         {name: "COMBOS", id: 48, key: "combos", readKey: "combos", version: 3, wireBit: 4, area: "combos"},
-        {name: "SETTINGS", id: 64, key: "settings", readKey: "settings", version: 12, wireBit: 8, area: "settings"},
+        {name: "SETTINGS", id: 64, key: "settings", readKey: "settings", version: 13, wireBit: 8, area: "settings"},
         {name: "PD_MODES", id: 80, key: "pdModes", readKey: "pdModes", version: 4, wireBit: 16, area: "pointing"},
         {name: "KEYMAP", id: 96, key: "keymap", readKey: undefined, version: 1, wireBit: 32, area: "keys"},
         {name: "MACROS", id: 112, key: "macros", readKey: undefined, version: 1, wireBit: 64, area: "macros"},
-        {name: "AUTOCORRECT", id: 128, key: "autocorrect", readKey: undefined, version: 1, wireBit: 128, area: "autocorrect"},
+        {name: "AUTOCORRECT", id: 128, key: "autocorrect", readKey: undefined, version: 2, wireBit: 128, area: "autocorrect"},
     ]);
     assert.equal(PROFILE_DOMAIN_MASK, 255);
     assert.ok(Object.isFrozen(PROFILE_DOMAINS));
@@ -64,7 +64,7 @@ const NONCANONICAL = {
     // The first two typo rows' links swapped: the texts still ascend, but a
     // correction's first typo no longer names it.
     autocorrect: payload => {
-        const bytes = Buffer.from(payload), rows = 8 + 6 * payload.readUInt16LE(0);
+        const bytes = Buffer.from(payload), rows = 10 + 6 * payload.readUInt16LE(0);
         payload.copy(bytes, rows + 4, rows + 10, rows + 12); payload.copy(bytes, rows + 10, rows + 4, rows + 6);
         return {bytes, refusal: {name: "AutocorrectDomainError", code: "FIRST_TYPO"}};
     },

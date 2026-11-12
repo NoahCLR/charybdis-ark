@@ -9,10 +9,10 @@ const PROFILE_WIRE_V1 = Object.freeze({
     // Profile Wire 2.0 opens the new base (firmware D-F28): every profile
     // length and offset is 32 bits, and the feature word holds only what a
     // build varies by. 2.1 adds the switch keys for behaviours (firmware
-    // D-F66), and for auto-mouse with no version change. Ark requires this
-    // version exactly (D-L64).
+    // D-F66), and for auto-mouse with no version change; 2.2 the Leader key
+    // (firmware D-F71). Ark requires this version exactly (D-L64).
     PROTOCOL_MAJOR: 2,
-    PROTOCOL_MINOR: 1,
+    PROTOCOL_MINOR: 2,
     // Response layout 3 (firmware D-F28): page 1 the ceilings that fit a byte,
     // page 2 the wider ones, page 3 the autocorrect list's (firmware D-F68).
     // Any other layout is refused.

@@ -88,7 +88,7 @@ test("format 5 colours 16 layers and 32 pointing slots and round-trips", () => {
     assert.deepEqual(decoded.layerColors.map(row => row.layerId), Array.from({length: 16}, (_, id) => id));
     assert.deepEqual(decoded.pdModeColors.map(row => row.pdModeId), Array.from({length: 32}, (_, id) => id));
     assert.deepEqual(encodeRgbDomainV1(decoded), encoded);
-    const blob = encodeProfileBlob({schema: {major: 4, minor: 5}, domains: [{id: 0x10, version: 5, payload: encoded}]});
+    const blob = encodeProfileBlob({schema: {major: 4, minor: 6}, domains: [{id: 0x10, version: 5, payload: encoded}]});
     assert.equal(decodeProfileBlob(blob).domains[0].version, 5);
 });
 

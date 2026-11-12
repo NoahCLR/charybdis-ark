@@ -26,7 +26,7 @@ const UNBUILT_GROUPS = new Set([
 const UNBUILT = new RegExp("^(?:" + [
     "QK_AUTO_SHIFT_", "QK_CAPS_WORD_", "QK_DYNAMIC_MACRO_", "QK_DYNAMIC_TAPPING_TERM_",
     "QK_HAPTIC_", "QK_KEY_OVERRIDE_", "QK_SECURE_", "QK_TRI_LAYER_", "QK_UNICODE_MODE_",
-    "QK_ALT_REPEAT_KEY$", "QK_LAYER_LOCK$", "QK_LEADER$", "QK_LOCK$", "QK_REPEAT_KEY$", "QK_VELOCIKEY_TOGGLE$",
+    "QK_ALT_REPEAT_KEY$", "QK_LAYER_LOCK$", "QK_LOCK$", "QK_REPEAT_KEY$", "QK_VELOCIKEY_TOGGLE$",
     "KC_LOCKING_",
     // The QK_KB slots the Charybdis leaves unnamed.
     "QK_KB_\\d+$",

@@ -120,6 +120,10 @@ export interface Vocabulary {
     macroSteps: WordList<MacroStepKind>;
     /** What a text replacement is, text or a macro, as its editor's choice and its tag say it. */
     replacementKinds: WordList<'text' | 'macro'>;
+    /** How a replacement fires (D-L91): as you type, after the Leader key, or both; the switch on its editor and its tag in the bank. */
+    inputModes: WordList<'word' | 'leader' | 'both'>;
+    /** The Leader key's name, on its cap before Try it's After Leader field and where the editor says the key is placed. */
+    leaderKey: string;
     /** The formats a text replacement list is saved in, by extension, in the order Export offers them. */
     listFileFormats: WordList<import('./messages.js').AutocorrectFileFormat>;
     /** A step's short name under its tile and in the legend: a key or chord step says which it is. */
@@ -218,7 +222,8 @@ export interface Vocabulary {
     comboOptions: Readonly<Record<string, string>>;
     /** What a behaviour and a combo share: whether it runs, and on which layers. */
     definitionFields: {use: Readonly<Record<'behaviour' | 'combo', string>>; allowedLayers: string; offInSettings: Readonly<Record<'behaviour' | 'combo', string>>; onceOn: Readonly<Record<'behaviour' | 'combo', string>>};
-    settingOff: {switches: Readonly<Record<SettingOffSwitch, {off: string; fix: string; /** What off means where the banner is, when it says so. */ detail?: string}>>; stage: string};
+    settingOff: {switches: Readonly<Record<SettingOffSwitch, {off: string; fix: string; /** What off means where the banner is, when it says so. */ detail?: string}>>; stage: string;
+        /** Text replacement off with a leader input on the list (D-L91): what off means on its screen and on the Replacement feedback tab. */ leading: {list: string; stage: string}};
     behaviourFields: Readonly<Record<'anchor' | 'timings', string>>;
     comboFields: Readonly<Record<'inputs' | 'sends' | 'window' | 'conditions', string>>;
 }
