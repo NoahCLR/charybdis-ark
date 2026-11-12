@@ -45,8 +45,8 @@ the keyboard reports.
 that does depends on the stage. On a layer the button is **Make
 passthrough** and the colour reads **Passthrough**: the layer paints nothing,
 so what is underneath shows through. A case of
-[replacement feedback](#replacement-feedback) turned off does not flash,
-and the other two still do.
+[replacement feedback](#replacement-feedback) turned off does not light,
+and the other cases still do.
 Everywhere else black is
 black: a pointing mode, combo feedback or a behaviour feedback colour turned off
 paints its area black while it runs, and the auto-mouse fade ends on black.
@@ -172,38 +172,50 @@ stay editable. Click the banner to go to that switch.
 ### Replacement feedback
 
 One flash when [text replacement](text-replacement.md) changes what you
-typed, over everything else the keyboard is lighting. It has three cases,
-each with a colour of its own:
+typed, and a colour held while the
+[Leader key](text-replacement.md#after-the-leader-key) waits for what you
+type after it, over everything else the keyboard is lighting. It has four
+cases, each with a colour of its own:
 
 - **Replaced with text**: an input replaced with text.
 - **Replaced by a macro**: an input replaced by its macro. The flash comes
   as the input is erased, before the macro plays.
 - **Replacement undone**: Backspace straight after a replacement put the
   word back.
+- **Leader waiting**: from the moment you press Leader until the leader
+  sends or gives up, however long it waits. It is no flash: it stays on
+  through Leader again and through a Backspace that leaves characters
+  typed.
 
-Pick a case in the list to change its colour. **Turn off** switches that
-case off: it does not flash, the list says **off** beside it, and the other
-two still flash. **Give it a colour** switches it back on. A word left as
+Pick a case in the list to change its colour; under its name the tab says
+when it shows, and the Locality's note says which key it follows, if any.
+**Turn off** switches that
+case off: it does not light, the list says **off** beside it, and the other
+cases still do. **Give it a colour** switches it back on. A word left as
 you typed it never flashes, whatever the reason.
 
-What the [Leader key](text-replacement.md#after-the-leader-key) sends
-flashes as a replacement does, in the **Replaced with text** or **Replaced by
-a macro** colour: that flash is how you know it went. A leader that sends
-nothing does not flash. Since the leader works with text replacement off,
-this tab still lights a leader's sends while text replacement is off and a
-replacement on your list fires after Leader; its banner says so.
+What the Leader key sends flashes as a replacement does, in the **Replaced
+with text** or **Replaced by a macro** colour, taking **Leader waiting**'s
+place at once: that flash is how you know it went. When the leader sends
+nothing, **Leader waiting** just goes, with no flash. Since the leader works
+with text replacement off, this tab still lights **Leader waiting** and a
+leader's sends while text replacement is off and a replacement on your list
+fires after Leader; its banner says so.
 
 Under **When and where**:
 
 - **Locality**: where the flash paints, with the same choices as a pointing
   mode. Here the trigger key is the key that ended the word (Space, Enter, a
   punctuation key), or the Backspace that undid the replacement; for what
-  the Leader key sends, the key that sent it, the last character or Enter.
-  For a combo, every key of it. When the keyboard cannot tell which key it
-  was, or the leader's wait sent it, the flash paints both halves, or every
-  key.
+  the Leader key sends, the key that sent it, the last character or Enter,
+  or the Leader key when the wait sent it. For a combo, every key of it.
+  When the keyboard cannot tell which key it was, the flash paints both
+  halves, or every key. For **Leader waiting** the trigger key is the Leader key you pressed;
+  on the board the first key that sends Leader stands in for it, ringed.
 - **Flash length**: how long one flash lasts, in milliseconds. The flash
-  begins as the replacement starts to be typed.
+  begins as the replacement starts to be typed. **Leader waiting** is no
+  flash: it holds for as long as the leader waits, which **Leader waits**
+  sets on [Host settings](text-replacement.md#turning-it-on-and-off).
 
 One flash shows at a time: an undo straight after a replacement takes its
 place.
@@ -212,26 +224,30 @@ While this tab is open, the board shows the flash of the case picked, with
 its accents. It can't know which key will end a word, so the first key that
 sends Space stands in for it, and the first that sends Backspace for
 **Replacement undone**: with a locality that follows the trigger key that key
-is ringed, and the line under the board names it. A case that is off shows
-no flash, and the line says so. The board shows where the flash lands, not
-the flash itself.
+is ringed, and the line under the board names it. **Leader waiting** follows
+no key, so no key is ringed and it shows on every key of the halves it
+paints. A case that is off shows no colour, and the line says so. The board
+shows where each case lands, not the flash itself.
 
 With **Enabled** off under **Text replacement** on
 [Host settings](text-replacement.md#turning-it-on-and-off) nothing is replaced, so this
 stage paints nothing: its tab reads off, and an amber banner says so. Its
-controls stay editable. Click the banner to go to that switch.
+controls stay editable. Click the banner to go to that switch. With a leader
+input on your list the tab stays live instead, since **Leader waiting** and
+the leader's sends still light, and the banner says that.
 
 ## Accents
 
 An **accent** lights some LEDs in a colour of their own while a layer is on,
 a pointing mode runs, a combo's inputs are held, a key shows a behaviour
-state or the keyboard flashes for a replacement. **Layer colours**,
+state, or the keyboard flashes for a replacement or waits after Leader.
+**Layer colours**,
 **Pointing modes**, **Combo feedback**, **Behaviour feedback** and
 **Replacement feedback** each end with an **Accents** list for what the tab
 has picked: the layer shown, the pointing mode, the feedback colour, or the
 replacement case. The list includes the accents that light for all of them,
 tagged **Every layer**, **Every pointing mode**, **Every behaviour state** or
-**Every replacement flash**, which you change or remove from any of their
+**Every case**, which you change or remove from any of their
 lists. Combo accents light for every combo. The background effect and
 the auto-mouse fade have none.
 
@@ -266,8 +282,8 @@ while a pointing mode linked to a layer above Base runs, it paints over Base
 and its accents, beneath that layer.
 
 An accent of a combo, a behaviour state or a replacement case lights the same
-LEDs whichever combo or key caused it. On Behaviour feedback and Replacement
-feedback, the accents for every behaviour state or every replacement flash
+LEDs whichever combo or key caused it, or none, as for **Leader waiting**. On Behaviour feedback and Replacement
+feedback, the accents for every behaviour state or every case
 paint before those for one state or case, whatever their place in the list,
 so the one for the state or case wins an LED they share.
 

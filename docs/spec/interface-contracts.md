@@ -1405,6 +1405,10 @@ board; with none, the flash paints as the keyboard paints one whose key it
 cannot tell, both halves or every key. A case whose colour paints nothing
 (`replacementPaints`) shows no flash, its accents in a colour of their own
 still lit, and the line says it is off; with the stage off no flash shows.
+Leader waiting (D-L92) follows the Leader key that began it: the first key
+that sends Leader stands in and is ringed (`replacementTrigger`), or with none
+it paints as a case whose key the keyboard cannot tell, and the line says it
+is held.
 What the board shows and the line under it are `lightingBoard`
 (`webview/view/lighting-board.mjs`; `tests/view/combo-held.test.mjs`,
 `tests/view/lighting-board.test.mjs`, `tests/view/lighting.test.mjs`,

@@ -215,6 +215,7 @@ export function autocorrectFeedback(feedback = {}, field, next, overrides = {}) 
         textColor: hsvPayload(feedback.textColor),
         macroColor: hsvPayload(feedback.macroColor),
         undoColor: hsvPayload(feedback.undoColor),
+        leadingColor: hsvPayload(feedback.leadingColor),
         locality: feedback.locality,
         ...overrides,
     };

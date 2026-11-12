@@ -564,9 +564,9 @@ test("every stage says what it does, behind one fold that stays as it was left",
 
 // Replacement feedback (D-L89), on the demo profile, which carries the
 // keyboard's compiled defaults for the stage: on, a colour for each case,
-// the half holding the trigger key, and an accent for every replacement flash.
-const FLASH = {textColor: {h: 106, s: 255, v: 200}, macroColor: {h: 234, s: 255, v: 200}, undoColor: {h: 0, s: 255, v: 200}, locality: "RGB_KEY_HALF"};
-const CASES = [["textColor", "Replaced with text"], ["macroColor", "Replaced by a macro"], ["undoColor", "Replacement undone"]];
+// the half holding the trigger key, and an accent for every case.
+const FLASH = {textColor: {h: 106, s: 255, v: 200}, macroColor: {h: 234, s: 255, v: 200}, undoColor: {h: 0, s: 255, v: 200}, leadingColor: {h: 170, s: 255, v: 200}, locality: "RGB_KEY_HALF"};
+const CASES = [["textColor", "Replaced with text"], ["macroColor", "Replaced by a macro"], ["undoColor", "Replacement undone"], ["leadingColor", "Leader waiting"]];
 const openReplacement = (page, state = {}, theme = "dark") =>
     openControls(page, "lighting", {stage: "autocorrect", layer: 0, replacementRow: "textColor", ...state}, theme, "shell=demo");
 const flashPost = config => ({type: "updateAutocorrectFeedback", config: {...FLASH, ...config}});
@@ -585,7 +585,7 @@ test("every stage tab and All accents fit a 1440px window, whichever stage is se
     }
 });
 
-test("replacement feedback is the seventh stage, lists its three cases once, and says what it does", async ({page}) => {
+test("replacement feedback is the seventh stage, lists its four cases once, and says what it does", async ({page}) => {
     await openReplacement(page);
     const tab = page.locator("#stage-tab-autocorrect");
     await expect(tab).toHaveAttribute("aria-selected", "true");
@@ -593,20 +593,23 @@ test("replacement feedback is the seventh stage, lists its three cases once, and
     await expect(tab.locator(".tab-label")).toHaveText("Replacement feedback");
     await expect(tab).toHaveAttribute("data-tip", "Painted 7 of 7");
     const list = body(page).locator('[data-scroll-list="lighting-replacements"]');
-    await expect(list.locator(".group-h .ttl")).toHaveText(["Flashes"]);
+    await expect(list.locator(".group-h .ttl")).toHaveText(["Cases"]);
     await expect(list.locator("tr[data-row]")).toHaveText(CASES.map(([, label]) => label));
     expect(await list.locator("tr[data-row]").evaluateAll(rows => rows.map(row => row.getAttribute("data-row")))).toEqual(CASES.map(([field]) => field));
     await expect(body(page).locator(".stage-detail > section").first().locator("h4")).toHaveText("Replaced with text");
     await expect(body(page).locator(".stage-about")).toContainText("flashes once");
+    await expect(body(page).locator(".stage-about")).toContainText("holds the Leader waiting colour instead");
     await expect(body(page)).not.toContainText(/autocorrect|typo/i);
     // The words for the trigger key, which here is the key that ended the word.
     const where = body(page).locator("section", {has: page.locator('[data-f="lighting:autocorrect:locality"]')});
     await expect(where.locator("h4")).toHaveText("When and where");
     await expect(where.locator('.field:has([data-f="lighting:autocorrect:locality"]) .hint')).toContainText("the key that ended the word (Space, Enter, a punctuation key), or the Backspace that undid the replacement");
+    await expect(where.locator('.field:has([data-f="lighting:autocorrect:locality"]) .hint')).not.toContainText("Leader waiting");
+    await expect(body(page).locator("[data-replacement-when]")).toHaveText("Flashes once as an input is replaced with text, and as the Leader key sends text.");
     expect(await where.locator("select option").allInnerTexts()).toEqual(["Both halves", "Left half", "Right half", "The half holding the trigger key", "Only the trigger key"]);
 });
 
-test("every replacement feedback case posts its own colour, preserving the other two and the locality", async ({page}) => {
+test("every replacement feedback case posts its own colour, preserving the others and the locality", async ({page}) => {
     await openReplacement(page);
     for (const [field] of CASES) {
         await body(page).locator(`[data-row="${field}"]`).click();
@@ -631,16 +634,16 @@ test("Turn off switches one replacement case off, the list and the board say so,
         await clearPosts(page);
         const off = body(page).locator("[data-off]");
         await expect(off).toHaveText("Turn off");
-        await expect(off).toHaveAttribute("data-tip", /does not flash for this case\. The other two still flash/);
+        await expect(off).toHaveAttribute("data-tip", /does not light for this case\. The other cases still do/);
         await off.click();
         await expectPost(page, flashPost({[field]: {h: 0, s: 0, v: 0}}));
         await publishAccepted(page, ["rgb", "autocorrectFeedback", field], {h: "0", s: "0", v: "0"});
         await expect(body(page).locator("[data-channel]")).toHaveCount(0);
         await expect(body(page).locator(".colour-head .note")).toHaveText("Off");
-        await expect(body(page).locator(".stage-detail .callout")).toContainText("This case is off: the keyboard does not flash for it");
+        await expect(body(page).locator(".stage-detail .callout")).toContainText("This case is off: the keyboard does not light for it");
         await expect(body(page).locator(`[data-row="${field}"]`)).toHaveText(`${label}off`);
         for (const [other, name] of CASES.filter(([each]) => each !== field)) await expect(body(page).locator(`[data-row="${other}"]`)).toHaveText(name);
-        await expect(page.locator(".board-foot-text")).toContainText(`${label} is off, so it does not flash`);
+        await expect(page.locator(".board-foot-text")).toContainText(`${label} is off, so it does not ${field === "leadingColor" ? "light" : "flash"}`);
         // A keyboard's colour with no saturation or brightness at another hue is off too.
         await publishAccepted(page, ["rgb", "autocorrectFeedback", field], {h: "40", s: "0", v: "0"});
         await expect(body(page).locator(".colour-head .note")).toHaveText("Off");
@@ -657,7 +660,7 @@ test("Turn off switches one replacement case off, the list and the board say so,
     }
 });
 
-test("replacement feedback's stage switch posts its own bit, and its locality the three colours kept", async ({page}) => {
+test("replacement feedback's stage switch posts its own bit, and its locality the four colours kept", async ({page}) => {
     await openReplacement(page);
     const mask = await page.evaluate(async () => (await import("/webview/store.mjs")).getModel().rgb.stageEnableMask);
     expect(mask & 32).toBe(32);
@@ -730,7 +733,7 @@ test("the board flashes the picked replacement case from the key standing in for
     await expect(page.locator(".board .kc-ring")).toHaveCount(1);
     expect(await fill(13)).toBe(await css(FLASH.textColor));
     expect(await fill(7)).not.toBe(await css(FLASH.textColor));
-    // The accent for every replacement flash takes the case's colour on the thumb LEDs of the other half too.
+    // The accent for every case takes the case's colour on the thumb LEDs of the other half too.
     expect(await page.locator('.board [data-led="53"] .kc-rect').evaluate(rect => getComputedStyle(rect).fill)).toBe(await css(FLASH.textColor));
     await body(page).locator('[data-row="macroColor"]').click();
     await expect(foot).toContainText("Replaced by a macro flashing");
@@ -758,16 +761,65 @@ test("the board flashes the picked replacement case from the key standing in for
     expect(await posted(page)).toEqual([]);
 });
 
-test("a replacement feedback accent is added for the picked case or every flash, changed and removed", async ({page}) => {
+// Leader waiting (D-L92, firmware D-F72) is held while the leader waits and
+// follows the Leader key that began it: with no Leader key in the demo the
+// board holds it on every key of the halves its locality names and rings
+// none, it takes accents of its own, and with Text replacement off and a
+// leader input on the list it still lights.
+test("Leader waiting holds from the Leader key, or on every key with none, takes an accent of its own, and still lights with text replacement off", async ({page}) => {
+    await openReplacement(page, {replacementRow: "leadingColor"});
+    const css = colour => page.evaluate(async (hsv) => (await import("/webview/lib/colour.mjs")).css(hsv), colour);
+    const fill = key => page.locator(`.board [data-key="${key}"] .kc-rect`).evaluate(rect => getComputedStyle(rect).fill);
+    await expect(body(page).locator(".stage-detail > section").first().locator("h4")).toHaveText("Leader waiting");
+    // Under its name, what Leader waiting is: from the Leader key to the send or the end.
+    await expect(body(page).locator("[data-replacement-when]")).toHaveText("Held from the moment you press the Leader key until the leader sends a replacement or gives up. A send's text or macro flash then takes its place; when nothing is sent it just goes. It lasts as long as the leader waits, whatever the Flash length.");
+    await expect(page.locator(".board-foot-text")).toContainText("Leader waiting held, painting the half holding the trigger key · no Leader key to stand in, so it paints as when the keyboard cannot tell the key");
+    await expect(page.locator(".board .kc-ring")).toHaveCount(0);
+    // The demo's locality follows the key and it has no Leader key, so it paints both halves.
+    for (const key of [7, 13, 49, 54]) expect(await fill(key), `key ${key}`).toBe(await css(FLASH.leadingColor));
+    const where = body(page).locator('.field:has([data-f="lighting:autocorrect:locality"]) .hint');
+    await expect(where).toHaveText("Here the trigger key is the Leader key you pressed; for a combo, every key of it. When the Leader came from no key, Leader waiting paints both halves, or every key.");
+    await expect(body(page).locator(".field:has([data-macro=\"replacementFlash\"])")).toHaveAttribute("data-tip", /Leader waiting is no flash: it holds for as long as the leader waits/);
+    // An accent for Leader waiting alone.
+    const section = body(page).locator('[data-accents="autocorrect"]');
+    await expect(section.locator("h4")).toHaveText("Accents · Leader waiting");
+    await expect(section.locator("p.note").first()).toHaveText("LEDs that light in a colour of their own while the keyboard shows Leader waiting, with those for every case: the same LEDs whichever key caused it, or none.");
+    await clearPosts(page);
+    await section.getByRole("button", {name: "Add accent", exact: true}).click();
+    const editor = section.locator(".accent-editor");
+    await page.locator('.board [data-led="5"]').click();
+    for (const [index, value] of [77, 78, 79].entries()) await change(editor.locator(`[data-channel="${index}"]`), value);
+    await editor.locator('[data-act="keep"]').click();
+    await expectPost(page, {type: "addRgbLedGroup", group: {target: "autocorrect", owner: "AUTOCORRECT_FEEDBACK_GROUP_LEADING", ledIndices: [5], h: 77, s: 78, v: 79}});
+    // Text replacement off: with no leader input the tab is off; with one,
+    // the leader still waits, so the tab is live and the banner says it lights.
+    const banner = page.locator(".lighting-bench [data-master-off]");
+    const switchOff = (leaders) => page.evaluate(async (count) => {
+        const store = await import("/webview/store.mjs");
+        const model = structuredClone(store.getModel());
+        for (const entry of model.configDefaults) for (const field of entry.fields) if (field.macro === "autocorrect") { field.value = "0"; field.enabled = false; }
+        model.autocorrect.usage.leaders = count;
+        store.setModel(model); store.render();
+    }, leaders);
+    await switchOff(0);
+    await expect(banner).toContainText("This stage paints nothing.");
+    await expect(page.locator('[data-ltab="autocorrect"]')).toHaveClass(/off/);
+    await switchOff(1);
+    await expect(banner).toContainText("Words you finish never flash; Leader waiting still lights, and what the Leader key sends still flashes, in the text or macro colour.");
+    await expect(page.locator('[data-ltab="autocorrect"]')).not.toHaveClass(/off/);
+    expect(await fill(13)).toBe(await css(FLASH.leadingColor));
+});
+
+test("a replacement feedback accent is added for the picked case or every case, changed and removed", async ({page}) => {
     await openReplacement(page, {replacementRow: "undoColor"});
     const section = body(page).locator('[data-accents="autocorrect"]');
     await expect(section.locator("h4")).toHaveText("Accents · Replacement undone");
-    await expect(section.locator("p.note").first()).toHaveText("LEDs that light in a colour of their own while the keyboard flashes Replacement undone, with those for every replacement flash: the same LEDs whichever key caused it.");
-    // The compiled accent for every replacement flash is listed on each case, tagged.
+    await expect(section.locator("p.note").first()).toHaveText("LEDs that light in a colour of their own while the keyboard shows Replacement undone, with those for every case: the same LEDs whichever key caused it, or none.");
+    // The compiled accent for every case is listed on each case, tagged.
     const row = section.locator('[data-accent="autocorrect:0"]');
     await expect(row.locator(".accent-leds")).toHaveText("LEDs 24–28, 53–55");
-    await expect(row.locator(".tag")).toHaveText("Every replacement flash");
-    await expect(row.locator(".accent-colour")).toContainText("Same as the flash colour");
+    await expect(row.locator(".tag")).toHaveText("Every case");
+    await expect(row.locator(".accent-colour")).toContainText("Same as the case's colour");
     await section.getByRole("button", {name: "Add accent", exact: true}).click();
     const editor = section.locator(".accent-editor");
     await expect(editor.locator('[data-act="keep"]')).toBeDisabled();
@@ -779,12 +831,12 @@ test("a replacement feedback accent is added for the picked case or every flash,
     expect(await posted(page)).toEqual([]);
     await editor.locator('[data-act="keep"]').click();
     await expectPost(page, {type: "addRgbLedGroup", group: {target: "autocorrect", owner: "AUTOCORRECT_FEEDBACK_GROUP_UNDO", ledIndices: [5, 56], h: 77, s: 78, v: 79}});
-    // For every replacement flash, in the flash colour.
+    // For every case, in the case's colour.
     await clearPosts(page);
     await section.getByRole("button", {name: "Add accent", exact: true}).click();
     await page.locator('.board [data-led="7"]').click();
-    await editor.getByText("Every replacement flash", {exact: true}).click();
-    await editor.getByText("Same as the flash colour", {exact: true}).click();
+    await editor.getByText("Every case", {exact: true}).click();
+    await editor.getByText("Same as the case's colour", {exact: true}).click();
     await expect(editor.locator("[data-channel]")).toHaveCount(0);
     await editor.locator('[data-act="keep"]').click();
     await expectPost(page, {type: "addRgbLedGroup", group: {target: "autocorrect", owner: "AUTOCORRECT_FEEDBACK_GROUP_ALL", ledIndices: [7], h: 0, s: 0, v: 0}});

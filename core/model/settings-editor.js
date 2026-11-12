@@ -9,9 +9,11 @@ const {hostSettings, followHostOs, UNICODE_ENABLED, LAYOUT_SHIFT, MACOS, MACOS_I
 const {hostLayouts} = require("../data/host-layouts");
 const {dpiChoices} = require("./pointer-dpi");
 const {hostKeyLabel} = require("./key-names");
-const {layerName, PROFILE_AREAS, REVIEW_AREAS: AREA, VOCABULARY} = require("./vocabulary");
+const {layerName, PROFILE_AREAS, REVIEW_AREAS: AREA, VOCABULARY, settingsPath, word} = require("./vocabulary");
 // Each section's heading, and the thresholds' names, are the vocabulary's.
 const SECTION = VOCABULARY.settingsSections, THRESHOLD = VOCABULARY.thresholdNames;
+// The leader's timeout, as its field is called and the Flash length's hint names it.
+const LEADER_WAITS = "Leader waits";
 /** @param {string} words */
 const capitalised = words => words.charAt(0).toUpperCase() + words.slice(1);
 const {settingsLinkRefusal} = require("./pointing-links");
@@ -134,7 +136,8 @@ const sections = [
     // A replacement feedback flash has a length of its own (firmware D-F70,
     // D-L89), drawn on that stage's tab as the flash interval is on its.
     {id: "replacementFeedback", label: SECTION.replacementFeedback, area: AREA.lighting, stage: "autocorrect", fields: [
-        number("replacementFlash", SETTING.AUTOCORRECT_FEEDBACK_PERIOD, "Flash length (ms)", "How long one flash lasts.", {min: SETTING_FIELD.AUTOCORRECT_FEEDBACK_PERIOD.min, validate: "positive-int"}),
+        number("replacementFlash", SETTING.AUTOCORRECT_FEEDBACK_PERIOD, "Flash length (ms)", "How long one flash lasts.", {min: SETTING_FIELD.AUTOCORRECT_FEEDBACK_PERIOD.min, validate: "positive-int",
+            tooltip: `${word(VOCABULARY.replacementOwners, "AUTOCORRECT_FEEDBACK_GROUP_LEADING")} is no flash: it holds for as long as the leader waits (${LEADER_WAITS}, in ${settingsPath("host", "autocorrect")}).`}),
     ]},
 ];
 
@@ -279,7 +282,7 @@ function settingsSections(snapshot, settings) {
     // (firmware D-F71).
     result.push({id: "autocorrect", area: AREA.settings, label: SECTION.autocorrect, fields: [
         ...keyOptions.filter(field => field.macro === AUTOCORRECT_SWITCH).map(({part, tooltip, ...field}) => switchedByKeys({...field, hint: field.hint || tooltip}, "autocorrect")),
-        number("leaderTimeout", SETTING.LEADER_TIMEOUT, "Leader waits (ms)", "How long the Leader key waits after your last key before it sends a leader input that a longer one begins with, from 1000 to 10000. It works with the switch off, and when a key turned it off."),
+        number("leaderTimeout", SETTING.LEADER_TIMEOUT, `${LEADER_WAITS} (ms)`, "How long the Leader key waits after your last key before it sends a leader input that a longer one begins with, from 1000 to 10000. It works with the switch off, and when a key turned it off."),
     ]});
     /** @param {number} id */
     const label = id => VOCABULARY.hostOs.find(([value]) => value === id)?.[1] || "Unknown";

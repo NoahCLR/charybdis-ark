@@ -13,7 +13,7 @@ value ids are listed in
 - Both halves run the split serial link at a fixed 460,800 baud
   (`SERIAL_USART_SPEED`, set in `users/noah/lib/compat/qmk_split_transport.mk`).
   There is no speed selector: `NOAH_SPLIT_BAUD` fails the build (D-F52,
-  [0052](https://github.com/NoahCLR/charybdis-4x6/blob/a90f448a5235071b7e64aead6e2bebcdf29ba6de/docs/adr/0052-split-activity-coalescing-and-fixed-baud.md)).
+  [0052](https://github.com/NoahCLR/charybdis-4x6/blob/7a3f6027ff66dba9b5b12698a7983dab89790a0b/docs/adr/0052-split-activity-coalescing-and-fixed-baud.md)).
 - `SERIAL_USART_TIMEOUT` is 5 ms, for each wait on the serial FIFO.
 - Every split data frame carries the fork's frame CRC8 by default
   (`SPLIT_TRANSPORT_CRC`); `NOAH_SPLIT_CRC=no` builds without it. The build
@@ -81,9 +81,10 @@ build's packed C struct, sent whole.
   sends at most one heartbeat; one due behind another's goes out on a
   following pass, and each packet's heartbeat counts from its own last send.
   Changed and forced packets never wait.
-- Replacement feedback is active state while a flash shows. The master half
-  times the flash and sends its end as a change; the slave half shows what
-  the last packet said and times nothing (D-F70).
+- Replacement feedback is active state while a flash shows, and while the
+  keyboard is leading, however long that lasts. The master half times the
+  flash and ends leading, and sends either end as a change; the slave half
+  shows what the last packet said and times nothing (D-F70, D-F72).
 - Fade progress is active state only while the pointer layer is on, where
   both halves draw it. With the layer off the packet carries the finished
   fade, whatever the auto-mouse timer reads; with auto-mouse off, or a
@@ -221,7 +222,7 @@ arming and just after, and summarises the windows wholly between them, stage
 times included. It also estimates the poll rate with measured split time
 removed, a comparison between builds rather than a prediction. Install its
 dependencies with `npm ci --prefix tools`. Capture with the procedure in
-[`measurements/pointing-cadence/`](https://github.com/NoahCLR/charybdis-4x6/blob/a90f448a5235071b7e64aead6e2bebcdf29ba6de/measurements/pointing-cadence/README.md),
+[`measurements/pointing-cadence/`](https://github.com/NoahCLR/charybdis-4x6/blob/7a3f6027ff66dba9b5b12698a7983dab89790a0b/measurements/pointing-cadence/README.md),
 which also keeps the recorded sets.
 
 Held by: `tests/host/run_split_activity_tests.sh` (`split_diagnostics_tool_test.cjs`).

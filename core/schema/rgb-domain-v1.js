@@ -81,11 +81,13 @@ const RGB_KEY_SEMANTICS = Object.freeze({
     KEY_FEEDBACK_GROUP_ALL: RGB_DOMAIN_V1.SELECTOR_ALL,
 });
 // What a replacement feedback group row lights for: an input replaced with
-// text, one replaced by its macro, a replacement undone, or all three.
+// text, one replaced by its macro, a replacement undone, the leader waiting
+// (firmware D-F72), or every case.
 const RGB_AUTOCORRECT_SEMANTICS = Object.freeze({
     AUTOCORRECT_FEEDBACK_GROUP_TEXT: 0,
     AUTOCORRECT_FEEDBACK_GROUP_MACRO: 1,
     AUTOCORRECT_FEEDBACK_GROUP_UNDO: 2,
+    AUTOCORRECT_FEEDBACK_GROUP_LEADING: 3,
     AUTOCORRECT_FEEDBACK_GROUP_ALL: RGB_DOMAIN_V1.SELECTOR_ALL,
 });
 // The owner an LED group row names when its selector is SELECTOR_ALL, by the
@@ -193,6 +195,9 @@ function encodeRgbDomainV1(profile, options = {}) {
         value.autocorrectFeedback.undoColor.h,
         value.autocorrectFeedback.undoColor.s,
         value.autocorrectFeedback.undoColor.v,
+        value.autocorrectFeedback.leadingColor.h,
+        value.autocorrectFeedback.leadingColor.s,
+        value.autocorrectFeedback.leadingColor.v,
         value.autocorrectFeedback.locality,
     ]));
     for (const row of value.autocorrectGroupRows) {
@@ -310,6 +315,7 @@ function decodeRgbDomainV1(value, options = {}) {
         textColor: reader.hsv(limits, "autocorrectFeedback", 0, "textColor"),
         macroColor: reader.hsv(limits, "autocorrectFeedback", 0, "macroColor"),
         undoColor: reader.hsv(limits, "autocorrectFeedback", 0, "undoColor"),
+        leadingColor: reader.hsv(limits, "autocorrectFeedback", 0, "leadingColor"),
         locality: reader.enumValue(4, "autocorrectFeedback", 0, "locality"),
     };
     const autocorrectGroupRows = readGroupRows(reader, counts.autocorrectGroups, counts.groups, (semantic, row) => assertAutocorrectSemantic(semantic, "autocorrectGroupRows", row), "autocorrectGroupRows", limits, "semantic");
@@ -392,6 +398,7 @@ function normalizeProfile(profile, limits) {
         textColor: normalizeHsv(profile.autocorrectFeedback?.textColor, limits, "autocorrectFeedback", 0, "textColor"),
         macroColor: normalizeHsv(profile.autocorrectFeedback?.macroColor, limits, "autocorrectFeedback", 0, "macroColor"),
         undoColor: normalizeHsv(profile.autocorrectFeedback?.undoColor, limits, "autocorrectFeedback", 0, "undoColor"),
+        leadingColor: normalizeHsv(profile.autocorrectFeedback?.leadingColor, limits, "autocorrectFeedback", 0, "leadingColor"),
         locality: assertEnum(profile.autocorrectFeedback?.locality, 4, "autocorrectFeedback", 0, "locality"),
     };
     const autocorrectGroupRows = normalizeGroupRows(profile.autocorrectGroupRows, groupState, limits, "autocorrectGroupRows", (semantic, row) => assertAutocorrectSemantic(semantic, "autocorrectGroupRows", row), "semantic");
@@ -572,7 +579,7 @@ function assertCompiledSurfaces(profile, limits) {
         throw rgbError("UNSUPPORTED_STAGE_DATA", "Key-feedback RGB data must be canonical zero when the stage is not compiled.");
     }
     const replacement = profile.autocorrectFeedback;
-    if ((compiled & RGB_STAGE_BITS.AUTOCORRECT) === 0 && (profile.autocorrectGroupRows.length || replacement.locality !== 0 || !isBlack(replacement.textColor) || !isBlack(replacement.macroColor) || !isBlack(replacement.undoColor))) {
+    if ((compiled & RGB_STAGE_BITS.AUTOCORRECT) === 0 && (profile.autocorrectGroupRows.length || replacement.locality !== 0 || !isBlack(replacement.textColor) || !isBlack(replacement.macroColor) || !isBlack(replacement.undoColor) || !isBlack(replacement.leadingColor))) {
         throw rgbError("UNSUPPORTED_STAGE_DATA", "Replacement-feedback RGB data must be canonical zero when the stage is not compiled.", {table: "autocorrectFeedback", row: 0, field: "textColor"});
     }
 }
@@ -722,7 +729,7 @@ function assertKeySemantic(value, table, row) {
 
 /** @param {number} value @param {string} table @param {number} row */
 function assertAutocorrectSemantic(value, table, row) {
-    if (value !== RGB_DOMAIN_V1.SELECTOR_ALL && value > RGB_AUTOCORRECT_SEMANTICS.AUTOCORRECT_FEEDBACK_GROUP_UNDO) throw rgbError("INVALID_SELECTOR", `${table}[${row}] semantic ${value} is unknown.`, {table, row, field: "semantic"});
+    if (value !== RGB_DOMAIN_V1.SELECTOR_ALL && value > RGB_AUTOCORRECT_SEMANTICS.AUTOCORRECT_FEEDBACK_GROUP_LEADING) throw rgbError("INVALID_SELECTOR", `${table}[${row}] semantic ${value} is unknown.`, {table, row, field: "semantic"});
     return value;
 }
 

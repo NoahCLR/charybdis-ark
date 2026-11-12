@@ -187,9 +187,10 @@ Pick a layer and the board shows what the keyboard will light. Lighting is
 built from seven stages, from the background effect at the bottom to
 replacement feedback at the top. Behaviour feedback lights tap counts and
 holds in their own colours, and replacement feedback flashes when text
-replacement changes what you typed. Any stage above the background can be switched off
+replacement changes what you typed and holds a colour while the Leader key
+waits. Any stage above the background can be switched off
 without losing its colours, and accents light chosen LEDs in their own colour
-while a layer, pointing mode, combo, behaviour feedback or replacement flash shows.
+while a layer, pointing mode, combo, behaviour feedback or replacement case shows.
 
 <p align="center">
   <picture>

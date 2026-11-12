@@ -251,7 +251,7 @@ test("replacement feedback reads by its cases as its tab lists them, a case off 
     const {VOCABULARY: V} = require("../../core/model/vocabulary");
     const base=pdDocument(), before=snapshot(base);
     const after=snapshot(lighting(base,rgb=>({...rgb,
-        autocorrectFeedback:{textColor:{h:106,s:255,v:200},macroColor:{h:234,s:255,v:0},undoColor:{h:0,s:255,v:200},locality:3}})));
+        autocorrectFeedback:{textColor:{h:106,s:255,v:200},macroColor:{h:234,s:255,v:0},undoColor:{h:0,s:255,v:200},leadingColor:{h:170,s:255,v:200},locality:3}})));
     const item=profileReview(before,after).find(entry=>entry.unit==="rgb:autocorrect");
     assert.equal(item.title,"Replacement feedback");
     assert.equal(item.area,"Lighting");
@@ -260,7 +260,8 @@ test("replacement feedback reads by its cases as its tab lists them, a case off 
         ["Replaced with text","off","HSV(106, 255, 200)"],
         ["Replaced by a macro","off","black"],
         ["Replacement undone","off","HSV(0, 255, 200)"],
-        [V.lightingFields.locality,"Both halves","The half holding the trigger key"]],"each case, then where the flash paints");
+        ["Leader waiting","off","HSV(170, 255, 200)"],
+        [V.lightingFields.locality,"Both halves","The half holding the trigger key"]],"each case, then where they paint");
     assert.deepEqual(item.fields[0].afterColour,{h:106,s:255,v:200},"a colour travels as a colour");
     // Any hue with no saturation or brightness paints nothing: the case is off.
     const dark=snapshot(lighting(after.document,rgb=>({...rgb,autocorrectFeedback:{...rgb.autocorrectFeedback,textColor:{h:40,s:0,v:0}}})));
@@ -278,8 +279,8 @@ test("a replacement feedback accent reads by the case it lights for, or every re
             {semantic:1,color:{h:0,s:0,v:0},groupId:rgb.groups.length},{semantic:2,color:{h:0,s:0,v:0},groupId:rgb.groups.length}]})));
     const accents=profileReview(before,after).find(entry=>entry.unit==="rgb:groups");
     assert.deepEqual(accents.fields.map(field=>[field.label,field.after]),[
-        ["Accent · Every replacement flash","LEDs 7, 8 · Same as the flash colour"],["Accent · Replaced with text","LEDs 7, 8 · HSV(10, 255, 200)"],
-        ["Accent · Replaced by a macro","LEDs 7, 8 · Same as the flash colour"],["Accent · Replacement undone","LEDs 7, 8 · Same as the flash colour"]]);
+        ["Accent · Every case","LEDs 7, 8 · Same as the case's colour"],["Accent · Replaced with text","LEDs 7, 8 · HSV(10, 255, 200)"],
+        ["Accent · Replaced by a macro","LEDs 7, 8 · Same as the case's colour"],["Accent · Replacement undone","LEDs 7, 8 · Same as the case's colour"]]);
     assert.ok(accents.fields.every(field=>field.status==="added"));
     assert.deepEqual(accents.place,{kind:"lighting",stage:"accents"});
 });

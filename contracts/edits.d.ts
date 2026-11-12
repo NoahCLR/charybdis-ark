@@ -51,14 +51,15 @@ export interface KeyFeedback<C = Hsv> {
 }
 export type FeedbackColourField = 'tapCommittedColor' | 'holdActiveColor' | 'longHoldActiveColor';
 export type FeedbackRow = FeedbackColourField | `branch:${number}`;
-/** Replacement feedback (D-L89, firmware D-F70): the colour the keyboard flashes for an input replaced with text, one replaced by its macro and a replacement undone, and where the flash paints. HSV(0, 0, 0) switches its case off. */
+/** Replacement feedback (D-L89, D-L92, firmware D-F70, D-F72): the colour the keyboard flashes for an input replaced with text, one replaced by its macro and a replacement undone, the colour it holds while the leader waits, and where they paint. HSV(0, 0, 0) switches its case off. */
 export interface AutocorrectFeedback<C = Hsv> {
     textColor: C;
     macroColor: C;
     undoColor: C;
+    leadingColor: C;
     locality?: string;
 }
-export type AutocorrectFeedbackColourField = 'textColor' | 'macroColor' | 'undoColor';
+export type AutocorrectFeedbackColourField = 'textColor' | 'macroColor' | 'undoColor' | 'leadingColor';
 export interface PdTap {keycode: Scalar; modifierPolicy: number; mask: number}
 export type Direction = 'left' | 'right' | 'up' | 'down';
 export type Diagonal = 'upLeft' | 'upRight' | 'downLeft' | 'downRight';

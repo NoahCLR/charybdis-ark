@@ -67,14 +67,14 @@ test("representative RGB payload and whole-profile blob match the shared C/JavaS
     assert.equal(payload.toString("hex"), golden.payloadHex);
     assert.deepEqual(decodeRgbDomainV1(payload, golden.codecOptions), golden.profile);
 
-    const blob = encodeProfileBlob({schema: {major: 4, minor: 6}, domains: [createRgbDomainV1(golden.profile, golden.codecOptions)]});
+    const blob = encodeProfileBlob({schema: {major: 4, minor: 7}, domains: [createRgbDomainV1(golden.profile, golden.codecOptions)]});
     assert.equal(blob.toString("hex"), golden.blobHex);
     assert.equal(fnv1a32(blob), Number.parseInt(golden.fnv1a32, 16));
     assert.equal(crc32(blob), Number.parseInt(golden.crc32, 16));
     const decoded = decodeProfileBlob(blob);
     assert.equal(decoded.domains.length, 1);
     assert.equal(decoded.domains[0].id, PROFILE_DOMAIN_IDS.RGB);
-    assert.equal(decoded.domains[0].version, 5);
+    assert.equal(decoded.domains[0].version, 6);
     assert.deepEqual(decodeRgbDomainV1(decoded.domains[0].payload, golden.codecOptions), golden.profile);
 });
 
@@ -191,7 +191,7 @@ test("complete RGB surfaces and negotiated feature inclusion are enforced", () =
         locality: 0,
     };
     layerOnly.keyGroupRows = [];
-    layerOnly.autocorrectFeedback = {textColor: {h: 0, s: 0, v: 0}, macroColor: {h: 0, s: 0, v: 0}, undoColor: {h: 0, s: 0, v: 0}, locality: 0};
+    layerOnly.autocorrectFeedback = {textColor: {h: 0, s: 0, v: 0}, macroColor: {h: 0, s: 0, v: 0}, undoColor: {h: 0, s: 0, v: 0}, leadingColor: {h: 0, s: 0, v: 0}, locality: 0};
     layerOnly.autocorrectGroupRows = [];
     const layerOptions = {...golden.codecOptions, compiledStageMask: RGB_STAGE_BITS.LAYER};
     assert.deepEqual(decodeRgbDomainV1(encodeRgbDomainV1(layerOnly, layerOptions), layerOptions), layerOnly);

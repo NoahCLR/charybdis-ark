@@ -10,7 +10,7 @@ const {candidateMetadataForBlob, buildCandidateBeginRequest} = require("../../co
 const {buildSnapshotModel} = require("../../core/session/device-model");
 function fixture() {
     const value = document(), snapshot = {document: value, fingerprint: fingerprint(value), summary: summary(value)};
-    const caps = {protocol: {major: 2, minor: 1}, schema: {major: 4, minor: 6}, compiledLayerCount: 16, supportedDomainMask: 255, actionAbiDigest: value.actionAbiDigest};
+    const caps = {protocol: {major: 2, minor: 1}, schema: {major: 4, minor: 7}, compiledLayerCount: 16, supportedDomainMask: 255, actionAbiDigest: value.actionAbiDigest};
     const draft = new ProfileDraftSession(snapshot, "board", caps);
     const stage = message => draft.stage({...message, draftRevision: draft.revision});
     return {draft, stage, caps};
@@ -19,7 +19,7 @@ test("the six factory modes stay data, with 32 RGB rows and the remaining slots 
     const value = validateSnapshot(document());
     assert.equal(value.document.version, 5);
     assert.deepEqual(value.pdModes.map(mode => mode.name), ["Dragscroll", "Volume", "Brightness", "Zoom", "Arrow", "Pinch", ...Array(26).fill("")]);
-    assert.equal(value.rgb.formatVersion, 5); assert.equal(value.rgb.pdModeColors.length, 32);
+    assert.equal(value.rgb.formatVersion, 6); assert.equal(value.rgb.pdModeColors.length, 32);
     // Arrow keeps its masked arrows and no mouse button overrides: version 4
     // retired them (firmware D-F22).
     assert.equal(value.pdModes[4].directions.up.mask, 0x44);
@@ -81,10 +81,10 @@ test("keycode-picker modifier expressions are accepted as directional actions", 
     assert.equal(mode.directions.up.keycode, 0x081d);
     assert.equal(mode.directions.down.keycode, 0x081c);
 });
-test("logical Apply declares schema 4.6, all eight domains and storage format six", () => {
+test("logical Apply declares schema 4.7, all eight domains and storage format six", () => {
     const value = validateSnapshot(document());
     const metadata = candidateMetadataForBlob(value.profile, {actionAbiDigest: value.document.actionAbiDigest});
-    assert.equal(metadata.schemaMajor, 4); assert.equal(metadata.schemaMinor, 6); assert.equal(metadata.requestedDomains, 255); assert.equal(metadata.storeFormatVersion, 6);
+    assert.equal(metadata.schemaMajor, 4); assert.equal(metadata.schemaMinor, 7); assert.equal(metadata.requestedDomains, 255); assert.equal(metadata.storeFormatVersion, 6);
     const frame = buildCandidateBeginRequest(1, metadata);
     // Profile Wire 2 implies the store format: BEGIN carries a 32-bit length.
     assert.equal(frame.readUInt32LE(8), value.profile.length); assert.equal(frame.readUInt32LE(24), 0); assert.equal(frame.readUInt32LE(28), 0);

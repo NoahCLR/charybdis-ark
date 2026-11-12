@@ -1,6 +1,6 @@
 {
   "profile": {
-    "formatVersion": 5,
+    "formatVersion": 6,
     "stageEnableMask": 31,
     "groups": [
       {"id": 0, "leds": []},
@@ -54,6 +54,7 @@
       "textColor": {"h": 0, "s": 0, "v": 0},
       "macroColor": {"h": 0, "s": 0, "v": 0},
       "undoColor": {"h": 0, "s": 0, "v": 0},
+      "leadingColor": {"h": 0, "s": 0, "v": 0},
       "locality": 0
     },
     "autocorrectGroupRows": []

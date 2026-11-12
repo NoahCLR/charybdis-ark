@@ -111,7 +111,7 @@ function placeAccent(rgb, group, color, index) {
         const semantic = enumValue(group.owner, RGB_KEY_SEMANTICS, "behaviour state");
         rgb.keyGroupRows.splice(index, 0, {color, groupId: groupFor(rgb, leds), semantic});
     } else if (group.target === "autocorrect") {
-        const semantic = enumValue(group.owner, RGB_AUTOCORRECT_SEMANTICS, "replacement flash");
+        const semantic = enumValue(group.owner, RGB_AUTOCORRECT_SEMANTICS, "replacement case");
         rgb.autocorrectGroupRows.splice(index, 0, {color, groupId: groupFor(rgb, leds), semantic});
     } else if (group.target === "combo") rgb.comboGroupRows.splice(index, 0, {color, groupId: groupFor(rgb, leds)});
     else throw invalid("Unknown accent table.");
@@ -257,12 +257,12 @@ function editLighting(rgb, message, maximumBrightness) {
             const feedback = message.config;
             rgb.keyFeedback = {tapBranchColors: feedback.tapBranchColors.map(editColor), tapCommittedColor: editColor(feedback.tapCommittedColor), holdActiveColor: editColor(feedback.holdActiveColor), longHoldActiveColor: editColor(feedback.longHoldActiveColor), tapCommitMode: enumValue(feedback.tapCommitMode, RGB_TAP_COMMIT_MODES, "tap policy"), locality: enumValue(feedback.locality, RGB_LOCALITIES, "locality")}; break;
         }
-        // The three colours of replacement feedback and where its flash
-        // paints, stored as one record like behaviour feedback's. A colour of
-        // HSV(0, 0, 0) switches its case off (firmware D-F70).
+        // The four colours of replacement feedback and where they paint,
+        // stored as one record like behaviour feedback's. A colour of
+        // HSV(0, 0, 0) switches its case off (firmware D-F70, D-F72).
         case "updateAutocorrectFeedback": {
             const feedback = message.config;
-            rgb.autocorrectFeedback = {textColor: editColor(feedback.textColor), macroColor: editColor(feedback.macroColor), undoColor: editColor(feedback.undoColor), locality: enumValue(feedback.locality, RGB_LOCALITIES, "locality")}; break;
+            rgb.autocorrectFeedback = {textColor: editColor(feedback.textColor), macroColor: editColor(feedback.macroColor), undoColor: editColor(feedback.undoColor), leadingColor: editColor(feedback.leadingColor), locality: enumValue(feedback.locality, RGB_LOCALITIES, "locality")}; break;
         }
         case "updateRgbStages": rgb.stageEnableMask = integer(message.stageEnableMask, RGB_STAGE_MASK_ALL, "RGB stage mask"); break;
         // An accent is added at its table's end, changed where it stands

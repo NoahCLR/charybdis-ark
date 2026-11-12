@@ -55,11 +55,11 @@ test("an accent lights some LEDs, and every accent edit drops the groups no acce
     for (const row of accents(rgb(removed))) assert.ok(rgb(removed).groups.some(group => group.id === row.groupId), "every accent still names a group");
 });
 
-test("replacement feedback saves its three colours and its locality as one record, a case off included", () => {
+test("replacement feedback saves its four colours and its locality as one record, a case off included", () => {
     const before = rgb(base);
-    const config = {textColor: {h: 1, s: 2, v: 3}, macroColor: {h: 0, s: 0, v: 0}, undoColor: {h: "7", s: "8", v: "9"}, locality: "RGB_KEYS_ONLY"};
+    const config = {textColor: {h: 1, s: 2, v: 3}, macroColor: {h: 0, s: 0, v: 0}, undoColor: {h: "7", s: "8", v: "9"}, leadingColor: {h: "170", s: "255", v: "100"}, locality: "RGB_KEYS_ONLY"};
     const edited = edit(base, {type: "updateAutocorrectFeedback", config});
-    assert.deepEqual(rgb(edited).autocorrectFeedback, {textColor: {h: 1, s: 2, v: 3}, macroColor: {h: 0, s: 0, v: 0}, undoColor: {h: 7, s: 8, v: 9}, locality: 4});
+    assert.deepEqual(rgb(edited).autocorrectFeedback, {textColor: {h: 1, s: 2, v: 3}, macroColor: {h: 0, s: 0, v: 0}, undoColor: {h: 7, s: 8, v: 9}, leadingColor: {h: 170, s: 255, v: 100}, locality: 4});
     assert.deepEqual({...rgb(edited), autocorrectFeedback: before.autocorrectFeedback}, before, "nothing else in lighting moves");
     assert.deepEqual(payloads(edited).filter(domain => domain.id !== 0x10), payloads(base).filter(domain => domain.id !== 0x10));
     assert.throws(() => edit(base, {type: "updateAutocorrectFeedback", config: {...config, locality: "RGB_NOWHERE"}}), /Unknown locality/);
@@ -98,7 +98,7 @@ test("a replacement feedback accent is added for one case or all, changed where 
     assert.deepEqual(rgb(edit(base, {type: "deleteRgbLedGroup", target: "autocorrect", index: 0})).autocorrectGroupRows, []);
     assert.deepEqual(rgb(added).keyGroupRows.map(key => key.semantic), rgb(base).keyGroupRows.map(key => key.semantic), "other tables keep their accents");
     // A behaviour state is no replacement case, nor the other way round.
-    assert.throws(() => edit(base, {type: "addRgbLedGroup", group: {target: "autocorrect", owner: "KEY_FEEDBACK_GROUP_ALL", ledIndices: [1], h: 0, s: 0, v: 0}}), /Unknown replacement flash/);
+    assert.throws(() => edit(base, {type: "addRgbLedGroup", group: {target: "autocorrect", owner: "KEY_FEEDBACK_GROUP_ALL", ledIndices: [1], h: 0, s: 0, v: 0}}), /Unknown replacement case/);
     assert.throws(() => edit(base, {type: "addRgbLedGroup", group: {target: "keyBehavior", owner: "AUTOCORRECT_FEEDBACK_GROUP_ALL", ledIndices: [1], h: 0, s: 0, v: 0}}), /Unknown behaviour state/);
     assert.throws(() => edit(base, {type: "addRgbLedGroup", group: {target: "autocorrect", owner: "AUTOCORRECT_FEEDBACK_GROUP_TEXT", ledIndices: [], h: 0, s: 0, v: 0}}), /Pick LEDs/);
     assert.throws(() => edit(base, {type: "deleteRgbLedGroup", target: "autocorrect", index: 1}), /Accent/);

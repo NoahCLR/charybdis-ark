@@ -176,11 +176,12 @@ export interface RgbKeyFeedback {
     tapCommitMode: number;
     locality: number;
 }
-/** Replacement feedback (firmware D-F70): a colour for an input replaced with text, one replaced by its macro and a replacement undone, each painting nothing with saturation and value 0, and where the flash paints. */
+/** Replacement feedback (firmware D-F70, D-F72): a colour for an input replaced with text, one replaced by its macro, a replacement undone and the leader waiting, each painting nothing with saturation and value 0, and where the flash paints. */
 export interface RgbAutocorrectFeedback {
     textColor: Hsv;
     macroColor: Hsv;
     undoColor: Hsv;
+    leadingColor: Hsv;
     locality: number;
 }
 export interface RgbProfile {

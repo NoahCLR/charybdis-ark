@@ -43,7 +43,8 @@ export function stageEnabled(model, id) {
 // turned on by hand shows its own lighting. Combo feedback lights a combo being
 // held, and behaviour feedback a behaviour firing, so neither paints while the master
 // switch of what it lights is off; replacement feedback flashes for a
-// replacement, and there is none while Text replacement is off. The stored
+// replacement, and there is none while Text replacement is off, unless the
+// list holds a leader input: the leader still waits and sends then. The stored
 // switch is left as it is, so turning that setting back on restores it.
 // Without settings readback nothing is claimed.
 /** @param {Model} model */
@@ -204,18 +205,19 @@ export const mappedKeyCount = (model, layer) => (layer?.positions || []).filter(
 // The firmware's rules for "no colour" (rules/led-light.mjs).
 export {inheritsStageColour, layerPaints, replacementPaints};
 
-// The key a replacement flash's preview follows (D-L89). On the keyboard it
-// is the key that ended the word, or the Backspace that undid the
-// replacement; the board cannot know which key will, so one key stands in:
-// the first that sends Space, or Backspace for an undo, on the viewed layer
-// first, then from layer 0 up. With none, the flash paints as the keyboard
-// paints one whose key it does not know: both halves, or every key.
-/** @param {Model} model @param {Layer} layer @param {boolean} undo @returns {{layoutIndex: number, layer: number} | null} */
-export function replacementTrigger(model, layer, undo) {
+// The key a replacement case's preview follows (D-L89, D-L92). On the
+// keyboard it is the key that ended the word, the Backspace that undid the
+// replacement, or for Leader waiting the Leader key that began it; the board
+// cannot know which key will, so one key stands in: the first that sends
+// `keycode` (KC_SPACE, KC_BACKSPACE or QK_LEADER), on the viewed layer first,
+// then from layer 0 up. With none, the case paints as the keyboard paints one
+// whose key it does not know: both halves, or every key.
+/** @param {Model} model @param {Layer} layer @param {string} keycode @returns {{layoutIndex: number, layer: number} | null} */
+export function replacementTrigger(model, layer, keycode) {
     const stack = model?.layers || [];
     const order = [layer, ...stack.filter((row) => row !== layer)].filter(Boolean);
     for (const row of order) {
-        const found = (row?.positions || []).find((position) => sameKey(model, keyMeaning(position), undo ? "KC_BACKSPACE" : "KC_SPACE"));
+        const found = (row?.positions || []).find((position) => sameKey(model, keyMeaning(position), keycode));
         if (found) return {layoutIndex: found.layoutIndex, layer: /** @type {number} */ (row?.index)};
     }
     return null;

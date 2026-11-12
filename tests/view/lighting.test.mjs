@@ -126,13 +126,14 @@ test("replacement feedback is in effect only while Text replacement is on", () =
     const stored = {...off, rgb: {...off.rgb, stages: off.rgb.stages.map((row) => row.id === "autocorrect" ? {...row, enabled: false} : row)}};
     assert.equal(stageIdle(stored, "autocorrect"), null, "a stage switched off is off, not idle");
     // With a leader input on the list the leader still sends, switch off or
-    // not, and its sends flash (D-L91): the banner stays, the tab is live.
+    // not, its sends flash (D-L91) and Leader waiting lights (D-L92): the
+    // banner stays, the tab is live.
     const leads = {...off, autocorrect: {entries: [], usage: {leaders: 1}}};
     assert.equal(stageHeldOffBy(leads, "autocorrect"), "autocorrect");
     assert.equal(stageIdle(leads, "autocorrect"), null);
     assert.equal(stageInEffect(leads, "autocorrect"), true);
     // Its banner then says what still flashes, colours and all.
-    assert.equal(stageOffDetail(leads, "autocorrect"), "Words you finish never flash; what the Leader key sends still flashes, in the text or macro colour.");
+    assert.equal(stageOffDetail(leads, "autocorrect"), "Words you finish never flash; Leader waiting still lights, and what the Leader key sends still flashes, in the text or macro colour.");
     assert.equal(stageOffDetail(off, "autocorrect"), "This stage paints nothing.");
     const unread = withSwitch(true); delete unread.configDefaults;
     assert.equal(stageInEffect(unread, "autocorrect"), true, "without settings readback nothing is claimed");
@@ -380,8 +381,8 @@ test("Turn off says what black does: literal black for modes and feedback, nothi
 
 test("Turn off switches a replacement case off: it does not flash, and off keeps its own words", () => {
     const {offTip, offNote, offAction, offWord} = offWording(words, "autocorrect");
-    assert.match(offTip, /does not flash for this case/);
-    assert.match(offNote, /This case is off.*other two cases still flash/);
+    assert.match(offTip, /does not light for this case/);
+    assert.match(offNote, /This case is off.*other cases still light/);
     for (const text of [offTip, offNote]) assert.doesNotMatch(text, /black|Stage on/, "off here is no black flash, and needs no stage switch");
     assert.deepEqual([offAction, offWord], [undefined, undefined], "the colour editor's Turn off and Off");
 });
@@ -441,15 +442,16 @@ test("a replacement flash's accents light for every case and then for its own; a
     assert.deepEqual(keyLight(base, layer, position(13, "KC_A"), dark).colour, narrower, "an accent in a colour of its own still lights");
 });
 
-test("a replacement flash previews from the first key that sends Space, or Backspace for an undo", () => {
-    const base = {index: 0, positions: [position(0, "KC_A"), position(49, "KC_SPC"), position(54, "KC_BSPC"), position(55, "KC_BACKSPACE")]};
+test("a replacement case previews from the first key that sends Space, Backspace for an undo, or Leader for Leader waiting", () => {
+    const base = {index: 0, positions: [position(0, "KC_A"), position(49, "KC_SPC"), position(54, "KC_BSPC"), position(55, "KC_BACKSPACE"), position(30, "QK_LEAD")]};
     const other = {index: 3, positions: [position(49, "KC_TRANSPARENT"), position(5, "KC_SPACE")]};
     const m = {...publishedModel(), layers: [base, other]};
-    assert.deepEqual(replacementTrigger(m, base, false), {layoutIndex: 49, layer: 0}, "Space, under any of its names");
-    assert.deepEqual(replacementTrigger(m, base, true), {layoutIndex: 54, layer: 0}, "Backspace for an undo");
-    assert.deepEqual(replacementTrigger(m, other, false), {layoutIndex: 5, layer: 3}, "the viewed layer's key first");
-    assert.deepEqual(replacementTrigger(m, other, true), {layoutIndex: 54, layer: 0}, "else from layer 0 up");
-    assert.equal(replacementTrigger({...m, layers: [other]}, other, true), null, "no key stands in where none sends it");
+    assert.deepEqual(replacementTrigger(m, base, "KC_SPACE"), {layoutIndex: 49, layer: 0}, "Space, under any of its names");
+    assert.deepEqual(replacementTrigger(m, base, "KC_BACKSPACE"), {layoutIndex: 54, layer: 0}, "Backspace for an undo");
+    assert.deepEqual(replacementTrigger(m, base, "QK_LEADER"), {layoutIndex: 30, layer: 0}, "the Leader key for Leader waiting, under any of its names");
+    assert.deepEqual(replacementTrigger(m, other, "KC_SPACE"), {layoutIndex: 5, layer: 3}, "the viewed layer's key first");
+    assert.deepEqual(replacementTrigger(m, other, "KC_BACKSPACE"), {layoutIndex: 54, layer: 0}, "else from layer 0 up");
+    assert.equal(replacementTrigger({...m, layers: [other]}, other, "KC_BACKSPACE"), null, "no key stands in where none sends it");
 });
 
 test("a key's LED and the trackball's are the ones core publishes", () => {
@@ -483,4 +485,40 @@ test("a combo held lights its feedback where its locality reaches against its he
     assert.deepEqual(keyLight(base, layer, position(0, "KC_ESC"), options).colour, colour(20, 255, 200), "a combo accent paints its LEDs");
     const off = {...base, rgb: {...base.rgb, stages: base.rgb.stages.map((stage) => stage.id === "combo" ? {...stage, enabled: false} : stage)}};
     assert.notEqual(keyLight(off, layer, position(7, "KC_U"), options).source, "combo", "with the stage off nothing of it paints");
+});
+
+// Leader waiting's key is the Leader key that began it (firmware D-F72): the
+// localities that follow a key paint its half, or it alone; with no Leader
+// key to stand in they paint every key, and the trackball, as a flash whose
+// key is unknown.
+test("Leader waiting paints the Leader key's half or the key alone, every key of the halves its locality names without one, with its own accents and those for every case", () => {
+    const blue = colour(170, 255, 200), own = colour(20, 255, 200), every = colour(60, 255, 200);
+    const base = model();
+    base.rgb = {...base.rgb, stages: [...base.rgb.stages.map((stage) => ({...stage, enabled: true})), {id: "autocorrect", label: "Replacement feedback", bit: 32, enabled: true}],
+        // LED 6 is key 13, LED 9 is key 14, LED 0 is key 0.
+        autocorrectFeedbackAccents: [{owner: "AUTOCORRECT_FEEDBACK_GROUP_LEADING", color: own, ledIndices: [6]}, {owner: "AUTOCORRECT_FEEDBACK_GROUP_ALL", color: every, ledIndices: [9]},
+            {owner: "AUTOCORRECT_FEEDBACK_GROUP_TEXT", color: colour(90, 255, 200), ledIndices: [0]}]};
+    const layer = {index: 4};
+    const leading = (locality, color = blue, triggerIndex = undefined) => ({replacementActive: {owner: "AUTOCORRECT_FEEDBACK_GROUP_LEADING", color, locality, triggerIndex}});
+    // From the Leader key at 13, on the left half: its half, or it alone.
+    assert.equal(keyLight(base, layer, position(13, "KC_A"), leading("RGB_KEY_HALF", blue, 13)).source, "replacement", "the Leader key's half");
+    assert.notEqual(keyLight(base, layer, position(7, "KC_U"), leading("RGB_KEY_HALF", blue, 13)).source, "replacement", "not the other half");
+    assert.notEqual(trackballLight(base, layer, leading("RGB_KEY_HALF", blue, 13)).source, "replacement", "nor the trackball, on the right half");
+    assert.equal(keyLight(base, layer, position(13, "KC_A"), leading("RGB_KEYS_ONLY", blue, 13)).source, "replacement", "the Leader key alone");
+    assert.notEqual(keyLight(base, layer, position(7, "KC_U"), leading("RGB_KEYS_ONLY", blue, 13)).source, "replacement", "no other key");
+    // With none standing in, every key of the halves its locality names.
+    for (const locality of ["RGB_BOTH_HALVES", "RGB_KEY_HALF", "RGB_KEYS_ONLY"]) {
+        for (const index of [7, 49, 50]) assert.deepEqual(keyLight(base, layer, position(index, "KC_A"), leading(locality)), {colour: blue, source: "replacement", layer: null}, `${locality} at ${index}`);
+        assert.equal(trackballLight(base, layer, leading(locality)).source, "replacement", `${locality} on the trackball`);
+    }
+    assert.equal(keyLight(base, layer, position(13, "KC_A"), leading("RGB_LEFT_HALF")).source, "replacement");
+    assert.notEqual(keyLight(base, layer, position(7, "KC_U"), leading("RGB_LEFT_HALF")).source, "replacement", "one half under a half's locality");
+    // Its accents and those for every case light; another case's do not.
+    assert.deepEqual(keyLight(base, layer, position(13, "KC_A"), leading("RGB_KEY_HALF")).colour, own, "an accent for Leader waiting");
+    assert.deepEqual(keyLight(base, layer, position(14, "KC_B"), leading("RGB_KEY_HALF")).colour, every, "an accent for every case");
+    assert.deepEqual(keyLight(base, layer, position(0, "KC_ESC"), leading("RGB_KEY_HALF")).colour, blue, "a text accent does not light while the leader waits");
+    // Off, it paints nothing but its accents in a colour of their own.
+    const dark = leading("RGB_BOTH_HALVES", colour(0, 0, 0));
+    assert.notEqual(keyLight(base, layer, position(7, "KC_U"), dark).source, "replacement");
+    assert.deepEqual(keyLight(base, layer, position(13, "KC_A"), dark).colour, own);
 });
