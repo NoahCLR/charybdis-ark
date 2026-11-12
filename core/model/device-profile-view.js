@@ -153,12 +153,13 @@ function rgbForView(domain) {
             locality: enumName(RGB_LOCALITIES, domain.keyFeedback.locality),
         },
         keyFeedbackAccents: groupRows(domain.keyGroupRows, (row) => enumName(RGB_KEY_SEMANTICS, row.semantic)),
-        // Replacement feedback (firmware D-F70): a colour for each case, one
+        // Replacement feedback (firmware D-F70, D-F72): a colour for each case, one
         // of saturation and value 0 painting nothing for its own.
         autocorrectFeedback: {
             textColor: colorForView(domain.autocorrectFeedback.textColor),
             macroColor: colorForView(domain.autocorrectFeedback.macroColor),
             undoColor: colorForView(domain.autocorrectFeedback.undoColor),
+            leadingColor: colorForView(domain.autocorrectFeedback.leadingColor),
             locality: enumName(RGB_LOCALITIES, domain.autocorrectFeedback.locality),
         },
         autocorrectFeedbackAccents: groupRows(domain.autocorrectGroupRows, (row) => enumName(RGB_AUTOCORRECT_SEMANTICS, row.semantic)),

@@ -501,8 +501,8 @@ test("behaviour feedback posts the whole record with one colour or policy replac
 test("replacement feedback posts the whole record with one case's colour or the locality replaced, and off as HSV(0, 0, 0)", () => {
     const draft = session();
     const feedback = () => buildSnapshotModel(draft.current, draft.capabilities, {editable: true, reason: ""}).rgb.autocorrectFeedback;
-    assert.deepEqual(edits.autocorrectFeedback({textColor: {h: "1", s: "2", v: "3"}, macroColor: {h: "4", s: "5", v: "6"}, undoColor: {h: "7", s: "8", v: "9"}, locality: "RGB_KEY_HALF"}, "macroColor", {h: 0, s: 0, v: 0}),
-        {type: "updateAutocorrectFeedback", config: {textColor: {h: 1, s: 2, v: 3}, macroColor: {h: 0, s: 0, v: 0}, undoColor: {h: 7, s: 8, v: 9}, locality: "RGB_KEY_HALF"}});
+    assert.deepEqual(edits.autocorrectFeedback({textColor: {h: "1", s: "2", v: "3"}, macroColor: {h: "4", s: "5", v: "6"}, undoColor: {h: "7", s: "8", v: "9"}, leadingColor: {h: "10", s: "11", v: "12"}, locality: "RGB_KEY_HALF"}, "macroColor", {h: 0, s: 0, v: 0}),
+        {type: "updateAutocorrectFeedback", config: {textColor: {h: 1, s: 2, v: 3}, macroColor: {h: 0, s: 0, v: 0}, undoColor: {h: 7, s: 8, v: 9}, leadingColor: {h: 10, s: 11, v: 12}, locality: "RGB_KEY_HALF"}});
     stage(draft, edits.autocorrectFeedback(feedback(), "textColor", {h: 99, s: 255, v: 150}));
     stage(draft, edits.autocorrectFeedback(feedback(), "undoColor", {h: 0, s: 0, v: 0}));
     assert.deepEqual(decoded(draft).rgb.autocorrectFeedback.textColor, {h: 99, s: 255, v: 150});

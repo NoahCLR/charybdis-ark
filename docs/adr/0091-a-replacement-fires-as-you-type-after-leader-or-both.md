@@ -89,7 +89,9 @@ authored lines, `leader pn -> text` and `both :adn: -> and`.
 What the leader sends flashes as the replacement it is, in the text or macro
 colour (firmware D-F71: the leader shares text replacement's confirmation).
 The Replacement feedback tab says so in its notes: for a send the trigger key
-is the key that ended leading, and the wait names none. The leader works with
+is the key that ended leading, and the wait names none (amended by D-L92:
+what the wait sends flashes on the Leader key, and Leader waiting is a case
+of its own on the tab). The leader works with
 Text replacement off, so while the switch is off and a replacement fires
 after Leader the tab does not read off (`stageIdle`, `listLeads`), and the
 switch's banner there and on the Text replacement screen says that words are

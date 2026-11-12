@@ -323,12 +323,12 @@ function lightingRecords(value) {
             [word(V.feedbackOwners, V.feedbackColourOwners[field]), colour(k[field])]),
         ...k.tapBranchColors.map(/** @returns {[string, Field]} */ (value, i) => [V.branches[i + 1] || `${i + 2} taps`, colour(value)]),
         [F.tapBranchCommit, nameIn(V.tapCommit, rgbEnums.RGB_TAP_COMMIT_MODES, k.tapCommitMode)], [F.locality, nameIn(V.localities, rgbEnums.RGB_LOCALITIES, k.locality)]]);
-    // Replacement feedback's three cases as its tab lists them, then where
-    // the flash paints. A colour that paints nothing reads off, as a layer's
-    // reads passthrough; one with brightness alone at zero flashes black.
+    // Replacement feedback's four cases as its tab lists them, then where
+    // they paint. A colour that paints nothing reads off, as a layer's reads
+    // passthrough; one with brightness alone at zero shows black.
     const a = r.autocorrectFeedback;
     record(UNIT.rgb("autocorrect"), "Replacement feedback", "autocorrect", [
-        ...(/** @type {const} */ (["textColor", "macroColor", "undoColor"])).map(/** @returns {[string, Field]} */ (field) =>
+        ...(/** @type {(keyof typeof V.replacementColourOwners)[]} */ (Object.keys(V.replacementColourOwners))).map(/** @returns {[string, Field]} */ (field) =>
             [word(V.replacementOwners, V.replacementColourOwners[field]), replacementPaints(a[field]) ? colour(a[field], "black") : colour(a[field])]),
         [F.locality, nameIn(V.localities, rgbEnums.RGB_LOCALITIES, a.locality)]]);
     // Accents are one record with the groups they light: a row names its

@@ -108,9 +108,10 @@ test("owners and when their accents light read in the vocabulary's words", () =>
     assert.equal(ownerCalled(published, "pdMode", "POINTING_MODE_DRAGSCROLL"), "Dragscroll");
     assert.equal(ownerCalled(published, "keyBehavior", "KEY_FEEDBACK_GROUP_HOLD_ACTIVE"), "Hold active");
     assert.equal(ownerCalled(published, "autocorrect", "AUTOCORRECT_FEEDBACK_GROUP_UNDO"), "Replacement undone");
-    assert.equal(ownerCalled(published, "autocorrect", "AUTOCORRECT_FEEDBACK_GROUP_ALL"), "Every replacement flash");
+    assert.equal(ownerCalled(published, "autocorrect", "AUTOCORRECT_FEEDBACK_GROUP_ALL"), "Every case");
+    assert.equal(ownerCalled(published, "autocorrect", "AUTOCORRECT_FEEDBACK_GROUP_LEADING"), "Leader waiting", "the case the leader holds while it waits (D-L92)");
     assert.equal(said(accentsWhen(published, "autocorrect", "AUTOCORRECT_FEEDBACK_GROUP_TEXT")),
-        "LEDs that light in a colour of their own while the keyboard flashes Replaced with text, with those for every replacement flash: the same LEDs whichever key caused it.");
+        "LEDs that light in a colour of their own while the keyboard shows Replaced with text, with those for every case: the same LEDs whichever key caused it, or none.");
     assert.match(said(accentsWhen(published, "layer", "Layer 2")), /while Symbol is on, with those for every layer\..*lower layer stays lit/);
     assert.match(said(accentsWhen(published, "combo", "")), /same LEDs for every combo/);
     assert.doesNotMatch(said(accentsWhen(published, "keyBehavior", "KEY_FEEDBACK_GROUP_HOLD_ACTIVE")), /\{owner\}/);

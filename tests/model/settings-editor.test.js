@@ -457,6 +457,7 @@ test("each feedback flash has its own length: the behaviour flash interval and t
     assert.deepEqual({macro: flash.macro, id: flash.id, label: flash.label, unit: flash.unit, min: flash.min, max: flash.max, value: flash.value, validate: flash.validate},
         {macro: "replacementFlash", id: 31, label: "Flash length (ms)", unit: "ms", min: 1, max: 65535, value: "200", validate: "positive-int"});
     assert.equal(flash.hint, "How long one flash lasts.");
+    assert.equal(flash.tooltip, "Leader waiting is no flash: it holds for as long as the leader waits (Leader waits, in Host settings → Text replacement).", "Leader waiting holds rather than flashes (D-L92)");
     assert.doesNotMatch(interval.hint, /replacement/i, "the flash interval is the behaviour flash's alone");
     const longer = validateSnapshot(draftEdit(current, message(current, "replacementFeedback", {replacementFlash: "350"}))).settings.values;
     const before = validateSnapshot(current.document).settings.values;

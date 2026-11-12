@@ -96,7 +96,7 @@ test("real device RGB retains every value and reference through the presentation
     assert.equal(view.pdModeAccents[0].owner, "RGB_POINTING_MODE_GROUP_ALL");
     assert.equal(view.keyFeedbackAccents[0].owner, "KEY_FEEDBACK_GROUP_ALL");
     // Replacement feedback as the keyboard's compiled defaults have it.
-    assert.deepEqual(view.autocorrectFeedback, {textColor: {h: "106", s: "255", v: "200"}, macroColor: {h: "234", s: "255", v: "200"}, undoColor: {h: "0", s: "255", v: "200"}, locality: "RGB_KEY_HALF"});
+    assert.deepEqual(view.autocorrectFeedback, {textColor: {h: "106", s: "255", v: "200"}, macroColor: {h: "234", s: "255", v: "200"}, undoColor: {h: "0", s: "255", v: "200"}, leadingColor: {h: "170", s: "255", v: "200"}, locality: "RGB_KEY_HALF"});
     assert.deepEqual(view.autocorrectFeedbackAccents.map(({index, owner, color, leds}) => ({index, owner, color, leds})),
         [{index: 0, owner: "AUTOCORRECT_FEEDBACK_GROUP_ALL", color: {h: "0", s: "0", v: "0"}, leds: "LEDs 24–28, 53–55"}]);
     assert.deepEqual(view.stages.at(-1), {id: "autocorrect", label: "Replacement feedback", bit: 32, enabled: true});

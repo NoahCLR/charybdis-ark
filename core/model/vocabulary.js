@@ -524,8 +524,8 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
             offNote: "The colour is black, so the keyboard flashes black for this state. To flash nothing, switch Stage on off; that turns off every feedback colour.",
         },
         autocorrect: {
-            offTip: "Store HSV(0, 0, 0): the keyboard then does not flash for this case. The other two still flash.",
-            offNote: "This case is off: the keyboard does not flash for it, and its accents that take its colour stay dark. The other two cases still flash.",
+            offTip: "Store HSV(0, 0, 0): the keyboard then does not light for this case. The other cases still do.",
+            offNote: "This case is off: the keyboard does not light for it, and its accents that take its colour stay dark. The other cases still light.",
         },
     },
     feedbackOwners: [
@@ -539,21 +539,32 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     // rows with that tier's dot, as the review does; the other states have
     // none.
     feedbackTiers: {KEY_FEEDBACK_GROUP_TAP_COMMITTED: "tap", KEY_FEEDBACK_GROUP_HOLD_ACTIVE: "hold", KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE: "long"},
-    // What Replacement feedback flashes for (D-L89; the firmware's
-    // replacement-feedback semantics, D-F70): the three cases, an input
+    // What Replacement feedback shows (D-L89, D-L92; the firmware's
+    // replacement-feedback semantics, D-F70, D-F72): the four cases, an input
     // replaced with text, one replaced by its macro and a replacement undone
-    // with Backspace, and all of them, which an accent may light for.
+    // with Backspace, which flash, and the leader waiting, which holds; and
+    // all of them, which an accent may light for.
     replacementOwners: [
-        ["AUTOCORRECT_FEEDBACK_GROUP_ALL", "Every replacement flash"],
+        ["AUTOCORRECT_FEEDBACK_GROUP_ALL", "Every case"],
         ["AUTOCORRECT_FEEDBACK_GROUP_TEXT", "Replaced with text"],
         ["AUTOCORRECT_FEEDBACK_GROUP_MACRO", "Replaced by a macro"],
         ["AUTOCORRECT_FEEDBACK_GROUP_UNDO", "Replacement undone"],
+        ["AUTOCORRECT_FEEDBACK_GROUP_LEADING", "Leader waiting"],
     ],
-    // The case each Replacement feedback colour flashes for, by the colour's
+    // When each case shows (firmware D-F70, D-F72), said under its name on
+    // the tab: the three flashes, and Leader waiting, held from the Leader
+    // key until the leader sends or gives up.
+    replacementWhen: {
+        AUTOCORRECT_FEEDBACK_GROUP_TEXT: "Flashes once as an input is replaced with text, and as the Leader key sends text.",
+        AUTOCORRECT_FEEDBACK_GROUP_MACRO: "Flashes once as an input is erased for its macro, and as the Leader key plays a macro.",
+        AUTOCORRECT_FEEDBACK_GROUP_UNDO: "Flashes once as Backspace, straight after a replacement, puts the word back.",
+        AUTOCORRECT_FEEDBACK_GROUP_LEADING: "Held from the moment you press the Leader key until the leader sends a replacement or gives up. A send's text or macro flash then takes its place; when nothing is sent it just goes. It lasts as long as the leader waits, whatever the Flash length.",
+    },
+    // The case each Replacement feedback colour shows, by the colour's
     // field, in the order the keyboard stores them. The tab lists its
     // colours by it, the review names them by it, and an accent of the case
     // is found by it.
-    replacementColourOwners: {textColor: "AUTOCORRECT_FEEDBACK_GROUP_TEXT", macroColor: "AUTOCORRECT_FEEDBACK_GROUP_MACRO", undoColor: "AUTOCORRECT_FEEDBACK_GROUP_UNDO"},
+    replacementColourOwners: {textColor: "AUTOCORRECT_FEEDBACK_GROUP_TEXT", macroColor: "AUTOCORRECT_FEEDBACK_GROUP_MACRO", undoColor: "AUTOCORRECT_FEEDBACK_GROUP_UNDO", leadingColor: "AUTOCORRECT_FEEDBACK_GROUP_LEADING"},
     // Accents (D-L77), by the table an accent edit names: when they light,
     // with {owner} for the layer, mode, behaviour state or replacement case picked; the owner
     // that is all of a table's, by the name core reads and writes
@@ -570,8 +581,8 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
             every: "Every combo", stageColour: "Same as combo feedback"},
         keyBehavior: {when: "LEDs that light in a colour of their own while a key shows {owner}, with those for every behaviour state: the same LEDs whichever key it is.",
             everyOwner: RGB_EVERY_OWNER.keyBehavior, every: "Every behaviour state", stageColour: "Same as the feedback colour"},
-        autocorrect: {when: "LEDs that light in a colour of their own while the keyboard flashes {owner}, with those for every replacement flash: the same LEDs whichever key caused it.",
-            everyOwner: RGB_EVERY_OWNER.autocorrect, every: "Every replacement flash", stageColour: "Same as the flash colour"},
+        autocorrect: {when: "LEDs that light in a colour of their own while the keyboard shows {owner}, with those for every case: the same LEDs whichever key caused it, or none.",
+            everyOwner: RGB_EVERY_OWNER.autocorrect, every: "Every case", stageColour: "Same as the case's colour"},
     },
     // The accent editor's own fields; its colour field is lightingFields.colour.
     accentFields: {lightsFor: "Lights for", ownColour: "Its own"},
@@ -590,7 +601,7 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
         inUse: "In use",
         tiers: {title: "Tiers", tip: "Flash as a key's tap, hold or long hold fires."},
         tapBranches: {title: "Tap branches", tip: "Flash while a run of taps waits on that tap count, until it resolves."},
-        replacements: {title: "Flashes", tip: "One flash as text replacement changes what was typed, in the colour of what it did."},
+        replacements: {title: "Cases", tip: "One flash as text replacement changes what was typed, in the colour of what it did, and a colour held while the leader waits."},
         comboFeedback: {title: "Combo feedback", empty: "No combo on this view lights combo feedback."},
         holdLayer: {title: "Hold a layer", empty: "No combo on this view holds a layer."},
     },
@@ -793,7 +804,7 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
         autocorrect: {off: "Text replacement is off.", detail: "The keyboard keeps this list and replaces nothing.", fix: `Turn it on in ${SETTINGS_SCREENS.host} →`}}, stage: "This stage paints nothing.",
         // With a leader input on the list the leader still sends, and its
         // sends still flash (firmware D-F71, D-L91).
-        leading: {list: "Words you finish are left as you typed them; the Leader key still sends your leader inputs.", stage: "Words you finish never flash; what the Leader key sends still flashes, in the text or macro colour."}},
+        leading: {list: "Words you finish are left as you typed them; the Leader key still sends your leader inputs.", stage: "Words you finish never flash; Leader waiting still lights, and what the Leader key sends still flashes, in the text or macro colour."}},
     // A behaviour's own switch, as its editor labels it and the review names
     // it, and the fold its timings open from.
     behaviourFields: {anchor: "Keeps the pointer layer on", timings: "Timings"},

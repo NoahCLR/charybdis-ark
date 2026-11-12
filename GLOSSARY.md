@@ -213,6 +213,14 @@ longer one begins with, or drops what is held: settings scalar 32,
 1000 to 10000 ms, on Host under **Text replacement**.
 _Avoid_: leader term, leader window
 
+**Leader waiting**:
+The case of replacement feedback the keyboard shows
+while the leader waits for what is typed after the Leader key (D-L92): a
+colour held, not flashed, until the leader sends or gives up, on every key of
+the halves its locality names, since it follows no key. The firmware calls it
+leading, replacement-feedback semantic `3` (firmware D-F72).
+_Avoid_: leading (in anything a person reads), leader flash, leader state
+
 **`*`** (in an input):
 Where other letters may go. An input is the whole word unless it is
 written with one: `recieve*` the start of a word, `*mnet` the end, `*tihng*`
@@ -303,7 +311,7 @@ _Avoid_: layer stack, overlay view
 **Accent**:
 LEDs that light in a colour of their own, or their stage's, while a layer is
 on, a pointing mode runs, a combo's inputs are held, a key shows a behaviour
-state or the keyboard flashes for a replacement (D-L77). It is added and changed on that stage's tab on Lighting, its
+state, or the keyboard flashes for a replacement or waits after Leader (D-L77). It is added and changed on that stage's tab on Lighting, its
 LEDs picked on the board and named by index ("LEDs 24–28, 53–55"). The
 different sets of LEDs accents light are **LED sets**; Ark keeps them.
 _Avoid_: LED group, LED override, group row, assignment
@@ -331,13 +339,16 @@ feedback (the spelling)
 
 **Replacement feedback**:
 The lighting stage that flashes once as text replacement changes what was
-typed, painted last, and its tab on Lighting (D-L89). It has three **cases**,
-each with a colour of its own: **Replaced with text**, **Replaced by a
-macro** and **Replacement undone** (with Backspace). A case whose colour is
-turned off does not flash; the others still do. Its accents light for one
-case or for **Every replacement flash**. The flash follows the key that
-ended the word, or the Backspace that undid the replacement, and lasts its
-**Flash length**, apart from behaviour feedback's Flash interval. The firmware's
+typed, and holds a colour while the leader waits, painted last, and its tab
+on Lighting (D-L89, D-L92). It has four **cases**, each with a colour of its
+own: **Replaced with text**, **Replaced by a macro** and **Replacement
+undone** (with Backspace), which flash, and **Leader waiting**, held from
+the Leader key until the leader sends or gives up. A case whose colour is
+turned off does not light; the others still do. Its accents light for one
+case or for **Every case**. A flash follows the key that ended the word, or
+the Backspace that undid the replacement, and lasts its **Flash length**,
+apart from behaviour feedback's Flash interval; Leader waiting follows no
+key. The firmware's
 code and Ark's call the stage `autocorrect` feedback
 (`autocorrectFeedback`, the accent table `autocorrect`).
 _Avoid_: autocorrect feedback, autocorrect flash, typo light, correction

@@ -102,3 +102,31 @@ test("a flash that follows no key rings none, a case that is off says so, and a 
     assert.deepEqual([none.replacementActive?.triggerIndex, none.standIn], [undefined, undefined]);
     assert.match(said(none.caption), /painting only the trigger key · no Backspace key to stand in, so it paints as when the keyboard cannot tell the key$/);
 });
+
+// Leader waiting (D-L92, firmware D-F72) follows the Leader key that began
+// it: the first key that sends Leader stands in and is ringed, and with none
+// it paints as the keyboard paints a case whose key it cannot tell.
+test("Leader waiting holds from the Leader key standing in, or as from no key when none sends Leader, and says so", () => {
+    const view = layerView(model, 0, []);
+    const feedback = model.rgb.autocorrectFeedback;
+    assert.deepEqual(feedback.leadingColor, {h: "170", s: "255", v: "200"}, "the compiled blue");
+    const leading = shows(view, {stage: "autocorrect", replacementRow: "leadingColor"});
+    assert.deepEqual(leading.replacementActive, {owner: "AUTOCORRECT_FEEDBACK_GROUP_LEADING", color: feedback.leadingColor, locality: "RGB_KEY_HALF", triggerIndex: undefined});
+    assert.equal(leading.standIn, undefined, "no key is ringed");
+    assert.equal(said(leading.caption), "Base over the background effect · Leader waiting held, painting the half holding the trigger key · no Leader key to stand in, so it paints as when the keyboard cannot tell the key");
+    const placed = publishedModel(profileDocument({keys: {0: {0: "KC_A", 30: "QK_LEADER"}}}));
+    placed.rgb.stages = placed.rgb.stages.map((/** @type {any} */ stage) => ({...stage, enabled: true}));
+    placed.rgb.autocorrectFeedback = {...feedback, locality: "RGB_KEYS_ONLY"};
+    const ringed = lightingBoard(layerView(placed, 0, []), {stage: "autocorrect", pointingSlot: 0, comboPreview: null, replacementRow: "leadingColor"});
+    assert.deepEqual([ringed.replacementActive?.triggerIndex, ringed.standIn], [30, 30]);
+    assert.match(said(ringed.caption), /· Leader waiting held, painting only the trigger key · Leader stands in for the key that began it$/);
+    const withFeedback = (/** @type {object} */ change) => ({...model, rgb: {...model.rgb, autocorrectFeedback: {...feedback, ...change}}});
+    const left = lightingBoard(layerView(withFeedback({locality: "RGB_LEFT_HALF"}), 0, []), {stage: "autocorrect", pointingSlot: 0, comboPreview: null, replacementRow: "leadingColor"});
+    assert.match(said(left.caption), /· Leader waiting held, painting left half$/);
+    const keys = lightingBoard(layerView(withFeedback({locality: "RGB_KEYS_ONLY"}), 0, []), {stage: "autocorrect", pointingSlot: 0, comboPreview: null, replacementRow: "leadingColor"});
+    assert.deepEqual([keys.replacementActive?.triggerIndex, keys.standIn], [undefined, undefined]);
+    assert.match(said(keys.caption), /· Leader waiting held, painting only the trigger key · no Leader key to stand in, so it paints as when the keyboard cannot tell the key$/);
+    const dark = lightingBoard(layerView(withFeedback({leadingColor: {h: "0", s: "0", v: "0"}}), 0, []), {stage: "autocorrect", pointingSlot: 0, comboPreview: null, replacementRow: "leadingColor"});
+    assert.ok(dark.replacementActive, "its accents in a colour of their own still light");
+    assert.match(said(dark.caption), /· Leader waiting is off, so it does not light · no Leader key to stand in/);
+});

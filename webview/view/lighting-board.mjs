@@ -6,7 +6,8 @@
 // pointing mode runs it, from the combo's keys, its combo feedback painting
 // beneath (firmware RGB domain, Drawing). An empty slot never runs. On
 // Replacement feedback it shows the picked case's flash, from the key that
-// stands in for the one that ended the word or undid it (D-L89).
+// stands in for the one that ended the word or undid it (D-L89), or Leader
+// waiting held, from the key that stands in for the Leader key (D-L92).
 
 import {comboHeld, viewWhileHeld} from "./combo-held.mjs";
 import {replacementOwner, replacementRowOf} from "./accents.mjs";
@@ -28,19 +29,20 @@ function modeRunning(model, slot, trigger) {
 }
 
 /**
- * The flash Replacement feedback's board shows: the picked case's, in its
+ * The case Replacement feedback's board shows: the picked case's, in its
  * colour and the stage's locality, from the key standing in for the one that
- * caused it. Null while the stage is off; a case that is off still shows,
- * since its accents in a colour of their own still light.
+ * caused it: Space, Backspace for an undo, and the Leader key for Leader
+ * waiting (firmware D-F72). Null while the stage is off; a case that is off
+ * still shows, since its accents in a colour of their own still light.
  * @param {LayerView} view @param {string | undefined} row
  */
-function replacementFlash(view, row) {
+function replacementCase(view, row) {
     const model = view.model, feedback = model?.rgb?.autocorrectFeedback;
     if (!feedback || !stageEnabled(model, "autocorrect")) return null;
     const owner = replacementOwner(model, row), field = replacementRowOf(model, owner);
-    const undo = field === "undoColor";
-    const trigger = replacementTrigger(model, view.layer, undo);
-    return {undo, standIn: trigger?.layoutIndex, active: {owner, color: feedback[field], locality: feedback.locality || "", triggerIndex: trigger?.layoutIndex}};
+    const undo = field === "undoColor", leading = field === "leadingColor";
+    const trigger = replacementTrigger(model, view.layer, leading ? "QK_LEADER" : undo ? "KC_BACKSPACE" : "KC_SPACE");
+    return {undo, leading, standIn: trigger?.layoutIndex, active: {owner, color: feedback[field], locality: feedback.locality || "", triggerIndex: trigger?.layoutIndex}};
 }
 
 /**
@@ -49,8 +51,8 @@ function replacementFlash(view, row) {
  *   held      the combo held (comboHeld), null off Combo feedback
  *   pdActive  the pointing mode running, null when none
  *   comboActive the held combo's feedback, null when it paints none
- *   replacementActive the replacement flash showing, null off Replacement feedback or while its stage is off
- *   standIn   the key that flash follows, ringed on the board: set while its locality follows a key and a key stands in
+ *   replacementActive the replacement case showing, null off Replacement feedback or while its stage is off
+ *   standIn   the key that case follows, ringed on the board: set while its locality follows a key and a key stands in
  *   caption   what the board shows, in words (a Phrase: its layers by their marks on screen)
  * @param {LayerView} view
  * @param {{stage: string, pointingSlot: number, comboPreview: {id: number, keys: number[]} | null, replacementRow?: string}} picked
@@ -62,8 +64,8 @@ export function lightingBoard(view, {stage, pointingSlot, comboPreview, replacem
     const pdActive = stage === "pd" ? modeRunning(model, pointingSlot, pdTrigger(model, view.layer, pointingSlot)?.layoutIndex)
         : held && held.pointing !== null ? modeRunning(model, held.pointing, held.held) : null;
     const comboActive = held?.active ?? null;
-    const flash = stage === "autocorrect" ? replacementFlash(view, replacementRow) : null;
-    const followsKey = Boolean(flash) && followsTrigger(flash?.active.locality);
+    const showing = stage === "autocorrect" ? replacementCase(view, replacementRow) : null;
+    const followsKey = Boolean(showing) && followsTrigger(showing?.active.locality);
     /** @param {string | undefined} locality */
     const area = (locality) => word(vocabulary(model).localities, locality).toLowerCase();
     // The base alone sits right on the background effect; a list of layers
@@ -80,14 +82,17 @@ export function lightingBoard(view, {stage, pointingSlot, comboPreview, replacem
             : [`${badge} held`]);
         if (held.choice) parts.push(["click a ringed key to hold it from that key"]);
     } else if (stage === "combo" && stageEnabled(model, "combo")) parts.push(["no combo fires in this view"]);
-    if (flash) {
-        const called = word(vocabulary(model).replacementOwners, flash.active.owner);
-        parts.push([replacementPaints(flash.active.color) ? `${called} flashing, painting ${area(flash.active.locality)}` : `${called} is off, so it does not flash`]);
-        // Which key the flash follows is the keyboard's to know as a word
-        // ends; the board says which key it took, or that it had none.
-        const key = flash.undo ? "Backspace" : "Space";
-        if (followsKey) parts.push([flash.standIn === undefined ? `no ${key} key to stand in, so it paints as when the keyboard cannot tell the key`
-            : flash.undo ? "Backspace stands in for the key that undid it" : "Space stands in for the key that ended the word"]);
+    if (showing) {
+        // A flash flashes; Leader waiting holds.
+        const {active, leading} = showing;
+        const called = word(vocabulary(model).replacementOwners, active.owner);
+        const [shows, lights] = leading ? ["held", "light"] : ["flashing", "flash"];
+        parts.push([replacementPaints(active.color) ? `${called} ${shows}, painting ${area(active.locality)}` : `${called} is off, so it does not ${lights}`]);
+        // Which key the case follows is the keyboard's to know as it happens;
+        // the board says which key it took, or that it had none.
+        const key = leading ? "Leader" : showing.undo ? "Backspace" : "Space";
+        if (followsKey) parts.push([showing.standIn === undefined ? `no ${key} key to stand in, so it paints as when the keyboard cannot tell the key`
+            : leading ? "Leader stands in for the key that began it" : showing.undo ? "Backspace stands in for the key that undid it" : "Space stands in for the key that ended the word"]);
     }
-    return {shown, held, pdActive, comboActive, replacementActive: flash?.active ?? null, standIn: followsKey ? flash?.standIn : undefined, caption: phrasesJoined(parts, " · ")};
+    return {shown, held, pdActive, comboActive, replacementActive: showing?.active ?? null, standIn: followsKey ? showing?.standIn : undefined, caption: phrasesJoined(parts, " · ")};
 }

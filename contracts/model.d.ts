@@ -1,4 +1,4 @@
-import type {AccentTable, Scalar, Tier, TimingTerm} from './edits.js';
+import type {AccentTable, AutocorrectFeedbackColourField, Scalar, Tier, TimingTerm} from './edits.js';
 // A global switch: one a banner names (vocabulary.settingOff), and whose
 // runtime override a switch key turns off for now (offByKey).
 export type SettingOffSwitch = 'behaviour' | 'combo' | 'autoMouse' | 'autocorrect';
@@ -166,10 +166,12 @@ export interface Vocabulary {
     accentFields: {lightsFor: string; ownColour: string};
     /** The behaviour state (an RGB_KEY_SEMANTICS name) each Behaviour feedback colour flashes for, by the colour's field. */
     feedbackColourOwners: Readonly<Record<'tapCommittedColor' | 'holdActiveColor' | 'longHoldActiveColor' | 'tapBranchColors', string>>;
-    /** What Replacement feedback flashes for, by its RGB_AUTOCORRECT_SEMANTICS name: each case, and all of them. */
+    /** What Replacement feedback shows, by its RGB_AUTOCORRECT_SEMANTICS name: each case, and all of them. */
     replacementOwners: WordList<string>;
-    /** The case (an RGB_AUTOCORRECT_SEMANTICS name) each Replacement feedback colour flashes for, by the colour's field. */
-    replacementColourOwners: Readonly<Record<'textColor' | 'macroColor' | 'undoColor', string>>;
+    /** When each Replacement feedback case shows, by its RGB_AUTOCORRECT_SEMANTICS name. */
+    replacementWhen: Readonly<Record<string, string>>;
+    /** The case (an RGB_AUTOCORRECT_SEMANTICS name) each Replacement feedback colour shows, by the colour's field. */
+    replacementColourOwners: Readonly<Record<AutocorrectFeedbackColourField, string>>;
     /** The groups of Lighting's lists beside an editor. */
     lightingLists: {inUse: string; tiers: {title: string; tip: string}; tapBranches: {title: string; tip: string}; replacements: {title: string; tip: string}; comboFeedback: {title: string; empty: string}; holdLayer: {title: string; empty: string}};
     stages: readonly {id: string; label: string; bit?: number}[];

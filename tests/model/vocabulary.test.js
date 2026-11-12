@@ -102,24 +102,28 @@ test("every accent table has its words, by the target its edits name, and an own
     }
     assert.ok(Object.hasOwn(RGB_KEY_SEMANTICS, RGB_EVERY_OWNER.keyBehavior), "every behaviour state is the key semantic for all of them");
     for (const owner of Object.values(VOCABULARY.feedbackColourOwners)) assert.ok(Object.hasOwn(RGB_KEY_SEMANTICS, owner), `${owner} is a behaviour state the keyboard knows`);
-    assert.ok(Object.hasOwn(RGB_AUTOCORRECT_SEMANTICS, RGB_EVERY_OWNER.autocorrect), "every replacement flash is the replacement semantic for all of them");
+    assert.ok(Object.hasOwn(RGB_AUTOCORRECT_SEMANTICS, RGB_EVERY_OWNER.autocorrect), "every case is the replacement semantic for all of them");
     // Replacement feedback's colours in the order the keyboard stores them,
     // each naming its own case: every case but the one that is all of them.
-    assert.deepEqual(Object.keys(VOCABULARY.replacementColourOwners), ["textColor", "macroColor", "undoColor"]);
-    assert.deepEqual(Object.values(VOCABULARY.replacementColourOwners).map(owner => RGB_AUTOCORRECT_SEMANTICS[owner]), [0, 1, 2]);
+    assert.deepEqual(Object.keys(VOCABULARY.replacementColourOwners), ["textColor", "macroColor", "undoColor", "leadingColor"]);
+    assert.deepEqual(Object.values(VOCABULARY.replacementColourOwners).map(owner => RGB_AUTOCORRECT_SEMANTICS[owner]), [0, 1, 2, 3]);
+    // Each case says when it shows, Leader waiting that it is held while the leader waits.
+    assert.deepEqual(Object.keys(VOCABULARY.replacementWhen), Object.values(VOCABULARY.replacementColourOwners));
+    assert.match(VOCABULARY.replacementWhen.AUTOCORRECT_FEEDBACK_GROUP_LEADING, /^Held from the moment you press the Leader key until the leader sends a replacement or gives up\./);
 });
 
 test("replacement feedback is named for what a person calls the feature, and never autocorrect", () => {
     const stage = VOCABULARY.stages.at(-1);
     assert.deepEqual(stage, {id: "autocorrect", label: "Replacement feedback", bit: rgb.RGB_STAGE_BITS.AUTOCORRECT}, "the last stage painted, by the firmware's name for it in code and Ark's on screen");
-    assert.deepEqual(VOCABULARY.replacementOwners.map(([, words]) => words), ["Every replacement flash", "Replaced with text", "Replaced by a macro", "Replacement undone"]);
+    assert.deepEqual(VOCABULARY.replacementOwners.map(([, words]) => words), ["Every case", "Replaced with text", "Replaced by a macro", "Replacement undone", "Leader waiting"]);
     const read = [...VOCABULARY.replacementOwners.map(([, words]) => words), stage.label, ...Object.values(VOCABULARY.colourOff.autocorrect), ...Object.values(VOCABULARY.lightingLists.replacements),
         VOCABULARY.accents.autocorrect.when, VOCABULARY.accents.autocorrect.every, VOCABULARY.accents.autocorrect.stageColour];
     for (const words of read) assert.doesNotMatch(words, /autocorrect|typo|correction|typed form/i, words);
-    // Off is the colour editor's own word: a case switched off does not flash.
+    // Off is the colour editor's own word: a case switched off does not light,
+    // whether it flashes or, as Leader waiting does, holds.
     assert.equal(VOCABULARY.colourOff.autocorrect.offAction, undefined);
     assert.equal(VOCABULARY.colourOff.autocorrect.offWord, undefined);
-    assert.match(VOCABULARY.colourOff.autocorrect.offNote, /does not flash/);
+    assert.match(VOCABULARY.colourOff.autocorrect.offNote, /does not light/);
 });
 
 test("an accent's LEDs read by index, a run of three or more as a range", () => {
