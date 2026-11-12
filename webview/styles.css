@@ -2330,6 +2330,12 @@ details > summary { list-style: none; }
 .ac-item.mslot { height: auto; min-height: 46px; padding: var(--sp-2) var(--sp-3); justify-items: start; place-items: start; text-align: left; }
 .ac-item.mslot .n { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ac-item .n .found { color: var(--text); }
+/* A replacement's line in the bank: its name, and how it fires at the end (D-L91). */
+.ac-item-head { display: flex; align-items: baseline; gap: var(--sp-2); width: 100%; min-width: 0; }
+.ac-item-head .v { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ac-item-head .ac-fires { flex: none; }
+/* The default stays quiet; After Leader and Both stand out. */
+.ac-fires:not([data-ac-fires="word"]) { color: var(--text); }
 .ac-item.caution { border-color: color-mix(in srgb, var(--warning) 55%, var(--line)); }
 .ac-item.fired { border-color: var(--focus); box-shadow: inset 0 0 0 1px var(--focus); }
 .ac-new.mslot { width: 100%; }
@@ -2353,6 +2359,18 @@ details > summary { list-style: none; }
 .ac-chip-input.input { width: 190px; height: var(--h-chip); }
 .ac-chip-input.input[data-ac-first] { width: min(100%, 300px); }
 .ac-more { border-style: dashed; background: none; color: var(--text-2); }
+.ac-more-field { display: inline-flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
+.ac-more-field > .field.segmented, .ac-inputs > .field.segmented { flex: none; }
+/* The Leader key's cap before Try it's After Leader field (D-L91). */
+.ac-leader-key { display: inline-block; margin-right: var(--sp-1); padding: 0 var(--sp-1); border: 1px solid var(--line-2); border-bottom-width: 2px; border-radius: var(--r-chip);
+  font-family: var(--sans); font-size: var(--fs-xs); line-height: 1.35; color: var(--text-2); background: var(--surface-2); vertical-align: 1px; }
+.ac-try-leader .input-row { display: flex; align-items: center; gap: var(--sp-2); }
+/* Under Fires: the Leader key's cap, where it is placed, and Place on a key →. */
+.ac-leader { gap: var(--sp-2); }
+.ac-leader-place { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; min-height: var(--h-control); }
+.ac-leader-place .ac-leader-key { margin-right: 0; }
+.ac-leader-place .btn { margin-left: auto; }
+.ac-try-leader .input { flex: 1 1 auto; min-width: 0; }
 .ac-more:hover:where(:not([disabled])) { color: var(--text); border-color: var(--line-3); }
 .ac-joins { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); }
 .ac-empty-actions { justify-content: center; flex-wrap: wrap; gap: var(--sp-2); margin-top: var(--sp-2); }

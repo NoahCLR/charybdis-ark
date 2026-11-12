@@ -2,18 +2,28 @@
 const {test} = require("node:test");
 const assert = require("node:assert/strict");
 const {typedText, firingTypo, typoFinder, wordsOf} = require("../../core/model/autocorrect-matcher");
-const {AUTOCORRECT_MATCH: MATCH} = require("../../core/schema/autocorrect-domain-v1");
+const {AUTOCORRECT_MATCH: MATCH, AUTOCORRECT_TRIGGER: TRIGGER} = require("../../core/schema/autocorrect-domain-v1");
 const {hostLayouts, US_HOST_LAYOUT} = require("../../core/data/host-layouts");
 const fixture = require("../../upstream/firmware/tests/fixtures/autocorrect_v1.json");
 
 const MATCH_OF = {"whole word": MATCH.WHOLE_WORD, "start of word": MATCH.START, "end of word": MATCH.END, anywhere: MATCH.ANYWHERE};
+const TRIGGER_OF = {"as a word ends": TRIGGER.AS_TYPED, "after the leader": TRIGGER.AFTER_LEADER, both: TRIGGER.BOTH};
 const US = {layout: US_HOST_LAYOUT};
 const list = (...entries) => ({entries: entries.map(([correction, ...typos]) => ({correction, typos: typos.map(typo => typeof typo === "string" ? {typo, match: MATCH.WHOLE_WORD} : {typo: typo[0], match: typo[1]})}))});
 // A fixture case's list as the codec's model, and its layout by slug.
-const listOf = entries => ({entries: entries.map(entry => ({correction: entry.correction ?? "", ...(entry.macro === undefined ? {} : {macro: entry.macro}), typos: entry.typos.map(typo => {
+const listOf = entries => ({entries: entries.map(entry => ({correction: entry.correction ?? "", ...(entry.macro === undefined ? {} : {macro: entry.macro}), ...firesOf(entry.trigger), typos: entry.typos.map(typo => {
     assert.ok(typo.match in MATCH_OF, `the fixture's match ${typo.match}`);
     return {typo: typo.typo, match: MATCH_OF[typo.match]};
 })}))});
+// How a fixture entry's replacement fires, as the codec's model says it: an
+// entry that fires as a word ends says nothing.
+const firesOf = trigger => {
+    if (trigger === undefined) return {};
+    assert.ok(trigger in TRIGGER_OF, `the fixture's trigger ${trigger}`);
+    return TRIGGER_OF[trigger] === TRIGGER.AS_TYPED ? {} : {trigger: TRIGGER_OF[trigger]};
+};
+// Entries of a list that fire after the Leader key alone, or both ways.
+const firing = (value, trigger, ...corrections) => { for (const entry of value.entries) if (corrections.includes(entry.correction)) entry.trigger = trigger; return value; };
 const hostOf = slug => {
     const layout = hostLayouts().find(candidate => candidate.slug === slug);
     assert.ok(layout, `the fixture's layout ${slug}`);
@@ -26,6 +36,8 @@ const KEYBOARD_ONLY = [
     "a dead-key sequence the layout does not resolve", "a cursor key", "a shortcut", "a mouse click", "a macro",
     "a key held until the computer repeats it", "a held modifier", "a macro key pressed during a correction",
     "more keys than the queue holds", "the stored switch",
+    // The leader's endings that type nothing on screen (firmware D-F71).
+    "Escape", "a switch key", "the leader's timeout",
     // A text matcher cannot tell how a character was typed: the keyboard
     // passes over a word whose ending character a dead key composed, and the
     // preview replaces it (firmware autocorrect-v1.md, "What a word is").
@@ -36,12 +48,12 @@ const text = fixture.cases.filter(entry => entry.screen !== undefined);
 const skipped = fixture.cases.filter(entry => entry.screen === undefined);
 
 test("the firmware's behaviour fixture is the version this matcher reads, and every case is run or skipped for a known reason", () => {
-    assert.equal(fixture.version, 1);
+    assert.equal(fixture.version, 2);
     assert.equal(text.length + skipped.length, fixture.cases.length);
     assert.ok(text.length >= 57, "the text cases are run");
     for (const entry of skipped) assert.ok(KEYBOARD_ONLY.includes(entry.keyboardOnly), `${entry.name} is skipped for a reason this test does not know: ${entry.keyboardOnly}`);
     assert.deepEqual([...new Set(skipped.map(entry => entry.keyboardOnly))].sort(), [...KEYBOARD_ONLY].sort(), "every reason listed here still skips a case");
-    for (const rule of [1, 2, 3, 4, 5, 6, 7, 9, 10]) assert.ok(text.some(entry => entry.rule === rule), `rule ${rule} has a text case`);
+    for (const rule of [1, 2, 3, 4, 5, 6, 7, 9, 10, 11]) assert.ok(text.some(entry => entry.rule === rule), `rule ${rule} has a text case`);
 });
 
 for (const entry of text) {
@@ -159,4 +171,33 @@ test("of part-of-word typos equally long, the first in the domain's order fires:
         assert.deepEqual(fires(`${high}q${low}q`), firingTypo(value, `${high}q${low}q`));
         assert.deepEqual(fires(`w${high}q`), {entry: value.entries[0], typo: value.entries[0].typos[0], start: 1, end: 3}, "a place is counted in characters");
     }
+});
+
+// What the leader does with text typed after it (firmware D-F71): Try it's
+// After Leader field reads it (D-L91).
+test("the leader sends an input no longer one begins with at once, waits on one a longer one begins with, and drops the start of none", () => {
+    const value = firing(list(["the", "teh"], ["+31 6 1234 5678", "pn"], ["alpha", "abc"], ["delta", "abcd"], ["receive", ["recieve", MATCH.START]]), TRIGGER.AFTER_LEADER, "+31 6 1234 5678", "alpha", "delta");
+    firing(value, TRIGGER.BOTH, "receive");
+    const {leaderOutcome} = require("../../core/model/autocorrect-matcher");
+    const said = typed => { const outcome = leaderOutcome(value, typed); return outcome.state === "sends" ? ["sends", outcome.entry.correction, outcome.at, outcome.finishing] : outcome.state === "drops" ? ["drops", outcome.at] : ["waits", outcome.exact?.entry.correction ?? null, outcome.longer.map(listed => listed.typo.typo)]; };
+    assert.deepEqual(said("PN"), ["sends", "+31 6 1234 5678", 1, false], "folded, sent on its last character");
+    assert.deepEqual(said("pnx"), ["sends", "+31 6 1234 5678", 1, false], "what follows a send is not the leader's");
+    assert.deepEqual(said("ab"), ["waits", null, ["abc", "abcd"]]);
+    assert.deepEqual(said("abc"), ["waits", "alpha", ["abcd"]], "Enter or the timeout sends alpha");
+    assert.deepEqual(said("abc\n"), ["sends", "alpha", 3, true]);
+    assert.deepEqual(said("abd"), ["drops", 2]);
+    assert.deepEqual(said("teh"), ["drops", 0], "an input of a replacement that fires as you type is no leader input");
+    assert.deepEqual(said("recieve"), ["sends", "receive", 6, false], "a part-of-word input is typed whole after the Leader key");
+    assert.deepEqual(said("p n"), ["drops", 1], "a space is in no input");
+    assert.deepEqual(said(""), ["waits", null, []]);
+});
+
+test("what the leader sends is marked as a replacement the leader sent, typed as written under Caps Lock, and passed over when the host cannot type it", () => {
+    const value = firing(list(["Kind regards", "kr"], ["über", "ub"]), TRIGGER.AFTER_LEADER, "Kind regards", "über");
+    const tried = typedText(value, US, true, "Hi \u0010kr.");
+    assert.deepEqual([tried.text, tried.fired, tried.marks.map(mark => tried.text.slice(mark.start, mark.end))], ["Hi Kind regards.", [{entry: "Kind regards", correction: "Kind regards", typo: "kr", leader: true}], ["Kind regards"]]);
+    assert.deepEqual([typedText(value, US, false, "\u0010ub!").text, typedText(value, US, false, "\u0010ub!").fired], ["!", []], "US cannot type ü: nothing is sent");
+    assert.equal(typedText(list(["the", "teh"]), US, false, "\u0010teh ").text, "the ", "with nothing that fires after it the key does nothing");
+    assert.equal(typedText(value, US, false, "kr ").text, "kr ", "one that fires after the Leader key alone leaves its input as typed");
+    assert.equal(typedText(firing(value, TRIGGER.BOTH, "Kind regards"), US, false, "kr \u0010kr").text, "Kind regards Kind regards", "both ways");
 });

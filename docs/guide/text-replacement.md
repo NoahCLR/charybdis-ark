@@ -3,7 +3,9 @@
 The keyboard replaces what you type when you finish a word, on any computer,
 with nothing installed on it. It fixes a typo (`teh` becomes `the`), types
 longer text for you (`pnumber` becomes your phone number) and can play a
-macro. This is the keyboard's autocorrect: its keys are still named for that
+macro. A replacement can fire after its own [Leader key](#after-the-leader-key)
+instead, or both ways: then what you type after Leader is never seen by the
+computer. This is the keyboard's autocorrect: its keys are still named for that
 (`AC_ON`, `AC_OFF`, `AC_TOGG`), and searching Ark for "autocorrect" finds
 them.
 
@@ -23,8 +25,8 @@ Enter, Tab or punctuation. It erases only the part that differs and types the
 rest, then sends the key that ended the word, so Enter in a chat box sends
 the replaced text. A word you are still typing is never touched.
 
-A word is letters and digits, with apostrophes between them, so an input is
-always one word: `pnumber`, `myemail`, `sig2`,
+A word is letters and digits, with apostrophes between them, so an input
+typed as you type is always one word: `pnumber`, `myemail`, `sig2`,
 `dosen't`. Apostrophes before or after it stay as typed and aren't part of
 it: `'teh'` is fixed as "teh". The keyboard follows a word up to 32
 characters and leaves a longer one alone.
@@ -90,7 +92,9 @@ macro has no undo.
 The keyboard can flash once as it replaces what you typed, in one colour for
 text, another for a macro and a third when Backspace undoes a replacement,
 so a change you did not expect does not pass unseen. A word it leaves alone
-never flashes. The colours, where the flash paints and its switch are
+never flashes. What the [Leader key](#after-the-leader-key) sends flashes
+the same way, in the text or macro colour: that flash is how you know it
+went. The colours, where the flash paints and its switch are
 [Replacement feedback](lighting.md#replacement-feedback) on Lighting.
 
 ### What it leaves alone
@@ -108,6 +112,44 @@ modifiers you hold stay out of it.
 Your list is stored on the keyboard as you wrote it, and anyone who connects
 the keyboard to Ark can read it. Don't use a replacement for a password.
 
+### After the Leader key
+
+Each replacement **fires** as you type, after the **Leader** key, or both:
+you choose it on its editor, and its inputs stay the same whichever you
+choose. After Leader, the keyboard holds back what you type and sends the
+replacement, so nothing you typed reaches the computer; a replacement that
+fires after Leader alone is left as you typed it when you finish its input
+as a word. Put Leader on a key, in a behaviour's tap or hold, or as a combo's
+output; the picker has it under **Other QMK**, in **Text replacement**, and
+searching for "leader" finds it. A replacement's editor says where it is
+while the replacement fires after Leader, with **Place on a key →**. Then press Leader and type `pn`, and your
+phone number is all the computer sees.
+
+- It sends as soon as no other input that fires after Leader could still
+  follow: with `pn` on your list, Leader then `p` `n` sends at once.
+- When one such input begins another, `abc` and `abcd`, press Enter to send
+  the shorter one, or wait: after **Leader waits** on Host (2000 ms unless
+  you set another, 1000 to 10000), it is sent too.
+- A character that leaves what you typed the start of no such input drops
+  it, that character included, and nothing is sent. Escape drops it too, and
+  so do Enter and the wait when what you typed is none.
+- Backspace takes back the last character, and with nothing typed ends it;
+  Leader again starts over. Any other key, an arrow, Tab, a shortcut, a click
+  or a macro key, ends it with nothing sent and then does what it always does.
+
+An input is a word after Leader too, typed whole: `recieve*` is sent by
+`recieve`, and a space or punctuation mark is in no input, so typing one drops
+what you typed. Its replacement is typed exactly as written, with no capitals
+rule, and there is no taking it back: Backspace afterwards is just Backspace.
+A replacement that plays a macro can fire after Leader too. What the leader
+sends flashes as any replacement does (above), and one that sends nothing
+does not flash.
+
+The leader works with text replacement switched off, on Host or by key. Ark
+warns before you apply a list with replacements that fire after Leader and no
+Leader key anywhere, and a Leader key with nothing on the list that fires
+after it.
+
 ## Turning it on and off
 
 The switch is on **Host**, under **Text replacement**: **Enabled** turns it
@@ -116,7 +158,10 @@ through the host layout chosen above it, and because every such switch is a
 Settings screen's: Behaviours, Combos and Pointer have theirs. It is saved
 with the profile like any other setting. Off, the keyboard types every word
 as you typed it and keeps your list. While it is off the Text replacement
-screen says so across its top, with the way back to the switch.
+screen says so across its top, with the way back to the switch. The Leader
+key still sends the replacements that fire after it while it is off.
+**Leader waits**, under **Enabled**, is how long the leader waits before it
+sends an input that a longer one begins with.
 
 The keyboard can't see where you are typing. In a password field or a
 terminal a replacement is wrong, so put a key on the keyboard to switch it
@@ -184,6 +229,16 @@ and what the preview can and cannot show. Hover
 it, or reach it with Tab; Escape closes it. In a small window the list opens
 where there is room, and scrolls when it is taller than that.
 
+### Fires
+
+**As you type**, **After Leader** or **Both** says how this replacement
+fires: as you finish a word, after the [Leader key](#after-the-leader-key),
+or either way. It is saved as soon as you choose, and its inputs stay as they
+are. While it fires after Leader, a line under the choice says what the
+Leader key does and where it is placed (keys by layer, behaviours, combos),
+and **Place on a key →** takes you to the board to put it on a key. In the list each replacement is tagged
+**As you type**, **After Leader** or **Both**.
+
 ### Inputs
 
 The inputs are chips.
@@ -195,8 +250,10 @@ The inputs are chips.
   field with the reason under it, and nothing is added.
 - **A chip** opens in place when you click it: change how it is written,
   with or without `*`, and press Enter, or choose **Remove** beside it.
-  Escape leaves it as it was. Removing a replacement's last input deletes
-  the replacement.
+  Escape leaves it as it was. Removing a replacement's last input takes it
+  off your list, since the keyboard keeps no replacement without one, but
+  its editor stays open with what it is and how it fires: give it a new
+  input to put it back, or **Discard** it. Undo takes it back as it was.
 
 To give an input to another replacement, remove it here and add it there.
 
@@ -205,7 +262,8 @@ To give an input to another replacement, remove it here and add it there.
 **+ New replacement** opens an empty one, with its text ready to type.
 
 1. Type the replacement, or choose **Macro** and pick one.
-2. Press Enter, type its first input, and press Enter again. Several inputs
+2. Choose how it fires, if not as you type.
+3. Press Enter, type its first input, and press Enter again. Several inputs
    with spaces between them are all added.
 
 It joins your list with that first input, and stays open for more. Leaving
@@ -278,6 +336,15 @@ Space), and the preview shows it replaced. An edit in the middle of the box coun
 would: the text stays and the next key starts a new word. Try it works
 whether text replacement is on or off.
 
+The box can't hold the Leader key, and Ark never writes one into it. With a
+replacement on your list that fires after Leader, **After Leader** under it
+tries what you type
+after the key, on its own: the line under it says whether the keyboard sends
+a replacement, and which, waits for more (and what Enter or the wait would
+send), or drops what you typed. A replacement your layout can't type, or a
+macro that can't play, is sent as nothing, and it says so. The wait itself
+and Escape need the keyboard.
+
 ## Importing a list
 
 **Import…** opens a list from a file, or drop the file anywhere on the
@@ -286,7 +353,9 @@ screen. Ark reads three formats, by the file's extension:
 - **`.json`**, Ark's own format, as **Export** writes it.
 - **`.csv`**, a spreadsheet: columns `replacement` and `inputs` under a
   header row, in any order. The inputs cell can hold several inputs with
-  spaces between them, each with its own `*`. A row that plays a macro has
+  spaces between them, each with its own `*`. How a replacement fires is in
+  a `fires` column (`as you type`, `after leader` or `both`; empty is as you
+  type). A row that plays a macro has
   the macro's number in a `macro` column and no replacement. Files as Excel,
   Numbers and Google Sheets save them all work: commas or semicolons, quoted
   cells, rows padded with empty cells.
@@ -294,7 +363,9 @@ screen. Ark reads three formats, by the file's extension:
   `typo -> correction`. QMK writes where it matches with colons, which Ark
   reads as its `*`: `:teh:` is `teh`, `:recieve` is `recieve*`, `mnet:` is
   `*mnet`, and with no colons `tihng` is `*tihng*`. Lines that start with
-  `#` and blank lines are skipped.
+  `#` and blank lines are skipped. The keyboard's own lines that begin with
+  how a replacement fires, `leader pn -> +31 6 1234 5678` and
+  `both :adn: -> and`, are read too.
 
 Files written before, by Ark or by hand, still read: a list that says
 `typed` where it now says `inputs`, a spreadsheet whose
@@ -329,11 +400,14 @@ Either is one step of the draft, so Undo takes all of it back.
 from its menu:
 
 - **Text (QMK)**: QMK's form, a line for each input, with its colons.
-  It has no way to say a macro, so a replacement that plays one is left out,
-  and the file's first line says how many were.
+  It has no way to say a macro or the Leader key, so a replacement that plays
+  one and one that fires after Leader alone are left out, and the file's
+  first lines say how many were; one that fires both ways is written as it
+  fires as you type, and the first lines say that too.
 - **CSV**: a header row `replacement,inputs`, then a row for each
-  replacement with all its inputs in one cell. With a replacement
-  that plays a macro in the list, a third column, `macro`, holds the macro's
+  replacement with all its inputs in one cell. With a replacement that fires
+  after Leader, a `fires` column says how each fires; with a replacement
+  that plays a macro, a `macro` column holds the macro's
   number. The file starts with a byte order mark, so Excel reads its accents.
   A spreadsheet may still retype a cell as it opens the file: a replacement
   of digits can lose a leading zero, and one that starts with `+`, `-` or `=`
@@ -348,15 +422,16 @@ from its menu:
     "replacements": [
       {"replacement": "because", "inputs": ["becuase", "becasue"]},
       {"replacement": "receive", "inputs": ["recieve*"]},
-      {"macro": 5, "inputs": ["sig"]}
+      {"macro": 5, "fires": "after leader", "inputs": ["sig"]}
     ]
   }
   ```
 
-  A file in another version is refused rather than guessed at.
+  `fires` is left out for a replacement that fires as you type. A file in another
+  version is refused rather than guessed at.
 
 A list exported as CSV or JSON imports as the same list, and so does one
-exported as text when no replacement plays a macro. A macro is named by its
+exported as text when no replacement plays a macro or fires after Leader. A macro is named by its
 number, so a list with one fits the keyboard it came from.
 
 ## Warnings

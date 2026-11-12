@@ -11,7 +11,9 @@
 // An input is written as a person types it: a whole word, or with `*`
 // where other letters may go (`recieve*` the start of a word, `*mnet` the
 // end, `*tihng*` anywhere). The `*` is notation: the list stores the letters
-// and where they match (D-L84).
+// and where they match (D-L84). How a replacement fires is its own: as you
+// type, after the Leader key, or both (firmware D-F71, D-L91); its inputs are
+// one list whichever, and after the Leader key an input is its whole text.
 //
 // An edit that would make a list the keyboard refuses, or an entry the chosen
 // host layout cannot type, is refused here in plain words. What only
@@ -19,7 +21,7 @@
 // entry changes again, a short input with `*`, a macro that is empty) is
 // a warning: found on the list, never a refusal.
 
-const {AUTOCORRECT_DOMAIN_V1, AUTOCORRECT_MATCH, autocorrectCounts, sizeOfCounts, correctionProblem, entryKey, entryOfKey, foldTypo, isMacroSlot, playsMacro, typoProblem} = require("../schema/autocorrect-domain-v1");
+const {AUTOCORRECT_DOMAIN_V1, AUTOCORRECT_MATCH, AUTOCORRECT_TRIGGER, firesAsTyped, matchesPart, triggerOf, autocorrectCounts, sizeOfCounts, correctionProblem, entryKey, entryOfKey, foldTypo, isMacroSlot, playsMacro, typoProblem} = require("../schema/autocorrect-domain-v1");
 const {AUTOCORRECT_APOSTROPHE, foldWordCharacter} = require("../data/autocorrect-words");
 const {typoFinder, wordsOf} = require("./autocorrect-matcher");
 const {layoutTypes} = require("../data/host-layouts");
@@ -117,9 +119,21 @@ function inputOf(text) {
     if (problem) throw refuse("An input may hold an apostrophe only between two letters or digits.");
     return {typo, match: start && end ? AUTOCORRECT_MATCH.ANYWHERE : start ? AUTOCORRECT_MATCH.START : end ? AUTOCORRECT_MATCH.END : AUTOCORRECT_MATCH.WHOLE_WORD};
 }
+// A trigger's name, as an edit and the screen give it (the vocabulary's
+// inputModes keys), by its number.
+const TRIGGER_NAMES = /** @type {const} */ (["word", "leader", "both"]);
+// How a replacement fires, as an edit or a file gives it, by name or number:
+// the trigger's number, as a word ends when it gives none.
+/** @param {unknown} trigger @returns {number} */
+function triggerFrom(trigger) {
+    if (trigger === undefined || trigger === null) return AUTOCORRECT_TRIGGER.AS_TYPED;
+    const number = typeof trigger === "string" ? TRIGGER_NAMES.indexOf(/** @type {typeof TRIGGER_NAMES[number]} */ (trigger)) : trigger;
+    if (!(/** @type {readonly number[]} */ (Object.values(AUTOCORRECT_TRIGGER))).includes(/** @type {number} */ (number))) throw refuse("A replacement fires as you type, after the Leader key, or both.");
+    return /** @type {number} */ (number);
+}
 // A field's text as the inputs it holds: split at spaces, since an input
-// never holds one. The field that adds inputs and a spreadsheet's inputs cell
-// are both read by it.
+// never holds one. The field that adds inputs and a spreadsheet's inputs
+// cell are both read by it.
 /** @param {unknown} text @returns {string[]} */
 const splitInputs = text => String(text ?? "").split(/\s+/).filter(Boolean);
 // A stored input as it is written, with its `*`.
@@ -136,14 +150,24 @@ function typoOf(row) {
     return {typo: typed.typo, match: /** @type {number} */ (row.match)};
 }
 
-// The entry and typo an input is stored under, whatever its case and
-// whatever `*` it is written with; undefined when the list does not hold it.
+// The entry and typo stored as exactly this text, whatever its match: one
+// text is one input.
+/** @param {AutocorrectList} list @param {string} text @returns {{entry: Entry, typo: Typo} | undefined} */
+function heldTypo(list, text) {
+    for (const entry of list.entries) {
+        const found = entry.typos.find(row => row.typo === text);
+        if (found) return {entry, typo: found};
+    }
+    return undefined;
+}
+// The entry and typo an edit names: by its stored text, else as it may be
+// written, whatever its case and `*`; undefined when the list does not hold it.
 /** @param {AutocorrectList} list @param {string} typo @returns {{entry: Entry, typo: Typo} | undefined} */
 function findTypo(list, typo) {
-    const folded = foldTypo(String(typo).trim().replace(/^\*|\*$/g, ""));
-    for (const entry of list.entries) {
-        const found = entry.typos.find(row => row.typo === folded);
-        if (found) return {entry, typo: found};
+    const text = String(typo).trim();
+    for (const wanted of [String(typo), foldTypo(text.replace(/^\*|\*$/g, ""))]) {
+        const found = wanted === undefined ? undefined : heldTypo(list, wanted);
+        if (found) return found;
     }
     return undefined;
 }
@@ -166,29 +190,33 @@ function storedEntry(list, target, host) {
     return entry;
 }
 // An input may be put under a replacement only when it is not that text,
-// no other replacement has it, and for a macro it is a whole word.
+// no other replacement has it, whatever its match (one text is one input),
+// and for a macro it is a whole word.
 /** @param {AutocorrectList} list @param {Typo} typo @param {Target} target @param {Host} host @param {Typo} [self] the typo being changed, which may keep its own spelling */
 function requireFree(list, typo, target, host, self) {
-    if (target.macro !== undefined && typo.match !== AUTOCORRECT_MATCH.WHOLE_WORD) throw refuse(`A macro plays for a whole word only: take the ${STAR} out of ${quoted(inputForm(typo))}.`);
+    if (target.macro !== undefined && matchesPart(typo.match)) throw refuse(`A macro plays for a whole word: take the ${STAR} out of ${quoted(inputForm(typo))}.`);
     if (typo.typo === target.correction) throw refuse(`${quoted(typo.typo)} is the replacement itself.`);
-    const held = findTypo(list, typo.typo);
+    const held = heldTypo(list, typo.typo);
     if (!held || held.typo === self) return;
     throw refuse(entryKey(held.entry) === entryKey(target) ? `${quoted(typo.typo)} is already an input for ${called(target, host)}.` : `${quoted(typo.typo)} is already an input for ${called(targetOfEntry(held.entry), host)}.`);
 }
 /** @param {Entry} entry @returns {Target} */
 const targetOfEntry = entry => entry.macro === undefined ? {correction: entry.correction} : {macro: entry.macro};
-/** @param {Target} target @returns {Entry} */
-const newEntry = target => target.macro === undefined ? {correction: target.correction, typos: []} : {correction: "", macro: target.macro, typos: []};
+// A new entry for a replacement, firing as given: one that fires as you type
+// says nothing of it, as the codec writes it.
+/** @param {Target} target @param {number} [trigger] @returns {Entry} */
+const newEntry = (target, trigger = AUTOCORRECT_TRIGGER.AS_TYPED) => ({...(target.macro === undefined ? {correction: target.correction} : {correction: "", macro: target.macro}), ...(trigger === AUTOCORRECT_TRIGGER.AS_TYPED ? {} : {trigger}), typos: []});
 /** @param {AutocorrectList} list @param {Entry} entry */
 function dropIfEmpty(list, entry) {
     if (!entry.typos.length) list.entries.splice(list.entries.indexOf(entry), 1);
 }
 
 // Adds inputs to a replacement, making the entry when the list has none
-// of that exact text or macro. All of it is checked before anything changes.
-/** @param {AutocorrectList} list @param {{correction?: unknown, macro?: unknown}} named @param {readonly {typo: unknown, match?: unknown}[]} typos @param {Host} host */
-function addTypos(list, named, typos, host) {
-    const target = targetOf(named);
+// of that exact text or macro, firing as `trigger` says (as you type when it
+// says nothing). All of it is checked before anything changes.
+/** @param {AutocorrectList} list @param {{correction?: unknown, macro?: unknown}} named @param {readonly {typo: unknown, match?: unknown}[]} typos @param {Host} host @param {unknown} [trigger] */
+function addTypos(list, named, typos, host, trigger) {
+    const target = targetOf(named), fires = triggerFrom(trigger);
     if (!Array.isArray(typos) || !typos.length) throw refuse("A replacement needs at least one input.");
     const existing = findEntry(list, target);
     if (!existing && target.macro === undefined) requireTypable(target.correction, host, "type this replacement");
@@ -202,7 +230,16 @@ function addTypos(list, named, typos, host) {
         added.push(typo);
     }
     if (existing) existing.typos.push(...added);
-    else list.entries.push({...newEntry(target), typos: added});
+    else list.entries.push({...newEntry(target, fires), typos: added});
+}
+
+// How a replacement fires (D-L91): as you type, after the Leader key, or
+// both. Its inputs stay as they are.
+/** @param {AutocorrectList} list @param {{correction?: unknown, macro?: unknown}} named @param {unknown} trigger @param {Host} host */
+function setTrigger(list, named, trigger, host) {
+    const target = named?.macro !== undefined ? targetOf(named) : /** @type {Target} */ ({correction: String(named?.correction ?? "")});
+    const entry = storedEntry(list, target, host), fires = triggerFrom(trigger);
+    if (fires === AUTOCORRECT_TRIGGER.AS_TYPED) delete entry.trigger; else entry.trigger = fires;
 }
 
 // Changes a replacement where it stands: its text respelled, text made a
@@ -214,7 +251,7 @@ function changeReplacement(list, from, to, host) {
     const entry = storedEntry(list, source, host), next = targetOf(to);
     if (entryKey(next) === entryKey(entry)) return;
     for (const typo of entry.typos) {
-        if (next.macro !== undefined && typo.match !== AUTOCORRECT_MATCH.WHOLE_WORD) throw refuse(`A macro plays for a whole word only: take the ${STAR} out of ${quoted(inputForm(typo))} first.`);
+        if (next.macro !== undefined && matchesPart(typo.match)) throw refuse(`A macro plays for a whole word: take the ${STAR} out of ${quoted(inputForm(typo))} first.`);
         if (typo.typo === next.correction) throw refuse(`${quoted(typo.typo)} is one of its inputs; an input cannot be its own replacement.`);
     }
     const target = findEntry(list, next);
@@ -253,12 +290,12 @@ function removeEntry(list, named, host) {
     list.entries.splice(list.entries.indexOf(storedEntry(list, target, host)), 1);
 }
 
-// What the keyboard stores of this list: its counts, its text, and the
-// domain's bytes.
+// What the keyboard stores of this list: its counts, the inputs that fire
+// after the Leader key among them, its text, and the domain's bytes.
 /** @param {AutocorrectList} list */
 function listUsage(list) {
     const counts = autocorrectCounts(list);
-    return {corrections: counts.corrections, typos: counts.typos, textBytes: counts.textBytes, bytes: sizeOfCounts(counts)};
+    return {corrections: counts.corrections, typos: counts.typos, leaders: counts.leaders, textBytes: counts.textBytes, bytes: sizeOfCounts(counts)};
 }
 
 // What to do about entries a layout change left untypable, said the same
@@ -302,7 +339,8 @@ function listWarnings(list, host) {
         for (const typo of entry.typos) {
             const unseen = missing.length ? [] : untypable(typo.typo, host);
             if (unseen.length) warnings.push({kind: WARNING.UNTYPABLE, entry: key, typo: typo.typo, text: `${layout} cannot type ${unseen.map(quoted).join(", ")}, so this input will never be seen.`});
-            if (typo.match === AUTOCORRECT_MATCH.WHOLE_WORD) continue;
+            // A `*` matters only as a word ends.
+            if (!matchesPart(typo.match) || !firesAsTyped(triggerOf(entry))) continue;
             if ([...typo.typo].length < SHORT_INPUT_LETTERS) warnings.push({kind: WARNING.SHORT_PART, entry: key, typo: typo.typo, text: `${quoted(inputForm(typo))} is a short input with ${STAR}, so it catches many words.`});
             const within = inside.get(typo);
             if (within !== undefined) warnings.push({kind: WARNING.INSIDE_CORRECTION, entry: key, typo: typo.typo, text: `${quoted(inputForm(typo))} also matches inside the replacement ${quoted(within)}, so typing that changes it.`});
@@ -346,13 +384,13 @@ function restoreEntry(mine, theirs, key, respelled) {
         const stored = findEntry(theirs, named);
         if (!stored) continue;
         for (const typo of stored.typos) {
-            const held = findTypo(mine, typo.typo);
+            const held = heldTypo(mine, typo.typo);
             if (!held) continue;
             held.entry.typos.splice(held.entry.typos.indexOf(held.typo), 1);
             dropIfEmpty(mine, held.entry);
         }
-        mine.entries.push({...newEntry(targetOfEntry(stored)), typos: stored.typos.map(typo => ({...typo}))});
+        mine.entries.push({...newEntry(targetOfEntry(stored), triggerOf(stored)), typos: stored.typos.map(typo => ({...typo}))});
     }
 }
 
-module.exports = {SHORT_INPUT_LETTERS, WARNING, addTypos, changeReplacement, changeTypo, correctionOf, entryOfKey, findEntry, findTypo, listUsage, listWarnings, pairEntries, removeEntry, removeTypo, replacementCalled, replacementSaid, restoreEntry, splitInputs, targetOf, inputForm, inputOf, typoOf, untypableFix};
+module.exports = {SHORT_INPUT_LETTERS, TRIGGER_NAMES, WARNING, addTypos, changeReplacement, changeTypo, correctionOf, entryOfKey, findEntry, findTypo, heldTypo, listUsage, listWarnings, pairEntries, removeEntry, removeTypo, replacementCalled, replacementSaid, restoreEntry, setTrigger, splitInputs, targetOf, triggerFrom, inputForm, inputOf, typoOf, untypableFix};

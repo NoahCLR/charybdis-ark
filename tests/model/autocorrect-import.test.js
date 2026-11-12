@@ -2,20 +2,22 @@
 const {test} = require("node:test");
 const assert = require("node:assert/strict");
 const {AUTOCORRECT_FILE_FORMATS, IMPORT_MAX_BYTES, entriesOf, exportAutocorrect, parseAutocorrectFile, planImport, previewImport, rowsOf} = require("../../core/model/autocorrect-import");
-const {typoOf} = require("../../core/model/autocorrect-list");
-const {AUTOCORRECT_MATCH: MATCH, autocorrectDomainSize, encodeAutocorrectDomain} = require("../../core/schema/autocorrect-domain-v1");
+const {triggerFrom, typoOf} = require("../../core/model/autocorrect-list");
+const {AUTOCORRECT_MATCH: MATCH, AUTOCORRECT_TRIGGER: TRIGGER, autocorrectDomainSize, encodeAutocorrectDomain} = require("../../core/schema/autocorrect-domain-v1");
 const {US_HOST_LAYOUT} = require("../../core/data/host-layouts");
 
 const US = {layout: US_HOST_LAYOUT, layoutName: "US"};
 const CEILINGS = {maxCorrections: 1024, maxTypos: 1024, maxTextBytes: 20480};
 // A list from rows: a replacement's text, or a number for the macro slot it
 // plays, then its inputs, each its letters or [letters, match].
+// A {fires} among an entry's inputs says how it fires, and its shape ends with it.
 const list = (...entries) => ({entries: entries.map(([correction, ...typos]) => ({...(typeof correction === "number" ? {correction: "", macro: correction} : {correction}),
-    typos: typos.map(typo => typeof typo === "string" ? {typo, match: MATCH.WHOLE_WORD} : {typo: typo[0], match: typo[1]})}))});
-const shape = value => value.entries.map(entry => [entry.macro ?? entry.correction, ...entry.typos.map(typo => typo.match ? [typo.typo, typo.match] : typo.typo)]);
+    ...Object.assign({}, ...typos.filter(typo => typo?.fires !== undefined).map(typo => ({trigger: typo.fires}))),
+    typos: typos.filter(typo => typo?.fires === undefined).map(typo => typeof typo === "string" ? {typo, match: MATCH.WHOLE_WORD} : {typo: typo[0], match: typo[1]})}))});
+const shape = value => value.entries.map(entry => [entry.macro ?? entry.correction, ...entry.typos.map(typo => typo.match ? [typo.typo, typo.match] : typo.typo), ...(entry.trigger ? [{fires: entry.trigger}] : [])]);
 // A file's rows as the list they would make, each input read as the
 // list editor reads it.
-const listed = rows => ({entries: entriesOf(rows).map(entry => ({...(entry.macro === undefined ? {correction: entry.correction} : {correction: "", macro: entry.macro}), typos: entry.typos.map(typoOf)}))});
+const listed = rows => ({entries: entriesOf(rows).map(entry => ({...(entry.macro === undefined ? {correction: entry.correction} : {correction: "", macro: entry.macro}), ...(entry.trigger ? {trigger: triggerFrom(entry.trigger)} : {}), typos: entry.typos.map(typoOf)}))});
 const read = (text, name) => { const file = parseAutocorrectFile(text, name); return {format: file.format, entries: shape(listed(file.rows)), refused: file.refused}; };
 const invalid = (fn, pattern) => assert.throws(fn, error => error.code === "AUTOCORRECT_IMPORT_INVALID" && pattern.test(error.message), String(pattern));
 
@@ -145,7 +147,7 @@ test("an import is planned by the list editor's rules: new replacements, inputs 
         {line: 7, text: "t-h → the", reason: "An input is one word: letters and digits, with an apostrophe only between them; “-” is neither."},
         {line: 8, text: "uber → über", reason: "US cannot type “ü”, so the keyboard could not type this replacement."},
         {line: 12, text: "si*g → x", reason: "“si*g” has * where it cannot go. Put * only at the start or the end, where other letters may go."},
-        {line: 13, text: "addr → the macro “Macro 6”", reason: "A macro plays for a whole word only: take the * out of “addr*”."},
+        {line: 13, text: "addr → the macro “Macro 6”", reason: "A macro plays for a whole word: take the * out of “addr*”."},
         {line: 14, text: "far → macro 128", reason: "Choose one of the keyboard's macros."}]);
     assert.deepEqual([plan.unfit, plan.unfitWhy, plan.removed], [0, "", 0]);
     assert.deepEqual(shape(current), [["the", "teh"], ["then", "tehn"]], "the list given is left as it is");
@@ -173,8 +175,8 @@ test("a file over what the keyboard holds says how much does not fit, by each ce
     // Within every count and the text, a list is still bound by its domain's
     // own bytes and by the room the profile has left: an entry here is 33
     // bytes, a row for the replacement and one for each input with its text.
-    assert.equal(autocorrectDomainSize(planImport(list(), rows.slice(0, 2), "add", US, CEILINGS).list), 8 + 33);
-    const memory = planImport(list(), rows, "add", US, {...CEILINGS, capacity: 8 + 2 * 33});
+    assert.equal(autocorrectDomainSize(planImport(list(), rows.slice(0, 2), "add", US, CEILINGS).list), 10 + 33);
+    const memory = planImport(list(), rows, "add", US, {...CEILINGS, capacity: 10 + 2 * 33});
     assert.deepEqual([memory.unfit, memory.unfitWhy, shape(memory.list)], [8, "text replacement memory is full", [["word0", "wrod0", "wodr0"], ["word1", "wrod1", "wodr1"]]]);
     const profile = planImport(list(["the", "teh"]), rows, "add", US, {...CEILINGS, sharedFree: 33});
     assert.deepEqual([profile.unfit, profile.unfitWhy, shape(profile.list)], [10, "the keyboard's profile is full", [["the", "teh"], ["word0", "wrod0", "wodr0"]]], "the profile grows by what the list grows");
@@ -243,4 +245,30 @@ test("each format is written as documented", () => {
     assert.equal(exportAutocorrect(list(), "txt"), "");
     assert.equal(exportAutocorrect(list(), "csv"), "\ufeffreplacement,inputs\r\n", "a byte order mark first, so Excel reads its accents");
     assert.equal(exportAutocorrect(list(), "json").charCodeAt(0), 0x7b, "none in JSON or text");
+});
+
+// How a replacement fires, in files (D-L85, D-L91): JSON and CSV say it as
+// `fires`, left out or "as you type" for one that fires as you type; QMK's
+// text has no Leader key, so it says what it left out and what it wrote as
+// typed.
+test("how a replacement fires goes through JSON and CSV as fires, and QMK's text leaves out one that fires after Leader alone and says it writes Both as you type", () => {
+    const value = list(["Kind regards, Sam", "kr", {fires: TRIGGER.AFTER_LEADER}], ["alpha", "abc", ["alph", MATCH.START], {fires: TRIGGER.BOTH}], ["the", "teh"], [5, "sig", {fires: TRIGGER.AFTER_LEADER}]);
+    const json = exportAutocorrect(value, "json");
+    assert.deepEqual(JSON.parse(json).replacements.slice(0, 3), [{replacement: "Kind regards, Sam", fires: "after leader", inputs: ["kr"]}, {replacement: "alpha", fires: "both", inputs: ["abc", "alph*"]}, {replacement: "the", inputs: ["teh"]}]);
+    assert.deepEqual(read(json, "x.json").entries, shape(value));
+    const csv = exportAutocorrect(value, "csv");
+    assert.equal(csv.split("\r\n")[0], "\ufeffreplacement,inputs,fires,macro");
+    assert.match(csv, /"Kind regards, Sam",kr,after leader,\r\nalpha,abc alph\*,both,\r\nthe,teh,as you type,\r\n,sig,after leader,5\r\n/);
+    assert.deepEqual(read(csv, "x.csv").entries, shape(value));
+    assert.equal(read("replacement,inputs,fires\nthe,teh,sometimes\n", "x.csv").refused[0].reason, "“sometimes” does not say how the replacement fires: as you type, after Leader, or both.");
+    const txt = exportAutocorrect(value, "txt");
+    assert.equal(txt, "# 1 replacement that plays a macro is not in this file: this format holds text only.\n# 1 replacement that fires after the Leader key alone is not in this file: this format has no Leader key.\n# 1 replacement that fires as you type and after the Leader key is written here as it fires as you type: this format has no Leader key.\n:abc: -> alpha\n:alph -> alpha\n:teh: -> the\n");
+    // The firmware's own authored lines say how a replacement fires as the line's first word.
+    assert.deepEqual(read("leader pn -> +31 6 1234 5678\nleader kr => 12\nboth :adn: -> and\n", "a.txt").entries,
+        [["+31 6 1234 5678", "pn", {fires: TRIGGER.AFTER_LEADER}], [12, "kr", {fires: TRIGGER.AFTER_LEADER}], ["and", "adn", {fires: TRIGGER.BOTH}]]);
+    // Straight before the arrow the word is the input itself, as typed.
+    assert.deepEqual(read("both -> and\nleader => 3\n", "a.txt").entries, [["and", ["both", MATCH.ANYWHERE]], [3, ["leader", MATCH.ANYWHERE]]]);
+    // A preview names a replacement's inputs as they are written.
+    const preview = previewImport(list(), parseAutocorrectFile(json, "x.json"), US, CEILINGS);
+    assert.deepEqual(preview.add.newReplacements[0], {label: "Kind regards, Sam", inputs: ["kr"]});
 });

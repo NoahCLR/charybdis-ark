@@ -254,10 +254,13 @@ export const macroValidationMessage = (keycode, payload, requestId) => ({type: "
 // refusal comes back in words.
 /** @typedef {import("../../contracts/edits.js").AutocorrectReplacement} AutocorrectReplacement */
 // Inputs for a replacement: the entry is made when the list has none of
-// that text or macro, else they are added to it. `typed` is the field's text
-// as it stands: core reads it into its inputs.
-/** @param {AutocorrectReplacement} replacement @param {string} typed @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'addAutocorrectTypos'>} */
-export const addAutocorrectInputs = (replacement, typed, identity) => ({type: "addAutocorrectTypos", ...replacement, inputs: typed, expectedFingerprint: identity});
+// that text or macro, firing as `fires` says, else they are added to it.
+// `typed` is the field's text as it stands: core reads it into its inputs.
+/** @param {AutocorrectReplacement} replacement @param {string} typed @param {string} [identity] @param {import("../../contracts/edits.js").AutocorrectTrigger} [fires] how a new replacement fires, as you type when left out @returns {import("../../contracts/edits.js").EditOf<'addAutocorrectTypos'>} */
+export const addAutocorrectInputs = (replacement, typed, identity, fires = "word") => ({type: "addAutocorrectTypos", ...replacement, inputs: typed, ...(fires === "word" ? {} : {trigger: fires}), expectedFingerprint: identity});
+// How a replacement fires (D-L91): as you type, after the Leader key, or both.
+/** @param {AutocorrectReplacement} replacement @param {import("../../contracts/edits.js").AutocorrectTrigger} trigger @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'updateAutocorrectTrigger'>} */
+export const autocorrectTrigger = (replacement, trigger, identity) => ({type: "updateAutocorrectTrigger", ...replacement, trigger, expectedFingerprint: identity});
 // A replacement changed where it stands: to other text, or to a macro.
 /** @param {AutocorrectReplacement} replacement @param {AutocorrectReplacement} to @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'updateAutocorrectCorrection'>} */
 export const changeAutocorrectReplacement = (replacement, to, identity) => ({type: "updateAutocorrectCorrection", ...replacement,

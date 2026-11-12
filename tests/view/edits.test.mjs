@@ -615,7 +615,7 @@ test("each text replacement edit is posted as written and staged as the keyboard
     stage(draft, edits.deleteAutocorrectEntry({correction: "Then"}, identity()));
     assert.equal(of("Then"), undefined);
     assert.throws(() => stage(draft, edits.addAutocorrectInputs({correction: "ten"}, "teh", identity())), /is already an input for/);
-    assert.throws(() => stage(draft, edits.addAutocorrectInputs({macro: 4}, "sig*", identity())), /A macro plays for a whole word only/);
+    assert.throws(() => stage(draft, edits.addAutocorrectInputs({macro: 4}, "sig*", identity())), /A macro plays for a whole word/);
     assert.deepEqual(edits.autocorrectValidationMessage(added, 7), {type: "validateAutocorrect", edit: added, requestId: 7});
 });
 

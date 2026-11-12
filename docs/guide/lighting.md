@@ -186,13 +186,22 @@ case off: it does not flash, the list says **off** beside it, and the other
 two still flash. **Give it a colour** switches it back on. A word left as
 you typed it never flashes, whatever the reason.
 
+What the [Leader key](text-replacement.md#after-the-leader-key) sends
+flashes as a replacement does, in the **Replaced with text** or **Replaced by
+a macro** colour: that flash is how you know it went. A leader that sends
+nothing does not flash. Since the leader works with text replacement off,
+this tab still lights a leader's sends while text replacement is off and a
+replacement on your list fires after Leader; its banner says so.
+
 Under **When and where**:
 
 - **Locality**: where the flash paints, with the same choices as a pointing
   mode. Here the trigger key is the key that ended the word (Space, Enter, a
-  punctuation key), or the Backspace that undid the replacement; for a
-  combo, every key of it. When the keyboard cannot tell which key it was,
-  the flash paints both halves, or every key.
+  punctuation key), or the Backspace that undid the replacement; for what
+  the Leader key sends, the key that sent it, the last character or Enter.
+  For a combo, every key of it. When the keyboard cannot tell which key it
+  was, or the leader's wait sent it, the flash paints both halves, or every
+  key.
 - **Flash length**: how long one flash lasts, in milliseconds. The flash
   begins as the replacement starts to be typed.
 

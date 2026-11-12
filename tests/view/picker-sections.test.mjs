@@ -133,3 +133,19 @@ test("a section's groups tell its keys apart by keycode, and a custom key by whe
     const renamed = {...published, customKeys: published.customKeys.map((key) => key.keycode === unnamed.keycode ? {...key, name: "Thumb"} : key)};
     assert.equal(groupOf("custom", unnamed.keycode, renamed), "Named");
 });
+
+// The Leader key (firmware D-F71, D-L91) is text replacement's: offered right
+// after the switch keys in a group of its own, since it switches nothing,
+// worded as the catalogue words it and found by "leader".
+test("the Leader key is offered in Other QMK's Text replacement group, right after the switch keys", () => {
+    const published = publishedModel(profileDocument());
+    const other = pickerSections().find((section) => section.id === "other");
+    const groups = groupedEntries(other, entriesForPickerSection(published.qmkKeycodes, other), published);
+    const names = groups.map((group) => group.name);
+    assert.equal(names.indexOf("Text replacement"), names.indexOf("Switch keys") + 1);
+    const leader = groups.find((group) => group.name === "Text replacement").entries;
+    assert.deepEqual(leader.map((entry) => [entry.value, entry.label, entry.keycode, entry.tip]), [["QK_LEADER", "Leader", 0x7c58, undefined]]);
+    assert.ok(leader.every(pickable));
+    assert.ok(leader[0].search.includes("leader"));
+    assert.ok(!groups.find((group) => group.name === "Switch keys").entries.some((entry) => entry.value === "QK_LEADER"), "it is no switch key");
+});

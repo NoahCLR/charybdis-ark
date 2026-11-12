@@ -28,7 +28,7 @@ const {testClock} = require("../fixtures/panel-loop");
 
 function representativeBlob(payloadSize = 41) {
     return encodeProfileBlob({
-        schema: {major: 4, minor: 5},
+        schema: {major: 4, minor: 6},
         domains: [{
             id: PROFILE_DOMAIN_IDS.RGB,
             version: 5,

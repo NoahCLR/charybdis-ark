@@ -41,21 +41,21 @@ const MUTATING_COMMANDS = new Set([0x03, 0x05, 0x06, 0x07, 0x09, 0x0a, 0x0b, 0x0
 const FEATURES = PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES;
 
 // The domain versions current firmware stores, and refuses any other.
-const CURRENT_DOMAINS = "16:5,32:2,48:3,64:12,80:4,96:1,112:1,128:1";
+const CURRENT_DOMAINS = "16:5,32:2,48:3,64:13,80:4,96:1,112:1,128:2";
 
 // `compiled` is the profile it was built with, which GET 0x05 serves: the
 // document's own unless given (current firmware's carries every domain, with
 // its authored combos and factory settings). `compiledOnly` runs those
 // defaults, with nothing committed; the live combo and settings readbacks
 // still answer from the document. `settingsVersion` is the version its
-// settings readback reports: any but 12 is firmware Ark does not read.
+// settings readback reports: any but 13 is firmware Ark does not read.
 /** @param {import("./types.js").FakeKeyboardOptions} options @returns {import("./types.js").FakeKeyboard} */
-function fakeKeyboard({document, compiled, settingsVersion = 12, compiledOnly = false, slaveKnown = true, generation = 42, firmwareVersion = 0x00010000, brightnessMax = 255, options = keyboardOptions.wire()}) {
+function fakeKeyboard({document, compiled, settingsVersion = 13, compiledOnly = false, slaveKnown = true, generation = 42, firmwareVersion = 0x00010000, brightnessMax = 255, options = keyboardOptions.wire()}) {
     const held = validateSnapshot(document);
     if (document.version !== 5 || held.layers.length !== 16) throw new Error("The fake keyboard runs current firmware: a schema-4, sixteen-layer document.");
     /** @param {Buffer} blob */
     const versions = blob => decodeProfileBlob(blob).domains.map(domain => `${domain.id}:${domain.version}`).join();
-    if (versions(held.candidate) !== CURRENT_DOMAINS || (compiled && versions(compiled) !== CURRENT_DOMAINS)) throw new Error("The fake keyboard runs current firmware: RGB 5, key behaviours 2, combos 3, settings 12, PD 4, keymap 1, macros 1 and autocorrect 1.");
+    if (versions(held.candidate) !== CURRENT_DOMAINS || (compiled && versions(compiled) !== CURRENT_DOMAINS)) throw new Error("The fake keyboard runs current firmware: RGB 5, key behaviours 2, combos 3, settings 13, PD 4, keymap 1, macros 1 and autocorrect 2.");
     const profile = held.candidate, digest = fnv1a32(profile), defaults = compiled || profile;
     const settingsDomain = decodeProfileBlob(profile).domains.find(domain => domain.id === PROFILE_DOMAIN_IDS.SETTINGS);
     if (!settingsDomain) throw new Error("The fake keyboard fixture must contain settings.");
@@ -79,7 +79,7 @@ function fakeKeyboard({document, compiled, settingsVersion = 12, compiledOnly = 
         // The autocorrect list's ceilings (firmware D-F68): corrections,
         // typos, text bytes, the domain, bytes in one typo and in one text
         // correction.
-        p.writeUInt16LE(1024, 0); p.writeUInt16LE(1024, 2); p.writeUInt16LE(20480, 4); p.writeUInt32LE(34824, 6); p[10] = 32; p[11] = 128;
+        p.writeUInt16LE(1024, 0); p.writeUInt16LE(1024, 2); p.writeUInt16LE(20480, 4); p.writeUInt32LE(36874, 6); p[10] = 32; p[11] = 128;
     })];
     // Committed (or running its defaults), converged with the slave half,
     // nothing pending.

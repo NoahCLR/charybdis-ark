@@ -87,12 +87,12 @@ test("the 128 macros populate the model, including empty slots and their names",
 
 test("naming a macro changes its name and nothing else", () => {
     const source = pdDocument(), current = snapshot(source);
-    assert.equal(settingsDomain(source).version, 12);
+    assert.equal(settingsDomain(source).version, 13);
     const named = draftEdit(current, {type: "updateMacro", keycode: "MACRO_3", name: "  Zoom mute "});
     assert.deepEqual(profileMacros(named), profileMacros(source), "a rename leaves every macro's steps alone");
     const domain = settingsDomain(named);
-    assert.equal(domain.version, 12);
-    assert.equal(domain.payload[0], 12, "the payload repeats the envelope's version");
+    assert.equal(domain.version, 13);
+    assert.equal(domain.payload[0], 13, "the payload repeats the envelope's version");
     const settings = validateSnapshot(named).settings, before = validateSnapshot(source).settings;
     assert.equal(settings.macroNames[3], "Zoom mute", "names are trimmed");
     assert.deepEqual(settings.values, before.values);

@@ -1,8 +1,7 @@
 // @ts-check
 import {el} from "../../lib/dom.mjs";
 import {getModel, state} from "../../store.mjs";
-import {stageHeldOffBy} from "../../view/lighting.mjs";
-import {vocabulary} from "../../view/vocabulary.mjs";
+import {stageHeldOffBy, stageOffDetail} from "../../view/lighting.mjs";
 import {settingOffBanner, underBanner} from "../participation.mjs";
 import {benchHeightWith} from "../../lib/scroll.mjs";
 import {stageBase} from "./base.mjs";
@@ -23,7 +22,7 @@ const STAGES = Object.freeze({base: stageBase, layers: stageLayers, auto: stageA
 /** @param {import("../../../contracts/panel.js").PublishedModel} model @param {string} id */
 function stageSurface(model, id) {
     const heldBy = stageHeldOffBy(model, id);
-    return underBanner(heldBy ? settingOffBanner(heldBy, vocabulary(model).settingOff.stage) : null, STAGES[id](model));
+    return underBanner(heldBy ? settingOffBanner(heldBy, stageOffDetail(model, id)) : null, STAGES[id](model));
 }
 
 // The tallest stage with a list beside its editor sets Lighting's workbench

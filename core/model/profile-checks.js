@@ -15,7 +15,9 @@ const {inspectMacroPlayback, readStoredMacro} = require("./macro-input");
 const {pointingMacros} = require("./pointing-taps");
 const {inertLinkLayers, inertLinkReason, linkNamed} = require("./pointing-links");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
-const {actionName} = require("../schema/actions");
+const {actionName, isLeaderKey, sendsLeader} = require("../schema/actions");
+const {profileFacts} = require("./layer-walk");
+const {entryKey, firesAfterLeader, triggerOf} = require("../schema/autocorrect-domain-v1");
 const {REVIEW_AREAS, VOCABULARY, macroDefaultName, settingsPath, slotName, word} = require("./vocabulary");
 const {WARNING, entryOfKey, listWarnings, replacementSaid, untypableFix} = require("./autocorrect-list");
 const {macroName} = require("../../rules/qmk-keycodes.mjs");
@@ -45,10 +47,45 @@ function shortcutlessCustomKeySteps(decoded) {
     return findings;
 }
 
+// Where the profile sends the Leader key (firmware D-F71): its keys, then
+// the behaviours and combos with a step or output that names it.
+/** @param {import("./types.js").DecodedProfile} decoded @returns {import("../../contracts/model.js").FindingPlace[]} */
+function leaderPlaces(decoded) {
+    /** @type {import("../../contracts/model.js").FindingPlace[]} */
+    const places = [];
+    profileFacts(decoded).layers.forEach((codes, layer) => codes.forEach((code, layoutIndex) => {if (isLeaderKey(code)) places.push({kind: "key", layer, layoutIndex});}));
+    for (const row of decoded.behaviors?.rows || []) {
+        if (row.steps.some(step => [step.tap, step.hold?.action, step.longHold?.action].some(sendsLeader))) places.push({kind: "behaviour", keycode: actionName(row.target)});
+    }
+    (decoded.combos?.rows || []).forEach((combo, index) => {if (sendsLeader(combo.output)) places.push({kind: "combo", index});});
+    return places;
+}
+// Replacements that fire after the Leader key with no Leader key to press,
+// and a Leader key with nothing on the list that fires after it (D-L91): the
+// keyboard accepts both, and either does nothing.
+/** @param {import("./types.js").DecodedProfile} decoded @returns {import("../../contracts/model.js").Finding[]} */
+function leaderFindings(decoded) {
+    const list = decoded.autocorrect || {entries: []}, leading = list.entries.filter(entry => firesAfterLeader(triggerOf(entry))), count = leading.length;
+    const places = leaderPlaces(decoded);
+    if (count && !places.length) {
+        return [{kind: "leaderWithoutKey", level: "warning", layers: [], identity: String(count), count,
+            title: `${count} replacement${count === 1 ? " fires" : "s fire"} after a Leader key there is not`,
+            detail: `${count === 1 ? "A replacement fires" : `${count} replacements fire`} after the Leader key, and no key, behaviour or combo sends it, so the keyboard never waits for ${count === 1 ? "its inputs" : "theirs"}.`,
+            fix: "Put the Leader key on a key, in a behaviour or as a combo's output, or make those replacements fire as you type.", place: {kind: "autocorrect", entry: entryKey(leading[0])}}];
+    }
+    if (places.length && !count) {
+        return [{kind: "leaderWithoutInputs", level: "warning", layers: [], identity: String(places.length), count: places.length,
+            title: `The Leader key has nothing to send`,
+            detail: `${places.length === 1 ? "A key, behaviour or combo sends" : `${places.length} keys, behaviours or combos send`} the Leader key, and no replacement on your text replacement list fires after it, so it does nothing.`,
+            fix: "Make a replacement fire after Leader in Text replacement, or take the Leader key off.", place: places[0]}];
+    }
+    return [];
+}
+
 /** @param {import("./types.js").DecodedProfile} decoded @param {import("./types.js").ProfileDestination} [destination] @returns {import("../../contracts/model.js").Finding[]} */
 function profileFindings(decoded, destination = {}) {
     /** @type {import("../../contracts/model.js").Finding[]} */
-    const findings = [...layerReach(decoded), ...gestureTimingFindings(decoded), ...shortcutlessCustomKeySteps(decoded), ...inertBehaviorFindings(decoded)];
+    const findings = [...layerReach(decoded), ...gestureTimingFindings(decoded), ...shortcutlessCustomKeySteps(decoded), ...inertBehaviorFindings(decoded), ...leaderFindings(decoded)];
     for (const [slot, count] of Object.entries(decoded.danglingPointingKeys || {})) {
         if (!count) continue;
         findings.push({kind: "inertPointing", level: "warning", layers: [], identity: `${slot}:${count}`, count,

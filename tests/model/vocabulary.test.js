@@ -16,6 +16,8 @@ test("every stored enum value has a word", () => {
     // letters may go, one way for each stored value.
     assert.deepEqual(Object.values(require("../../core/schema/autocorrect-domain-v1").AUTOCORRECT_MATCH).map(match => require("../../core/model/autocorrect-list").inputForm({typo: "x", match})),
         ["x", "x*", "*x", "*x*"], "where a text replacement's input matches");
+    // How a replacement fires is worded by its switch, one word a trigger.
+    assert.deepEqual(VOCABULARY.inputModes.map(([id]) => id), require("../../core/model/autocorrect-list").TRIGGER_NAMES.slice(), "how a replacement fires");
     // What a replacement is, text or a macro, has a word for each stored kind.
     assert.deepEqual(VOCABULARY.replacementKinds.map(([id]) => id.toUpperCase()).sort(), Object.keys(require("../../core/schema/autocorrect-domain-v1").AUTOCORRECT_KIND).sort(), "replacement kinds");
     // A list's file formats: the runtime list, the contract's union and the words agree.

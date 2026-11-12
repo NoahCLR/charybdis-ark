@@ -381,7 +381,7 @@ test("the text replacement switch is a Settings section of its own, saying where
     const sections = settingsEditorView(current).sections;
     const section = sections.find(({id}) => id === "autocorrect");
     assert.deepEqual([section.area, section.label], ["Settings", "Text replacement"]);
-    assert.deepEqual(section.fields.map(field => [field.macro, field.kind, field.label, field.enabled, Boolean(field.readOnly)]), [["autocorrect", "toggle", "Enabled", false, false]]);
+    assert.deepEqual(section.fields.map(field => [field.macro, field.kind, field.label, field.enabled, Boolean(field.readOnly)]), [["autocorrect", "toggle", "Enabled", false, false], ["leaderTimeout", "number", "Leader waits (ms)", true, false]]);
     assert.equal(section.fields[0].hint, "Off, the keyboard types every word as you typed it and keeps your list. Replacements and their inputs are in Text replacement.");
     // AC_ON, AC_OFF and AC_TOGG override it until the keyboard restarts
     // (firmware D-F66), so it says so and names its switch.
@@ -393,7 +393,21 @@ test("the text replacement switch is a Settings section of its own, saying where
     current.options.keymapMasks[12] = 0x4000;
     assert.equal(validateSnapshot(draftEdit(current, message(current, "autocorrect", {autocorrect: true}))).settings.values[24], 0x4004, "the keyboard's mask, not an assumed bit");
     delete current.options;
-    assert.deepEqual(settingsEditorView(current).sections.find(({id}) => id === "autocorrect").fields, [], "nothing to switch before the keyboard's options are read");
+    assert.deepEqual(settingsEditorView(current).sections.find(({id}) => id === "autocorrect").fields.map(field => field.macro), ["leaderTimeout"], "nothing to switch before the keyboard's options are read");
+});
+
+// Under the switch, how long the leader waits (settings scalar 32, firmware
+// D-F71): 1000 to 10000 ms, typed in milliseconds like the keyboard's other
+// times, which the leader keeps whatever the switch says.
+test("the leader's wait is edited beside the switch in milliseconds, from 1000 to 10000, and changes only scalar 32", () => {
+    const current = withSettings(() => {});
+    const field = settingsEditorView(current).sections.find(({id}) => id === "autocorrect").fields.find(entry => entry.macro === "leaderTimeout");
+    assert.deepEqual([field.value, field.min, field.max, field.unit, field.presentation], ["2000", 1000, 10000, "ms", undefined]);
+    assert.match(field.hint, /works with the switch off/);
+    const longer = validateSnapshot(draftEdit(current, message(current, "autocorrect", {leaderTimeout: "3500"})));
+    assert.equal(longer.settings.values[32], 3500);
+    assert.deepEqual(longer.settings.values.slice(0, 32), validateSnapshot(current.document).settings.values.slice(0, 32), "nothing else moves");
+    for (const refused of ["999", "10001"]) assert.throws(() => draftEdit(current, message(current, "autocorrect", {leaderTimeout: refused})), undefined, refused);
 });
 
 // Settings v9: auto-sniping follows a set of layers beside its master switch,

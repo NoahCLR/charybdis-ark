@@ -59,12 +59,20 @@ function textReplacementOff(model) {
         ?.fields.find((entry) => entry.macro === "autocorrect");
     return Boolean(field && !field.enabled);
 }
-/** @type {Readonly<Record<string, {needs: import("../../contracts/model.js").SettingOffSwitch, off: (model: Model) => boolean}>>} */
+// The list holds a leader input, as core counts them: the leader sends
+// whatever Text replacement's switch says, and what it sends flashes
+// (firmware D-F71, D-L91).
+/** @param {Model} model */
+const hasLeaderInputs = (model) => (model?.autocorrect?.usage?.leaders ?? 0) > 0;
+// What keeps a stage from painting: the switch it needs, and when it is off.
+// A stage that `still` paints something with that switch off keeps its
+// banner and is not idle; its banner then says what it still paints.
+/** @type {Readonly<Record<string, {needs: import("../../contracts/model.js").SettingOffSwitch, off: (model: Model) => boolean, still?: (model: Model) => boolean}>>} */
 const STAGE_NEEDS = Object.freeze({
     auto: {needs: "autoMouse", off: autoMouseOff},
     combo: {needs: "combo", off: (model) => masterOff(model, "combo")},
     key: {needs: "behaviour", off: (model) => masterOff(model, "behavior")},
-    autocorrect: {needs: "autocorrect", off: textReplacementOff},
+    autocorrect: {needs: "autocorrect", off: textReplacementOff, still: hasLeaderInputs},
 });
 // The global switch keeping this stage from painting; null when none is.
 /** @param {Model} model @param {string} id */
@@ -72,11 +80,19 @@ export function stageHeldOffBy(model, id) {
     const stage = Object.hasOwn(STAGE_NEEDS, id) ? STAGE_NEEDS[id] : null;
     return stage && stageEnabled(model, id) && stage.off(model) ? stage.needs : null;
 }
-// Why this stage paints nothing, in the words of its banner; null when it paints.
+// What a stage's banner says the switch's being off leaves of it: nothing,
+// or what it still paints (replacement feedback a leader's sends).
+/** @param {Model} model @param {string} id */
+export function stageOffDetail(model, id) {
+    const words = vocabulary(model).settingOff;
+    return Object.hasOwn(STAGE_NEEDS, id) && STAGE_NEEDS[id].still?.(model) ? words.leading.stage : words.stage;
+}
+// Why this stage paints nothing, in the words of its banner; null when it
+// paints, a stage that still paints something with its switch off included.
 /** @param {Model} model @param {string} id */
 export function stageIdle(model, id) {
     const needs = stageHeldOffBy(model, id);
-    if (!needs) return null;
+    if (!needs || STAGE_NEEDS[id].still?.(model)) return null;
     const words = vocabulary(model).settingOff;
     return `${words.switches[needs].off} ${words.stage}`;
 }

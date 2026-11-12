@@ -6,7 +6,7 @@ const {editDomain} = require("../fixtures/profile-document");
 const {draftEdit} = require("../fixtures/draft-edit");
 const {fingerprint, validateSnapshot} = require("../../core/model/portable-profile");
 const {autocorrectEditorView, editNames, newWarnings, tryText, TRY_TEXT_MAX} = require("../../core/model/autocorrect-editor");
-const {AUTOCORRECT_DOMAIN_V1, AUTOCORRECT_MATCH: MATCH, autocorrectDomainSize, entryKey} = require("../../core/schema/autocorrect-domain-v1");
+const {AUTOCORRECT_DOMAIN_V1, AUTOCORRECT_MATCH: MATCH, AUTOCORRECT_TRIGGER: TRIGGER, autocorrectDomainSize, entryKey} = require("../../core/schema/autocorrect-domain-v1");
 const {encodeMacroPayload} = require("../../core/schema/macro-payload");
 const {hostLayouts} = require("../../core/data/host-layouts");
 const {draftEditLabel} = require("../../core/model/draft-edits");
@@ -21,8 +21,10 @@ function fixture(entries, layout = 0, macros = {}) {
     const policy = settings();
     policy.values[27] = 1 | (layout << 16);
     for (const slot of Object.keys(macros)) policy.macroNames[Number(slot)] = `Macro ${slot} named`;
+    // A {fires} among an entry's inputs says how it fires.
     let document = editDomain(compiled({policy}), "autocorrect", list => {list.entries = entries.map(([correction, ...typos]) => ({...(typeof correction === "number" ? {correction: "", macro: correction} : {correction}),
-        typos: typos.map(typo => typeof typo === "string" ? {typo, match: 0} : {typo: typo[0], match: typo[1]})}));});
+        ...Object.assign({}, ...typos.filter(typo => typo?.fires !== undefined).map(typo => ({trigger: typo.fires}))),
+        typos: typos.filter(typo => typo?.fires === undefined).map(typo => typeof typo === "string" ? {typo, match: 0} : {typo: typo[0], match: typo[1]})}));});
     if (Object.keys(macros).length) document = editDomain(document, "macros", slots => {for (const [slot, payload] of Object.entries(macros)) slots[Number(slot)] = encodeMacroPayload(payload);});
     return snapshot(document);
 }
@@ -38,17 +40,17 @@ test("the view lists each replacement once with its inputs, as it is written, in
     const view = autocorrectEditorView(current, CURRENT_CAPABILITIES);
     assert.equal(view.identity, current.fingerprint);
     assert.deepEqual(view.entries, [
-        {id: "because", label: "because", correction: "because", warnings: [], typos: [{typo: "becuase", input: "becuase", warnings: []}]},
-        {id: "ment", label: "ment", correction: "ment", warnings: [], typos: [{typo: "mnet", input: "*mnet", warnings: []}]},
-        {id: "receive", label: "receive", correction: "receive", warnings: [], typos: [{typo: "recieve", input: "recieve*", warnings: []}]},
-        {id: "the", label: "the", correction: "the", warnings: [], typos: [{typo: "hte", input: "hte", warnings: []}, {typo: "teh", input: "teh", warnings: []}]},
-        {id: "thing", label: "thing", correction: "thing", warnings: [], typos: [{typo: "tihng", input: "*tihng*", warnings: []}]},
-        {id: entryKey({macro: 5}), label: "Macro 5 named", correction: "", macro: 5, warnings: [], typos: [{typo: "sig", input: "sig", warnings: []}]}],
+        {id: "because", label: "because", correction: "because", fires: "word", warnings: [], typos: [{typo: "becuase", input: "becuase", warnings: []}]},
+        {id: "ment", label: "ment", correction: "ment", fires: "word", warnings: [], typos: [{typo: "mnet", input: "*mnet", warnings: []}]},
+        {id: "receive", label: "receive", correction: "receive", fires: "word", warnings: [], typos: [{typo: "recieve", input: "recieve*", warnings: []}]},
+        {id: "the", label: "the", correction: "the", fires: "word", warnings: [], typos: [{typo: "hte", input: "hte", warnings: []}, {typo: "teh", input: "teh", warnings: []}]},
+        {id: "thing", label: "thing", correction: "thing", fires: "word", warnings: [], typos: [{typo: "tihng", input: "*tihng*", warnings: []}]},
+        {id: entryKey({macro: 5}), label: "Macro 5 named", correction: "", macro: 5, fires: "word", warnings: [], typos: [{typo: "sig", input: "sig", warnings: []}]}],
         "each named once, by core: its text, or its macro's name after the mark");
     const bytes = autocorrectDomainSize(validateSnapshot(current.document).autocorrect);
     // The share both memory meters draw is the list's bytes of its own limit;
     // what is free is bound by the text's ceiling and the profile's room too.
-    assert.deepEqual(view.usage, {corrections: 6, typos: 7, maxTypos: 1024, textBytes: 58, maxTextBytes: 20480, bytes, capacity: 34824, share: bytes / 34824, free: 20480 - 58, textMax: 32, correctionMax: 128, shortInput: 4});
+    assert.deepEqual(view.usage, {corrections: 6, typos: 7, leaders: 0, maxTypos: 1024, textBytes: 58, maxTextBytes: 20480, bytes, capacity: 36874, share: bytes / 36874, free: 20480 - 58, textMax: 32, correctionMax: 128, shortInput: 4});
     assert.equal("starter" in view, false, "Ark ships no list of its own to offer (D-L90)");
     assert.deepEqual([view.notices, view.layoutName], [[], "US"]);
     assert.equal(autocorrectEditorView(null), null);
@@ -132,7 +134,7 @@ test("a refused edit says why in plain words, and a form drawn from another revi
     says(() => edit(current, {type: "addAutocorrectTypos", correction: "ten", typos: [{typo: "teh"}]}), /“teh” is already an input for “the”/, "AUTOCORRECT_EDIT_REFUSED");
     says(() => edit(current, {type: "addAutocorrectTypos", correction: "über", typos: [{typo: "ueber"}]}), /US cannot type “ü”/, "AUTOCORRECT_EDIT_REFUSED");
     says(() => edit(current, {type: "addAutocorrectTypos", correction: "then", typos: [{typo: "te*hn"}]}), /“te\*hn” has \* where it cannot go/, "AUTOCORRECT_EDIT_REFUSED");
-    says(() => edit(current, {type: "addAutocorrectTypos", macro: 5, typos: [{typo: "sig*"}]}), /A macro plays for a whole word only/, "AUTOCORRECT_EDIT_REFUSED");
+    says(() => edit(current, {type: "addAutocorrectTypos", macro: 5, typos: [{typo: "sig*"}]}), /A macro plays for a whole word/, "AUTOCORRECT_EDIT_REFUSED");
     says(() => edit(current, {type: "addAutocorrectTypos", macro: 128, typos: [{typo: "sig"}]}), /Choose one of the keyboard's macros/, "AUTOCORRECT_EDIT_REFUSED");
     says(() => edit(current, {type: "addAutocorrectTypos", correction: "x".repeat(129), typos: [{typo: "long"}]}), /at most 128 bytes/, "AUTOCORRECT_EDIT_REFUSED");
     says(() => edit(current, {type: "updateAutocorrectTypo", typo: "gone", to: "gone*"}), /no longer in the list/);
@@ -384,4 +386,55 @@ test("a try is bounded and refuses what is not text", () => {
     says(() => tryText(current, {before: "", typed: "x".repeat(TRY_TEXT_MAX + 1), capsLock: false}), /too long to try/, "AUTOCORRECT_TRY_REFUSED");
     says(() => tryText(current, {before: 4, typed: "teh ", capsLock: false}), /text/, "AUTOCORRECT_TRY_REFUSED");
     says(() => tryText(current, {before: "", typed: "teh ", capsLock: "yes"}), /Caps Lock/, "AUTOCORRECT_TRY_REFUSED");
+});
+
+// Replacements that fire after a Leader key there is not, and a Leader key
+// with nothing that fires after it (D-L91): the keyboard accepts either and
+// either does nothing, so Review says so.
+test("Review warns of replacements that fire after a Leader key no key sends, and of a Leader key with nothing to send", () => {
+    const {profileFindings} = require("../../core/model/profile-checks");
+    const LEADER = require("../../core/schema/keycodes").encode("QK_LEADER");
+    const leaderChecks = current => profileFindings(validateSnapshot(current.document)).filter(finding => finding.kind.startsWith("leader")).map(finding => [finding.kind, finding.count, finding.title, finding.place?.kind]);
+    const listed = [["+31 6 1234 5678", "pn", {fires: TRIGGER.AFTER_LEADER}], ["alpha", "abc", "alpah", {fires: TRIGGER.BOTH}], ["the", "teh"]];
+    assert.deepEqual(leaderChecks(fixture(listed)), [["leaderWithoutKey", 2, "2 replacements fire after a Leader key there is not", "autocorrect"]]);
+    const keyed = editDomain(fixture(listed).document, "keymap", layers => {layers[1][7] = LEADER;});
+    assert.deepEqual(leaderChecks(snapshot(keyed)), [], "a key sends it");
+    const bare = editDomain(fixture([["the", "teh"]]).document, "keymap", layers => {layers[1][7] = LEADER;});
+    const [finding] = profileFindings(validateSnapshot(bare)).filter(row => row.kind === "leaderWithoutInputs");
+    assert.deepEqual([finding.title, finding.place.kind, finding.place.layer], ["The Leader key has nothing to send", "key", 1]);
+    assert.deepEqual(leaderChecks(fixture([["the", "teh"]])), [], "neither: nothing to say");
+});
+
+test("how a replacement fires is switched alone, its inputs kept, and a new one fires as its add says", () => {
+    const current = fixture([["the", "teh", ["recieve", MATCH.START]]]);
+    const leading = edit(current, {type: "updateAutocorrectTrigger", correction: "the", trigger: "leader"});
+    assert.deepEqual(listOf(leading), [["the", ["recieve", MATCH.START], "teh"]], "its inputs stay");
+    const view = autocorrectEditorView(leading, CURRENT_CAPABILITIES);
+    assert.deepEqual([view.entries[0].fires, view.usage.leaders], ["leader", 2]);
+    // Review says the switch in its own words, and only it.
+    const [reviewed] = require("../../core/model/profile-review").profileReview(current, leading, CURRENT_CAPABILITIES).filter(item => item.area === "Text replacement");
+    assert.deepEqual(reviewed.fields.map(field => [field.label, field.status, field.before, field.after]), [["Fires", "changed", "As you type", "After Leader"]]);
+    assert.equal(autocorrectEditorView(edit(leading, {type: "updateAutocorrectTrigger", correction: "the", trigger: "both"}), CURRENT_CAPABILITIES).entries[0].fires, "both");
+    assert.equal(autocorrectEditorView(edit(leading, {type: "updateAutocorrectTrigger", correction: "the", trigger: "word"}), CURRENT_CAPABILITIES).entries[0].fires, "word");
+    const made = edit(current, {type: "addAutocorrectTypos", correction: "Kind regards", inputs: "kr", trigger: "leader"});
+    assert.equal(autocorrectEditorView(made, CURRENT_CAPABILITIES).entries.find(entry => entry.id === "Kind regards")?.fires, "leader");
+    says(() => edit(current, {type: "addAutocorrectTypos", correction: "Kind regards", inputs: "k.r", trigger: "leader"}), /one word/);
+    says(() => edit(current, {type: "updateAutocorrectTrigger", correction: "the", trigger: "never"}), /fires as you type, after the Leader key, or both/);
+});
+
+// Try it's After Leader field (D-L91): the box is never written into, so what
+// the leader does is asked of text typed after the key on its own.
+test("a try says what the leader would do with text typed after it: send, wait, drop, pass over or nothing", () => {
+    const leads = {fires: TRIGGER.AFTER_LEADER};
+    const current = fixture([["+31 6 1234 5678", "pn", leads], ["alpha", "abc", leads], ["delta", "abcd", leads], ["über", "ub", leads], [5, "sig", leads]], 0, {5: "Kind regards"});
+    const leader = typed => tryText(current, {before: "", typed: "", capsLock: false, leader: typed}).leader;
+    assert.deepEqual(leader("PN"), {state: "sends", input: "pn", entry: "+31 6 1234 5678", label: "+31 6 1234 5678", finishing: false, passedOver: false});
+    assert.deepEqual(leader("abc"), {state: "waits", sends: "alpha", longer: ["abcd"]});
+    assert.deepEqual(leader("abc\n"), {state: "sends", input: "abc", entry: "alpha", label: "alpha", finishing: true, passedOver: false});
+    assert.deepEqual(leader("ax"), {state: "drops", held: "ax"});
+    assert.deepEqual(leader("ub"), {state: "sends", input: "ub", entry: "über", label: "über", finishing: false, passedOver: true}, "US cannot type it");
+    assert.deepEqual(leader("sig"), {state: "sends", input: "sig", entry: entryKey({macro: 5}), label: "Macro 5 named", macro: 5, finishing: false, passedOver: false});
+    assert.deepEqual(tryText(fixture([["the", "teh"]]), {before: "", typed: "", capsLock: false, leader: "pn"}).leader, {state: "none"});
+    assert.equal(tryText(current, {before: "", typed: "teh", capsLock: false}).leader, undefined, "asked only when given");
+    says(() => tryText(current, {before: "", typed: "", capsLock: false, leader: 5}), /takes text/);
 });

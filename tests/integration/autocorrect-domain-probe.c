@@ -9,7 +9,8 @@
 // runtime reads it, a line each in row order: the typo's bytes in hex, its
 // match, and its correction, a text correction's bytes in hex or `m` and the
 // slot of a macro one; then the part-of-word typos' rows, as the part index
-// lists them.
+// lists them, and the rows of the typos after the leader, as the leader
+// index lists them, each found by the leader's own search.
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -56,9 +57,10 @@ int main(int argc, char **argv) {
         // The binary search the engine uses finds every typo by its bytes.
         assert(noah_profile_autocorrect_v1_find(&list, text, typo.length, &found) && found.index == row);
         hex(text, typo.length);
-        printf(" %u ", (unsigned)typo.match);
+        // Its match, and how its correction fires (firmware D-F71).
+        printf(" %u %u ", (unsigned)typo.match, (unsigned)correction.trigger);
         if (correction.kind == NOAH_PROFILE_AUTOCORRECT_V1_KIND_MACRO) {
-            // A macro plays for the whole word only, and has no text.
+            // A macro plays for the whole word, and has no text.
             assert(typo.match == NOAH_PROFILE_AUTOCORRECT_V1_MATCH_WHOLE_WORD && correction.length == 0u);
             printf("m%u", (unsigned)correction.macro);
         } else {
@@ -70,6 +72,17 @@ int main(int argc, char **argv) {
     for (uint16_t position = 0; position < list.part_typos; position++) {
         noah_profile_autocorrect_v1_typo_t typo;
         assert(noah_profile_autocorrect_v1_part_at(&list, position, &typo, NULL));
+        printf(" %u", (unsigned)typo.index);
+    }
+    putchar('\n');
+    printf("leaders");
+    for (uint16_t position = 0; position < list.leader_typos; position++) {
+        noah_profile_autocorrect_v1_typo_t typo;
+        noah_profile_autocorrect_v1_leader_t found;
+        uint8_t text[NOAH_PROFILE_AUTOCORRECT_V1_TEXT_MAX];
+        assert(noah_profile_autocorrect_v1_leader_at(&list, position, &typo, text));
+        // What the leader holds finds the typed form it is, exactly.
+        assert(noah_profile_autocorrect_v1_leader(&list, text, typo.length, &found) && found.exact && found.typo.index == typo.index);
         printf(" %u", (unsigned)typo.index);
     }
     putchar('\n');

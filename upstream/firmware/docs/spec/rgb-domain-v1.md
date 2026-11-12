@@ -17,7 +17,7 @@ lighting ceilings a build reports are on
 All integers are unsigned; multibyte integers are little-endian. A colour is
 three bytes, hue, saturation, value. Hue and saturation take `0..255`; value
 is at most the build's `RGB_MATRIX_MAXIMUM_BRIGHTNESS`, which GET `0x08`
-page 1 reports (D-F38, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/b734c89a86a682564faad5a65b0a526af360466b/docs/adr/0038-keyboard-reports-its-brightness-limit.md);
+page 1 reports (D-F38, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/a90f448a5235071b7e64aead6e2bebcdf29ba6de/docs/adr/0038-keyboard-reports-its-brightness-limit.md);
 [editor metadata](profile-wire-v1/settings-domain.md#editor-metadata--get-0x08)).
 Black (`0, 0, 0`) is literal black, except in a group row
 ([below](#group-rows)), and in a layer colour and a replacement-feedback
@@ -47,7 +47,7 @@ Held by: `tests/host/run_profile_rgb_v1_tests.sh` (`profile_rgb_v1_test.c`, `tes
 | 15 | 1 | reserved, zero |
 
 `LG + PG + CG + KG + RG` is at most 640 (D-F63,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/b734c89a86a682564faad5a65b0a526af360466b/docs/adr/0063-more-led-sets-and-accents.md)). The tap-branch colour
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/a90f448a5235071b7e64aead6e2bebcdf29ba6de/docs/adr/0063-more-led-sets-and-accents.md)). The tap-branch colour
 count's ceiling is the shared tap depth less one.
 
 | Stage bit | Stage |
@@ -103,7 +103,7 @@ Behaviour feedback:
 | 10 | 1 | locality |
 
 Replacement feedback (D-F70,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/b734c89a86a682564faad5a65b0a526af360466b/docs/adr/0070-replacement-feedback-is-a-lighting-stage.md)):
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/a90f448a5235071b7e64aead6e2bebcdf29ba6de/docs/adr/0070-replacement-feedback-is-a-lighting-stage.md)):
 
 | Offset | Size | Field |
 | ---: | ---: | --- |
@@ -305,8 +305,8 @@ Replacement feedback is a flash for what text replacement
 
 | Semantic | Shown from | Colour |
 | --- | --- | --- |
-| text replaced | the replacement of a typed form begins to be typed | text replaced |
-| macro replaced | a typed form begins to be erased for its macro | macro replaced |
+| text replaced | the replacement of a typed form, or the text [the leader](autocorrect-v1.md#the-leader) sends, begins to be typed | text replaced |
+| macro replaced | a typed form begins to be erased for its macro, or the macro the leader sends begins to play | macro replaced |
 | undone | Backspace right after a replacement begins to put the word back | undone |
 
 - A flash lasts the replacement-feedback flash length, settings scalar 31
@@ -315,7 +315,8 @@ Replacement feedback is a flash for what text replacement
   flash half-period, scalar 15. One shows at a time: a newer one takes the place
   of the one showing.
 - Its key is the key that ended the word, or the Backspace that undid the
-  replacement; a combo's output is every key of the combo, as they are when
+  replacement, or for what the leader sends the key that ended leading, none
+  when its timeout did (D-F71); a combo's output is every key of the combo, as they are when
   the typing stage reads the key. Locality `3` paints that key's half and
   `4` that key alone. The key is not known when what ended the word reached
   the report by no key's press or action, or in a report read after one
@@ -329,7 +330,9 @@ Replacement feedback is a flash for what text replacement
   so do black rows for it; the other semantics are unaffected.
 - A word that ends and is left as typed shows nothing: a word not on the
   list, one that already reads as its replacement, one the layout cannot
-  type, one passed over or suspended, and text replacement switched off.
+  type, one passed over or suspended, and any word while text replacement is
+  switched off. So does a leader that sends nothing; what the leader sends
+  shows whatever the switches say.
 
 Held by: `tests/host/run_rgb_layer_render_tests.sh` (`rgb_layer_render_test.c`, `test_render_order_*`, `test_combo_*_stays_*`, `test_runtime_boot_indicator_overrides_scene`, the `*automouse*` and `*timeout*` tests, `test_newest_global_feedback_owner_wins_over_older_higher_priority`, `test_key_half_feedback_follows_newest_owner_without_visible_fallback`, `test_render_order_replacement_feedback_covers_key_feedback`, `test_a_frame_reads_replacement_feedback_once`; `rgb_base_underlay_test.c`; `rgb_autocorrect_active_profile_test.c`), `tests/host/run_autocorrect_tests.sh` (`autocorrect_test.c`, the tests under "What lighting is told"), `tests/host/run_runtime_debug_tests.sh` (`runtime_debug_test.c`, the `test_key_feedback_*` and `test_display_preview_*` tests, `test_split_term_branch_names_its_tap_at_the_accept_window`, `test_long_hold_only_branch_keeps_branch_color_until_long_hold`), `tests/host/run_qmk_combo_origin_tests.sh` (`qmk_combo_origin_test.c`, `test_active_combo_partition_*`).
 
@@ -355,13 +358,13 @@ Held by: `tests/host/run_active_profile_rgb_runtime_tests.sh` (`active_profile_r
 ## Compatibility
 
 The firmware reads only version 5 (D-F10,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/b734c89a86a682564faad5a65b0a526af360466b/docs/adr/0010-firmware-accepts-only-current-formats.md)); version 4 and
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/a90f448a5235071b7e64aead6e2bebcdf29ba6de/docs/adr/0010-firmware-accepts-only-current-formats.md)); version 4 and
 earlier are `INVALID_VERSION` and are not translated. Version 5 added
 replacement feedback: stage bit 5, the row count in header byte 14 and the
 two sections at the end (D-F70); how long its flash lasts is settings scalar
 31, settings version 12, in the same profile schema 4.5. D-F63 raised the
 group and row ceilings within version 4, and version 5 keeps them. The 32
-pointing-colour rows are D-F09's ([ADR](https://github.com/NoahCLR/charybdis-4x6/blob/b734c89a86a682564faad5a65b0a526af360466b/docs/adr/0009-thirty-two-pointing-slots-stored-sparsely.md));
-the sixteen layer colours D-F14's ([ADR](https://github.com/NoahCLR/charybdis-4x6/blob/b734c89a86a682564faad5a65b0a526af360466b/docs/adr/0014-bigger-profiles.md)).
+pointing-colour rows are D-F09's ([ADR](https://github.com/NoahCLR/charybdis-4x6/blob/a90f448a5235071b7e64aead6e2bebcdf29ba6de/docs/adr/0009-thirty-two-pointing-slots-stored-sparsely.md));
+the sixteen layer colours D-F14's ([ADR](https://github.com/NoahCLR/charybdis-4x6/blob/a90f448a5235071b7e64aead6e2bebcdf29ba6de/docs/adr/0014-bigger-profiles.md)).
 
 Held by: `tests/host/run_profile_rgb_v5_tests.sh` (`profile_rgb_v5_test.c`), `tests/fixtures/rgb_domain_v5.json` (`groups-128`, `groups-129`, `rows-255-in-one-table`, `rows-640-in-all`, `rows-641-in-all`, `rows-640-with-replacement`, `rows-641-with-replacement`, `replacement-rows-255`, `version-4`, `version-3`, `version-2`).

@@ -69,7 +69,7 @@ test("a restore to firmware on another base is refused before recovery or any wr
         return responses;
     }};
     const {service} = await connectedService(t, {keyboard});
-    assert.deepEqual(service.capabilities.protocol, {major: 2, minor: 2});
+    assert.deepEqual(service.capabilities.protocol, {major: 2, minor: 3});
     let recovery = 0;
     await assert.rejects(service.restorePortableProfile(document(), {saveRecovery: () => {recovery++;}}), {code: "FIRMWARE_UPDATE_REQUIRED"});
     assert.equal(recovery, 0);
@@ -131,7 +131,7 @@ function readPages(options = {}) {
     const capabilityIdentity = Buffer.alloc(25);
     const featureFlags = (PROFILE_WIRE_FEATURES.SPLIT_KEYBOARD | PROFILE_WIRE_FEATURES.POINTING
         | (options.mutation ? PROFILE_WIRE_KNOWN_MASKS.CURRENT_MUTATION_FEATURES : 0)) >>> 0;
-    capabilityIdentity.set([options.capabilityLayout ?? 3, PROFILE_WIRE_V1.CAPABILITY_PAGE_COUNT, PROFILE_WIRE_V1.PROTOCOL_MAJOR, PROFILE_WIRE_V1.PROTOCOL_MINOR, options.schemaMajor || 4, options.schemaMajor ? 0 : 5, 32, options.mutation ? 20 : 0, 2], 0);
+    capabilityIdentity.set([options.capabilityLayout ?? 3, PROFILE_WIRE_V1.CAPABILITY_PAGE_COUNT, PROFILE_WIRE_V1.PROTOCOL_MAJOR, PROFILE_WIRE_V1.PROTOCOL_MINOR, options.schemaMajor || 4, options.schemaMajor ? 0 : 6, 32, options.mutation ? 20 : 0, 2], 0);
     capabilityIdentity.writeUInt32LE(featureFlags, 9);
     capabilityIdentity.writeUInt32LE(options.actionAbiDigest ?? 0x12345678, 13);
     const capacity = Buffer.from([
@@ -142,7 +142,7 @@ function readPages(options = {}) {
     wide.writeUInt16LE(640, 0); wide.writeUInt32LE(65536, 2);
     wide.writeUInt32LE(65504, 6); wide.writeUInt32LE(65504, 10); wide.writeUInt32LE(10327, 14);
     const autocorrect = Buffer.alloc(25);
-    autocorrect.writeUInt16LE(1024, 0); autocorrect.writeUInt16LE(1024, 2); autocorrect.writeUInt16LE(20480, 4); autocorrect.writeUInt32LE(34824, 6); autocorrect[10] = 32;
+    autocorrect.writeUInt16LE(1024, 0); autocorrect.writeUInt16LE(1024, 2); autocorrect.writeUInt16LE(20480, 4); autocorrect.writeUInt32LE(36874, 6); autocorrect[10] = 32;
     const statusIdentity = Buffer.alloc(25);
     statusIdentity.set([1, 2], 0);
     const stateFlags = options.stateFlags ?? (options.mutation ? 0x31 : 0x81);
@@ -351,7 +351,7 @@ test("compatibility reports a schema blocker, and the diagnostic says what was c
     const scanned = await service.enumerate();
     const connected = await service.connect(scanned.devices[0].id);
     assert.equal(connected.compatibility.compatible, false);
-    assert.match(connected.compatibility.reasons.join("\n"), /Profile schema is 1\.0; Charybdis Ark requires 4\.5/);
+    assert.match(connected.compatibility.reasons.join("\n"), /Profile schema is 1\.0; Charybdis Ark requires 4\.6/);
     assert.match(connected.diagnostics.join("\n"), /found \d+ blocking issue/);
 });
 
@@ -375,7 +375,7 @@ test("compatibility compares only what the keyboard reports with what this app r
 test("compatibility uses the exact Profile Wire and schema versions in capabilities", () => {
     const {capabilities} = require("../fixtures/portable-restore");
     assert.equal(evaluateProfileCompatibility(capabilities).compatible, true);
-    for (const protocol of [{major: 1, minor: 0}, {major: 2, minor: 0}, {major: 2, minor: 2}]) {
+    for (const protocol of [{major: 1, minor: 0}, {major: 2, minor: 1}, {major: 2, minor: 3}]) {
         const result = evaluateProfileCompatibility({...capabilities, protocol});
         assert.equal(result.compatible, false);
         assert.match(result.reasons.join("\n"), /Update both halves/);

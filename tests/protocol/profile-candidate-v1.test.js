@@ -74,7 +74,7 @@ test("JavaScript emits the exact candidate frames consumed by the firmware fixtu
     const fixtures = goldenFixtures();
     const metadata = {
         schemaMajor: 4,
-        schemaMinor: 5,
+        schemaMinor: 6,
         requestedDomains: 3,
         flags: 0,
         payloadLength: 8,
@@ -85,7 +85,7 @@ test("JavaScript emits the exact candidate frames consumed by the firmware fixtu
     };
     assert.deepEqual(buildCandidateBeginRequest(0x1234, metadata), fixtures["begin-request"]);
     assert.deepEqual(
-        buildCandidateChunkRequest(0x1234, 0, Buffer.from("4e4c503104050001", "hex")),
+        buildCandidateChunkRequest(0x1234, 0, Buffer.from("4e4c503104060001", "hex")),
         fixtures["chunk-request"]
     );
     assert.deepEqual(buildCandidateValidateRequest(0x1234), fixtures["validate-request"]);
@@ -299,7 +299,7 @@ test("candidate codecs reject noncanonical padding, invalid bounds, and unknown 
     assert.equal(decodeCandidateStatusResponse(failed, fixtures["operation-status-request"]).state, CANDIDATE_STATE.AUTHORITY_FAILED);
 });
 
-const SCHEMA_4 = {major: 4, minor: 5};
+const SCHEMA_4 = {major: 4, minor: 6};
 
 test("metadata is derived from the canonical blob and its exact domain mask", () => {
     const blob = encodeProfileBlob({
@@ -308,7 +308,7 @@ test("metadata is derived from the canonical blob and its exact domain mask", ()
     });
     const metadata = candidateMetadataForBlob(blob, {actionAbiDigest: 0x12345678});
     assert.equal(metadata.schemaMajor, 4);
-    assert.equal(metadata.schemaMinor, 5);
+    assert.equal(metadata.schemaMinor, 6);
     assert.equal(metadata.requestedDomains, 1);
     assert.equal(metadata.payloadLength, blob.length);
     assert.equal(metadata.actionAbiDigest, 0x12345678);
@@ -324,7 +324,7 @@ test("every candidate begin carries a 32-bit length and zero reserved bytes", ()
     const blob = encodeProfileBlob({schema: SCHEMA_4, domains: []});
     const metadata = candidateMetadataForBlob(blob, {actionAbiDigest: 0x12345678});
     const report = buildCandidateBeginRequest(0x4321, metadata);
-    assert.deepEqual([report[5], report[6]], [4, 5]);
+    assert.deepEqual([report[5], report[6]], [4, 6]);
     assert.equal(report.readUInt32LE(8), blob.length);
     assert.equal(report.readUInt32LE(20), 0x12345678);
     assert.equal(report.readUInt32LE(24), 0);
@@ -352,12 +352,12 @@ test("every store format but current firmware's 6 is refused, the custom-only fo
     assert.throws(() => buildCandidateBeginRequest(1, {...metadata, storeFormatVersion: 0}), /store format/);
 });
 
-test("only schema 4.5 candidates are built, up to the 130,048-byte payload", () => {
+test("only schema 4.6 candidates are built, up to the 130,048-byte payload", () => {
     const schema1 = Buffer.from("4e4c503101000001", "hex");
     assert.throws(() => candidateMetadataForBlob(schema1, {actionAbiDigest: 1}), (error) => error.code === "INCOMPATIBLE_SCHEMA");
     const metadata = candidateMetadataForBlob(encodeProfileBlob({schema: SCHEMA_4, domains: []}), {actionAbiDigest: 1});
     assert.throws(() => buildCandidateBeginRequest(1, {...metadata, schemaMajor: 1}), (error) => error.code === "INCOMPATIBLE_SCHEMA");
-    for (const schemaMinor of [4, 6]) assert.throws(() => buildCandidateBeginRequest(1, {...metadata, schemaMinor}), (error) => error.code === "INCOMPATIBLE_SCHEMA");
+    for (const schemaMinor of [5, 7]) assert.throws(() => buildCandidateBeginRequest(1, {...metadata, schemaMinor}), (error) => error.code === "INCOMPATIBLE_SCHEMA");
     assert.throws(() => candidateMetadataForBlob(Buffer.from("4e4c503104000001", "hex"), {actionAbiDigest: 1}), (error) => error.code === "INCOMPATIBLE_SCHEMA", "schema 4.0");
     assert.throws(() => candidateMetadataForBlob(Buffer.from("4e4c503104010001", "hex"), {actionAbiDigest: 1}), (error) => error.code === "INCOMPATIBLE_SCHEMA", "schema 4.1");
     assert.throws(() => candidateMetadataForBlob(Buffer.from("4e4c503104020001", "hex"), {actionAbiDigest: 1}), (error) => error.code === "INCOMPATIBLE_SCHEMA", "schema 4.2");

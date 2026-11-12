@@ -9,8 +9,8 @@ const {SETTING, shortcutIdentity, shortcutPresent} = require("../schema/settings
 const {decodedOf} = require("./portable-profile");
 const {settingsEditorView, COMBO_TIMING} = require("./settings-editor");
 const {macroEditorView} = require("./macro-editor");
-const {findTypo, pairEntries, replacementCalled, replacementSaid, inputForm} = require("./autocorrect-list");
-const {entryKey} = require("../schema/autocorrect-domain-v1");
+const {TRIGGER_NAMES, heldTypo, pairEntries, replacementCalled, replacementSaid, inputForm} = require("./autocorrect-list");
+const {entryKey, triggerOf} = require("../schema/autocorrect-domain-v1");
 const {inspectMacroPlayback} = require("./macro-input");
 const {hostLayout} = require("../data/host-layouts");
 const rgbEnums = require("../schema/rgb-domain-v1");
@@ -467,18 +467,21 @@ function profileReview(before, after, capabilities) {
         const old = macrosA.macros[i], next = macrosB.macros[i], has = /** @param {Macros["macros"][number]} macro */ (macro) => Boolean(macro.payload || macro.name || macro.protection !== "auto");
         item(AREA.macros, UNIT.macro(i), `${macroDefaultName(i)}${(next.name || old.name) ? ` · ${next.name || old.name}` : ""}`, fields(old), fields(next), {kind: "macro", index: i, keycode: macroName(i)}, [has(old), has(next)]);
     });
-    // The text replacement list, an entry an item: its replacement, and each
-    // input as it is written. One that changed entries says where it
-    // went or came from; an entry whose replacement changed is one item, old
-    // to new.
+    // The text replacement list, an entry an item: its replacement, how it
+    // fires where either side fires after the Leader key, and each input as
+    // it is written. One that changed entries says where it went or came
+    // from; an entry whose replacement changed is one item, old to new.
     for (const pair of pairEntries(a.autocorrect, b.autocorrect)) {
         /** @param {import("../schema/autocorrect-domain-v1.js").Entry} entry @param {Decoded} profile */
         const replacement = (entry, profile) => replacementCalled(entry, profile.settings.macroNames);
         /** @param {import("../schema/autocorrect-domain-v1.js").Entry | undefined} entry @param {Decoded} mine @param {Decoded} theirs @param {import("../schema/autocorrect-domain-v1.js").Entry | undefined} twin @param {string} moved @returns {Fields} */
         const fields = (entry, mine, theirs, twin, moved) => new Map(/** @type {[string, Field][]} */ (!entry ? [] : [["Replacement",
                 entry.macro === undefined ? replacement(entry, mine) : {text: replacement(entry, mine), key: `macro:${entry.macro}`, mark: {kind: "macro"}}],
+            // How it fires (D-L91), in the words of its switch: said where
+            // either side fires after the Leader key.
+            ...(triggerOf(entry) || (twin && triggerOf(twin)) ? [/** @type {[string, Field]} */ (["Fires", word(V.inputModes, TRIGGER_NAMES[triggerOf(entry)])])] : []),
             ...entry.typos.map(typo => {
-                const elsewhere = twin?.typos.some(row => row.typo === typo.typo) ? undefined : findTypo(theirs.autocorrect, typo.typo)?.entry;
+                const elsewhere = twin?.typos.some(row => row.typo === typo.typo) ? undefined : heldTypo(theirs.autocorrect, typo.typo)?.entry;
                 return [`typo:${typo.typo}`, {label: "Input", key: typo.match,
                     text: `${inputForm(typo)}${elsewhere === undefined ? "" : ` · ${moved} ${replacementSaid(elsewhere, theirs.settings.macroNames)}`}`}];
             })]));

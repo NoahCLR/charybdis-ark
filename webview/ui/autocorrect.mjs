@@ -25,7 +25,9 @@
 //
 // New replacement opens an editor with nothing in the list behind it yet: a
 // replacement always has an input, so it joins the list with its first one.
-// One the list already has is offered to be opened instead.
+// One the list already has is offered to be opened instead. A replacement
+// whose last input is removed leaves the list the same way, and stays open
+// as one being made, for the input that puts it back.
 //
 // A list comes in from a file (QMK's text, a spreadsheet's CSV or Ark's JSON,
 // D-L85), chosen or dropped on the screen. Ark ships no list of its own
@@ -56,16 +58,17 @@ import {topbar} from "./frame.mjs";
 import {dialogFoot} from "./dialog-foot.mjs";
 import {openPicker} from "./picker.mjs";
 import {attachInfoMarks, infoMark} from "./info-mark.mjs";
-import {marked, replacementMark} from "./marks.mjs";
+import {marked, phraseMarked, replacementMark} from "./marks.mjs";
 import {titleText} from "./title-name.mjs";
 import {settingOffBanner, settingSwitchedOff} from "./participation.mjs";
 import {getModel, post, render, state} from "../store.mjs";
 import {editGate} from "../view/edit-gate.mjs";
 import {keyIdentity} from "../view/key-identity.mjs";
+import {keycodePlacements, reachLine} from "../view/placements.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
 import {macroNamed, vocabulary, word} from "../view/vocabulary.mjs";
 import {LIST_FILE_MAX_BYTES, LIST_FILE_TOO_LARGE, addedReplacement, autocorrectRows, bytesWords, countWords, freeWords, importLines,
-    openEntry, replacementOf, textCount, triedAfter, triedWords, usageWords} from "../view/autocorrect.mjs";
+    leaderTriedWords, openEntry, replacementOf, textCount, triedAfter, triedWords, usageWords} from "../view/autocorrect.mjs";
 import * as edits from "../view/edits.mjs";
 import * as controls from "../view/controls.mjs";
 
@@ -96,7 +99,8 @@ const inputsInfo = (list) => infoMark({id: "ac-info-inputs", label: "How inputs 
     {term: "Characters", says: `Letters, digits and apostrophes, up to ${list.usage.textMax} bytes.`},
     {term: "Several", says: "Type them with spaces between to add more than one at once."},
     {term: "Overlaps", says: "The longest input wins, and a whole word beats a wildcard."},
-    {term: "Macros", says: "A replacement that plays a macro takes whole words only, without *."}]});
+    {term: "Macros", says: "A replacement that plays a macro takes whole words only, without *."},
+    {term: "After Leader", says: "Typed after the Leader key instead: the whole input, whatever its *, sent the moment it is typed, and the computer never sees it. Choose After Leader or Both above."}]});
 
 /** @param {Model} model */
 const identityOf = (model) => model?.autocorrectEditing?.identity;
@@ -278,7 +282,8 @@ export function screenAutocorrect() {
     // Macros says nothing: its controls are off, and the rail and the commit
     // bar say why.
     const heads = el(`<div class="library-head stack"></div>`);
-    if (settingSwitchedOff(model, "autocorrect")) heads.appendChild(settingOffBanner("autocorrect"));
+    // With a leader input on the list the leader still sends (D-L91).
+    if (settingSwitchedOff(model, "autocorrect")) heads.appendChild(list.usage.leaders > 0 ? settingOffBanner("autocorrect", vocabulary(model).settingOff.leading.list) : settingOffBanner("autocorrect"));
     for (const notice of list.notices) heads.appendChild(el(`<div class="callout caution" data-ac-notice>${esc(notice)}</div>`));
     if (heads.childElementCount) pad.appendChild(heads);
 
@@ -329,6 +334,17 @@ function settle(model, list) {
         // take the editor back.
         if (made && fresh.shown) Object.assign(state, {autocorrectEntry: made.id, autocorrectEdit: {entry: made.id, part: "more"}});
     } else if (fresh?.sent && state.error) state.autocorrectNew = {...fresh, sent: undefined};
+    // A replacement whose last input was removed waits as one being made.
+    // Refused, it is the entry it was; once the removal lands it is asked
+    // about as any new one is; and Undo, bringing it back as it was, opens it.
+    if (fresh?.emptied && !fresh.sent) {
+        const back = entryOf(fresh.emptied.entry), named = addedReplacement(fresh);
+        const reopen = () => { state.autocorrectNew = null; if (fresh.shown && back) state.autocorrectEntry = back.id; };
+        if (fresh.emptied.sent && state.error) reopen();
+        else if (fresh.emptied.sent && fresh.emptied.sent !== identity) state.autocorrectNew = {...fresh, emptied: {entry: fresh.emptied.entry}};
+        else if (!fresh.emptied.sent && back && !fresh.input?.trim() && named
+            && ("macro" in named ? back.macro === named.macro : back.macro === undefined && back.correction === named.correction)) reopen();
+    }
     if (editing?.sent && editing.sent !== identity) {
         const now = entryOf(editing.follow ?? editing.entry);
         if (now && state.autocorrectEntry === editing.entry) state.autocorrectEntry = now.id;
@@ -428,7 +444,7 @@ function bank(model, list, rows, open, canEdit) {
     if (fresh && !searching) {
         const named = addedReplacement(fresh);
         const cell = el(`<button type="button" class="mslot ac-item" data-ac-new-item aria-current="${esc(fresh.shown)}">
-            <span class="v">${!named ? "New replacement" : named_(model, fresh.label || (fresh.kind === "macro" ? macroName(model, fresh.macro) : fresh.text.trim()), fresh.kind === "macro")}</span>
+            <span class="ac-item-head"><span class="v">${!named ? "New replacement" : named_(model, fresh.label || (fresh.kind === "macro" ? macroName(model, fresh.macro) : fresh.text.trim()), fresh.kind === "macro")}</span>${firesTag(model, fresh.fires ?? "word")}</span>
             <span class="n">not on your list yet</span></button>`);
         cell.addEventListener("click", openNew);
         cells.appendChild(cell);
@@ -459,14 +475,21 @@ function bank(model, list, rows, open, canEdit) {
 /** @param {Model} model @param {string} label @param {boolean} macro */
 const named_ = (model, label, macro) => macro ? marked(model, {kind: "macro"}, label) : esc(label);
 
-// A replacement in the bank: what the core calls it on one line, with its
-// inputs under it. An input a search found is marked.
+// How a replacement fires, as a tag on its line in the bank, in the words of
+// its switch (D-L91): one for each way, so After Leader and Both are told
+// apart at a glance.
+/** @param {Model} model @param {"word" | "leader" | "both"} fires */
+const firesTag = (model, fires) => `<span class="tag ac-fires" data-ac-fires="${esc(fires)}">${esc(word(vocabulary(model).inputModes, fires))}</span>`;
+
+// A replacement in the bank: what the core calls it on one line, with how it
+// fires beside it, and its inputs under it. An input a search found is
+// marked.
 /** @param {Model} model @param {ReturnType<typeof autocorrectRows>[number]} row @param {boolean} open @param {boolean} changed */
 function item(model, {entry, found}, open, changed) {
     const warned = entry.warnings.length > 0 || entry.typos.some((typo) => typo.warnings.length);
-    const tip = `${entry.label} · inputs: ${entry.typos.map((typo) => typo.input).join(", ")}${warned ? " · has a warning" : ""}`;
+    const tip = `${entry.label} · ${word(vocabulary(model).inputModes, entry.fires).toLowerCase()} · inputs: ${entry.typos.map((typo) => typo.input).join(", ")}${warned ? " · has a warning" : ""}`;
     const cell = el(`<button type="button" class="mslot filled ac-item ${warned ? "caution" : ""}" data-ac-entry="${esc(entry.id)}" aria-current="${esc(open)}" data-tip="${esc(tip)}">
-        <span class="v">${named_(model, entry.label, entry.macro !== undefined)}</span>${changed ? draftDot(model?.draft, "corner") : ""}
+        <span class="ac-item-head"><span class="v">${named_(model, entry.label, entry.macro !== undefined)}</span>${firesTag(model, entry.fires)}</span>${changed ? draftDot(model?.draft, "corner") : ""}
         <span class="n">${entry.typos.map((typo) => `<span ${found.includes(typo.typo) ? `class="found"` : ""} data-ac-input="${esc(typo.typo)}">${esc(typo.input)}</span>`).join(" ")}</span></button>`);
     cell.addEventListener("click", () => openInEditor(entry.id));
     return cell;
@@ -535,6 +558,43 @@ function showMacro(model, slot) {
     render();
 }
 
+// The Leader key's cap, drawn before Try it's field for what is typed after
+// it, and before where the key is placed under Fires.
+/** @param {Model} model */
+const leaderCap = (model) => `<span class="kbd ac-leader-key" aria-hidden="true">${esc(vocabulary(model).leaderKey)}</span>`;
+// How a replacement fires (D-L91): as you type, after the Leader key, or
+// both. Its inputs are one list whichever.
+/** @param {Model} model @param {string} f @param {boolean} canEdit @param {"word" | "leader" | "both"} current */
+const firesField = (model, f, canEdit, current) => choiceField({label: "How it fires", f: `${f}:fires`, hideLabel: true, disabled: !canEdit, choices: vocabulary(model).inputModes, current, tip: FIRES_TIP});
+// What a field for an input shows before it is typed in: an example, a
+// word's as the field gives it (`words`).
+/** @param {"word" | "leader" | "both"} fires @param {boolean} macro @param {string} [words] */
+const inputPlaceholder = (fires, macro, words = "teh or recieve*") => `${macro ? "sig" : fires === "leader" ? "pn or sig" : words}, then Enter`;
+// A new replacement's first input gives a word's example of its own.
+const FIRST_INPUT = "becuase or recieve*";
+// What the choice of how a replacement fires means, and what the Leader key
+// is, said where a replacement fires after it.
+const FIRES_TIP = "As you type: replaced as you finish the word. After Leader: typed after the Leader key, and sent at once; the computer never sees what you typed. Both: either way. The inputs stay the same whichever you choose.";
+const LEADER_NOTE = "Press the Leader key, then type one of its inputs: the keyboard sends this replacement, and the computer never sees what you typed. How long it waits for you is Leader waits, on Host.";
+// The Leader key as core names it (LEADER_KEY_NAME in core/schema/actions.js).
+const LEADER_KEY = "QK_LEADER";
+// Under the switch while a replacement fires after Leader: what the Leader
+// key does, where it is placed (keys by layer, behaviours, combos), and Place
+// on a key →, as a macro's and a pointing mode's editors have it.
+/** @param {Model} model */
+function leaderRow(model) {
+    return `<div class="stack ac-leader" data-ac-leader-note><p class="note">${esc(LEADER_NOTE)}</p>
+        <div class="ac-leader-place" role="group" aria-label="Where the Leader key is">${leaderCap(model)}
+            <span class="note" data-ac-leader-placed>${phraseMarked(model, reachLine(keycodePlacements(model, [LEADER_KEY])))}</span>
+            <button type="button" class="btn tiny link" data-act="ac-place-leader" ${editGate(model, "keys").editable ? "" : "disabled"}
+                data-tip="Put the Leader key on a key you pick on the board.">Place on a key →</button></div></div>`;
+}
+// Place on a key → puts the Leader key on a key picked on the board.
+function placeLeader() {
+    Object.assign(state, {placement: {keycode: LEADER_KEY}, screen: "keys", tab: "key"});
+    render();
+}
+
 // A replacement the list has, open: its header, what it is, its inputs, and
 // Try it.
 /** @param {Model} model @param {List} list @param {Entry} entry @param {boolean} canEdit */
@@ -558,6 +618,9 @@ function entryEditor(model, list, entry, canEdit) {
             ${replacementControls(model, `autocorrect:entry:${entry.id}`, value, canEdit, list.usage.correctionMax, pending)}
             ${entry.warnings.map((warning) => `<p class="note warn" data-ac-warning>${esc(warning)}</p>`).join("")}
             <div data-ac-feedback="replacement" hidden></div>
+            <div class="macro-sequence-heading"><h4>Fires</h4></div>
+            ${firesField(model, `autocorrect:entry:${entry.id}`, canEdit, entry.fires)}
+            ${entry.fires === "word" ? "" : leaderRow(model)}
             <div class="macro-sequence-heading"><h4>Inputs</h4>${inputsInfo(list)}</div>
             <div class="ac-inputs" role="group" aria-label="Inputs">
                 ${entry.typos.map((typo) => editing?.part === "input" && editing.typo === typo.typo
@@ -565,12 +628,12 @@ function entryEditor(model, list, entry, canEdit) {
                         <input class="input mono ac-chip-input" data-f="autocorrect:entry:${esc(entry.id)}:input:${esc(typo.typo)}" data-ac-input-text aria-label="The input ${esc(typo.input)}"
                             autocomplete="off" autocapitalize="off" spellcheck="false" value="${esc(typo.input)}" ${off}>
                         <button type="button" class="btn tiny ghost destructive" data-act="ac-remove-input" ${off}
-                            data-tip="${entry.typos.length === 1 ? "Its only input: removing it deletes the replacement. Undo takes it back." : "Remove this input. Undo takes it back."}">Remove</button></span>`
+                            data-tip="${entry.typos.length === 1 ? emptiesTip() : "Remove this input. Undo takes it back."}">Remove</button></span>`
                     : `<button type="button" class="chip mono ac-chip ${typo.warnings.length ? "warn" : ""}" data-act="ac-chip" data-ac-chip="${esc(typo.typo)}" ${off}
                         aria-label="The input ${esc(typo.input)}: edit or remove it" data-tip="${esc(typo.warnings.length ? typo.warnings.join(" ") : "Click to write it anew, or to remove it.")}">${esc(typo.input)}</button>`).join("")}
                 ${editing?.part === "more"
-                    ? `<input class="input mono ac-chip-input" data-f="autocorrect:entry:${esc(entry.id)}:more" data-ac-more data-ac-open aria-label="Another input for ${esc(entry.label)}"
-                        autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${entry.macro === undefined ? "teh or recieve*" : "sig"}, then Enter" value="" ${off}>`
+                    ? `<span class="ac-more-field" data-ac-open><input class="input mono ac-chip-input" data-f="autocorrect:entry:${esc(entry.id)}:more" data-ac-more data-ac-open aria-label="Another input for ${esc(entry.label)}"
+                        autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${esc(inputPlaceholder(entry.fires, entry.macro !== undefined))}" value="" ${off}></span>`
                     : `<button type="button" class="chip ac-more" data-act="ac-more" ${off} data-tip="Another input for this replacement.">+ Input</button>`}
             </div>
             ${entry.typos.map((typo) => typo.warnings.map((warning) => `<p class="note warn" data-ac-warning="${esc(typo.typo)}"><span class="mono">${esc(typo.input)}</span> ${esc(warning)}</p>`).join("")).join("")}
@@ -625,6 +688,13 @@ function entryEditor(model, list, entry, canEdit) {
     // core's check of it has passed; a choice as soon as it is made.
     card.addEventListener("change", (event) => {
         const input = /** @type {HTMLInputElement} */ (event.target);
+        // How it fires is posted as soon as it is chosen; its inputs stay.
+        if (input.matches('[type=radio][name$=":fires"]')) {
+            /** @type {"word" | "leader" | "both"} */
+            const picked = input.value === "leader" ? "leader" : input.value === "both" ? "both" : "word";
+            if (picked !== entry.fires) { dropEntered(); state.autocorrectEdit = null; keep(edits.autocorrectTrigger(target, picked, identity())); }
+            return;
+        }
         if (input.matches('[type=radio][name$=":kind"]')) {
             const picked = input.value === "macro" ? "macro" : "text";
             if (picked === stored) close(); else open("kind", {kind: picked});
@@ -683,11 +753,30 @@ function entryEditor(model, list, entry, canEdit) {
         else if (act === "ac-macros") showMacro(model, -1);
         else if (act === "ac-more") { open("more"); focusLater("[data-ac-more]"); }
         else if (act === "ac-chip") { open("input", {typo: button.dataset.acChip || ""}); focusLater("[data-ac-input-text]"); }
-        else if (act === "ac-remove-input" && typed) { dropEntered(); state.autocorrectEdit = null; keep(edits.deleteAutocorrectTypo(typed.typo, identity())); }
+        else if (act === "ac-remove-input" && typed) {
+            dropEntered();
+            state.autocorrectEdit = null;
+            const emptied = entry.typos.length === 1 && keepsEmptied();
+            if (emptied) state.autocorrectNew = {kind: stored, text: entry.macro === undefined ? entry.correction : "", macro: entry.macro ?? null, input: "", fires: entry.fires,
+                label: entry.label, joins: null, shown: true, emptied: {entry: entry.id, sent: identity() || ""}};
+            keep(edits.deleteAutocorrectTypo(typed.typo, identity()));
+            if (emptied) { render(); focusLater("[data-ac-new] [data-ac-first]"); }
+        }
         else if (act === "ac-delete") { dropEntered(); state.autocorrectEdit = null; keep(edits.deleteAutocorrectEntry(target, identity())); }
+        else if (act === "ac-place-leader") placeLeader();
     });
     return card;
 }
+
+// The keyboard keeps no replacement without an input, so removing the last
+// one takes it off the list; the editor keeps it open as one being made, for
+// the input that puts it back. The screen makes one at a time: with another
+// begun and waiting in the bank, the replacement is deleted, and Undo takes
+// it back.
+const keepsEmptied = () => !state.autocorrectNew || !addedReplacement(state.autocorrectNew);
+const emptiesTip = () => keepsEmptied()
+    ? "Its only input: the replacement leaves your list but stays open, for a new input that puts it back. Undo takes it back."
+    : "Its only input: removing it deletes the replacement, as a new one waits in the list. Undo takes it back.";
 
 // A replacement being made: what it is, then its first input, which is what
 // puts it on the list, kept when Enter is pressed in it or the editor is left
@@ -705,7 +794,7 @@ function newEditor(model, list, fresh, canEdit) {
             <span class="tag">Not on your list yet</span>
             <span class="right row actions">
                 ${editMacroLink(fresh.kind === "macro" && fresh.macro !== null)}
-                <button class="btn tiny ghost destructive" data-act="ac-discard" data-tip="Let this new replacement go. Nothing was added to your list.">Discard</button></span></div>
+                <button class="btn tiny ghost destructive" data-act="ac-discard" data-tip="${fresh.emptied ? "Let this replacement go: it left your list with its last input. Undo takes it back." : "Let this new replacement go. Nothing was added to your list."}">Discard</button></span></div>
         <div class="card-b stack">
             <div class="macro-sequence-heading"><h4>Replacement</h4>${replacementInfo(list)}</div>
             ${replacementControls(model, "autocorrect:new", fresh, canEdit, list.usage.correctionMax)}
@@ -713,12 +802,15 @@ function newEditor(model, list, fresh, canEdit) {
             <div data-ac-feedback="replacement" hidden></div>
             ${joins ? `<div class="callout ac-joins" data-ac-joins><span>${esc(fresh.joins?.said)}</span>
                     <button type="button" class="btn tiny" data-act="ac-open-joined">Open it</button></div>` : `
+            <div class="macro-sequence-heading"><h4>Fires</h4></div>
+            ${firesField(model, "autocorrect:new", canEdit && Boolean(named), fresh.fires ?? "word")}
+            ${(fresh.fires ?? "word") === "word" ? "" : leaderRow(model)}
             <div class="macro-sequence-heading"><h4>Inputs</h4>${inputsInfo(list)}</div>
             <div class="pd-chips ac-inputs">
                 <input class="input mono ac-chip-input" data-f="autocorrect:new:input" data-ac-first aria-label="First input" autocomplete="off" autocapitalize="off" spellcheck="false"
-                    placeholder="${fresh.kind === "macro" ? "sig, then Enter" : "becuase or recieve*, then Enter"}" value="${esc(fresh.input || "")}" ${canEdit && named ? "" : "disabled"}>
+                    placeholder="${esc(inputPlaceholder(fresh.fires ?? "word", fresh.kind === "macro", FIRST_INPUT))}" value="${esc(fresh.input || "")}" ${canEdit && named ? "" : "disabled"}>
             </div>
-            <p class="note">It joins your list with its first input.</p>
+            <p class="note" data-ac-joins-with>${fresh.emptied ? "Its last input was removed, so it is off your list: give it an input to put it back." : "It joins your list with its first input."}</p>
             <div data-ac-feedback="new" hidden></div>`}
         </div></div>`);
     /** @type {HTMLElement} */ (card.querySelector(".card-b")).appendChild(trySection(model, list));
@@ -730,9 +822,11 @@ function newEditor(model, list, fresh, canEdit) {
     // even before it has an input: whether the list has that replacement.
     const addEdit = () => {
         const replacement = addedReplacement(current());
-        return replacement ? edits.addAutocorrectInputs(replacement, current().input || "", identityOf(getModel())) : null;
+        return replacement ? edits.addAutocorrectInputs(replacement, current().input || "", identityOf(getModel()), current().fires) : null;
     };
-    const ask = () => { if (canEdit && !current().sent) check("new", addEdit()); };
+    // While the removal of its last input is on its way the list still has
+    // it, so it is asked about once that has landed.
+    const ask = () => { if (canEdit && !current().sent && !current().emptied?.sent) check("new", addEdit()); };
     const discard = () => { Object.assign(state, {autocorrectNew: null, autocorrectCheck: null}); render(); focusLater('[data-act="ac-add"]'); };
     // The first input, kept: the replacement joins the list with it.
     const commit = () => {
@@ -752,7 +846,9 @@ function newEditor(model, list, fresh, canEdit) {
             state.autocorrectNew = {...current(), text: input.value, label: undefined};
             // Whether it can take an input yet is said as it is typed; whether
             // the list has it already is the check's answer.
-            if (first) first.disabled = !canEdit || !addedReplacement(current());
+            const ready = canEdit && Boolean(addedReplacement(current()));
+            if (first) first.disabled = !ready;
+            for (const radio of /** @type {NodeListOf<HTMLInputElement>} */ (card.querySelectorAll('[name$=":fires"]'))) radio.disabled = !ready;
             /** @type {HTMLElement | null} */ (document.querySelector("[data-ac-new-item] .v"))?.replaceChildren(input.value.trim() || "New replacement");
             ask();
         } else if (input === first) { state.autocorrectNew = {...current(), input: input.value}; ask(); }
@@ -767,6 +863,12 @@ function newEditor(model, list, fresh, canEdit) {
     });
     card.addEventListener("change", (event) => {
         const input = /** @type {HTMLInputElement} */ (event.target);
+        if (input.matches('[type=radio][name$=":fires"]')) {
+            state.autocorrectNew = {...current(), fires: input.value === "leader" ? "leader" : input.value === "both" ? "both" : "word"};
+            render();
+            focusLater("[data-ac-new] [data-ac-first]");
+            return;
+        }
         if (!input.matches('[type=radio][name$=":kind"]')) return;
         state.autocorrectNew = {...current(), kind: input.value === "macro" ? "macro" : "text", joins: null, label: undefined};
         state.autocorrectCheck = null;
@@ -793,6 +895,7 @@ function newEditor(model, list, fresh, canEdit) {
         else if (act === "ac-macros") showMacro(model, -1);
         else if (act === "ac-open-joined" && joins) { state.autocorrectNew = null; openInEditor(joins.id); focusLater('[data-ac-editor] [data-act="ac-more"]'); }
         else if (act === "ac-discard") discard();
+        else if (act === "ac-place-leader") placeLeader();
     });
     // Drawn with a replacement named, it asks the core whether the list has it.
     if (named) queueMicrotask(ask);
@@ -836,7 +939,7 @@ const draftOf = (model) => `${model?.draft?.id ?? ""}:${model?.draft?.revision ?
 // holds: the text that was there, then what was typed after it.
 function askTry() {
     const tried = state.autocorrectTry;
-    if (!tried.before && !tried.typed) { state.autocorrectTry = {...tried, shown: "", fired: [], marks: [], undone: false, error: "", requestId: 0}; paintTry(); return; }
+    if (!tried.before && !tried.typed && !tried.leader) { state.autocorrectTry = {...tried, shown: "", fired: [], marks: [], undone: false, error: "", requestId: 0, leaderResult: null}; paintTry(); return; }
     const requestId = ++nextTry;
     state.autocorrectTry = {...tried, requestId};
     post(controls.tryAutocorrect(tried, requestId));
@@ -847,7 +950,7 @@ export function receiveAutocorrectTry(message) {
     const tried = state.autocorrectTry, model = getModel();
     if (tried.requestId !== message.requestId || message.draftId !== model?.draft?.id || message.draftRevision !== model?.draft?.revision) return;
     state.autocorrectTry = {...tried, draft: draftOf(model), error: message.error || "",
-        ...(message.result ? {shown: message.result.text, fired: message.result.fired, marks: message.result.marks, undone: message.result.undone} : {})};
+        ...(message.result ? {shown: message.result.text, fired: message.result.fired, marks: message.result.marks, undone: message.result.undone, leaderResult: message.result.leader ?? null} : {})};
     paintTry();
 }
 
@@ -880,6 +983,8 @@ function paintTry() {
     for (const row of /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll("[data-ac-bank] [data-ac-entry]"))) row.classList.toggle("fired", Boolean(last) && row.dataset.acEntry === last?.entry);
     const open = /** @type {HTMLElement | null} */ (document.querySelector("[data-ac-editor]"))?.dataset.acEditor;
     for (const chip of /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll("[data-ac-editor] [data-ac-chip]"))) chip.classList.toggle("fired", Boolean(last) && open === last?.entry && chip.dataset.acChip === last?.typo);
+    const leaderSaid = /** @type {HTMLElement | null} */ (document.querySelector("[data-ac-try-leader-said]"));
+    if (leaderSaid) leaderSaid.textContent = leaderTriedWords(tried.leader, tried.leaderResult);
     const show = /** @type {HTMLButtonElement} */ (document.querySelector('[data-act="ac-try-show"]'));
     show.hidden = !last || tried.undone || open === last.entry || !getModel()?.autocorrect?.entries.some((entry) => entry.id === last.entry);
     show.dataset.entry = last?.entry || "";
@@ -893,12 +998,17 @@ function paintTry() {
 /** @param {Model} model @param {List} list */
 function trySection(model, list) {
     const tried = state.autocorrectTry;
+    // A Leader key cannot be typed into the box, and nothing writes one there:
+    // what follows it is tried in a field of its own (D-L91), shown while the
+    // list has a leader input.
+    const leading = list.usage.leaders > 0;
     const card = el(`<div class="card editor-section" data-ac-try>
         <div class="card-h"><h3>Try it</h3>${infoMark({id: "ac-info-try", label: "About the preview", heading: "About the preview", rows: [
                 {term: "Preview", says: `What your keyboard would type with this draft's list, through ${list.layoutName}.`},
                 {term: "Your text", says: "The box keeps what you type. Only the preview shows replacements."},
                 {term: "Not shown", says: "Clicks, shortcuts, arrow keys and held keys. On the keyboard they start a new word or pause replacing until the next one. A word ended through a dead key is left alone by the keyboard, and replaced here."},
-                {term: "Caps Lock", says: "The switch follows your own Caps Lock when it changes as you type here, or set it yourself for the preview."}]})}
+                {term: "Caps Lock", says: "The switch follows your own Caps Lock when it changes as you type here, or set it yourself for the preview."},
+                ...(leading ? [{term: "After Leader", says: "What you type after the Leader key, tried on its own: whether the keyboard sends a replacement, waits for more, or drops it. The box above never holds the Leader key."}] : [])]})}
             <button class="btn tiny ghost destructive right" data-act="ac-try-clear" ${tried.text ? "" : "disabled"} data-tip="Empty the box and its preview.">Clear</button></div>
         <div class="card-b stack">
             <textarea class="input ac-try-box" data-f="autocorrect:try:text" rows="2" aria-label="Type here to try your list" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Type here: teh, then a space.">${esc(tried.text)}</textarea>
@@ -910,8 +1020,16 @@ function trySection(model, list) {
                 <span class="note" data-ac-try-said aria-live="polite"></span>
                 <button class="btn tiny link" data-act="ac-try-show" hidden>Show it →</button>
             </div>
+            ${leading ? `<label class="field ac-try-leader"><span>${esc(word(vocabulary(model).inputModes, "leader"))}</span>
+                <span class="input-row">${leaderCap(model)}<input class="input mono" data-f="autocorrect:try:leader" data-ac-try-leader autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"
+                    placeholder="What you type after the Leader key: pn" value="${esc(tried.leader)}"></span></label>
+            <p class="note" data-ac-try-leader-said aria-live="polite"></p>` : ""}
         </div></div>`);
     const box = /** @type {HTMLTextAreaElement} */ (card.querySelector("textarea"));
+    /** @type {HTMLInputElement | null} */ (card.querySelector("[data-ac-try-leader]"))?.addEventListener("input", (event) => {
+        state.autocorrectTry = {...state.autocorrectTry, leader: /** @type {HTMLInputElement} */ (event.target).value};
+        askTry();
+    });
     const caps = /** @type {HTMLInputElement} */ (card.querySelector('[data-f="autocorrect:try:caps"]'));
     const clear = /** @type {HTMLButtonElement} */ (card.querySelector('[data-act="ac-try-clear"]'));
     box.addEventListener("input", () => {
@@ -944,7 +1062,7 @@ function trySection(model, list) {
         openInEditor(/** @type {HTMLElement} */ (event.currentTarget).dataset.entry || "");
     });
     // The list or the host layout changed under what was tried: try it again.
-    if ((tried.before || tried.typed) && tried.draft !== draftOf(model)) queueMicrotask(askTry);
+    if ((tried.before || tried.typed || tried.leader) && tried.draft !== draftOf(model)) queueMicrotask(askTry);
     return card;
 }
 

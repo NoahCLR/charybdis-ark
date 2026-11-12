@@ -60,11 +60,11 @@ export interface CatalogEntry {value: string; key: string; label: string; group:
 /** One input of a text replacement entry (a typo, in the firmware's and these contracts' names): its letters as stored (folded), which name it in an edit; as it is written, with `*` where other letters may go; and what will misbehave about it, in words. */
 export interface AutocorrectTypo {typo: string; input: string; warnings: string[]}
 /** One text replacement entry: what names it among the entries (`id`), what it is called wherever a replacement is listed (`label`: its text, or its macro's name after the mark of one that plays), its replacement (a correction, in the firmware's names) as text, or '' with the macro slot it plays, all its inputs, and what will misbehave about the entry, in words. */
-export interface AutocorrectEntry {id: string; label: string; correction: string; macro?: number; typos: AutocorrectTypo[]; warnings: string[]}
+export interface AutocorrectEntry {id: string; label: string; correction: string; macro?: number; /** How it fires (D-L91): as you type, after the Leader key, or both. */ fires: import('./edits.js').AutocorrectTrigger; typos: AutocorrectTypo[]; warnings: string[]}
 /** The text replacement list as its screen draws it (core/model/autocorrect-editor.js): entries in stored order; what the list uses against what the keyboard holds (`share`, 0 to 1, its bytes of its own limit, which both memory meters draw; `free`, the bytes it can still grow by, bounded by its text's ceiling and the profile's shared room too; `textMax` the bytes in one input, `correctionMax` in one replacement's text; `shortInput`, the letters under which an input with `*` is warned about); what the chosen host layout cannot type, said once with what to do; and that layout's name. */
 export interface AutocorrectView {
     entries: AutocorrectEntry[];
-    usage: {corrections: number; typos: number; maxTypos: number; textBytes: number; maxTextBytes: number; bytes: number; capacity: number; share: number; free: number; textMax: number; correctionMax: number; shortInput: number};
+    usage: {corrections: number; typos: number; /** The inputs of replacements that fire after the Leader key. */ leaders: number; maxTypos: number; textBytes: number; maxTextBytes: number; bytes: number; capacity: number; share: number; free: number; textMax: number; correctionMax: number; shortInput: number};
     notices: string[];
     /** The host layout entries are checked against, by name. */
     layoutName: string;

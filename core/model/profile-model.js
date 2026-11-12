@@ -25,7 +25,7 @@ const {emptyCells} = require("./empty-cells");
 const {dualRole, effectiveTimings, holdTermSetting} = require("./gesture-timing");
 const {timingAlone} = require("./inert-behaviors");
 const {SWITCH_KEY_FAMILIES, compactKeyLabels, heldModifierWords, hostKeyVocabulary, keyKind, keyLabel, keyLayer, keyLayerForm, layerModWords, layerTapWords, profileKeyNames, shortcutAct, shortcutKeys, shortcutLabel, shortcutLayerNames} = require("./key-names");
-const {QMK_SWITCH_KEY_NAMES, keycodeAction, knownActionAbi, layerRef, nativeCode} = require("../schema/actions");
+const {LEADER_KEY_NAME, QMK_SWITCH_KEY_NAMES, keycodeAction, knownActionAbi, layerRef, nativeCode} = require("../schema/actions");
 const {dpiChoices} = require("./pointer-dpi");
 const {pointingTapKeys} = require("./pointing-taps");
 const {linkStarts, linkTargets, pointerCoveredLayers} = require("./pointing-links");
@@ -531,8 +531,9 @@ function catalogViews() {
             key: entry.name,
             label,
             // QMK's switch keys for combos and autocorrect are offered with
-            // the keyboard's own, in the one group the picker reads.
-            group: QMK_SWITCH_KEY_NAMES.includes(entry.name) ? "Switch keys" : entry.group,
+            // the keyboard's own, in the one group the picker reads; the
+            // Leader key beside them, in text replacement's own (D-L91).
+            group: QMK_SWITCH_KEY_NAMES.includes(entry.name) ? "Switch keys" : entry.name === LEADER_KEY_NAME ? "Text replacement" : entry.group,
             aliases: entry.aliases,
             keycode: entry.value,
             searchTerms,

@@ -7,12 +7,15 @@
 // can type under Caps Lock, and the undo. It is the one matcher: Try it shows
 // its result, the list's warnings ask it which typo fires, and the firmware's
 // behaviour fixture holds it to the keyboard (tests/model). What needs a key,
-// a timing or a setting (shortcuts, held keys, macro keys, the queue) has no
-// form in text and is not here. A replacement that plays a macro is: the
-// input goes and the macro's text, when it is only text, takes its
-// place.
+// a timing or a setting (shortcuts, held keys, macro keys, the queue, the
+// leader's timeout) has no form in text and is not here. A replacement that
+// plays a macro is: the input goes and the macro's text, when it is only
+// text, takes its place. So is the leader (firmware D-F71): U+0010 stands
+// for the Leader key, after which what is typed is held, never shown, and
+// sent as the replacement of an input that fires after it, or dropped. A
+// replacement fires as you type, after the Leader key, or both.
 
-const {AUTOCORRECT_DOMAIN_V1, AUTOCORRECT_MATCH, entryKey, playsMacro} = require("../schema/autocorrect-domain-v1");
+const {AUTOCORRECT_DOMAIN_V1, AUTOCORRECT_MATCH, entryKey, firesAfterLeader, firesAsTyped, playsMacro, triggerOf} = require("../schema/autocorrect-domain-v1");
 const {AUTOCORRECT_APOSTROPHE, capitalOfWordCharacter, foldWordCharacter} = require("../data/autocorrect-words");
 const {hostLayout} = require("../data/host-layouts");
 
@@ -22,17 +25,20 @@ const {hostLayout} = require("../data/host-layouts");
  * @typedef {Entry["typos"][number]} Typo
  * @typedef {{layout: number, macos?: boolean}} Host the host layout the keyboard types through; `macos` when the host's system is macOS though the layout is not one of its own
  * @typedef {{entry: Entry, typo: Typo, length: number}} Listed a typo with its entry, and how many characters it has
- * @typedef {{whole: Map<string, Listed>, parts: Listed[]}} Index a list's whole-word typos by their text, and its part-of-word typos, the longest first and equally long ones in the domain's byte order
+ * @typedef {{whole: Map<string, Listed>, parts: Listed[], leaders: Map<string, Listed>}} Index the whole-word typos of a list's replacements that fire as you type, by their text, their part-of-word typos, the longest first and equally long ones in the domain's byte order, and the typos of those that fire after the leader by their text, whatever their match
  * @typedef {{entry: Entry, typo: Typo, start: number, end: number}} Fired the typo that fires on a word, and the characters of the word it matched
  * @typedef {(slot: number) => {text: string | null} | null} Macros what a macro slot plays: its text when it types only text, `text: null` when it does more, and null for a slot that is empty or cannot play
  * @typedef {Replaced & {start: number, end: number}} Mark where a standing replacement's text is in the text tried, by its offsets
- * @typedef {{entry: string, correction: string, typo: string, macro?: number}} Replaced a replacement that fired: its entry's key, its text ("" for a macro), the input, and the macro slot it played
+ * @typedef {{entry: string, correction: string, typo: string, macro?: number, leader?: true}} Replaced a replacement that fired: its entry's key, its text ("" for a macro), the input, the macro slot it played, and `leader` when the leader sent it
+ * @typedef {{state: "sends", entry: Entry, typo: Typo, at: number, finishing: boolean} | {state: "waits", exact: Listed | null, longer: Listed[]} | {state: "drops", at: number}} Leading what the leader does with characters typed after it: send an entry's replacement on the character at `at` (on Enter or the timeout when `finishing`), wait with what Enter would send and the inputs it could still become, or drop what is held on the character at `at`
  */
 
 // The keyboard follows this many characters of a word, and types no
 // correction that takes more key strokes than this, erasing included.
 const WORD_MAX = 32, STROKES_MAX = 288;
 const BACKSPACE = "\b";
+// The Leader key, as the firmware's behaviour fixture writes it in a screen.
+const LEADER = "\u0010";
 // Enter and Tab end a word and print nothing a Backspace could take back.
 const ENDS_WITHOUT_UNDO = new Set(["\n", "\t"]);
 
@@ -64,10 +70,13 @@ function byBytes(a, b) {
 /** @param {AutocorrectList} list @returns {Index} */
 function indexed(list) {
     /** @type {Index} */
-    const index = {whole: new Map(), parts: []};
+    const index = {whole: new Map(), parts: [], leaders: new Map()};
     for (const entry of list.entries) for (const typo of entry.typos) {
-        const listed = {entry, typo, length: [...typo.typo].length};
-        if (typo.match === AUTOCORRECT_MATCH.WHOLE_WORD) index.whole.set(typo.typo, listed); else index.parts.push(listed);
+        const listed = {entry, typo, length: [...typo.typo].length}, trigger = triggerOf(entry);
+        if (firesAfterLeader(trigger)) index.leaders.set(typo.typo, listed);
+        if (!firesAsTyped(trigger)) continue;
+        if (typo.match === AUTOCORRECT_MATCH.WHOLE_WORD) index.whole.set(typo.typo, listed);
+        else index.parts.push(listed);
     }
     index.parts.sort((a, b) => b.length - a.length || byBytes(a.typo.typo, b.typo.typo));
     return index;
@@ -109,6 +118,18 @@ function choose(index, word, takes = () => true) {
     return null;
 }
 
+// What is held after the leader, against its inputs: the one it is exactly,
+// if any, and those longer that begin with it. Held text past an input's 32
+// bytes is no input and begins none.
+/** @param {Index} index @param {readonly string[]} held folded @returns {{exact: Listed | null, longer: Listed[]}} */
+function leaderMatch(index, held) {
+    const text = held.join("");
+    if (!text || Buffer.byteLength(text) > AUTOCORRECT_DOMAIN_V1.TEXT_MAX) return {exact: null, longer: []};
+    const longer = [...index.leaders.values()].filter(listed => listed.typo.typo.length > text.length && listed.typo.typo.startsWith(text))
+        .sort((a, b) => byBytes(a.typo.typo, b.typo.typo));
+    return {exact: index.leaders.get(text) ?? null, longer};
+}
+
 // The words of a text, folded: letters and digits with apostrophes between
 // them. Apostrophes at a word's start or end are not part of it.
 /** @param {string} text @returns {string[]} */
@@ -138,6 +159,42 @@ function typoFinder(list) {
 }
 /** @param {AutocorrectList} list @param {string} word @returns {Fired | null} */
 const firingTypo = (list, word) => typoFinder(list)(word);
+
+// One character typed while leading (firmware autocorrect-v1.md, "The
+// leader"): Enter sends what is held when it is an input and drops it when
+// not; any other joins what is held, folded, which is then sent when it is an
+// input no longer one begins with, dropped when it begins none, and held
+// otherwise. What is held after it (null once leading is over) and what it
+// sends. Backspace, Tab and the Leader key are the caller's.
+/** @param {Index} index @param {readonly string[]} held @param {string} character @returns {{held: string[] | null, sends: Listed | null}} */
+function leadStep(index, held, character) {
+    if (character === "\n") return {held: null, sends: leaderMatch(index, held).exact};
+    if (held.length === WORD_MAX) return {held: null, sends: null};
+    const next = [...held, folded(character)];
+    const {exact, longer} = leaderMatch(index, next);
+    return longer.length ? {held: next, sends: null} : {held: null, sends: exact};
+}
+
+// What the leader does with these characters typed after it: each taken by
+// leadStep, as the fixture-held typedText takes them, until one sends an
+// input or drops what is held; at the end of the text it waits, Enter or the
+// timeout to send an input a longer one begins with. It does not ask whether
+// the host can type what is sent.
+/** @param {AutocorrectList} list @param {string} typed @returns {Leading} */
+function leaderOutcome(list, typed) {
+    const index = indexed(list);
+    /** @type {string[]} */
+    let held = [];
+    let at = 0;
+    for (const character of typed) {
+        const step = leadStep(index, held, character);
+        if (step.sends) return {state: "sends", entry: step.sends.entry, typo: step.sends.typo, at, finishing: character === "\n"};
+        if (!step.held) return {state: "drops", at};
+        held = step.held;
+        at += character.length;
+    }
+    return {state: "waits", ...leaderMatch(index, held)};
+}
 
 // How many key strokes show this character on this host under its Caps Lock;
 // none when nothing the layout types shows it. Caps Lock changes letters
@@ -201,6 +258,9 @@ function typedText(list, host, capsLock, screen, before = "", macros = () => nul
     /** @type {string[]} */
     let word = [];
     let suspended = false, leftAlone = false, undone = false;
+    // What is held after the Leader key, folded; null when not leading.
+    /** @type {string[] | null} */
+    let held = null;
     // After a correction a printing key ended: the word as typed, how many of
     // its characters the correction kept and how many it typed.
     /** @type {{kept: number, typed: number} | null} */
@@ -266,8 +326,56 @@ function typedText(list, host, capsLock, screen, before = "", macros = () => nul
         return {kept: result.kept, typed: result.text.length - result.kept};
     };
 
+    // What the leader sends: text as written, through this host and under its
+    // Caps Lock, with nothing to erase and no undo; a macro as a
+    // replacement's plays. One the host cannot type, or a macro that cannot
+    // play, is passed over and nothing is sent.
+    /** @param {Listed} listed */
+    const lead = listed => {
+        const {entry, typo} = listed;
+        /** @type {Replaced} */
+        const sent = {entry: entryKey(entry), correction: entry.correction, typo: typo.typo, ...(playsMacro(entry) ? {macro: entry.macro} : {}), leader: true};
+        let text;
+        if (playsMacro(entry)) {
+            const played = macros(/** @type {number} */ (entry.macro));
+            if (!played) return;
+            text = [...(played.text ?? "")];
+        } else {
+            text = [...entry.correction];
+            let count = 0;
+            for (const character of text) {
+                const needed = strokes(character);
+                if (!needed || count + needed > STROKES_MAX) return;
+                count += needed;
+            }
+        }
+        if (text.length) marked.push({...sent, at: out.length, length: text.length});
+        out.push(...text);
+        fired.push(sent);
+    };
+    const hasLeader = index.leaders.size > 0;
+
     for (const character of screen) {
         undone = false;
+        // The Leader key starts leading, or over: the word before it is
+        // forgotten. With nothing on the list that fires after it, it does
+        // nothing.
+        if (character === LEADER) {
+            if (hasLeader) {forget(false); held = [];}
+            continue;
+        }
+        if (held) {
+            // While leading nothing typed reaches the computer, but Tab.
+            if (character === BACKSPACE) {
+                if (held.length) held.pop(); else held = null;
+                continue;
+            }
+            if (character === "\t") {held = null; out.push(character); continue;}
+            const step = leadStep(index, held, character);
+            held = step.held;
+            if (step.sends) lead(step.sends);
+            continue;
+        }
         if (character === BACKSPACE) {
             if (undo) {
                 // The ending character and what the correction typed go, and
@@ -313,4 +421,4 @@ function typedText(list, host, capsLock, screen, before = "", macros = () => nul
     return {text: out.join(""), fired, marks, undone};
 }
 
-module.exports = {firingTypo, typedText, typoFinder, wordsOf};
+module.exports = {LEADER, firingTypo, leaderOutcome, typedText, typoFinder, wordsOf};

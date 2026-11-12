@@ -401,6 +401,12 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     // What a text replacement is (schema/autocorrect-domain-v1.js
     // AUTOCORRECT_KIND), as its editor's choice and its tag say it.
     replacementKinds: [["text", "Text"], ["macro", "Macro"]],
+    // How a replacement fires (D-L91): as you type, after the Leader key, or
+    // both; its inputs are one list whichever. The switch on its editor.
+    inputModes: [["word", "As you type"], ["leader", "After Leader"], ["both", "Both"]],
+    // The Leader key as its cap names it: before Try it's After Leader field
+    // and where a replacement's editor says the key is placed.
+    leaderKey: "Leader",
     // The formats a text replacement list is saved in (autocorrect-import.js
     // AUTOCORRECT_FILE_FORMATS), as Export's menu names each.
     listFileFormats: [["txt", "Text (QMK)"], ["csv", "CSV"], ["json", "JSON"]],
@@ -784,7 +790,10 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     settingOff: {switches: {behaviour: {off: "Behaviours are off.", fix: `Turn them on in ${SETTINGS_SCREENS.behaviours} →`},
         combo: {off: "Combos are off.", fix: `Turn them on in ${SETTINGS_SCREENS.combos} →`},
         autoMouse: {off: "Auto-mouse is off.", fix: `Turn it on in ${SETTINGS_SCREENS.pointer} →`},
-        autocorrect: {off: "Text replacement is off.", detail: "The keyboard keeps this list and replaces nothing.", fix: `Turn it on in ${SETTINGS_SCREENS.host} →`}}, stage: "This stage paints nothing."},
+        autocorrect: {off: "Text replacement is off.", detail: "The keyboard keeps this list and replaces nothing.", fix: `Turn it on in ${SETTINGS_SCREENS.host} →`}}, stage: "This stage paints nothing.",
+        // With a leader input on the list the leader still sends, and its
+        // sends still flash (firmware D-F71, D-L91).
+        leading: {list: "Words you finish are left as you typed them; the Leader key still sends your leader inputs.", stage: "Words you finish never flash; what the Leader key sends still flashes, in the text or macro colour."}},
     // A behaviour's own switch, as its editor labels it and the review names
     // it, and the fold its timings open from.
     behaviourFields: {anchor: "Keeps the pointer layer on", timings: "Timings"},

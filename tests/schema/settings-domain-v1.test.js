@@ -6,10 +6,11 @@ const {SETTINGS, SHORTCUT_KEYS, SHORTCUT_LAYER_KINDS, SETTING, SETTING_FIELD, SE
 // Compiled defaults as the firmware sets them (profile-wire-v1/settings-domain.md):
 // scalar 27 retired at zero, auto-sniping on Navigation (layer 3) alone,
 // behaviours on, every layer in both masks, every layer referring combos to
-// itself with nothing bypassed or excluded, and each flash 200 ms.
-const defaults = () => ({comboOutputBehaviors: true, values: [200,150,400,150,1,4,1200,25,1,1 << 3,0,0,0,0,0,200,400,900000,1200,200,1,257,0xc8ff00,1,0,200,10,0,1,0xffff,0xffff,200],
+// itself with nothing bypassed or excluded, each flash 200 ms, and the leader
+// waiting 2 s.
+const defaults = () => ({comboOutputBehaviors: true, values: [200,150,400,150,1,4,1200,25,1,1 << 3,0,0,0,0,0,200,400,900000,1200,200,1,257,0xc8ff00,1,0,200,10,0,1,0xffff,0xffff,200,2000],
     names: Array.from({length: 16}, (_, id) => id < 8 ? `Layer ${id}` : ""), layers: Array.from({length: 16}, (_, layer) => defaultLayerRecord(layer)),
-    macroNames: Array(128).fill(""), customKeyNames: Array(128).fill(""), customKeyShortcuts: Array.from({length: 128}, () => ({mods: 0, keys: [], layers: 0, layerKind: 0})), keyboardName: "", formatVersion: 12});
+    macroNames: Array(128).fill(""), customKeyNames: Array(128).fill(""), customKeyShortcuts: Array.from({length: 128}, () => ({mods: 0, keys: [], layers: 0, layerKind: 0})), keyboardName: "", formatVersion: 13});
 const thirtyTwo = (seed, fill) => `${seed}`.padEnd(32, fill);
 const full = () => ({...defaults(), names: Array.from({length: 16}, (_, i) => thirtyTwo(`L${i}`, "-")),
     macroNames: Array.from({length: 128}, (_, i) => thirtyTwo(i, "~")), customKeyNames: Array.from({length: 128}, (_, i) => thirtyTwo(`Key ${i}`, "!")),
@@ -22,13 +23,13 @@ const withShortcut = (slot, shortcut) => { const value = defaults(); value.custo
 const withValue = (id, v) => { const value = defaults(); value.values[id] = v; return value; };
 const withLayer = (layer, record) => { const value = defaults(); value.layers[layer] = {...value.layers[layer], ...record}; return value; };
 
-test("the layout constants are the firmware's version 12 domain", () => {
-    assert.deepEqual([SETTINGS.VERSION, SETTINGS.COUNT, SETTINGS.LAYERS, SETTINGS.MACRO_NAMES, SETTINGS.CUSTOM_KEY_NAMES, SETTINGS.CUSTOM_KEY_SHORTCUTS], [12, 32, 16, 128, 128, 128]);
-    // 32 scalars, 128 ten-byte shortcuts at 408, then 273 counted names: 16
+test("the layout constants are the firmware's version 13 domain", () => {
+    assert.deepEqual([SETTINGS.VERSION, SETTINGS.COUNT, SETTINGS.LAYERS, SETTINGS.MACRO_NAMES, SETTINGS.CUSTOM_KEY_NAMES, SETTINGS.CUSTOM_KEY_SHORTCUTS], [13, 33, 16, 128, 128, 128]);
+    // 33 scalars, 128 ten-byte shortcuts at 412, then 273 counted names: 16
     // layers, 128 macros, 128 custom keys and the keyboard
     // (profile-wire-v1/settings-domain.md).
-    assert.deepEqual([SETTINGS.SCALARS_OFFSET, SETTINGS.LAYER_RECORDS_OFFSET, SETTINGS.SHORTCUTS_OFFSET, SETTINGS.SHORTCUT_SIZE, SETTINGS.SHORTCUT_KEY_COUNT, SETTINGS.FIXED_SIZE, SETTINGS.MIN_SIZE, SETTINGS.MAX_SIZE], [8, 136, 408, 10, 6, 1688, 1961, 10697]);
-    assert.deepEqual([SETTING.UNICODE_HOST_MODE, SETTING.BEHAVIORS_ENABLED, SETTING.LAYER_BEHAVIORS, SETTING.LAYER_COMBOS, SETTING.AUTOCORRECT_FEEDBACK_PERIOD], [27, 28, 29, 30, 31]);
+    assert.deepEqual([SETTINGS.SCALARS_OFFSET, SETTINGS.LAYER_RECORDS_OFFSET, SETTINGS.SHORTCUTS_OFFSET, SETTINGS.SHORTCUT_SIZE, SETTINGS.SHORTCUT_KEY_COUNT, SETTINGS.FIXED_SIZE, SETTINGS.MIN_SIZE, SETTINGS.MAX_SIZE], [8, 140, 412, 10, 6, 1692, 1965, 10701]);
+    assert.deepEqual([SETTING.UNICODE_HOST_MODE, SETTING.BEHAVIORS_ENABLED, SETTING.LAYER_BEHAVIORS, SETTING.LAYER_COMBOS, SETTING.AUTOCORRECT_FEEDBACK_PERIOD, SETTING.LEADER_TIMEOUT], [27, 28, 29, 30, 31, 32]);
     assert.equal(MATRIX_POSITIONS, 60);
     assert.deepEqual(defaultLayerRecord(9), {reference: 9, bypass: [], exclude: []});
 });
@@ -62,6 +63,8 @@ const EDGES = {
     BEHAVIORS_ENABLED: [[0, 1], [2]], LAYER_BEHAVIORS: [[0, 0xffff], [0x10000]], LAYER_COMBOS: [[0, 0xffff], [0x10000]],
     // How long one replacement feedback flash lasts (firmware D-F70): never zero.
     AUTOCORRECT_FEEDBACK_PERIOD: [[1, 200, 65535], [0, 65536]],
+    // How long the leader waits (firmware D-F71): 1000 to 10000 ms.
+    LEADER_TIMEOUT: [[1000, 2000, 10000], [0, 999, 10001]],
 };
 
 test("every stored value is named once, in ID order, and accepts only what the firmware does", () => {
@@ -83,24 +86,29 @@ test("every stored value is named once, in ID order, and accepts only what the f
     // A plain range carries its bounds for an editor.
     assert.deepEqual([SETTING_FIELD.AUTO_MOUSE_DEBOUNCE.max, SETTING_FIELD.RGB_TIMEOUT.max, SETTING_FIELD.FEEDBACK_PERIOD.min], [255, 86400000, 1]);
     assert.deepEqual([SETTING_FIELD.AUTOCORRECT_FEEDBACK_PERIOD.min, SETTING_FIELD.AUTOCORRECT_FEEDBACK_PERIOD.max], [1, 65535]);
+    assert.deepEqual([SETTING_FIELD.LEADER_TIMEOUT.min, SETTING_FIELD.LEADER_TIMEOUT.max], [1000, 10000]);
     assert.deepEqual([SETTING_FIELD.DEFAULT_DPI.min, SETTING_FIELD.DEFAULT_DPI.max, SETTING_FIELD.DEFAULT_DPI.step], [400, 3400, 200]);
 });
 
-test("settings v12 round-trip Unicode names, layer records, zero settings and every name", () => {
+test("settings v13 round-trip Unicode names, layer records, zero settings and every name", () => {
     const value = defaults(); value.names[1] = "Édition ⌘"; value.names[15] = "Top"; value.macroNames[3] = "Sign-off"; value.macroNames[127] = "Last macro";
     value.customKeyNames[127] = "Last key"; value.keyboardName = "Noah’s Charybdis";
     value.layers[2] = {reference: 0, bypass: [0, 7, 8, 59], exclude: [12, 33]};
     value.layers[15] = {reference: 14, bypass: [], exclude: [59]};
     const bytes = encodeSettings(value);
-    assert.deepEqual([...bytes.subarray(0, 8)], [12, 16, 32, 128, 128, 0, 128, 0]);
+    assert.deepEqual([...bytes.subarray(0, 8)], [13, 16, 33, 128, 128, 0, 128, 0]);
     const nameBytes = [...value.names, ...value.macroNames, ...value.customKeyNames, value.keyboardName].reduce((sum, name) => sum + Buffer.byteLength(name), 0);
     assert.equal(bytes.length, SETTINGS.MIN_SIZE + nameBytes);
     const layer2 = SETTINGS.LAYER_RECORDS_OFFSET + 2 * SETTINGS.LAYER_RECORD_SIZE;
     assert.deepEqual([...bytes.subarray(layer2, layer2 + 17)], [0, 0x81, 0x01, 0, 0, 0, 0, 0, 0x08, 0, 0x10, 0, 0, 2, 0, 0, 0]);
     assert.equal(bytes.readUInt32LE(SETTINGS.SCALARS_OFFSET + 29 * 4), 0xffff);
-    // Scalar 31, the last, right before the layer records.
+    // Scalar 31, then scalar 32, the last, right before the layer records.
     assert.equal(bytes.readUInt32LE(SETTINGS.SCALARS_OFFSET + 31 * 4), 200);
-    assert.equal(SETTINGS.SCALARS_OFFSET + 32 * 4, SETTINGS.LAYER_RECORDS_OFFSET);
+    assert.equal(bytes.readUInt32LE(SETTINGS.SCALARS_OFFSET + 32 * 4), 2000);
+    assert.equal(SETTINGS.SCALARS_OFFSET + 33 * 4, SETTINGS.LAYER_RECORDS_OFFSET);
+    const waits = encodeSettings(withValue(SETTING.LEADER_TIMEOUT, 10000));
+    assert.equal(decodeSettings(waits).values[SETTING.LEADER_TIMEOUT], 10000);
+    assert.throws(() => encodeSettings(withValue(SETTING.LEADER_TIMEOUT, 999)), /Invalid keyboard settings/);
     const longer = encodeSettings(withValue(SETTING.AUTOCORRECT_FEEDBACK_PERIOD, 65535));
     assert.equal(decodeSettings(longer).values[SETTING.AUTOCORRECT_FEEDBACK_PERIOD], 65535, "its own value, apart from scalar 15's");
     assert.equal(decodeSettings(longer).values[SETTING.FEEDBACK_PERIOD], 200);
@@ -228,14 +236,15 @@ test("decoded names must be well-formed, counted and within 32 bytes", () => {
     assert.throws(() => decodeSettings(six), /Unsupported settings format/);
 });
 
-test("only version 12 is read or written: the retired versions, version 11 among them, and reserved bytes are refused", () => {
-    for (const formatVersion of [11, 10, 9, 8, 7, 6, 5, 4, 13]) assert.throws(() => encodeSettings({...defaults(), formatVersion}), /Unsupported settings format/);
+test("only version 13 is read or written: the retired versions, version 12 among them, and reserved bytes are refused", () => {
+    for (const formatVersion of [12, 11, 10, 9, 8, 7, 6, 5, 4, 14]) assert.throws(() => encodeSettings({...defaults(), formatVersion}), /Unsupported settings format/);
     const bytes = encodeSettings(defaults());
     for (const header of [[5, 8, 28, 64, 64], [4, 8, 28, 64, 0], [3, 8, 28, 64, 0], [2, 8, 28, 16, 0], [1, 8, 28, 16, 0], [6, 16, 31, 128, 128], [7, 16, 31, 128, 128], [8, 16, 31, 128, 128], [9, 16, 31, 128, 128], [10, 16, 31, 128, 128],
-        // Version 11, 31 scalars and no replacement flash, as its header says it, or relabelled 12 with 31; and a later one.
-        [11, 16, 31, 128, 128], [11, 16, 32, 128, 128], [12, 16, 31, 128, 128], [13, 16, 32, 128, 128],
-        [12, 8, 32, 128, 128], [12, 16, 28, 128, 128], [12, 16, 32, 64, 128], [12, 16, 32, 128, 64],
-        [12, 16, 32, 128, 128, 2], [12, 16, 32, 128, 128, 0, 0], [12, 16, 32, 128, 128, 0, 64], [12, 16, 32, 128, 128, 0, 128, 1]]) {
+        [11, 16, 31, 128, 128], [11, 16, 32, 128, 128],
+        // Version 12, 32 scalars and no leader timeout, as its header says it, or relabelled 13 with 32; and a later one.
+        [12, 16, 32, 128, 128], [12, 16, 33, 128, 128], [13, 16, 32, 128, 128], [14, 16, 33, 128, 128],
+        [13, 8, 33, 128, 128], [13, 16, 28, 128, 128], [13, 16, 33, 64, 128], [13, 16, 33, 128, 64],
+        [13, 16, 33, 128, 128, 2], [13, 16, 33, 128, 128, 0, 0], [13, 16, 33, 128, 128, 0, 64], [13, 16, 33, 128, 128, 0, 128, 1]]) {
         const relabelled = Buffer.from(bytes); relabelled.set(header);
         assert.throws(() => decodeSettings(relabelled), /Unsupported settings format/, header.join());
     }

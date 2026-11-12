@@ -84,14 +84,16 @@ export interface PdConfig {
     directionOutput?: number;
     scroll?: Record<string, number>;
 }
-/** Where a typo matches a word, as the keyboard stores it: 0 the whole word, 1 its start, 2 its end, 3 anywhere in it. */
+/** Where a typo matches a word, as the keyboard stores it: 0 the whole word, 1 its start, 2 its end, 3 anywhere in it; or 4, after the Leader key (firmware D-F71). */
 export type AutocorrectMatch = 0 | 1 | 2 | 3;
+/** How a replacement fires (D-L91, firmware D-F71): as you type, after the Leader key, or both; the vocabulary's inputModes keys. */
+export type AutocorrectTrigger = 'word' | 'leader' | 'both';
 /** An input as an edit names it (the firmware's and this contract's name for one is a typo): written as a person writes it, a whole word or with `*` where other letters may go (`recieve*`, `*mnet`, `*tihng*`). `match` is only an older list file's, for one written without `*`. */
 export interface AutocorrectTypoEdit {typo: string; match?: AutocorrectMatch}
 /** What an edit names as a replacement (a correction, in the firmware's and this contract's names): its text, or the number of the macro slot it plays. One of the two. */
 export type AutocorrectReplacement = {correction: string; macro?: undefined} | {macro: number; correction?: undefined};
-/** A replacement with its inputs, as a list file gives one. */
-export type AutocorrectEntryEdit = AutocorrectReplacement & {typos: AutocorrectTypoEdit[]};
+/** A replacement with its inputs and how it fires (as you type when left out), as a list file gives one. */
+export type AutocorrectEntryEdit = AutocorrectReplacement & {trigger?: AutocorrectTrigger; typos: AutocorrectTypoEdit[]};
 export interface SettingEdit {macro: string; enabled?: boolean; value?: Scalar | boolean}
 
 export interface EditPayloads {
@@ -124,8 +126,10 @@ export interface EditPayloads {
         | {protection: 'auto' | 'on' | 'off'; payload?: string; name?: string}
     );
     validateMacro: {keycode: string; payload: string; requestId: number};
-    /** Inputs for a replacement: the entry is made when the list has none of that exact text or macro, otherwise they are added to it. `inputs` is a field's text as it was typed, which core reads into inputs, split at spaces; `typos` gives them one by one. One of the two. */
-    addAutocorrectTypos: AutocorrectReplacement & {typos?: AutocorrectTypoEdit[]; inputs?: string; expectedFingerprint?: string};
+    /** Inputs for a replacement: the entry is made when the list has none of that exact text or macro, firing as `trigger` says (as you type when left out), otherwise they are added to it and it fires as it did. `inputs` is a field's text as it was typed, which core reads into inputs, split at spaces; `typos` gives them one by one. One of the two. */
+    addAutocorrectTypos: AutocorrectReplacement & {typos?: AutocorrectTypoEdit[]; inputs?: string; trigger?: AutocorrectTrigger; expectedFingerprint?: string};
+    /** How a replacement fires (D-L91): as you type, after the Leader key, or both. Its inputs stay as they are. */
+    updateAutocorrectTrigger: AutocorrectReplacement & {trigger: AutocorrectTrigger; expectedFingerprint?: string};
     /** A replacement changed where it stands: its text respelled (`to`), or made to play a macro (`toMacro`). Changed to one the list already has, its inputs joins that one. */
     updateAutocorrectCorrection: AutocorrectReplacement & ({to: string; toMacro?: undefined} | {toMacro: number; to?: undefined}) & {expectedFingerprint?: string};
     /** One input, named by its stored letters, written anew (`to`, with its `*`). */
@@ -165,7 +169,7 @@ export type PanelEdit = {[K in keyof EditPayloads]: EditOf<K>}[keyof EditPayload
 /** Every posted edit the draft stages: an import opens a review and a macro or autocorrect check is answered, none of them an edit. core/model/draft-edits.js registers each one. */
 export type DraftEditType = Exclude<keyof EditPayloads, 'reviewPortableProfile' | 'validateMacro' | 'validateAutocorrect'>;
 /** The edits the Text replacement screen makes to the list. */
-export type AutocorrectEditType = 'addAutocorrectTypos' | 'updateAutocorrectCorrection' | 'updateAutocorrectTypo' | 'deleteAutocorrectTypo' | 'deleteAutocorrectEntry' | 'importAutocorrect';
+export type AutocorrectEditType = 'addAutocorrectTypos' | 'updateAutocorrectTrigger' | 'updateAutocorrectCorrection' | 'updateAutocorrectTypo' | 'deleteAutocorrectTypo' | 'deleteAutocorrectEntry' | 'importAutocorrect';
 export type AutocorrectEdit = Extract<PanelEdit, {type: AutocorrectEditType}>;
 
 /** A dense decoded slot has values even for inactive fields. */

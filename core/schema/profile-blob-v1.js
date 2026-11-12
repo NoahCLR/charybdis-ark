@@ -6,7 +6,7 @@ const {POINTING_SLOT_COUNT} = require("../data/pd-mode-keys");
 const {MACRO_DOMAIN_V1} = require("./macro-domain-v1");
 const {u8: assertU8, u16: assertU16, u32: assertU32, answerFault, asBytes, copyBytes, protocolError} = require("./bytes");
 
-// The one profile format the keyboard stores: schema 4.5, up to 130,048 bytes
+// The one profile format the keyboard stores: schema 4.6, up to 130,048 bytes
 // (one 128 KiB flash slot less its 1 KiB record, firmware D-F29). Schema 4 opens the new
 // base (firmware D-F28): a domain envelope's payload length is 32 bits, so
 // the envelope is 6 bytes; a domain's payload bytes are schema 3's.
@@ -18,7 +18,7 @@ const PROFILE_BLOB_V1 = Object.freeze({
     DOMAIN_HEADER_SIZE: 6,
     ACTION_SIZE: 4,
     SCHEMA_MAJOR: 4,
-    SCHEMA_MINOR: 5,
+    SCHEMA_MINOR: 6,
     CANONICAL_FLAG: 1,
     KNOWN_FLAGS: 1,
     MAX_SIZE: 130048,

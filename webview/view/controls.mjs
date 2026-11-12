@@ -39,9 +39,10 @@ export const chooseAutocorrectFile = (requestId) => ({type: 'chooseAutocorrectFi
 export const exportAutocorrect = (format) => ({type: 'exportAutocorrect', format});
 
 // Try it: what the keyboard would leave on screen for what was typed into
-// the box (`\b` for Backspace) after the text already in it.
-/** @param {{before: string, typed: string, capsLock: boolean}} tried @param {number} requestId @returns {import("../../contracts/messages.js").ControlsOn<'inspect'>} */
-export const tryAutocorrect = ({before, typed, capsLock}, requestId) => ({type: 'tryAutocorrect', before, typed, capsLock, requestId});
+// the box (`\b` for Backspace) after the text already in it, and what it
+// would do with the After Leader field's text.
+/** @param {{before: string, typed: string, capsLock: boolean, leader?: string}} tried @param {number} requestId @returns {import("../../contracts/messages.js").ControlsOn<'inspect'>} */
+export const tryAutocorrect = ({before, typed, capsLock, leader}, requestId) => ({type: 'tryAutocorrect', before, typed, capsLock, ...(leader ? {leader} : {}), requestId});
 
 // Live preview + save (firmware D-F32): the keyboard's Save and Revert, the
 // answer to a live edit's trap check, and how edits reach the keyboard.

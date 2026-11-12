@@ -98,7 +98,7 @@ first and releases the candidate after, bounded at 15 s
 (`NOAH_PROFILE_SPLIT_PREPARED_ABORT_TIMEOUT_MS`) when the slave half stays
 silent or answers `BUSY`
 ([cancellation](logical-profile-transaction-v1.md#cancellation),
-[D-F41](https://github.com/NoahCLR/charybdis-4x6/blob/b734c89a86a682564faad5a65b0a526af360466b/docs/adr/0041-cancelled-save-ends-in-bounded-time.md)). Released
+[D-F41](https://github.com/NoahCLR/charybdis-4x6/blob/a90f448a5235071b7e64aead6e2bebcdf29ba6de/docs/adr/0041-cancelled-save-ends-in-bounded-time.md)). Released
 unacknowledged, it leaves durable authority unchanged on both halves, since
 neither holds a marker for the copy, and sets *peer cleanup pending*.
 

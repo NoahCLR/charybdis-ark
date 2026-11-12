@@ -7,12 +7,12 @@ const {judge, markdown} = require("../../scripts/check-agreement");
 
 const FIRMWARE = "https://github.com/NoahCLR/charybdis-4x6";
 const QMK = "https://github.com/NoahCLR/bastardkb-qmk";
-// Capability pages as firmware's contract probe states them (Profile Wire 2.1,
-// schema 4.5, action-ABI digest 0xa6abaa9a, sixteen layers, all eight domains,
+// Capability pages as firmware's contract probe states them (Profile Wire 2.2,
+// schema 4.6, action-ABI digest 0x951f1b61, sixteen layers, all eight domains,
 // the autocorrect list's ceilings, a
 // split build that saves and has pointing).
-const PAGES = ["030402010405201402070000009aaaaba600000100c0a24491", "10108005801010203a088080ff202040000000000000000000", "800200d00000e0cf0000e0cf00005788000000000000000000",
-    "0004000400500888000020" + "00".repeat(14)];
+const PAGES = ["03040202040620140207000000611b1f9500000100c0a24491", "10108005801010203a088080ff202040000000000000000000", "800200d00000e0cf0000e0cf00005788000000000000000000",
+    "00040004005008880a0020" + "00".repeat(14)];
 const sha = text => createHash("sha256").update(text).digest("hex");
 
 function setup() {

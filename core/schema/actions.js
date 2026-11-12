@@ -22,7 +22,7 @@ const {resolveNativeQmkExpression} = require("./compiled-profile-v1");
 
 // The native action ABI whose semantic actions map onto VIA keycodes: the
 // 32-slot firmware's, with the userspace keycode blocks and pointing slots
-// 0..31 (firmware D-F09), under schema 4.5. The firmware folds the schema's
+// 0..31 (firmware D-F09), under schema 4.6. The firmware folds the schema's
 // major and minor into the digest, so schema 4 moved it from schema 3's
 // 0x837cf479 (firmware D-F28), schema 4.1 from 4.0's 0x6fd70b90 (firmware
 // D-F62), schema 4.2 from 4.1's 0x7fecec81 and schema 4.3 from 4.2's
@@ -33,10 +33,12 @@ const {resolveNativeQmkExpression} = require("./compiled-profile-v1");
 // (firmware D-F66, still Profile Wire 2.1), moved it again, from 0xb2205fc3.
 // Schema 4.4, the autocorrect list's (firmware D-F68), moved it from 4.3's
 // 0x91fcd248, with no keycode changed, and schema 4.5, replacement
-// feedback's (firmware D-F70), from 4.4's 0x3c9e17ff the same way.
+// feedback's (firmware D-F70), from 4.4's 0x3c9e17ff the same way, and
+// schema 4.6, the leader's (firmware D-F71), from 4.5's 0xa6abaa9a: the Leader
+// key is QMK's own QK_LEADER, so no keycode moved.
 // A keyboard advertising another vocabulary numbers its keys differently, so
 // Ark reads it but neither names its keys nor edits it.
-const ACTION_ABI = 0xa6abaa9a;
+const ACTION_ABI = 0x951f1b61;
 const KNOWN_ACTION_ABIS = Object.freeze([ACTION_ABI]);
 /** @param {number} value */
 const knownActionAbi = value => KNOWN_ACTION_ABIS.includes(value);
@@ -98,6 +100,17 @@ const QMK_SWITCH_KEYS = Object.freeze(QMK_SWITCH_KEY_NAMES.map(name => /** @type
 /** @param {number} code */
 const isSwitchKey = code => QMK_SWITCH_KEYS.includes(code) || behaviorSwitchKeyName(code) !== undefined || autoMouseSwitchKeyName(code) !== undefined;
 
+// The Leader key (firmware D-F71): QMK's QK_LEADER, which the keyboard runs
+// as an action of its own wherever a switch key goes, a key, a behaviour's
+// tap or hold, a combo's output. It is no switch key: it switches nothing.
+const LEADER_KEY_NAME = "QK_LEADER";
+const LEADER_KEY = /** @type {number} */ (keycodes.encode(LEADER_KEY_NAME));
+/** @param {number} code */
+const isLeaderKey = code => code === LEADER_KEY;
+// Whether a stored action sends the Leader key.
+/** @param {import("./types.js").SemanticAction | undefined} action */
+const sendsLeader = action => action?.kind === ACTION.QMK_KEYCODE && isLeaderKey(action.operand);
+
 // TG(n), TO(n), TT(n) and OSL(n) on a layer the keyboard has: the QMK layer
 // keycodes the keyboard runs through its own layer ownership (TG as LOCK_LAYER, TO as "lock only n", TT as a hold
 // whose fifth tap locks, OSL as a one-shot). Where each may go is
@@ -133,4 +146,4 @@ function placementProblem(action, placement, {layerCount = LAYERS} = {}) {
 /** @param {string} expression */
 const momentaryCall = expression => callParts(expression.replace(/\s+(?=\()/, ""))?.name === "MO";
 
-module.exports = {placementProblem, momentaryCall, isOwnedLayerCode, isSwitchKey, QMK_SWITCH_KEY_NAMES, KNOWN_ACTION_ABIS, ACTION_ABI, knownActionAbi, actionName, nativeCode, keycodeAction, pointingSlotOfCode, layerRef, layerOfRef};
+module.exports = {placementProblem, momentaryCall, isOwnedLayerCode, isSwitchKey, QMK_SWITCH_KEY_NAMES, LEADER_KEY_NAME, isLeaderKey, sendsLeader, KNOWN_ACTION_ABIS, ACTION_ABI, knownActionAbi, actionName, nativeCode, keycodeAction, pointingSlotOfCode, layerRef, layerOfRef};

@@ -115,7 +115,7 @@ export const STATE_FIELDS = {
     autocorrectImport: resets(null),
     // What was typed into Try it stays through a draft change: it is tried
     // again against the list as it then stands.
-    autocorrectTry: kept({before: "", typed: "", capsLock: false, text: "", shown: "", fired: [], marks: [], undone: false, error: "", requestId: 0, draft: ""}),
+    autocorrectTry: kept({before: "", typed: "", capsLock: false, text: "", shown: "", fired: [], marks: [], undone: false, error: "", requestId: 0, draft: "", leader: "", leaderResult: null}),
     heldSlot: resets(null),    // {bank, key}: the tile held for a keyboard swap, let go when the draft is replaced
     customKey: kept(null),
     customKeySearch: kept(""),

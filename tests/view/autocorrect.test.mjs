@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {addedReplacement, autocorrectRows, bytesWords, countWords, freeWords, importLines, openEntry, replacementOf, textCount, triedAfter, triedWords, usageWords} from "../../webview/view/autocorrect.mjs";
+import {addedReplacement, autocorrectRows, bytesWords, countWords, freeWords, importLines, leaderTriedWords, openEntry, replacementOf, textCount, triedAfter, triedWords, usageWords} from "../../webview/view/autocorrect.mjs";
 
 // An entry as core publishes it: a replacement's text, or a number for the
 // macro slot it plays, then its inputs as it is written. Its label is core's
@@ -50,12 +50,12 @@ test("an edit names a replacement by its text or its slot", () => {
 });
 
 test("the counts and the memory read what the keyboard holds, in core's own figures, and no ceiling of replacements is shown", () => {
-    const usage = {corrections: 1, typos: 1200, maxTypos: 2048, textBytes: 10, maxTextBytes: 20480, bytes: 34, capacity: 34824, share: 34 / 34824, free: 100, textMax: 32, correctionMax: 128, shortInput: 4};
+    const usage = {corrections: 1, typos: 1200, maxTypos: 2048, textBytes: 10, maxTextBytes: 20480, bytes: 34, capacity: 34826, share: 34 / 34826, free: 100, textMax: 32, correctionMax: 128, shortInput: 4};
     assert.equal(countWords(usage), "1 replacement · 1,200 inputs");
     assert.equal(countWords({corrections: 2, typos: 1}), "2 replacements · 1 input");
     assert.equal(usageWords(usage), "1,200 of 2,048 inputs");
     assert.equal(usageWords({...usage, typos: 15, maxTypos: 1024}), "15 of 1,024 inputs");
-    assert.equal(bytesWords({...usage, bytes: 1234}), "1,234 / 34,824 bytes", "as Macro memory says its own");
+    assert.equal(bytesWords({...usage, bytes: 1234}), "1,234 / 34,826 bytes", "as Macro memory says its own");
     assert.deepEqual([freeWords({...usage, free: 20422}), freeWords({...usage, free: 1}), freeWords({...usage, free: 0})], ["20,422 bytes free", "1 byte free", "0 bytes free"], "as Macro memory says what is free");
     assert.deepEqual(textCount(" café ", 128), {used: 5, max: 128, over: false, label: "5 / 128 bytes"}, "bytes, of the text as it is stored");
     assert.equal(textCount("x".repeat(129), 128).over, true);
@@ -110,4 +110,19 @@ test("the line under Try it says what fired last, a macro by its name, or that B
     assert.equal(triedWords({fired: [{entry: "\u0001macro:2", correction: "", typo: "addr", macro: 2}], undone: false}, macros), "“addr” plays the macro “Address”.");
     assert.equal(triedWords({fired: [{entry: "\u0001macro:5", correction: "", typo: "sig", macro: 5}], undone: false}, macros), "“sig” plays the macro “Macro 5”.");
     assert.match(triedWords({fired: [{entry: "the", correction: "the", typo: "hte"}], undone: true}), /^Backspace put the word back/);
+});
+
+// What Try it's After Leader field says of core's answer (D-L91).
+test("the After Leader line says what the leader would do, in plain words, and nothing for an empty field", () => {
+    assert.equal(leaderTriedWords("", {state: "none"}), "");
+    assert.equal(leaderTriedWords("pn", null), "");
+    assert.equal(leaderTriedWords("pn", {state: "none"}), "Nothing on your list fires after Leader, so the Leader key does nothing.");
+    assert.equal(leaderTriedWords("pn", {state: "sends", input: "pn", entry: "x", label: "+31 6 1234 5678", finishing: false, passedOver: false}), "“pn” sends “+31 6 1234 5678”, and that is all the computer sees.");
+    assert.equal(leaderTriedWords("abc", {state: "sends", input: "abc", entry: "alpha", label: "alpha", finishing: true, passedOver: false}), "Enter sends “alpha”, and that is all the computer sees.");
+    assert.equal(leaderTriedWords("sig", {state: "sends", input: "sig", entry: "m", label: "Sign-off", macro: 5, finishing: false, passedOver: false}), "“sig” plays the macro “Sign-off”, and that is all the computer sees.");
+    assert.equal(leaderTriedWords("ub", {state: "sends", input: "ub", entry: "über", label: "über", finishing: false, passedOver: true}), "“ub” is a leader input, but the keyboard cannot type its replacement here: nothing is sent.");
+    assert.equal(leaderTriedWords("sig", {state: "sends", input: "sig", entry: "m", label: "Sign-off", macro: 5, finishing: false, passedOver: true}), "“sig” is a leader input, but the keyboard cannot play its macro: nothing is sent.");
+    assert.equal(leaderTriedWords("ab", {state: "waits", sends: null, longer: ["abc", "abcd", "abce", "abcf"]}), "Waiting for more: it could become “abc”, “abcd”, “abce” and 1 more.");
+    assert.equal(leaderTriedWords("abc", {state: "waits", sends: "alpha", longer: ["abcd"]}), "Waiting: Enter, or a pause, sends “alpha”; “abcd” could still follow.");
+    assert.equal(leaderTriedWords("ax", {state: "drops", held: "ax"}), "No leader input begins with “ax”: the keyboard drops what you typed, and nothing reaches the computer.");
 });

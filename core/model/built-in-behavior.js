@@ -56,7 +56,7 @@
 // The keyboard owns the gesture timing of authored LT(), MT() and OSM() rows
 // (physical gesture timing and runtime-owned tapping).
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
-const {isSwitchKey, keycodeAction} = require("../schema/actions");
+const {isLeaderKey, isSwitchKey, keycodeAction} = require("../schema/actions");
 const {customKeyOfCode} = require("../data/user-keycodes");
 const {pdModeKeyOfCode} = require("../data/pd-mode-keys");
 const {QK, inBlock, BASIC_KEYS, MOD_MASK, TRANSPARENT, keyOf, modsOf, layerFormLayer, layerTapLayer} = require("../../rules/qmk-keycodes.mjs");
@@ -133,7 +133,7 @@ function keyActions(target, {customKeyShortcuts = []} = {}) {
     if (inBlock(code, QK.MOMENTARY)) return {hold: {kind: ACTION.LAYER_MOMENTARY, operand: layerFormLayer(code)}, fromPress: true};
     if (inBlock(code, QK.LAYER_MOD)) return {hold: keycodeAction(code), fromPress: true};
     if (pdModeKeyOfCode(code)?.locked === false) return {hold: keycodeAction(code), fromPress: true};
-    if (pdModeKeyOfCode(code)?.locked || isSwitchKey(code)) return {tap: keycodeAction(code), releaseTaps: true};
+    if (pdModeKeyOfCode(code)?.locked || isSwitchKey(code) || isLeaderKey(code)) return {tap: keycodeAction(code), releaseTaps: true};
     if (inBlock(code, QK.ONE_SHOT_MOD)) {
         return {tap: keycodeAction(code), hold: keycodeAction((code & MOD_MASK) << 8)};
     }

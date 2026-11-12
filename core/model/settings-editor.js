@@ -274,9 +274,13 @@ function settingsSections(snapshot, settings) {
     result.push({id: "keyboardOptions", area: AREA.settings, label: SECTION.keyboardOptions, ...(options ? {} : {description: "Read the keyboard to see the key options it supports."}), fields:
         keyOptions.filter(field => field.macro !== AUTOCORRECT_SWITCH)});
     // Its switch keys override it until the keyboard restarts (switchedByKeys),
-    // so it is no longer a "Typing" option among the swaps.
-    result.push({id: "autocorrect", area: AREA.settings, label: SECTION.autocorrect, fields:
-        keyOptions.filter(field => field.macro === AUTOCORRECT_SWITCH).map(({part, tooltip, ...field}) => switchedByKeys({...field, hint: field.hint || tooltip}, "autocorrect"))});
+    // so it is no longer a "Typing" option among the swaps. How long the
+    // leader waits follows it: the leader works whatever the switch says
+    // (firmware D-F71).
+    result.push({id: "autocorrect", area: AREA.settings, label: SECTION.autocorrect, fields: [
+        ...keyOptions.filter(field => field.macro === AUTOCORRECT_SWITCH).map(({part, tooltip, ...field}) => switchedByKeys({...field, hint: field.hint || tooltip}, "autocorrect")),
+        number("leaderTimeout", SETTING.LEADER_TIMEOUT, "Leader waits (ms)", "How long the Leader key waits after your last key before it sends a leader input that a longer one begins with, from 1000 to 10000. It works with the switch off, and when a key turned it off."),
+    ]});
     /** @param {number} id */
     const label = id => VOCABULARY.hostOs.find(([value]) => value === id)?.[1] || "Unknown";
     const macos = host.effective === MACOS;
