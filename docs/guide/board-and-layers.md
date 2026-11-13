@@ -56,7 +56,8 @@ also shows while the ⓘ has the keyboard's focus, and Escape hides it.
 Rest the pointer on a key of the Keymap and a card opens with everything it
 does:
 
-- its name and the keycode it stores
+- its name and the keycode it stores, and for a pointing key what its mode
+  does (send keys or scroll) or that its slot is still empty
 - for a key that taps one thing and holds another, both, and the tap / hold
   threshold it uses
 - for a custom key, its shortcut: the keys it sends and the layers it turns
@@ -64,7 +65,7 @@ does:
   whether it runs as the key does or where its behaviour leaves a tap or hold
   empty
 - its behaviour, branch by branch, with the thresholds it runs on
-- the macro it plays, step by step, or the pointing mode it runs
+- the macro it plays, step by step
 - the combos it is part of, what each sends and its other keys
 - for a transparent key, which layer answers it and what that key does
 
