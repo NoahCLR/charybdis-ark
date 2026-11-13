@@ -128,8 +128,8 @@ The same kind of control looks and sits the same on every screen.
   sentence case like the captions over it. What the board takes from the
   mouse and the keys is in the list behind the info mark on the board's
   top-right corner: a button named Shortcuts and described by the list,
-  which shows while the pointer is on the mark or the list, or the
-  keyboard's focus is on the mark, and which Escape hides until both leave.
+  which a press opens and keeps open until it is pressed again, Escape or a
+  press elsewhere, and which the pointer resting on it previews (D-L96).
   It names ⌘-clicking (Ctrl-clicking) a layer to preview
   layers together, which reads the board, whether or not the board takes an
   edit; while it takes none, the rest of the list says only what still
@@ -396,6 +396,17 @@ The same kind of control looks and sits the same on every screen.
   masks of a strip's faded edges (`tests/scripts/conventions.test.js`).
   Tips and hover cards sit over a dialog's scrim; a message floating over the
   screen sits under it, as the rail's own message does (no test).
+- A tip and an info mark do different jobs (D-L96). A tip is one control's
+  one line: what it does, or what pressing it changes; it never explains an
+  idea, repeats text on screen, or holds the only copy of something needed.
+  An info mark holds what a section or an idea means: a press on it (a
+  click, Enter or Space) opens its list and keeps it open, across a redraw,
+  until it is pressed again, Escape is pressed or a press lands elsewhere;
+  opening one closes any other; the pointer resting on it previews the list;
+  the focus alone opens nothing, the list being the button's description,
+  its `aria-expanded` saying whether it is open (`infoMark`,
+  `attachInfoMarks`, `webview/ui/info-mark.mjs`;
+  `browser-tests/shortcut-glyphs.spec.js`, `browser-tests/autocorrect.spec.js`).
 - A tip is the words that open when the pointer rests on a control, its
   `data-tip`, and every one is shown by `webview/ui/hover.mjs` at the pointer
   (D-L80): below and to the right of where it rested, kept inside the
