@@ -73,7 +73,7 @@ export function stageAutocorrect(model) {
     // is set on Host settings, a link away.
     const leaderWaits = sectionsIn(model, "Settings").find((entry) => entry.id === "autocorrect")?.fields.find((field) => field.macro === "leaderTimeout");
     const waits = (leaderWaits?.label || "").replace(/\s*\(ms\)$/, "");
-    const leader = el(`<button class="btn tiny link" data-act="leader-waits" data-tip="Leader waiting is no flash: it holds as long as the leader waits, set on ${esc(sectionPath(model, "autocorrect"))}.">${esc(waits)} →</button>`);
+    const leader = el(`<button class="btn tiny link" data-act="leader-waits" data-tip="Opens ${esc(sectionPath(model, "autocorrect"))}.">${esc(waits)} →</button>`);
     leader.addEventListener("click", () => { state.screen = screenOfSection("autocorrect") || "host"; state.reveal = '.setrow:has([data-macro="leaderTimeout"])'; render(); });
     return stageSurface(model, {id: "autocorrect", first: list, head, colour, side: where, accents: accentsSection(model, "autocorrect"),
         shared: [flashSetting(model, "replacementFeedback"), el(`<span class="stage-bar-aside">Leader waiting lasts as long as</span>`), leader]});

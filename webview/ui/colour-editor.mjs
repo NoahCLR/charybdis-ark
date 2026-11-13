@@ -33,8 +33,8 @@ let groups = 0;
 // editor on screen. `unused` draws it dimmed under that note with no choice,
 // for a colour its stage keeps but does not paint as set (the fade's end
 // colour in a mode that takes none).
-/** @param {{identity: string, colour: import("../../contracts/edits.js").Colour | null | undefined, title: string, canEdit?: boolean, onChange?: (colour: import("../../contracts/edits.js").Colour) => void, offNote?: string, offTip?: string, offAction?: string, offWord?: string, ledsOffTip?: string, ledsOffNote?: string, unused?: string, choiceWords?: {colour: string, off: string}, maximumBrightness?: number}} options */
-export function colourEditor({identity, colour, title, canEdit = true, onChange, offNote, offTip, offAction, offWord, ledsOffTip, ledsOffNote, unused, choiceWords = {colour: "", off: ""}, maximumBrightness}) {
+/** @param {{identity: string, colour: import("../../contracts/edits.js").Colour | null | undefined, title: string, canEdit?: boolean, onChange?: (colour: import("../../contracts/edits.js").Colour) => void, offNote?: string, offTip?: string, offAction?: string, offWord?: string, ledsOffTip?: string, unused?: string, choiceWords?: {colour: string, off: string}, maximumBrightness?: number}} options */
+export function colourEditor({identity, colour, title, canEdit = true, onChange, offNote, offTip, offAction, offWord, ledsOffTip, unused, choiceWords = {colour: "", off: ""}, maximumBrightness}) {
     const [h, s, v] = hsv(colour);
     const maximum = brightnessLimit(maximumBrightness);
     const node = el(`<div class="stack gap-12 colour-editor"></div>`);
@@ -62,7 +62,7 @@ export function colourEditor({identity, colour, title, canEdit = true, onChange,
     const choices = unused ? [] : owned ? [["colour", choiceWords.colour, ""], ["off", choiceWords.off, ledsOffTip || ""], ["passthrough", offWord || "", offTip || ""]]
         : offTip ? [["colour", choiceWords.colour, ""], ["off", offAction || choiceWords.off, offTip]] : [];
     const group = `${identity}:state:${++groups}`;
-    const head = el(`<div class="row colour-head"${dark && owned && ledsOffNote ? ` data-tip="${esc(ledsOffNote)}"` : ""}>
+    const head = el(`<div class="row colour-head">
         <span class="swatch-lg ${passthrough ? "swatch-off" : dark ? "swatch-dark" : ""}${unused ? " unused" : ""}" style="${passthrough || dark ? "" : `background:${css(colour)}`}"></span>
         <div class="colour-readout"><div class="note${idle && !unused ? "" : " mono"}">${idle && !unused ? esc(passthrough ? offWord || "" : offAction || choiceWords.off) : `${esc(hsvLabel(colour))} · rgb(${esc(rgb(colour).join(", "))})`}</div></div>
         ${choices.length ? `<div class="seg colour-state" role="radiogroup" aria-label="${esc(title)}">${choices.map(([value, words, tip]) =>
@@ -91,7 +91,8 @@ export function colourEditor({identity, colour, title, canEdit = true, onChange,
 
     const topWhite = css({h: "0", s: "0", v: String(maximum)});
     const topHue = css({h: String(h), s: "255", v: String(maximum)});
-    const field = el(`<div class="sv-field" data-tip="Brightness is limited to ${maximum}, as reported by this keyboard."
+    // Brightness stops at the keyboard's limit, which its field's label says.
+    const field = el(`<div class="sv-field"
         style="background:linear-gradient(to top, ${css({h: "0", s: "0", v: "0"})}, transparent), linear-gradient(to right, ${topWhite}, ${topHue})">
         <span class="thumb" style="left:${(s / 255) * 100}%;top:${100 - valuePercent(v, maximum)}%"></span></div>`);
     body.append(field);

@@ -135,7 +135,8 @@ export function lightingGroup(id) {
 // (replacementFeedback), each a stored setting of its own, on the stage
 // bar since it is every case's. The keyboard keeps them with its settings,
 // so each saves as a settings section of one field. What it means is in the
-// stage's info mark; its tip says it too.
+// stage's info mark alone (a tip is one control's one line, never an
+// explanation the info mark already gives).
 /** @param {Model} model @param {string} sectionId */
 export function flashSetting(model, sectionId) {
     const flash = sectionsIn(model, "Lighting").find((entry) => entry.id === sectionId);
@@ -143,7 +144,7 @@ export function flashSetting(model, sectionId) {
     if (!flash || !field) return el(`<span></span>`);
     const editable = editGate(model, "settings").editable && !field.readOnly;
     const label = field.unit ? field.label.replace(new RegExp(`\\s*\\(${field.unit}\\)$`), "") : field.label;
-    const node = el(`<label class="field inline" data-tip="${esc([field.tooltip, field.hint].filter(Boolean).join(" "))}"><span>${esc(label)}</span>
+    const node = el(`<label class="field inline"><span>${esc(label)}</span>
         <span class="affix unit"><input class="input mono num" inputmode="numeric" data-macro="${esc(field.macro)}" data-f="setting:${esc(field.macro)}" value="${esc(field.value)}" ${editable ? "" : "disabled"}>${field.unit ? `<i>${esc(field.unit)}</i>` : ""}</span></label>`);
     /** @type {HTMLInputElement} */ (node.querySelector("input")).addEventListener("change", (event) => {
         const written = /** @type {HTMLInputElement} */ (event.target).value.trim();

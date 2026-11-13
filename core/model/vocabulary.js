@@ -516,14 +516,13 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     // background effect offers neither. The editor's choice reads Colour,
     // Off and `offWord` (D-L95); each choice's tip is `ledsOffTip` for Off
     // and `offTip` for Passthrough, the fade end's Off; a passthrough
-    // colour's note is `offNote`, and an off one's `ledsOffNote`.
+    // colour's note is `offNote`. An off one says it on its item's head.
     colourOff: {
         layers: {
             offTip: "Store HSV(0, 0, 0): this layer then paints nothing, and what is beneath shows through.",
             offNote: "This layer is passthrough: it paints nothing, so what is beneath shows through wherever it would paint.",
             offWord: "Passthrough",
             ledsOffTip: "Store brightness 0 with saturation: this layer's keys then go dark, covering what is beneath.",
-            ledsOffNote: "The colour is off: this layer's keys go dark, covering what is beneath. Make it passthrough to let what is beneath show.",
         },
         auto: {
             offTip: "Store HSV(0, 0, 0): the fade then ends with the LEDs off.",
@@ -533,28 +532,24 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
             offNote: "This mode is passthrough: it paints nothing while it runs, so what is beneath shows. Its accents in a colour of their own still light.",
             offWord: "Passthrough",
             ledsOffTip: "Store brightness 0 with saturation: this mode then turns its area's LEDs off while it runs, covering what is beneath.",
-            ledsOffNote: "The colour is off: this mode turns its area's LEDs off while it runs, covering what is beneath. Make it passthrough to let what is beneath show.",
         },
         combo: {
             offTip: "Store HSV(0, 0, 0): combo feedback then paints nothing while a combo's inputs are held, and what is beneath shows. Its accents in a colour of their own still light.",
             offNote: "Combo feedback is passthrough: it paints nothing while a combo's inputs are held, so what is beneath shows. Its accents in a colour of their own still light.",
             offWord: "Passthrough",
             ledsOffTip: "Store brightness 0 with saturation: combo feedback then turns its area's LEDs off while a combo's inputs are held, covering what is beneath.",
-            ledsOffNote: "The colour is off: combo feedback turns its area's LEDs off while a combo's inputs are held, covering what is beneath. Make it passthrough to let what is beneath show.",
         },
         key: {
             offTip: "Store HSV(0, 0, 0): this case then paints nothing, and what is beneath shows. The other cases still light, and so do its accents in a colour of their own.",
             offNote: "This case is passthrough: it paints nothing, so what is beneath shows. The other cases still light, and so do its accents in a colour of their own.",
             offWord: "Passthrough",
             ledsOffTip: "Store brightness 0 with saturation: this case then turns its area's LEDs off, covering what is beneath.",
-            ledsOffNote: "The colour is off: this case turns its area's LEDs off, covering what is beneath. Make it passthrough to let what is beneath show.",
         },
         autocorrect: {
             offTip: "Store HSV(0, 0, 0): this case then paints nothing, and what is beneath shows. The other cases still light, and so do its accents in a colour of their own.",
             offNote: "This case is passthrough: it paints nothing, so what is beneath shows, and its accents that take its colour stay dark. The other cases still light.",
             offWord: "Passthrough",
             ledsOffTip: "Store brightness 0 with saturation: this case then turns its area's LEDs off, covering what is beneath.",
-            ledsOffNote: "The colour is off: this case turns its area's LEDs off, covering what is beneath. Make it passthrough to let what is beneath show.",
         },
     },
     // What Behaviour feedback shows (D-L93; the firmware's behaviour-feedback

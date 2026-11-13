@@ -861,7 +861,7 @@ test("Passthrough makes one replacement case paint nothing, the list and the boa
         // Off is a colour, black: its hue and saturation stay editable, and the head says what it does.
         await expect(colourState(page, "off").locator("input")).toBeChecked();
         await expect(body(page).locator("[data-channel]:enabled")).toHaveCount(3);
-        await expect(body(page).locator(".colour-head")).toHaveAttribute("data-tip", /^The colour is off/);
+        await expect(body(page).locator(".colour-head")).not.toHaveAttribute("data-tip", /./);
         await publishAccepted(page, ["rgb", "autocorrectFeedback", field], {h: "0", s: "0", v: "0"});
         await clearPosts(page);
         await colourState(page, "colour").click();
@@ -899,7 +899,9 @@ test("the Flash length field posts its own setting edit and keeps its focus acro
     const field = where.locator('.field:has([data-f="setting:replacementFlash"])');
     await expect(field.locator("> span").first()).toHaveText("Flash length");
     await expect(field.locator(".affix i")).toHaveText("ms");
-    await expect(field).toHaveAttribute("data-tip", /How long one flash lasts/);
+    // What it means is on the stage's info mark alone, never also in a tip.
+    await expect(field).not.toHaveAttribute("data-tip", /./);
+    await expect(where.locator(".info-pop")).toContainText("How long one flash lasts");
     // Leader waiting lasts as long as the leader waits instead, set on Host settings, a link away.
     await expect(where.locator('[data-act="leader-waits"]')).toHaveText("Leader waits →");
     const input = field.locator("input");
@@ -922,7 +924,8 @@ test("the Flash length field posts its own setting edit and keeps its focus acro
 test("Behaviour feedback's Flash interval posts its own setting and no longer speaks for replacement feedback", async ({page}) => {
     await openStage(page, "key");
     const field = body(page).locator('.field:has([data-f="setting:feedbackFlash"])');
-    await expect(field).toHaveAttribute("data-tip", /Time for each on or off phase; a full blink takes twice this value/);
+    await expect(field).not.toHaveAttribute("data-tip", /./);
+    await expect(body(page).locator(".stage-bar .info-pop")).toContainText("a full blink takes twice this");
     await expect(field).not.toContainText(/replacement/i);
     await expect(field).not.toHaveAttribute("data-tip", /replacement/i);
     await clearPosts(page);
@@ -989,7 +992,8 @@ test("Leader waiting holds from the Leader key, or on every key with none, takes
     for (const key of [7, 13, 49, 54]) expect(await fill(key), `key ${key}`).toBe(await css(FLASH.leadingColor));
     const where = body(page).locator('.field:has([data-f="lighting:autocorrect:leadingColor:locality"]) .hint');
     await expect(where).toHaveText("Trigger key: the Leader key you pressed.");
-    await expect(body(page).locator(".field:has([data-macro=\"replacementFlash\"])")).toHaveAttribute("data-tip", /Leader waiting is no flash: it holds for as long as the leader waits/);
+    await expect(body(page).locator(".stage-bar .info-pop")).toContainText("which holds as long as the leader waits");
+    await expect(body(page).locator('[data-act="leader-waits"]')).toHaveAttribute("data-tip", /^Opens Host settings/);
     // An accent for Leader waiting alone.
     const section = body(page).locator('[data-accents="autocorrect"]');
     await expect(section.locator(".accent-band")).toHaveText(["For Leader waiting", "For every case"]);

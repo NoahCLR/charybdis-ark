@@ -373,7 +373,6 @@ test("every owned colour offers Passthrough and Off, passthrough never called of
         assert.match(wording.offTip, /paints nothing/, stage);
         assert.match(wording.offNote, /[Pp]assthrough.*shows/, stage);
         assert.match(wording.ledsOffTip || "", /LEDs off|go dark/, stage);
-        assert.match(wording.ledsOffNote || "", /The colour is off/, stage);
         for (const text of [wording.offTip, wording.offNote]) {
             assert.doesNotMatch(text || "", /\boff\b|Turn off|Stage on/, `${stage}: neither off nor the stage switch stands for passthrough`);
         }

@@ -41,20 +41,19 @@ export function stageBase(model) {
         if (brightness.readOnly && brightness.hint) colour.append(el(`<p class="note">${esc(brightness.hint)}</p>`));
     }
 
-    // A choice's tip is its own; what the choices mean is on the section's
-    // info mark (help.mjs), so neither repeats the other. Why one cannot be
-    // chosen yet stays under it.
+    // What the choices mean is on the section's info mark (help.mjs) alone,
+    // so no tip repeats it; why one cannot be chosen yet stays under it.
     /** @param {import("../../../contracts/panel.js").PresentedField | undefined} entry */
     const choice = (entry) => {
         if (!entry) return el(`<span></span>`);
-        const control = el(`<div ${entry.tooltip ? `data-tip="${esc(entry.tooltip)}"` : ""}>${choiceField({label: entry.label, f: `setting:${entry.macro}`,
+        const control = el(`<div>${choiceField({label: entry.label, f: `setting:${entry.macro}`,
             choices: settingOptions(entry), current: String(entry.value), disabled: !(editable && !entry.readOnly), attributes: {"data-macro": entry.macro}})}
             ${entry.readOnly && entry.hint ? `<span class="hint">${esc(entry.hint)}</span>` : ""}</div>`);
         control.addEventListener("change", (event) => submit({[entry.macro]: /** @type {HTMLInputElement | HTMLSelectElement} */ (event.target).value}));
         return control;
     };
     const speed = field("effectSpeed");
-    const speedControl = speed ? el(`<label class="field" ${speed.tooltip ? `data-tip="${esc(speed.tooltip)}"` : ""}><span>${esc(speed.label)}</span>
+    const speedControl = speed ? el(`<label class="field"><span>${esc(speed.label)}</span>
         <input class="input mono num" inputmode="numeric" data-macro="${esc(speed.macro)}" data-f="setting:${esc(speed.macro)}" value="${esc(speed.value)}" ${editable && !speed.readOnly ? "" : "disabled"}>
         <span class="hint">${esc(speed.hint || "")}</span></label>`) : el(`<span></span>`);
     speedControl.querySelector("input")?.addEventListener("change", (event) => {

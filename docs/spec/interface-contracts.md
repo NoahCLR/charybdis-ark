@@ -374,7 +374,10 @@ The same kind of control looks and sits the same on every screen.
   work on the Accents heading, and the board's shortcuts on its corner.
   Visible stays what is needed every time: a range or unit, a live value,
   the one line saying when a replacement case shows and which key it
-  follows, refusals and state. A tip never repeats the hint under it.
+  follows, refusals and state. A tip is one control's one line, what it does
+  or what pressing it changes (Stage on, a shared accent's Change and
+  Remove); it never explains what the info mark explains, nor repeats the
+  hint under it.
 - The commit bar floats over the screen's foot but covers none of it: while
   it shows, the screen's scrolling area ends above it, by its height as drawn
   (`reserveCommitRoom`, `webview/ui/frame.mjs`;
