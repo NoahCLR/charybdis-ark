@@ -157,6 +157,8 @@ export interface Vocabulary {
     tapCommit: WordList<string>;
     /** Lighting's fields, as its tabs label them and the review names them. */
     lightingFields: Readonly<Record<LightingField, string>>;
+    /** The colour editor's choice: a colour, or off (D-L95). */
+    colourChoice: {colour: string; off: string};
     /** What storing HSV(0, 0, 0) does, by lighting stage: its choice's tip and the note once stored, and, for a colour an owner has (D-L94), what that choice and the colour then read (Passthrough), and the Off choice's tip and note; `offAction` names the choice where HSV(0, 0, 0) is off (D-L95). */
     colourOff: Readonly<Record<string, {offTip: string; offNote?: string; offAction?: string; offWord?: string; ledsOffTip?: string; ledsOffNote?: string}>>;
     feedbackOwners: WordList<string>;

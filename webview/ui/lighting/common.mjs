@@ -7,7 +7,7 @@ import {editGate} from "../../view/edit-gate.mjs";
 import {isOff, isPassthrough, lightingOff, stageEnabled, stageHeldOffBy, stageOffDetail} from "../../view/lighting.mjs";
 import * as edits from "../../view/edits.mjs";
 import {colourEditor} from "../colour-editor.mjs";
-import {settingOffBanner} from "../participation.mjs";
+import {settingOffWord} from "../participation.mjs";
 import {sectionsIn} from "../../view/settings-layout.mjs";
 import {stageInfo} from "./help.mjs";
 import {accentOwner, ownerMark} from "../../view/accents.mjs";
@@ -66,12 +66,7 @@ export function stageBar(model, id, {shared = [], note = "", end = null} = {}) {
         const heldBy = stageHeldOffBy(model, id);
         if (heldBy) {
             node.classList.add("held");
-            const words = vocabulary(model).settingOff;
-            const chip = settingOffBanner(heldBy, "");
-            chip.className = "stage-held";
-            chip.dataset.tip = `${stageOffDetail(model, id)} ${words.switches[heldBy].fix}`;
-            chip.textContent = `${words.switches[heldBy].off.replace(/\.$/, "")} →`;
-            node.append(chip);
+            node.append(settingOffWord(heldBy, stageOffDetail(model, id)));
         }
     }
     if (end) node.append(end);
@@ -82,7 +77,7 @@ export function stageBar(model, id, {shared = [], note = "", end = null} = {}) {
 // Whose the settings on a stage bar are: every item of the stage, in the
 // words its accents use for all of them.
 /** @param {Model} model @param {string} id */
-const sharedBy = (model, id) => ({key: vocabulary(model).accents.keyBehavior.every, autocorrect: vocabulary(model).accents.autocorrect.every})[id] || "Whole stage";
+const sharedBy = (model, id) => ({key: vocabulary(model).accents.keyBehavior.every, autocorrect: vocabulary(model).accents.autocorrect.every})[id] || "";
 
 // A stage's on/off switch, at the end of its stage bar. It keeps the stage's
 // colours; its bit comes from the keyboard (model.rgb.stages), and a stage
@@ -105,8 +100,8 @@ export function stageSwitch(model, id) {
 // The item a stage's list has picked, heading what is its own: its mark and
 // name, and in one line where it paints or, for a replacement case, when it
 // shows.
-/** @param {string} name markup: the item's name, with its mark @param {string} line */
-export const itemHead = (name, line) => el(`<div class="span stage-item"><span class="stage-item-name">${name}</span><span class="note">${esc(line)}</span></div>`);
+/** @param {string} name markup: the item's name, with its mark @param {string} line @param {{when?: boolean}} [options] `when`: the line says when it shows */
+export const itemHead = (name, line, {when = false} = {}) => el(`<div class="span stage-item"><span class="stage-item-name">${name}</span><span class="note"${when ? " data-replacement-when" : ""}>${esc(line)}</span></div>`);
 
 // The item a stage's tab has picked, by its mark and name, as its accents'
 // heading names it (D-L31).
@@ -194,5 +189,5 @@ export function localityField(model, {f, value, canEdit, hint = "", onChange}) {
 // Keep each colour editor's identity tied to the same stored owner as before.
 /** @param {Model} model @param {Omit<Parameters<typeof colourEditor>[0], "identity">} options */
 export function colourControl(model, options) {
-    return colourEditor({identity: `lighting:${state.stage}:${state.stage === "layers" ? currentLayer()?.index : state.stage === "pd" ? state.pointingSlot : state.stage === "key" ? state.feedbackRow : state.stage === "autocorrect" ? state.replacementRow : "stage"}`, maximumBrightness: model.rgb.maximumBrightness, ...options});
+    return colourEditor({choiceWords: vocabulary(model).colourChoice, identity: `lighting:${state.stage}:${state.stage === "layers" ? currentLayer()?.index : state.stage === "pd" ? state.pointingSlot : state.stage === "key" ? state.feedbackRow : state.stage === "autocorrect" ? state.replacementRow : "stage"}`, maximumBrightness: model.rgb.maximumBrightness, ...options});
 }

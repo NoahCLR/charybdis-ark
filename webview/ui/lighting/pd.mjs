@@ -35,7 +35,7 @@ export function stagePointing(model) {
         const lit = row && !isPassthrough(row.color) && !isOff(row.color);
         const on = slot.id === state.pointingSlot;
         return pickableRow(`${slot.id}`, on, [
-            pickButton(`lighting-pointing:${slot.id}`, on, `<span class="mk-swatch lead ${lit ? "" : swatchOf(row?.color)}" style="${lit ? `background:${css(row.color)}` : ""}"></span>${esc(slotNamed(slot))}${marks.lightingSlots.has(slot.id) ? draftDot(model?.draft) : ""}`),
+            pickButton(`lighting-pointing:${slot.id}`, on, `<span class="mk-swatch lead ${swatchOf(row?.color)}" style="${lit ? `background:${css(row.color)}` : ""}"></span>${esc(slotNamed(slot))}${marks.lightingSlots.has(slot.id) ? draftDot(model?.draft) : ""}`),
             `<span class="muted">${esc(!row ? "not reported" : paintsCell(row.color, row.locality))}</span>`,
         ], {data: {slot: slot.id}, quiet: !slot.kind});
     };
@@ -55,7 +55,7 @@ export function stagePointing(model) {
         ...offWording(model, "pd"),
         onChange: (next) => { if (row) post(edits.pdModeColour(POINTING_MODE_IDS[state.pointingSlot], row.locality, next)); },
     }));
-    const where = section("Where it paints", localityInfo("pd"));
+    const where = section("Where it paints", localityInfo(model, "pd"));
     where.append(stack(localityField(model, {f: `lighting:pointing:${state.pointingSlot}:locality`, value: row?.locality, canEdit,
         onChange: (locality) => { if (row) post(edits.pdModeColour(POINTING_MODE_IDS[state.pointingSlot], locality, row.color)); }})));
     return stageSurface(model, {id: "pd", first: list, head, colour, side: where, accents: accentsSection(model, "pd"),

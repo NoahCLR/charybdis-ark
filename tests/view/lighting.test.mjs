@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {createRequire} from "node:module";
-import {baseColour, colourPaints, feedbackColours, inheritsStageColour, isPassthrough, keyLed, keyLight, mappedKeyCount, offWording, ownLight, pdColourRow, replacementTrigger, stageEnabled, stageHeldOffBy, stageIdle, stageInEffect, stageOffDetail, trackballLed, trackballLight} from "../../webview/view/lighting.mjs";
+import {baseColour, colourPaints, feedbackColours, inheritsStageColour, isPassthrough, keyLed, keyLight, mappedKeyCount, offWording, ownLight, pdColourRow, replacementTrigger, stageEnabled, stageHeldOffBy, stageIdle, stageInEffect, stageOffDetail, trackballLed, trackballLight, swatchOf} from "../../webview/view/lighting.mjs";
 
 const colour = (h, s, v) => ({h: String(h), s: String(s), v: String(v)});
 const position = (layoutIndex, keycode) => ({layoutIndex, keycode});
@@ -517,4 +517,15 @@ test("Leader waiting paints the Leader key's half or the key alone, every key of
     const dark = leading("RGB_BOTH_HALVES", colour(0, 0, 0));
     assert.notEqual(keyLight(base, layer, position(7, "KC_U"), dark).source, "replacement");
     assert.deepEqual(keyLight(base, layer, position(13, "KC_A"), dark).colour, own);
+});
+
+// A colour that lights nothing shows why in a list's swatch (D-L94, D-L95):
+// passthrough hatched, off dark and struck through, never read hollow.
+test("a list's swatch says passthrough, off and unread apart, and a lit colour needs none", () => {
+    const colour = (h, s, v) => ({h: String(h), s: String(s), v: String(v)});
+    assert.equal(swatchOf(colour(0, 0, 0)), "swatch-off");
+    assert.equal(swatchOf(colour(40, 0, 0)), "swatch-off", "passthrough at any hue");
+    assert.equal(swatchOf(colour(40, 255, 0)), "swatch-dark");
+    assert.equal(swatchOf(undefined), "swatch-none");
+    assert.equal(swatchOf(colour(40, 255, 200)), "");
 });

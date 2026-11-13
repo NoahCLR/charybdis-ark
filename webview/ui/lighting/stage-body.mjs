@@ -20,7 +20,7 @@ const STAGES = Object.freeze({base: stageBase, layers: stageLayers, auto: stageA
 // from painting is said on its stage bar (common.mjs), so the stage is laid
 // out the same either way.
 /** @param {import("../../../contracts/panel.js").PublishedModel} model @param {string} id */
-function stageSurface(model, id) {
+function surfaceOf(model, id) {
     const surface = STAGES[id](model);
     attachInfoMarks(surface);
     return surface;
@@ -55,7 +55,7 @@ export function matchTallestStageHeight(root) {
     let tallest = bench.getBoundingClientRect().height;
     for (const stage of LISTED) {
         if (stage === state.stage) continue;
-        const height = measured.heights.get(stage) ?? benchHeightWith(bench, holding(stageSurface(model, stage)));
+        const height = measured.heights.get(stage) ?? benchHeightWith(bench, holding(surfaceOf(model, stage)));
         measured.heights.set(stage, height);
         tallest = Math.max(tallest, height);
     }
@@ -66,5 +66,5 @@ export function matchTallestStageHeight(root) {
 export function stageBody(body) {
     const model = getModel();
     if (!model) return;
-    body.replaceChildren(Object.hasOwn(STAGES, state.stage) ? stageSurface(model, state.stage) : el(`<div></div>`));
+    body.replaceChildren(Object.hasOwn(STAGES, state.stage) ? surfaceOf(model, state.stage) : el(`<div></div>`));
 }

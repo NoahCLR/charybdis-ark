@@ -17,13 +17,14 @@ import {rovingTabs} from "../lib/tabs.mjs";
 
 // A layer's swatch and how it is lit, the same wherever its colour is shown,
 // and the colour its mark wears (ui/marks.mjs): a layer whose colour is off, or
-// whose stage is off, shows as unlit.
+// whose stage is off, shows as unlit; one that is passthrough is hatched
+// where its stage is on (view/lighting.mjs swatchOf).
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {Pick<import("../../contracts/panel.js").Layer, "index"> & Partial<import("../../contracts/panel.js").Layer>} layer @param {string} [className] */
 export function layerSwatch(model, layer, className = "") {
     const row = layerColourRow(model, layer.index);
     const lit = stageEnabled(model, "layers") && row && !isPassthrough(row.color);
     return {
-        html: `<span class="${className ? `${esc(className)} ` : ""}swatch ${lit ? "" : "swatch-off"}" style="${lit ? `background:${css(row.color)}` : ""}"></span>`,
+        html: `<span class="${className ? `${esc(className)} ` : ""}swatch ${lit ? "" : stageEnabled(model, "layers") && row ? "swatch-pass" : "swatch-off"}" style="${lit ? `background:${css(row.color)}` : ""}"></span>`,
         tip: `${layerCalled(layer)} · ${lit ? hsvLabel(row.color) : "no layer colour"}`,
         colour: lit ? css(row.color) : null,
     };

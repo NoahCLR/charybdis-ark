@@ -19,7 +19,7 @@ import {sectionInfo} from "./help.mjs";
 function fadeTiming(model) {
     const section = sectionsIn(model, "Lighting").find((entry) => entry.stage === "auto");
     const gate = editGate(model, "settings");
-    const node = el(`<section><div class="sect-h"><h4>Timing${section && draftMarks(model?.draft?.changes).settings.has(section.id) ? draftDot(model?.draft) : ""}</h4>${sectionInfo("auto:timing")}</div></section>`);
+    const node = el(`<section><div class="sect-h"><h4>Timing${section && draftMarks(model?.draft?.changes).settings.has(section.id) ? draftDot(model?.draft) : ""}</h4>${sectionInfo(model, "auto:timing")}</div></section>`);
     if (!section) {
         node.append(el(`<p class="note">${esc(gate.why || "Choose Read keyboard to read the auto-mouse timing.")}</p>`));
         return node;
@@ -63,7 +63,7 @@ export function stageAuto(model) {
     const fade = model.rgb.automouseFade || {};
     // With auto-mouse off the fade never runs (its stage bar says so). Its
     // controls stay editable, for when it is back on.
-    const policy = section("Fade", sectionInfo("auto:fade"));
+    const policy = section("Fade", sectionInfo(model, "auto:fade"));
     const select = el(`<label class="field"><span>${esc(vocabulary(model).lightingFields.fadeMode)}</span><select data-f="lighting:auto:fade-mode" class="input" ${canEdit ? "" : "disabled"}>
         ${vocabulary(model).fadeModes.map(([id, text]) => `<option value="${esc(id)}" ${fade.mode === id ? "selected" : ""}>${esc(text)}</option>`).join("")}</select></label>`);
     /** @type {HTMLSelectElement} */ (select.querySelector("select")).addEventListener("change", (event) =>

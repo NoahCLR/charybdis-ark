@@ -336,11 +336,10 @@ _Avoid_: LED group, LED override, group row, assignment
 A colour that paints nothing, so what is beneath it shows through: for a
 layer, the layers on under it or the background effect; for a pointing mode,
 combo feedback or a feedback case, whatever the stages before it paint
-(D-L94, firmware D-F74). Ark stores it as HSV(0, 0, 0) with **Make
-passthrough**; the keyboard treats any colour a layer, a pointing slot, combo
+(D-L94, firmware D-F74). Ark stores it as HSV(0, 0, 0) with the
+**Passthrough** choice; the keyboard treats any colour a layer, a pointing slot, combo
 feedback or a feedback case owns with no saturation or brightness so, at any
-hue. The colour editor sets it with the **Passthrough** choice beside
-**Colour** and **Off**. Its accents in a colour of their own still light. It is not **off**,
+hue. Its accents in a colour of their own still light. It is not **off**,
 brightness zero with some saturation, whose LEDs go dark. An accent's
 HSV(0, 0, 0) takes its owner's colour instead, and the auto-mouse fade's end
 colour is literal, so HSV(0, 0, 0) turns the LEDs off there.
@@ -348,8 +347,8 @@ _Avoid_: no colour, off (for passthrough), transparent (that is a key)
 
 **Off** (a colour):
 Brightness zero with some saturation: a colour whose LEDs go dark, covering
-what is beneath, stored with the **Off** choice beside **Make passthrough**
-(D-L94). Not passthrough, which paints nothing and lets what is beneath show.
+what is beneath, stored with the **Off** choice beside **Colour** and
+**Passthrough** (D-L94, D-L95). Not passthrough, which paints nothing and lets what is beneath show.
 _Avoid_: black (in anything a person reads)
 
 **Behaviour feedback**:

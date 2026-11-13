@@ -33,7 +33,7 @@ export function stageLayers(model) {
         const row = layerColourRow(model, index);
         const lit = row && !isPassthrough(row.color) && !isOff(row.color);
         return pickableRow(`${index}`, index === state.layer, [
-            pickButton(`lighting-layers:${index}`, index === state.layer, `<span class="mk-swatch lead ${lit ? "" : swatchOf(row?.color)}" style="${lit ? `background:${css(row.color)}` : ""}"></span>${esc(layerCalled(layer))}${marks.lightingLayers.has(index) ? draftDot(model?.draft) : ""}`),
+            pickButton(`lighting-layers:${index}`, index === state.layer, `<span class="mk-swatch lead ${swatchOf(row?.color)}" style="${lit ? `background:${css(row.color)}` : ""}"></span>${esc(layerCalled(layer))}${marks.lightingLayers.has(index) ? draftDot(model?.draft) : ""}`),
             `<span class="muted">${esc(!row ? "not reported" : !colourPaints(row.color) ? "passthrough" : `${lit ? "" : "off · "}${word(vocabulary(model).paintModesBrief, row.mode)}`)}</span>`,
         ], {data: {layer: index}});
     };
@@ -54,7 +54,7 @@ export function stageLayers(model) {
     }));
     // Which LEDs the layer lights is its own; what each choice means is on
     // the section's info mark.
-    const where = section("Where it paints", sectionInfo("layers:mode"));
+    const where = section("Where it paints", sectionInfo(model, "layers:mode"));
     const mode = el(choiceField({label: vocabulary(model).lightingFields.paintMode, f: `lighting:layer:${layer?.index}:mode`, choices: vocabulary(model).paintModes,
         current: row?.mode || "KEYS_MAPPED_ON_THIS_LAYER_ONLY", disabled: !canEdit}));
     mode.addEventListener("change", (event) =>

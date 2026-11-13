@@ -976,10 +976,10 @@ button.tier:hover { background: var(--surface-3); }
   .bench-tabs [data-ltab="combo"] { width: 84px; }
   .bench-tabs [data-ltab="key"] { width: 102px; }
   .bench-tabs [data-ltab="autocorrect"] { width: 113px; }
-  /* The stage bar keeps one line: the tab above already names the stage,
-     so the bar's own name is left to a screen reader. */
   /* A narrower list leaves where it paints room for its whole choice. */
   .workbench .stage .tab-split.reach-split { grid-template-columns: 280px minmax(0, 1fr); }
+  /* The stage bar keeps one line: the tab above already names the stage,
+     so the bar's own name is left to a screen reader. */
   .stage-bar-title > span:first-child { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 }
 .bench-tabs .c { font-family: var(--mono); font-size: var(--fs-xs); color: var(--text-3); }
@@ -1213,11 +1213,10 @@ button.tier:hover { background: var(--surface-3); }
 .recovery-row .recovery-ask { display: flex; align-items: center; gap: var(--sp-3); }
 .recovery-row .recovery-ask > .note { color: var(--text); }
 .swatch-lg { width: 26px; height: 26px; border-radius: var(--r-control); border: 1px solid var(--line-2); flex: none; }
-.swatch-off { background: repeating-linear-gradient(45deg, var(--surface-3) 0 4px, transparent 4px 8px); }
 /* A colour that lights nothing, by why (view/lighting.mjs swatchOf):
-   passthrough hatched (above, and .swatch-pass where a tab draws
-   .swatch-off hollow), off dark and struck through, unread hollow. */
-.swatch-pass { background: repeating-linear-gradient(45deg, var(--surface-3) 0 4px, transparent 4px 8px); }
+   passthrough hatched (.swatch-pass too, where a tab draws .swatch-off
+   hollow), off dark and struck through, unread hollow. */
+.swatch-off, .swatch-pass { background: repeating-linear-gradient(45deg, var(--surface-3) 0 4px, transparent 4px 8px); }
 .swatch-dark { background: linear-gradient(to top right, transparent calc(50% - .75px), var(--text-3) calc(50% - .75px), var(--text-3) calc(50% + .75px), transparent calc(50% + .75px)), var(--led-dark); }
 .swatch-none { background: none; border-style: dashed; }
 table.t { width: 100%; border-collapse: collapse; font-size: var(--fs-md); }
@@ -2231,7 +2230,7 @@ button.stage-held:hover { background: color-mix(in srgb, var(--warning) 26%, var
 .colour-body { position: relative; display: flex; flex-direction: column; gap: var(--sp-3); }
 .colour-body[data-idle] > :not(.colour-idle) { opacity: .3; pointer-events: none; }
 .colour-idle { position: absolute; z-index: var(--z-raised); top: 0; left: 0; right: 0; display: flex; flex-direction: column; gap: var(--sp-2); color: var(--text); background: color-mix(in srgb, var(--surface-2) 92%, transparent); }
-.swatch-lg.unused { border-style: dashed; }
+.swatch-lg.unused { border-style: dashed; opacity: .3; }
 /* Accents (ui/lighting/accents.mjs): a list under each stage's editor, one
    row per accent, and the accent being added or changed in its place. */
 .accents { border-top: 1px solid var(--line); padding-top: var(--sp-4); }

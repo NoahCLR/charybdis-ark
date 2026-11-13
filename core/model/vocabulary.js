@@ -503,6 +503,10 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     // Lighting's fields, as its tabs label them and the review names them.
     lightingFields: {colour: "Colour", locality: "Locality", paintMode: "Which LEDs light up", fadeMode: "Fade mode", endColour: "End colour",
         tapBranchCommit: "Tap branch commit"},
+    // The colour editor's choice for a colour that may paint nothing (D-L94,
+    // D-L95): a colour, or off, its LEDs dark; passthrough is each stage's
+    // `colourOff[stage].offWord`.
+    colourChoice: {colour: "Colour", off: "Off"},
     // What the colour editor says about HSV(0, 0, 0) in each stage (D-L94,
     // firmware D-F74): every colour a layer, a pointing slot, combo feedback
     // or a feedback case owns is passthrough at saturation and value 0, at

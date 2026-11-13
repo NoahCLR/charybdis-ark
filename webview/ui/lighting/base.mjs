@@ -61,9 +61,9 @@ export function stageBase(model) {
         const written = /** @type {HTMLInputElement} */ (event.target).value.trim();
         if (written && written !== speed?.value) submit({effectSpeed: written});
     });
-    const how = section("Effect", sectionInfo("base:effect"));
+    const how = section("Effect", sectionInfo(model, "base:effect"));
     how.append(stack(choice(field("effectMode")), speedControl));
-    const leds = section("Where it paints", sectionInfo("base:leds"));
+    const leds = section("Where it paints", sectionInfo(model, "base:leds"));
     leds.append(stack(choice(field("effectLeds"))));
     return stageSurface(model, {id: "base", first: how, colour, side: leds, note: "Drawn first, under every other stage."});
 }

@@ -21,19 +21,20 @@ let groups = 0;
 // Colour, Off (brightness 0 with saturation: its LEDs go dark) and
 // Passthrough (`offWord`; saturation and brightness 0 at any
 // hue, firmware D-F74: it paints nothing). A colour with only `offTip` (the
-// auto-mouse fade's end) is Colour or Off (`offAction`), off being HSV(0, 0, 0); one with
+// auto-mouse fade's end) is Colour or Off, off being HSV(0, 0, 0); one with
 // neither (the background effect, an accent's own) is a colour alone. A
 // colour that paints nothing keeps its square, hue strip and fields, dimmed
 // under a note saying what that means here, so the editor is the same size
 // whatever the colour is; choosing Colour again brings them back. An owned
 // colour that is off stays editable, as the black it is (its hue and
 // saturation kept for when its brightness rises). `title`
-// names the colour to a screen reader; the item it belongs to heads the
+// names the colour to a screen reader, and `choiceWords` are the
+// vocabulary's words for the choice (`colourChoice`); the item it belongs to heads the
 // editor on screen. `unused` draws it dimmed under that note with no choice,
 // for a colour its stage keeps but does not paint as set (the fade's end
 // colour in a mode that takes none).
-/** @param {{identity: string, colour: import("../../contracts/edits.js").Colour | null | undefined, title: string, canEdit?: boolean, onChange?: (colour: import("../../contracts/edits.js").Colour) => void, offNote?: string, offTip?: string, offAction?: string, offWord?: string, ledsOffTip?: string, ledsOffNote?: string, unused?: string, maximumBrightness?: number}} options */
-export function colourEditor({identity, colour, title, canEdit = true, onChange, offNote, offTip, offAction = "Off", offWord = "Off", ledsOffTip, ledsOffNote, unused, maximumBrightness}) {
+/** @param {{identity: string, colour: import("../../contracts/edits.js").Colour | null | undefined, title: string, canEdit?: boolean, onChange?: (colour: import("../../contracts/edits.js").Colour) => void, offNote?: string, offTip?: string, offAction?: string, offWord?: string, ledsOffTip?: string, ledsOffNote?: string, unused?: string, choiceWords?: {colour: string, off: string}, maximumBrightness?: number}} options */
+export function colourEditor({identity, colour, title, canEdit = true, onChange, offNote, offTip, offAction, offWord, ledsOffTip, ledsOffNote, unused, choiceWords = {colour: "", off: ""}, maximumBrightness}) {
     const [h, s, v] = hsv(colour);
     const maximum = brightnessLimit(maximumBrightness);
     const node = el(`<div class="stack gap-12 colour-editor"></div>`);
@@ -51,24 +52,24 @@ export function colourEditor({identity, colour, title, canEdit = true, onChange,
     // Colour brings back the hue and saturation an Off colour kept, and a
     // fresh one where nothing was kept; Off keeps the hue and saturation
     // where the colour is owned, and is HSV(0, 0, 0) where it is literal.
-    /** @type {Record<string, () => number[]>} */
+    /** @type {Record<"colour" | "off" | "passthrough", () => number[]>} */
     const to = {
         colour: () => passthrough || (h === 0 && s === 0) ? [140, 255, bright] : [h, s, bright],
         off: () => owned ? [h, s || 255, 0] : [0, 0, 0],
         passthrough: () => [0, 0, 0],
     };
     /** @type {[string, string, string][]} */
-    const choices = unused ? [] : owned ? [["colour", "Colour", ""], ["off", "Off", ledsOffTip || ""], ["passthrough", offWord, offTip || ""]]
-        : offTip ? [["colour", "Colour", ""], ["off", offAction, offTip]] : [];
+    const choices = unused ? [] : owned ? [["colour", choiceWords.colour, ""], ["off", choiceWords.off, ledsOffTip || ""], ["passthrough", offWord || "", offTip || ""]]
+        : offTip ? [["colour", choiceWords.colour, ""], ["off", offAction || choiceWords.off, offTip]] : [];
     const group = `${identity}:state:${++groups}`;
     const head = el(`<div class="row colour-head"${dark && owned && ledsOffNote ? ` data-tip="${esc(ledsOffNote)}"` : ""}>
         <span class="swatch-lg ${passthrough ? "swatch-off" : dark ? "swatch-dark" : ""}${unused ? " unused" : ""}" style="${passthrough || dark ? "" : `background:${css(colour)}`}"></span>
-        <div class="colour-readout"><div class="note${idle && !unused ? "" : " mono"}">${idle && !unused ? esc(passthrough ? offWord : "Off") : `${esc(hsvLabel(colour))} · rgb(${esc(rgb(colour).join(", "))})`}</div></div>
+        <div class="colour-readout"><div class="note${idle && !unused ? "" : " mono"}">${idle && !unused ? esc(passthrough ? offWord || "" : offAction || choiceWords.off) : `${esc(hsvLabel(colour))} · rgb(${esc(rgb(colour).join(", "))})`}</div></div>
         ${choices.length ? `<div class="seg colour-state" role="radiogroup" aria-label="${esc(title)}">${choices.map(([value, words, tip]) =>
             `<label ${tip ? `data-tip="${esc(tip)}"` : ""}><input type="radio" name="${esc(group)}" value="${esc(value)}" data-f="${esc(identity)}:state:${esc(value)}" ${value === state ? "checked" : ""} ${canEdit ? "" : "disabled"}><span>${esc(words)}</span></label>`).join("")}</div>` : ""}</div>`);
     node.append(head);
     head.querySelectorAll(".colour-state input").forEach((input) => input.addEventListener("change", () => {
-        const value = /** @type {HTMLInputElement} */ (input).value;
+        const value = /** @type {"colour" | "off" | "passthrough"} */ (/** @type {HTMLInputElement} */ (input).value);
         if (value !== state) commit(to[value]());
     }));
     // A colour that paints nothing says what that means here, over the

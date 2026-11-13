@@ -56,7 +56,7 @@ export function stageCombo(model) {
         ...offWording(model, "combo"),
         onChange: (next) => { if (combo.locality !== undefined) post(edits.comboFeedback(combo.locality, next)); },
     }));
-    const where = section("Where it paints", localityInfo("combo"));
+    const where = section("Where it paints", localityInfo(model, "combo"));
     where.append(stack(localityField(model, {f: "lighting:combo:locality", value: combo.locality, canEdit,
         onChange: (locality) => { if (combo.color) post(edits.comboFeedback(locality, combo.color)); }})));
     return stageSurface(model, {id: "combo", first: list, head, colour, side: where, accents: accentsSection(model, "combo"),

@@ -48,7 +48,7 @@ export function stageKey(model) {
             const lit = !isPassthrough(row.colour) && !isOff(row.colour);
             const on = row.id === current?.id;
             return pickableRow(row.id, on, [
-                pickButton(`lighting-feedback:${row.id}`, on, `<span class="mk-swatch lead ${lit ? "" : swatchOf(row.colour)}" style="${lit ? `background:${css(row.colour)}` : ""}"></span>${esc(row.label)}`),
+                pickButton(`lighting-feedback:${row.id}`, on, `<span class="mk-swatch lead ${swatchOf(row.colour)}" style="${lit ? `background:${css(row.colour)}` : ""}"></span>${esc(row.label)}`),
                 `<span class="muted">${esc(paintsCell(row.colour, row.locality))}</span>`,
             ], {data: {row: row.id}});
         })}))});
@@ -61,7 +61,7 @@ export function stageKey(model) {
         onChange: (next) => { if (current) post(edits.keyFeedback(model.rgb.keyBehaviorFeedback, current.id, next)); },
     }));
     // Where the picked case paints, its own (D-L93), as a pointing slot's.
-    const where = section("Where it paints", localityInfo("key"));
+    const where = section("Where it paints", localityInfo(model, "key"));
     if (current) where.append(stack(localityField(model, {f: `lighting:key:${current.id}:locality`, value: current.locality, canEdit,
         onChange: (locality) => post(edits.keyFeedbackLocality(feedback, current.id, locality))})));
     // When the stage flashes, and how fast, is one setting for every case,

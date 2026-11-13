@@ -137,20 +137,21 @@ const standingOut = (model, shade) => {
 // "Same as the mode" shows which colour that is.
 /** @param {Model} model @param {AccentTable} target @param {Accent} row */
 function colourCell(model, target, row) {
-    if (inheritsStageColour(row.color)) {
-        const shade = stageShade(model, target, row.owner, picked());
-        return `<span class="led-swatch${shade ? "" : " swatch-off"}" style="${shade ? `background:${css(shade)}` : ""}"></span><span class="muted">${esc(vocabulary(model).accents[target]?.stageColour || "")}</span>`;
-    }
-    return `<span class="led-swatch" style="background:${css(row.color)}"></span><code class="dim">${esc(hsvLabel(row.color))}</code>`;
+    return inheritsStageColour(row.color)
+        ? `${accentSwatch(model, target, row)}<span class="muted">${esc(vocabulary(model).accents[target]?.stageColour || "")}</span>`
+        : `${accentSwatch(model, target, row)}<code class="dim">${esc(hsvLabel(row.color))}</code>`;
 }
 
-// An accent's swatch on All accents: its own colour, or the colour its stage
-// paints for its owner.
+// An accent's swatch: its own colour, or the colour its stage paints for its
+// owner, hatched where that is passthrough.
 /** @param {Model} model @param {AccentTable} target @param {Accent} row */
-function sameAsSwatch(model, target, row) {
+function accentSwatch(model, target, row) {
     const shade = inheritsStageColour(row.color) ? stageShade(model, target, row.owner, picked()) : row.color;
     return `<span class="led-swatch${shade ? "" : " swatch-off"}" style="${shade ? `background:${css(shade)}` : ""}"></span>`;
 }
+
+// Dropping the accent being edited posts nothing.
+const cancelAccent = () => { state.accent = null; render(); };
 
 // Scrolls the board into view, whole where it fits: an accent's LEDs are
 // picked there, and Open shows one there.
@@ -184,12 +185,13 @@ export function accentsSection(model, stage) {
 
     const {here, beneath} = accentsFor(model, target, owner);
     const every = everyOwner(model, target), group = groupOwner(model, target, owner);
-    const forEvery = (/** @type {string} */ owner) => (every && owner === every) ? "every" : (group && owner === group && group !== owner) ? "group" : "own";
+    // Whom an accent lights for: all of the table's owners, a group of them, or the one picked.
+    const scopeOf = (/** @type {string} */ whose) => (every && whose === every) ? "every" : (group && whose === group && group !== owner) ? "group" : "own";
     /** @type {{id: string, scope: string, rows: Accent[]}[]} */
     const bands = [
-        {id: "own", scope: name ? "" : words.every.toLowerCase(), rows: here.filter((row) => forEvery(row.owner) === "own")},
-        ...(words.group && group && group !== owner ? [{id: "group", scope: words.group.words.toLowerCase(), rows: here.filter((row) => forEvery(row.owner) === "group")}] : []),
-        ...(every ? [{id: "every", scope: words.every.toLowerCase(), rows: here.filter((row) => forEvery(row.owner) === "every")}] : []),
+        {id: "own", scope: name ? "" : words.every.toLowerCase(), rows: here.filter((row) => scopeOf(row.owner) === "own")},
+        ...(words.group && group && group !== owner ? [{id: "group", scope: words.group.words.toLowerCase(), rows: here.filter((row) => scopeOf(row.owner) === "group")}] : []),
+        ...(every ? [{id: "every", scope: words.every.toLowerCase(), rows: here.filter((row) => scopeOf(row.owner) === "every")}] : []),
     ];
     const list = el(`<div class="accent-list"></div>`);
     const any = here.length || beneath.length || editing;
@@ -277,7 +279,7 @@ export function accentActions(model, stage) {
         <button class="btn tiny ghost" data-act="cancel-accent">Cancel</button>
         <button class="btn tiny primary" data-act="keep-accent" ${count ? "" : "disabled"}>${esc(editWords(model.draft).keep("accent"))}</button></span>`);
     /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="clear-leds"]')).addEventListener("click", () => { editing.leds = []; render(); });
-    /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="cancel-accent"]')).addEventListener("click", () => { state.accent = null; render(); });
+    /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="cancel-accent"]')).addEventListener("click", cancelAccent);
     /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="keep-accent"]')).addEventListener("click", () => keepAccent(model, editing));
     return node;
 }
@@ -316,7 +318,7 @@ function accentEditor(model, editing, mine) {
     const actions = el(`<div class="row gap-8"><button class="btn primary" data-act="keep" ${count ? "" : "disabled"}>${esc(editWords(model.draft).keep("accent"))}</button>
         <button class="btn ghost" data-act="cancel">Cancel</button></div>`);
     node.append(actions);
-    /** @type {HTMLButtonElement} */ (actions.querySelector('[data-act="cancel"]')).addEventListener("click", () => { state.accent = null; render(); });
+    /** @type {HTMLButtonElement} */ (actions.querySelector('[data-act="cancel"]')).addEventListener("click", cancelAccent);
     /** @type {HTMLButtonElement} */ (actions.querySelector('[data-act="keep"]')).addEventListener("click", () => keepAccent(model, editing));
     return node;
 }
@@ -344,7 +346,7 @@ export function accentsOverview(model) {
             const called = ownerCalled(model, target, owner) || label;
             const line = el(`<div class="accent-row" data-owner="${esc(key)}">
                 ${pickButton(`accent-owner:${key}`, isShown(key), `<b>${marked(model, ownerMark(model, target, owner), called)}</b>`)}
-                <span class="accent-colours">${rows.map((row) => `<span class="accent-colour">${sameAsSwatch(model, target, row)}<span class="accent-leds mono">${esc(row.leds)}</span></span>`).join("")}</span>
+                <span class="accent-colours">${rows.map((row) => `<span class="accent-colour">${accentSwatch(model, target, row)}<span class="accent-leds mono">${esc(row.leds)}</span></span>`).join("")}</span>
                 <span class="right"><button class="btn tiny ghost" data-act="open">Open</button></span></div>`);
             showsOnBoard(model, line, key, rows.flatMap((row) => row.ledIndices));
             /** @type {HTMLButtonElement} */ (line.querySelector('[data-act="open"]')).addEventListener("click", () => {
