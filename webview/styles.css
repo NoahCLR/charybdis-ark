@@ -70,6 +70,8 @@
   --badge-text: #f5f5f3;
   --light-thumb: #ffffff;
   --light-shade: rgba(0,0,0,.55);
+  /* An LED that is off: dark in either theme, as the keyboard shows it. */
+  --led-dark: #0a0a0c;
   /* The hue a colour editor's ramp runs through. */
   --hue-ramp: linear-gradient(90deg, #f33, #ff0, #3f3, #0ff, #33f, #f0f, #f33);
   --draft: #e3b341;
@@ -494,7 +496,7 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 .chip .mono { font-size: var(--fs-xs); }
 /* Two small capitals, and only two: the eyebrow that labels a section, and
    the code tag that names a thing by its identifier (KC_ESCAPE, SLOT 0). */
-.sect-h h4, .group-h, .rail-group, .rail-menu-h, .reach .rl, table.t th, .rv-cols, .hc-h, .hc-eyebrow, .pd-sub h5, .setrow-part,
+.sect-h h4, .stage-bar-scope, .accent-band, .group-h, .rail-group, .rail-menu-h, .reach .rl, table.t th, .rv-cols, .hc-h, .hc-eyebrow, .pd-sub h5, .setrow-part,
 .macro-sequence-heading h4, .macro-editor-card [data-recorder] .card-h h3, .editor-section .card-h h3 {
   font-family: var(--sans); font-size: var(--fs-xs); font-weight: var(--fw-label); letter-spacing: .1em; text-transform: uppercase; color: var(--text-3);
 }
@@ -558,6 +560,7 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
    with no colour is the outline alone, as a tier with none is hollow. */
 :is(.layer-tab, .layer-chip, .bench-tabs) .swatch { width: 9px; height: 9px; border-radius: var(--r-mark); border: 1px solid var(--line-2); flex: none; }
 :is(.layer-tab, .layer-chip, .bench-tabs) .swatch-off { background: none; border-color: var(--line-3); }
+:is(.layer-tab, .layer-chip, .bench-tabs) .swatch-pass { background: repeating-linear-gradient(45deg, var(--line-3) 0 2px, transparent 2px 4px); }
 .layer-tab .idx { font-family: var(--mono); font-size: var(--fs-xs); color: var(--text-3); }
 /* Rename & Reorder stays in reach at the strip's end, outside what scrolls. */
 .layerbar-wrap > .layer-edit { flex: none; margin: 0 var(--sp-3) 0 var(--sp-3); }
@@ -791,6 +794,9 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
   display: none; position: absolute; top: calc(100% + 6px); left: -6px; width: max-content; max-width: min(420px, var(--info-wide, calc(100vw - 2 * var(--window-room))));
   border: 1px solid var(--line-2); border-radius: var(--r-control); background: var(--surface-3); box-shadow: var(--shadow);
   text-align: left;
+  /* Its own text, whatever the line it sits on sets (a bold, unbroken stage
+     bar title, a heading's capitals). */
+  white-space: normal; font-weight: var(--fw-regular); text-transform: none; letter-spacing: normal;
 }
 .info-mark.corner .info-pop { left: auto; right: 0; max-width: min(380px, var(--info-wide, calc(100vw - 2 * var(--window-room)))); }
 .info-mark[data-up] .info-pop { top: auto; bottom: calc(100% + 6px); }
@@ -816,9 +822,10 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 .sect-h { display: flex; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-3); }
 
 .sect-h .right { margin-left: auto; display: flex; gap: var(--sp-2); }
-/* A stage's switch rides at the far end of the header line of the section
-   that says where it paints (ui/lighting/common.mjs paintsSection). */
-.sect-h > .sw { margin-left: auto; }
+/* A stage's switch is the last thing on its stage bar (ui/lighting/common.mjs
+   stageBar), its label wide enough for both words so it never shifts. */
+.stage-bar > .sw { margin-left: var(--sp-2); }
+.stage-bar > .sw .txt { min-width: 7ch; white-space: nowrap; }
 .kv { display: grid; grid-template-columns: 96px 1fr; gap: var(--sp-1) var(--sp-3); font-size: var(--fs-md); }
 .kv dt { color: var(--text-3); }
 .kv dd { margin: 0; font-family: var(--mono); font-size: var(--fs-sm); }
@@ -934,14 +941,11 @@ button.tier:hover { background: var(--surface-3); }
 .bench-tabs [data-tab="pointing"] { width: 152px; }
 .bench-tabs [data-tab] .c { text-align: left; }
 .bench-tabs button[role="tab"] > .draft-dot { position: absolute; top: 4px; right: 4px; margin: 0; }
-.stage-fold .disclose { margin-left: calc(-1 * var(--sp-2)); }
-.stage-fold .stage-about { margin-top: var(--sp-2); }
 /* Lighting's stage tabs carry the paint order: a number, the colour the
    stage paints now, and a stage that is off drawn dim. */
 .bench-tabs .n { font-family: var(--mono); font-size: var(--fs-xs); color: var(--text-3); }
 .bench-tabs button[role="tab"].off { color: var(--text-3); }
 /* The step between two stages sits on their labels' middle line. */
-.bench-tabs .tab-step { align-self: stretch; display: flex; align-items: center; padding-bottom: var(--sp-hair); color: var(--text-3); font-size: var(--fs-md); line-height: 1; }
 .bench-tabs .tab-sep { width: 1px; height: 18px; align-self: center; background: var(--line-2); margin: 0 var(--sp-2); }
 /* Each stage tab is exactly as wide as its label in the picked weight, with
    less padding than the Keymap tabs and no gap between a tab and the step
@@ -958,6 +962,26 @@ button.tier:hover { background: var(--surface-3); }
 .bench-tabs [data-ltab="key"] { width: 155px; }
 .bench-tabs [data-ltab="autocorrect"] { width: 173px; }
 .bench-tabs [data-ltab="accents"] { width: 77px; }
+/* Where the window is too narrow for every stage's whole name, each tab
+   reads by its short word (its stage bar names it whole), at widths of their
+   own, so the strip still fits and nothing moves as a tab is picked. */
+.bench-tabs .tab-label .short { display: none; }
+@container content (max-width: 1197px) { /* window 1429 */
+  .bench-tabs [data-ltab] .tab-label .long { display: none; }
+  .bench-tabs [data-ltab] .tab-label .short { display: inline; }
+  .bench-tabs [data-ltab="base"] { width: 107px; }
+  .bench-tabs [data-ltab="layers"] { width: 74px; }
+  .bench-tabs [data-ltab="auto"] { width: 109px; }
+  .bench-tabs [data-ltab="pd"] { width: 84px; }
+  .bench-tabs [data-ltab="combo"] { width: 84px; }
+  .bench-tabs [data-ltab="key"] { width: 102px; }
+  .bench-tabs [data-ltab="autocorrect"] { width: 113px; }
+  /* The stage bar keeps one line: the tab above already names the stage,
+     so the bar's own name is left to a screen reader. */
+  /* A narrower list leaves where it paints room for its whole choice. */
+  .workbench .stage .tab-split.reach-split { grid-template-columns: 280px minmax(0, 1fr); }
+  .stage-bar-title > span:first-child { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+}
 .bench-tabs .c { font-family: var(--mono); font-size: var(--fs-xs); color: var(--text-3); }
 .bench-tabs button[role="tab"][aria-selected="true"] .c { color: var(--text-2); }
 /* The tab strip sits on the bar's floor, but its buttons centre on the whole
@@ -1166,7 +1190,7 @@ button.tier:hover { background: var(--surface-3); }
   .tab-split, .tab-split.wide, .tab-split.builder { grid-template-columns: minmax(0, 1fr); }
   /* A workbench's list stacks over its editor, on Keys and Lighting alike,
      and scrolls in a pane of a set height, since it takes none of its own. */
-  .workbench .tab-split.reach-split { grid-template-columns: minmax(0, 1fr); align-items: start; }
+  .workbench .tab-split.reach-split, .workbench .stage .tab-split.reach-split { grid-template-columns: minmax(0, 1fr); align-items: start; }
   .workbench .tab-split.reach-split > .bench-pane { height: 320px; }
 }
 @container content (max-width: 620px) { /* window 852 */
@@ -1190,6 +1214,12 @@ button.tier:hover { background: var(--surface-3); }
 .recovery-row .recovery-ask > .note { color: var(--text); }
 .swatch-lg { width: 26px; height: 26px; border-radius: var(--r-control); border: 1px solid var(--line-2); flex: none; }
 .swatch-off { background: repeating-linear-gradient(45deg, var(--surface-3) 0 4px, transparent 4px 8px); }
+/* A colour that lights nothing, by why (view/lighting.mjs swatchOf):
+   passthrough hatched (above, and .swatch-pass where a tab draws
+   .swatch-off hollow), off dark and struck through, unread hollow. */
+.swatch-pass { background: repeating-linear-gradient(45deg, var(--surface-3) 0 4px, transparent 4px 8px); }
+.swatch-dark { background: linear-gradient(to top right, transparent calc(50% - .75px), var(--text-3) calc(50% - .75px), var(--text-3) calc(50% + .75px), transparent calc(50% + .75px)), var(--led-dark); }
+.swatch-none { background: none; border-style: dashed; }
 table.t { width: 100%; border-collapse: collapse; font-size: var(--fs-md); }
 table.t th { text-align: left; padding: 0 var(--sp-3) var(--sp-2); }
 
@@ -1379,6 +1409,11 @@ table.t .row-pick { text-align: left; max-width: 100%; }
 .beh-branches .fbdot { margin-right: var(--sp-1); }
 table.t tr[data-picked] > td { background: var(--surface-3); }
 table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text); }
+/* A list that picks only what the board shows (Lighting's combos) marks the
+   one held with a ring, never the bar that says it is being edited. */
+.preview-picks table.t tr[data-picked] > td { background: none; }
+.preview-picks table.t tr[data-picked] > td:first-child { box-shadow: none; }
+.preview-picks table.t tr[data-picked] .mk-badge { outline: 1.5px dashed var(--text-2); outline-offset: 2px; }
 table.t tr[data-pick] { cursor: pointer; }
 table.t tr.quiet > td { color: var(--text-3); }
 .del { color: var(--text-3); text-decoration: line-through; }
@@ -2149,22 +2184,58 @@ select.input.pd-add { height: var(--h-chip); width: 124px; min-width: 0; padding
 /* The colour an editor edits, large, beside its name and value. */
 .colour-head { gap: var(--sp-3); }
 .colour-head .swatch-lg { width: 34px; height: 34px; }
-.colour-head .colour-title { font-size: var(--fs-md); }
 .colour-head > .btn { margin-left: auto; }
-.colour-head.unused .colour-title { color: var(--text-2); }
-.colour-head.unused .swatch-lg { border-style: dashed; }
-.colour-head.unused + .note { margin-top: var(--sp-3); }
 /* Lighting's stage surfaces. */
 /* An editor beside a list keeps its rows at the top: the workbench may be
    taller than it, for its tallest stage, and the space goes below. */
 .tab-grid.stage-detail { gap: var(--sp-6); align-content: start; }
-/* Two sections in the column beside a colour: a case's locality, then what the stage shares. */
+/* Every stage lays out the same (D-L95): its stage bar across the top, then
+   the first column (a list, or the stage's own settings), the colour and
+   where it paints beside it, and the accents under them. The bar holds what
+   is the whole stage's, so nothing on it moves between tabs. */
+.lighting-bench .stage { display: grid; grid-template: auto minmax(0, 1fr) / minmax(0, 1fr); gap: var(--sp-4); }
+.stage > .accents-overview { align-self: start; }
+.stage-bar { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2) var(--sp-4); min-height: 42px; padding: var(--sp-1) var(--sp-3);
+  border: 1px solid var(--line); border-radius: var(--r-control); background: var(--surface-2); font-size: var(--fs-md); }
+.stage-bar-title { display: flex; align-items: center; gap: var(--sp-2); font-weight: var(--fw-strong); color: var(--text); white-space: nowrap; }
+.stage-bar-shared { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2) var(--sp-3); }
+.stage-bar .field.segmented, .stage-bar .field.inline { display: flex; align-items: center; gap: var(--sp-2); }
+.stage-bar .field > span:first-child { white-space: nowrap; }
+.stage-bar .field > .seg label > span { white-space: nowrap; }
+.stage-bar-note, .stage-bar-aside { color: var(--text-3); font-size: var(--fs-sm); }
+.stage-bar-aside { margin-right: calc(-1 * var(--sp-2)); }
+.stage-bar > .grow { flex: 1; }
+.stage-bar > .accent-budget { margin: 0; }
+.stage-bar.off .stage-bar-title > span:first-child { color: var(--text-2); }
+/* A switch elsewhere that keeps the stage from painting, or All lighting
+   off: the bar is tinted and says so in a word, going to that switch. */
+.stage-bar.held { border-color: color-mix(in srgb, var(--warning) 55%, var(--line)); background: color-mix(in srgb, var(--warning) 10%, var(--surface-2)); }
+.stage-held { display: inline-flex; align-items: center; height: var(--h-chip); padding: 0 var(--sp-2); border-radius: var(--r-pill); font: inherit; font-size: var(--fs-sm); white-space: nowrap;
+  color: var(--text); border: 1px solid color-mix(in srgb, var(--warning) 55%, var(--line)); background: color-mix(in srgb, var(--warning) 18%, var(--surface)); }
+button.stage-held { cursor: pointer; }
+button.stage-held:hover { background: color-mix(in srgb, var(--warning) 26%, var(--surface)); }
+/* The item a stage's list has picked heads what is its own. */
+.stage-item { display: flex; align-items: baseline; gap: var(--sp-3); min-width: 0; min-height: 24px; padding-bottom: var(--sp-3); border-bottom: 1px solid var(--line); }
+.stage-item-name { font-size: var(--fs-lg); font-weight: var(--fw-strong); color: var(--text); white-space: nowrap; }
+.stage-item > .note { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stage .sect-h { min-height: 24px; }
+.stage .tab-split.reach-split > section { min-width: 0; }
+/* Where it paints: the column beside a colour. */
 .tab-grid.stage-detail > .stage-side { display: flex; flex-direction: column; gap: var(--sp-6); min-width: 0; }
-.stage-about { max-width: 96ch; }
+/* A colour's state, beside its value, and the controls it leaves dimmed
+   under a note while it paints nothing (ui/colour-editor.mjs). */
+.colour-editor > * { min-width: 0; }
+.colour-readout { flex: 1; min-width: 0; }
+.colour-readout .note { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.colour-head > .seg { margin-left: auto; flex: none; }
+.colour-body { position: relative; display: flex; flex-direction: column; gap: var(--sp-3); }
+.colour-body[data-idle] > :not(.colour-idle) { opacity: .3; pointer-events: none; }
+.colour-idle { position: absolute; z-index: var(--z-raised); top: 0; left: 0; right: 0; display: flex; flex-direction: column; gap: var(--sp-2); color: var(--text); background: color-mix(in srgb, var(--surface-2) 92%, transparent); }
+.swatch-lg.unused { border-style: dashed; }
 /* Accents (ui/lighting/accents.mjs): a list under each stage's editor, one
    row per accent, and the accent being added or changed in its place. */
 .accents { border-top: 1px solid var(--line); padding-top: var(--sp-4); }
-.accent-list { display: flex; flex-direction: column; gap: var(--sp-2); margin-top: var(--sp-3); }
+.accent-list { display: flex; flex-direction: column; gap: var(--sp-2); margin-top: var(--sp-1); }
 .accent-row { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-2) var(--sp-3); border: 1px solid var(--line); border-radius: var(--r-control); }
 .accent-row:hover { border-color: var(--line-3); }
 .accent-row.from { border-style: dashed; color: var(--text-2); }
@@ -2180,9 +2251,16 @@ select.input.pd-add { height: var(--h-chip); width: 124px; min-width: 0; padding
 .accent-colours { display: inline-flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-4); }
 .accent-editor { display: flex; flex-direction: column; gap: var(--sp-3); padding: var(--sp-3); border: 1px solid var(--line-3); border-radius: var(--r-control); background: var(--surface-2); }
 .accent-editor > .row .right { margin-left: auto; }
-.accent-editor > .stack { max-width: 520px; }
-.accent-choices { flex-wrap: wrap; align-items: flex-end; }
-.accent-budget { margin-top: var(--sp-3); }
+/* The accent's colour editor is as wide as the stage's own: its columns are
+   the stage's colour and where it paints, less the editor's padding. */
+.accent-cols { display: grid; grid-template-columns: minmax(300px, 0.9fr) minmax(0, 1.1fr); gap: var(--sp-6); }
+.accent-cols > * { min-width: 0; }
+.accent-budget { margin-top: var(--sp-3); font-variant-numeric: tabular-nums; }
+/* Accents grouped by who they light for: the item picked, a group of
+   items, all of them, Base's. */
+.accent-band { margin-top: var(--sp-2); }
+.accent-band:first-child { margin-top: 0; }
+.accent-none { padding-left: var(--sp-1); }
 .led-swatch { width: 13px; height: 13px; border-radius: var(--r-chip); border: 1px solid var(--line-2); flex: none; display: inline-block; vertical-align: -2px; }
 .led-swatch + code { margin-left: var(--sp-1); }
 .note { font-size: var(--fs-sm); color: var(--text-3); line-height: 1.5; }

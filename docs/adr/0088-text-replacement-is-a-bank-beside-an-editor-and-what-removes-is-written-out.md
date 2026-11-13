@@ -1,6 +1,6 @@
 # Text replacement is a bank beside an editor, and what removes is written out
 
-Cited as D-L88.
+Cited as D-L88. Amended by D-L95: Lighting explains with the same info mark, on each stage bar, on section headings and on its board's corner.
 
 The Text replacement screen is built as Macros, Custom keys and Pointing modes are: a **bank** at the left and the **editor** of the item picked beside it (`.pad.library`). It was first a table of its own, a row per replacement edited in place, with a toolbar, a panel under each chip and a card of its own for Try it. Nothing else in Ark looked or worked like it, and a person who knew Macros had to learn it from nothing. It now has no component of its own where Ark had one.
 

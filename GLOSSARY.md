@@ -289,6 +289,21 @@ The words that open at the pointer when it rests on a control, saying what
 the control does or what it shows in full.
 _Avoid_: tooltip, title, hover text
 
+**Info mark**:
+A small circled i beside a heading, on a stage bar or on the board's corner,
+whose list of terms and what each means opens while the pointer or the focus
+is on it (D-L88, D-L95). It holds what is read once, how a section works or
+what its choices mean, so the screen keeps only what is needed every time.
+_Avoid_: help icon, tooltip (that is a tip), info button
+
+**Stage bar**:
+The strip across the top of every Lighting stage that holds what is the
+whole stage's (D-L95): its name and what it does behind an info mark, the
+settings every item on it shares, whether a switch elsewhere keeps it from
+painting, and its **Stage on** switch at the end. Under it, the item picked
+in the stage's list heads what is its own alone.
+_Avoid_: stage header, toolbar, banner (that says a global switch is off)
+
 **Keycode picker**:
 The dialog that chooses what a key, branch, shortcut or output sends.
 _Avoid_: key picker, keycode chooser, selector
@@ -324,7 +339,8 @@ combo feedback or a feedback case, whatever the stages before it paint
 (D-L94, firmware D-F74). Ark stores it as HSV(0, 0, 0) with **Make
 passthrough**; the keyboard treats any colour a layer, a pointing slot, combo
 feedback or a feedback case owns with no saturation or brightness so, at any
-hue. Its accents in a colour of their own still light. It is not **off**,
+hue. The colour editor sets it with the **Passthrough** choice beside
+**Colour** and **Off**. Its accents in a colour of their own still light. It is not **off**,
 brightness zero with some saturation, whose LEDs go dark. An accent's
 HSV(0, 0, 0) takes its owner's colour instead, and the auto-mouse fade's end
 colour is literal, so HSV(0, 0, 0) turns the LEDs off there.
@@ -345,7 +361,7 @@ pending (**Double tap**, **Triple tap**, **Quadruple tap**, **Quintuple tap**,
 the last for every deeper count too), each with its own colour, locality and
 accents (D-L93, firmware D-F73); an accent lights for one case, for **Every
 tap branch** (firmware D-F75), or for **Every behaviour state**. Its tap-commit policy and **Flash interval**, how long one
-on or off phase lasts, are one setting for every case. The
+on or off phase lasts, are one setting for every case, on its stage bar. The
 firmware's code and Ark's keep the stage's old name: the stage id `key`, the
 record `keyFeedback`, the accent table `keyBehavior`, the edit
 `updateKeyBehaviorFeedback`.

@@ -13,12 +13,14 @@ import {editGate} from "../../view/edit-gate.mjs";
 import {editWords} from "../../view/edit-mode.mjs";
 import * as edits from "../../view/edits.mjs";
 import {vocabulary} from "../../view/vocabulary.mjs";
-import {accentBudget, accentOwner, accentsFor, accentsWhen, allAccents, everyOwner, groupOwner, ownerCalled, ownerMark, ownerPlace, stageShade} from "../../view/accents.mjs";
+import {accentBudget, accentOwner, accentsFor, allAccents, everyOwner, groupOwner, ownerCalled, ownerMark, ownerPlace, stageShade} from "../../view/accents.mjs";
 import {inheritsStageColour} from "../../view/lighting.mjs";
 import {colourEditor} from "../colour-editor.mjs";
 import {pickButton} from "../groups.mjs";
 import {choiceField, choiceValue} from "../segmented.mjs";
-import {marked, phraseMarked} from "../marks.mjs";
+import {marked} from "../marks.mjs";
+import {accentsInfo} from "./help.mjs";
+import {stageBar} from "./common.mjs";
 
 /** @typedef {import("../../../contracts/panel.js").PublishedModel} Model */
 /** @typedef {import("../../../contracts/panel.js").Accent} Accent */
@@ -130,17 +132,37 @@ const standingOut = (model, shade) => {
     return {h: (h + 128) % 256, s: 255, v: Math.min(200, Number(model.rgb.maximumBrightness) || 200)};
 };
 
-// An accent's colour, as its swatch and words: its own, or its stage's.
+// An accent's colour, as its swatch and words: its own, or its stage's,
+// drawn in the colour the stage paints for what the tab has picked, so
+// "Same as the mode" shows which colour that is.
 /** @param {Model} model @param {AccentTable} target @param {Accent} row */
 function colourCell(model, target, row) {
     if (inheritsStageColour(row.color)) {
-        return `<span class="led-swatch swatch-off"></span><span class="muted">${esc(vocabulary(model).accents[target]?.stageColour || "")}</span>`;
+        const shade = stageShade(model, target, row.owner, picked());
+        return `<span class="led-swatch${shade ? "" : " swatch-off"}" style="${shade ? `background:${css(shade)}` : ""}"></span><span class="muted">${esc(vocabulary(model).accents[target]?.stageColour || "")}</span>`;
     }
     return `<span class="led-swatch" style="background:${css(row.color)}"></span><code class="dim">${esc(hsvLabel(row.color))}</code>`;
 }
 
+// An accent's swatch on All accents: its own colour, or the colour its stage
+// paints for its owner.
+/** @param {Model} model @param {AccentTable} target @param {Accent} row */
+function sameAsSwatch(model, target, row) {
+    const shade = inheritsStageColour(row.color) ? stageShade(model, target, row.owner, picked()) : row.color;
+    return `<span class="led-swatch${shade ? "" : " swatch-off"}" style="${shade ? `background:${css(shade)}` : ""}"></span>`;
+}
+
+// Scrolls the board into view, whole where it fits: an accent's LEDs are
+// picked there, and Open shows one there.
+const boardInView = () => document.querySelector(".keys-pad > .board-card")?.scrollIntoView({block: "nearest"});
+
 /**
  * The Accents section of a stage's tab, or null for a stage without accents.
+ * Its accents are grouped by who they light for, so it is plain which light
+ * for the item picked alone and which for every item, wherever they are
+ * changed: the item's own first, then those for a group of items (Every tap
+ * branch), those for all of them, and Base's, which light over the layers
+ * above it and are changed on Base.
  * @param {Model} model @param {string} stage
  */
 export function accentsSection(model, stage) {
@@ -149,62 +171,76 @@ export function accentsSection(model, stage) {
     const {target, owner} = whose;
     const canEdit = editGate(model, "lighting").editable;
     const editing = editingOn(model, stage);
+    const words = vocabulary(model).accents[target];
     const name = ownerCalled(model, target, owner);
     const node = el(`<section class="span accents" data-accents="${esc(target)}">
-        <div class="sect-h"><h4>${name ? `Accents · ${marked(model, ownerMark(model, target, owner), name)}` : "Accents"}</h4>
-        <span class="right"><button class="btn tiny" data-act="add" ${canEdit && !editing ? "" : "disabled"}>Add accent</button></span></div>
-        <p class="note">${phraseMarked(model, accentsWhen(model, target, owner))}</p></section>`);
+        <div class="sect-h"><h4>Accents</h4>${accentsInfo(model, target)}
+        <span class="right"><button class="btn tiny" data-act="add" ${canEdit && !editing ? "" : "disabled"}>Add accent</button></span></div></section>`);
     /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="add"]')).addEventListener("click", () => {
         state.accent = {stage, target, every: false, index: null, leds: [], colour: standingOut(model, stageShade(model, target, owner, picked())), stageColour: false, adding: true};
         render();
+        boardInView();
     });
 
-    // Accents for every layer, mode or state are edited wherever they light,
-    // tagged as such; Base's, which light over the layers above it, on Base.
     const {here, beneath} = accentsFor(model, target, owner);
     const every = everyOwner(model, target), group = groupOwner(model, target, owner);
+    const forEvery = (/** @type {string} */ owner) => (every && owner === every) ? "every" : (group && owner === group && group !== owner) ? "group" : "own";
+    /** @type {{id: string, scope: string, rows: Accent[]}[]} */
+    const bands = [
+        {id: "own", scope: name ? "" : words.every.toLowerCase(), rows: here.filter((row) => forEvery(row.owner) === "own")},
+        ...(words.group && group && group !== owner ? [{id: "group", scope: words.group.words.toLowerCase(), rows: here.filter((row) => forEvery(row.owner) === "group")}] : []),
+        ...(every ? [{id: "every", scope: words.every.toLowerCase(), rows: here.filter((row) => forEvery(row.owner) === "every")}] : []),
+    ];
     const list = el(`<div class="accent-list"></div>`);
-    for (const row of here) {
-        const tag = every && row.owner === every ? vocabulary(model).accents[target].every
-            : group && row.owner === group && group !== owner ? vocabulary(model).accents[target].group?.words : undefined;
-        list.append(editing?.index === row.index ? accentEditor(model, editing, owner) : accentRow(model, stage, target, row, {editable: canEdit && !editing, tag}));
+    const any = here.length || beneath.length || editing;
+    for (const band of bands) {
+        const editedHere = editing && editing.index !== null && band.rows.some((row) => row.index === editing.index);
+        if (!band.rows.length && band.id !== "own") continue;
+        // A band names whom its accents light for, the item picked by its mark (D-L31).
+        if (any) list.append(el(`<div class="accent-band" data-band="${esc(band.id)}">For ${band.scope ? esc(band.scope) : marked(model, ownerMark(model, target, owner), name)}</div>`));
+        if (any && !band.rows.length && !(editing && editing.index === null)) list.append(el(`<p class="note accent-none">None yet.</p>`));
+        for (const row of band.rows) {
+            list.append(editedHere && editing?.index === row.index ? accentEditor(model, editing, owner)
+                : accentRow(model, stage, target, row, {editable: canEdit && !editing, scope: band.id === "own" ? "" : band.scope}));
+        }
+        if (band.id === "own" && editing && editing.index === null) list.append(accentEditor(model, editing, owner));
     }
-    if (editing && editing.index === null) list.append(accentEditor(model, editing, owner));
-    const base = model.layers?.[0];
-    for (const row of beneath) list.append(accentRow(model, stage, target, row, {tag: `From ${ownerCalled(model, target, row.owner)}`,
-        go: {label: `Go to ${ownerCalled(model, target, row.owner)}`, then: () => { showLayer(base?.index ?? 0); render(); }}}));
-    if (!list.childElementCount) list.append(el(`<p class="note">No accents yet. Add one, then click or drag across keys on the board to pick its LEDs.</p>`));
+    if (beneath.length) {
+        const base = model.layers?.[0];
+        list.append(el(`<div class="accent-band" data-band="beneath">From ${marked(model, ownerMark(model, target, beneath[0].owner), ownerCalled(model, target, beneath[0].owner))}</div>`));
+        for (const row of beneath) list.append(accentRow(model, stage, target, row, {
+            go: {label: `Go to ${ownerCalled(model, target, row.owner)}`, then: () => { showLayer(base?.index ?? 0); render(); }}}));
+    }
+    if (!any) list.append(el(`<p class="note">No accents yet. Add one, then click or drag across keys on the board to pick its LEDs.</p>`));
     node.append(list);
     const budget = budgetNote(model);
     if (budget) node.append(budget);
     return node;
 }
 
-// How many accents and LED sets the keyboard holds, and how many are used,
-// with what an LED set is, in the Memory card's words.
+// How many accents and LED sets the keyboard holds, and how many are used:
+// the whole keyboard's count, said so. What an LED set is, is on the
+// Accents info mark.
 /** @param {Model} model */
 function budgetNote(model) {
     const budget = accentBudget(model);
     if (!budget.length) return null;
-    const sets = budget.find((count) => count.id === "lightingGroups");
-    return el(`<p class="note accent-budget">${budget.map((count) => `${esc(count.label)}: ${esc(count.used)} of ${esc(count.limit)}`).join(" · ")}.
-        ${esc(sets?.what || "")}</p>`);
+    return el(`<p class="note accent-budget">On the keyboard: ${budget.map((count) => `${esc(count.label)} ${esc(count.used)} of ${esc(count.limit)}`).join(" · ")}</p>`);
 }
 
-// One accent: its LEDs, its colour, a tag when it lights for every layer,
-// mode or state, and Change and Remove; one edited elsewhere (Base's on a
-// layer above) says where, with a way there instead.
-/** @param {Model} model @param {string} stage @param {AccentTable} target @param {Accent} row @param {{editable?: boolean, tag?: string, go?: {label: string, then: () => void}}} options */
-function accentRow(model, stage, target, row, {editable = false, tag, go}) {
+// One accent: its LEDs, its colour, and Change and Remove, which say whom
+// they change it for when it lights for more than the item picked (`scope`);
+// one edited elsewhere (Base's on a layer above) offers a way there instead.
+/** @param {Model} model @param {string} stage @param {AccentTable} target @param {Accent} row @param {{editable?: boolean, scope?: string, go?: {label: string, then: () => void}}} options */
+function accentRow(model, stage, target, row, {editable = false, scope, go}) {
     const key = `${target}:${row.index}`;
     const node = el(`<div class="accent-row${go ? " from" : ""}" data-accent="${esc(key)}">
         ${pickButton(`accent:${key}`, isShown(key), `<span class="accent-leds mono">${esc(row.leds)}</span>`)}
         <span class="accent-colour">${colourCell(model, target, row)}</span>
-        ${tag ? `<span class="tag">${esc(tag)}</span>` : ""}
         <span class="right row gap-8">${go
             ? `<button class="btn tiny ghost" data-act="go">${esc(go.label)}</button>`
-            : `<button class="btn tiny ghost" data-act="change" ${editable ? "" : "disabled"}>Change</button>
-               <button class="btn tiny ghost destructive" data-act="remove" ${editable ? "" : "disabled"}>Remove</button>`}</span></div>`);
+            : `<button class="btn tiny ghost" data-act="change" ${editable ? "" : "disabled"}${scope ? ` data-tip="Changes it for ${esc(scope)}."` : ""}>Change</button>
+               <button class="btn tiny ghost destructive" data-act="remove" ${editable ? "" : "disabled"}${scope ? ` data-tip="Removes it for ${esc(scope)}."` : ""}>Remove</button>`}</span></div>`);
     showsOnBoard(model, node, key, row.ledIndices);
     /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="go"]'))?.addEventListener("click", () => go?.then());
     /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="change"]'))?.addEventListener("click", () => {
@@ -213,14 +249,43 @@ function accentRow(model, stage, target, row, {editable = false, tag, go}) {
         state.accent = {stage, target, every: row.owner === everyOwner(model, target), group: row.owner === groupOwner(model, target, row.owner), index: row.index, leds: [...row.ledIndices],
             colour: stageColour ? standingOut(model, stageShade(model, target, row.owner, picked())) : {h, s, v}, stageColour, adding: true};
         render();
+        boardInView();
     });
     /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="remove"]'))?.addEventListener("click", () => post(edits.deleteAccent(target, row.index)));
     return node;
 }
 
-// The accent being added or changed: the LEDs picked on the board, whose it
-// is (the tab's owner, `mine`, the group it is in, or all of them), and its
-// colour, its own or its stage's. Nothing posts until it is kept.
+// Keeping the accent being edited posts it, its owner as the editor has
+// it; cancelling drops it. Nothing posts before.
+/** @param {Model} model @param {Editing} editing */
+function keepAccent(model, editing) {
+    const accent = {target: editing.target, owner: editingOwner(model, editing), leds: editing.leds, colour: editing.stageColour ? {h: 0, s: 0, v: 0} : editing.colour};
+    post(editing.index === null ? edits.addAccent(accent) : edits.updateAccent(editing.index, accent));
+    state.accent = null;
+    render();
+}
+
+// Keep, Cancel and Clear LEDs, for the row under the board while its LEDs
+// are picked (lighting.mjs), so an accent is finished where it is picked;
+// the editor in the list ends with Keep and Cancel too.
+/** @param {Model} model @param {string} stage */
+export function accentActions(model, stage) {
+    const editing = editingOn(model, stage);
+    if (!editing) return null;
+    const count = editing.leds.length;
+    const node = el(`<span class="right"><button class="btn tiny ghost" data-act="clear-leds" ${count ? "" : "disabled"}>Clear LEDs</button>
+        <button class="btn tiny ghost" data-act="cancel-accent">Cancel</button>
+        <button class="btn tiny primary" data-act="keep-accent" ${count ? "" : "disabled"}>${esc(editWords(model.draft).keep("accent"))}</button></span>`);
+    /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="clear-leds"]')).addEventListener("click", () => { editing.leds = []; render(); });
+    /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="cancel-accent"]')).addEventListener("click", () => { state.accent = null; render(); });
+    /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="keep-accent"]')).addEventListener("click", () => keepAccent(model, editing));
+    return node;
+}
+
+// The accent being added or changed: whose it is (the tab's owner, `mine`,
+// the group it is in, or all of them) and its colour, its own or its
+// stage's, laid out as the stage's own colour and where it paints are, so
+// its colour editor is the same width. Its LEDs are picked on the board.
 /** @param {Model} model @param {Editing} editing @param {string} mine */
 function accentEditor(model, editing, mine) {
     const {target} = editing;
@@ -230,9 +295,8 @@ function accentEditor(model, editing, mine) {
     const count = editing.leds.length;
     const node = el(`<div class="accent-editor">
         <div class="row gap-8"><b>${editing.index === null ? "New accent" : "Change accent"}</b>
-            <span class="muted">${count ? `${esc(count)} LED${count === 1 ? "" : "s"} picked` : "Click or drag across keys on the board to pick LEDs"}</span>
-            <span class="right"><button class="btn tiny ghost" data-act="clear" ${count ? "" : "disabled"}>Clear LEDs</button></span></div>
-        <div class="row gap-16 accent-choices"></div></div>`);
+            <span class="muted">${count ? `${esc(count)} LED${count === 1 ? "" : "s"} picked on the board` : "Click or drag across keys on the board to pick LEDs"}</span></div>
+        <div class="accent-cols"><div class="accent-colour-col"></div><div class="stack gap-12 accent-choices"></div></div></div>`);
     const choices = /** @type {HTMLElement} */ (node.querySelector(".accent-choices"));
     const colourFrom = el(choiceField({label: vocabulary(model).lightingFields.colour, f: "lighting:accent:colour-from", current: editing.stageColour ? "stage" : "own",
         choices: [["own", fields.ownColour], ["stage", words.stageColour]]}));
@@ -245,20 +309,15 @@ function accentEditor(model, editing, mine) {
         whose.addEventListener("change", () => { const value = choiceValue(whose); editing.every = value === "every"; editing.group = value === "group"; render(); });
         choices.append(whose);
     }
-    if (editing.stageColour) node.append(el(`<p class="note">These LEDs take the colour their stage paints.</p>`));
-    else node.append(colourEditor({identity: "lighting:accent:colour", colour: editing.colour, title: "Accent colour", maximumBrightness: model.rgb.maximumBrightness,
+    const colourCol = /** @type {HTMLElement} */ (node.querySelector(".accent-colour-col"));
+    if (editing.stageColour) colourCol.append(el(`<p class="note">These LEDs take the colour their stage paints.</p>`));
+    else colourCol.append(colourEditor({identity: "lighting:accent:colour", colour: editing.colour, title: "Accent colour", maximumBrightness: model.rgb.maximumBrightness,
         onChange: (next) => { editing.colour = {h: Number(next.h), s: Number(next.s), v: Number(next.v)}; render(); }}));
     const actions = el(`<div class="row gap-8"><button class="btn primary" data-act="keep" ${count ? "" : "disabled"}>${esc(editWords(model.draft).keep("accent"))}</button>
         <button class="btn ghost" data-act="cancel">Cancel</button></div>`);
     node.append(actions);
-    /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="clear"]')).addEventListener("click", () => { editing.leds = []; render(); });
     /** @type {HTMLButtonElement} */ (actions.querySelector('[data-act="cancel"]')).addEventListener("click", () => { state.accent = null; render(); });
-    /** @type {HTMLButtonElement} */ (actions.querySelector('[data-act="keep"]')).addEventListener("click", () => {
-        const accent = {target, owner: editingOwner(model, editing), leds: editing.leds, colour: editing.stageColour ? {h: 0, s: 0, v: 0} : editing.colour};
-        post(editing.index === null ? edits.addAccent(accent) : edits.updateAccent(editing.index, accent));
-        state.accent = null;
-        render();
-    });
+    /** @type {HTMLButtonElement} */ (actions.querySelector('[data-act="keep"]')).addEventListener("click", () => keepAccent(model, editing));
     return node;
 }
 
@@ -269,21 +328,23 @@ function accentEditor(model, editing, mine) {
  * @param {Model} model
  */
 export function accentsOverview(model) {
-    const node = el(`<div class="stack gap-16 accents-overview">
-        <p class="note">Every accent, by the stage that paints it. An accent is changed on its stage's tab.</p></div>`);
+    const node = el(`<div class="stage" data-stage="accents"></div>`);
+    const budget = budgetNote(model);
+    node.append(stageBar(model, "accents", {note: "Every accent, by the stage that paints it.", end: budget}));
+    const box = el(`<div class="stack gap-16 accents-overview"></div>`);
+    node.append(box);
     const stages = allAccents(model);
-    if (!stages.length) node.append(el(`<p class="note">No accents yet. Add one on Layer colours, Pointing modes, Combo feedback, Behaviour feedback or Replacement feedback.</p>`));
+    if (!stages.length) box.append(el(`<p class="note">No accents yet. Add one on Layer colours, Pointing modes, Combo feedback, Behaviour feedback or Replacement feedback.</p>`));
     for (const {stage, target, owners} of stages) {
         const label = vocabulary(model).stages.find((entry) => entry.id === stage)?.label || stage;
-        const box = el(`<section><div class="sect-h"><h4>${esc(label)}</h4></div><div class="accent-list"></div></section>`);
-        const list = /** @type {HTMLElement} */ (box.querySelector(".accent-list"));
+        const section = el(`<section><div class="sect-h"><h4>${esc(label)}</h4></div><div class="accent-list"></div></section>`);
+        const list = /** @type {HTMLElement} */ (section.querySelector(".accent-list"));
         for (const {owner, rows} of owners) {
             const key = `${target}:${owner}`;
             const called = ownerCalled(model, target, owner) || label;
             const line = el(`<div class="accent-row" data-owner="${esc(key)}">
                 ${pickButton(`accent-owner:${key}`, isShown(key), `<b>${marked(model, ownerMark(model, target, owner), called)}</b>`)}
-                <span class="accent-colours">${rows.map((row) => `<span class="accent-colour">${inheritsStageColour(row.color)
-                    ? `<span class="led-swatch swatch-off"></span>` : `<span class="led-swatch" style="background:${css(row.color)}"></span>`}<span class="accent-leds mono">${esc(row.leds)}</span></span>`).join("")}</span>
+                <span class="accent-colours">${rows.map((row) => `<span class="accent-colour">${sameAsSwatch(model, target, row)}<span class="accent-leds mono">${esc(row.leds)}</span></span>`).join("")}</span>
                 <span class="right"><button class="btn tiny ghost" data-act="open">Open</button></span></div>`);
             showsOnBoard(model, line, key, rows.flatMap((row) => row.ledIndices));
             /** @type {HTMLButtonElement} */ (line.querySelector('[data-act="open"]')).addEventListener("click", () => {
@@ -295,13 +356,14 @@ export function accentsOverview(model) {
                 if (place.slot !== undefined) state.pointingSlot = place.slot;
                 if (place.feedbackRow !== undefined) state.feedbackRow = /** @type {typeof state.feedbackRow} */ (place.feedbackRow);
                 if (place.replacementRow !== undefined) state.replacementRow = place.replacementRow;
+                // It lands with its first accent's LEDs glowing, the board in view.
+                state.accentShown = rows.length ? {stage, key: `${target}:${rows[0].index}`} : null;
                 render();
+                boardInView();
             });
             list.append(line);
         }
-        node.append(box);
+        box.append(section);
     }
-    const budget = budgetNote(model);
-    if (budget) node.append(budget);
     return node;
 }

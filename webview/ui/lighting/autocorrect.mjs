@@ -7,23 +7,25 @@ import {el, esc} from "../../lib/dom.mjs";
 import {css} from "../../lib/colour.mjs";
 import {post, render, state} from "../../store.mjs";
 import {editGate} from "../../view/edit-gate.mjs";
-import {isOff, isPassthrough, offWording} from "../../view/lighting.mjs";
+import {isOff, isPassthrough, offWording, swatchOf} from "../../view/lighting.mjs";
 import {replacementOwner, replacementRowOf} from "../../view/accents.mjs";
 import {vocabulary, word} from "../../view/vocabulary.mjs";
 import * as edits from "../../view/edits.mjs";
 import {localityOf} from "../../view/edits.mjs";
-import {aboutStage, colourControl, flashSetting, lightingGroup, localityField, paintsCell, paintsSection, section, stack} from "./common.mjs";
+import {colourControl, flashSetting, itemHead, lightingGroup, localityField, paintsCell, pickedMarked, section, stack, stageSurface} from "./common.mjs";
+import {localityInfo} from "./help.mjs";
+import {screenOfSection} from "../../view/settings-layout.mjs";
 import {accentsSection} from "./accents.mjs";
 import {attachPickRows, groupedTable, pickButton, pickableRow} from "../groups.mjs";
 
-// Which key the Locality follows, for the case picked: a flash's trigger
-// key, or the Leader key for Leader waiting.
-const FLASH_WHERE = "Here the trigger key is the key that ended the word (Space, Enter, a punctuation key), or the Backspace that undid the replacement; for what the Leader key sends, the key that sent it, the last character or Enter, or the Leader key when the wait sent it. For a combo, every key of it. When the keyboard cannot tell which key it was, the flash paints both halves, or every key.";
-const LEADING_WHERE = "Here the trigger key is the Leader key you pressed; for a combo, every key of it. When the Leader came from no key, Leader waiting paints both halves, or every key.";
+// Which key the Locality follows for the case picked, in one line under
+// it: a flash's trigger key, or the Leader key for Leader waiting. The rest
+// is on the Locality info mark (help.mjs).
+const FLASH_WHERE = "Trigger key: the key that ended the word, or the Backspace that undid it.";
+const LEADING_WHERE = "Trigger key: the Leader key you pressed.";
 
 /** @param {import("../../../contracts/panel.js").PublishedModel} model */
 export function stageAutocorrect(model) {
-    const node = el(`<div class="tab-split reach-split"></div>`);
     const canEdit = editGate(model, "lighting").editable;
 
     /** @type {Partial<import("../../../contracts/edits.js").AutocorrectFeedback<import("../../../contracts/edits.js").Colour>>} */
@@ -45,17 +47,17 @@ export function stageAutocorrect(model) {
             const lit = !isPassthrough(row.colour) && !isOff(row.colour);
             const on = row.id === current?.id;
             return pickableRow(row.id, on, [
-                pickButton(`lighting-replacements:${row.id}`, on, `<span class="mk-swatch lead ${lit ? "" : "swatch-off"}" style="${lit ? `background:${css(row.colour)}` : ""}"></span>${esc(row.label)}`),
+                pickButton(`lighting-replacements:${row.id}`, on, `<span class="mk-swatch lead ${lit ? "" : swatchOf(row.colour)}" style="${lit ? `background:${css(row.colour)}` : ""}"></span>${esc(row.label)}`),
                 `<span class="muted">${esc(paintsCell(row.colour, row.locality))}</span>`,
             ], {data: {row: row.id}});
         })}]});
     attachPickRows(list, (id) => { state.replacementRow = id; render(); });
-    const main = el(`<div class="tab-grid two stage-detail"></div>`);
-    const colour = section(current?.label || "Colour");
-    // When the picked case shows, under its name: a flash, or Leader
-    // waiting, held while the leader waits (D-L92).
+    // When the picked case shows, in one line under its name: a flash, or
+    // Leader waiting, held while the leader waits (D-L92).
     const owner = current ? words.replacementColourOwners[current.id] : "";
-    if (owner && words.replacementWhen[owner]) colour.append(el(`<p class="note" data-replacement-when>${esc(words.replacementWhen[owner])}</p>`));
+    const head = current ? itemHead(pickedMarked(model, "autocorrect", current.label), words.replacementWhen[owner] || "") : null;
+    head?.querySelector(".note")?.setAttribute("data-replacement-when", "");
+    const colour = section(words.lightingFields.colour);
     colour.append(colourControl(model, {
         colour: current?.colour, canEdit, title: current?.label || "",
         ...offWording(model, "autocorrect"),
@@ -63,22 +65,15 @@ export function stageAutocorrect(model) {
     }));
     // Where the picked case paints, its own (D-L93), with which key that is
     // here under it.
-    const where = section("Where it paints");
+    const where = section("Where it paints", localityInfo("autocorrect"));
     if (current) where.append(stack(localityField(model, {f: `lighting:autocorrect:${current.id}:locality`, value: current.locality, canEdit,
-        tip: current.id === "leadingColor" ? "Where Leader waiting paints. The trigger key choices follow the Leader key you pressed."
-            : "Where this case's flash paints. The trigger key choices follow the key that ended the word, the Backspace that undid the replacement, or the key that ended what you typed after the Leader key (the Leader key when the wait sent it).",
         hint: current.id === "leadingColor" ? LEADING_WHERE : FLASH_WHERE,
         onChange: (locality) => post(edits.autocorrectFeedbackLocality(feedback, current.id, locality))})));
-    // How long a flash lasts is one setting for every case.
-    const policy = paintsSection(model, "autocorrect", "How long it flashes");
-    policy.append(stack(flashSetting(model, "replacementFeedback")));
-    // Where it paints and how long it flashes share the column beside the
-    // colour, so the tab is no taller for having both.
-    const side = el(`<div class="stack stage-side"></div>`);
-    side.append(where, policy);
-    main.append(colour, side, aboutStage("As text replacement changes what you typed, the keyboard flashes once, in the colour of what it did and in the area chosen for that case: an input replaced with text, one replaced by a macro, or a replacement undone with Backspace. While the leader waits for what you type after the Leader key, the keyboard holds the Leader waiting colour instead, from the Leader key until it sends or gives up. What the Leader key sends flashes as a replacement does, in the text or macro colour, taking Leader waiting's place: that is how you see it went; when it sends nothing, Leader waiting just goes. Both paint over every other stage; a word left as you typed it never flashes. The board shows the case picked in the list. Where a case follows a key, Space stands in for the key that ended the word, Backspace for the one that undid it and the Leader key for Leader waiting, ringed on the board."));
-    const accents = accentsSection(model, "autocorrect");
-    if (accents) main.append(accents);
-    node.append(list, main);
-    return node;
+    // How long a flash lasts is one setting for every case, on the stage
+    // bar; Leader waiting holds as long as the leader waits instead, which
+    // is set on Host settings, a link away.
+    const leader = el(`<button class="btn tiny link" data-act="leader-waits" data-tip="Leader waiting is no flash: it holds as long as the leader waits.">Leader waits →</button>`);
+    leader.addEventListener("click", () => { state.screen = screenOfSection("autocorrect") || "host"; state.reveal = '.setrow:has([data-macro="leaderTimeout"])'; render(); });
+    return stageSurface(model, {id: "autocorrect", first: list, head, colour, side: where, accents: accentsSection(model, "autocorrect"),
+        shared: [flashSetting(model, "replacementFeedback"), el(`<span class="stage-bar-aside">Leader waiting lasts as long as</span>`), leader]});
 }

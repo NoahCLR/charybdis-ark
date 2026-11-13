@@ -10,89 +10,111 @@ import {brightnessLimit, clampHsv, css, hsv, label as hsvLabel, rgb, valuePercen
 import {inheritsStageColour, isPassthrough} from "../view/lighting.mjs";
 import {el, esc} from "../lib/dom.mjs";
 
-// `offTip` offers Turn off, storing HSV(0, 0, 0), and says what that does in
-// this stage (`offWording` in view/lighting.mjs); without it there is no Turn
-// off, as for the background effect. A colour turned off reads "Off", never
-// its stored numbers; the callout says what off means here. A colour an
-// owner has (a layer's, a pointing slot's, combo feedback's or a feedback
-// case's, D-L94) comes with `ledsOffTip`: there off is passthrough, at any hue
-// with no saturation or brightness (firmware D-F74), `offAction` and
-// `offWord` say so (Make passthrough, Passthrough), and an Off choice beside
-// it stores brightness 0 with saturation, which `ledsOffNote` explains once
-// stored. Otherwise the colour is off as HSV(0, 0, 0).
-/** @param {{identity: string, colour: import("../../contracts/edits.js").Colour | null | undefined, title: string, canEdit?: boolean, onChange?: (colour: import("../../contracts/edits.js").Colour) => void, offNote?: string, offTip?: string, offAction?: string, offWord?: string, ledsOffTip?: string, ledsOffNote?: string, off?: boolean, maximumBrightness?: number}} options */
-export function colourEditor({identity, colour, title, canEdit = true, onChange, offNote, offTip, offAction = "Turn off", offWord = "Off", ledsOffTip, ledsOffNote,
-    off = ledsOffTip ? isPassthrough(colour) : inheritsStageColour(colour), maximumBrightness}) {
+// Each colour choice is a radio group of its own: copies of a stage laid out
+// unseen to measure it (ui/lighting/stage-body.mjs) share an editor's
+// identity, and a shared group name would let one take another's pick.
+let groups = 0;
+
+// What a colour is, and the choice that sets it, drawn the same on every
+// stage (D-L94): a colour an owner has (a layer's, a pointing slot's, combo
+// feedback's or a feedback case's) comes with `ledsOffTip` and is one of
+// Colour, Off (brightness 0 with saturation: its LEDs go dark) and
+// Passthrough (`offWord`; saturation and brightness 0 at any
+// hue, firmware D-F74: it paints nothing). A colour with only `offTip` (the
+// auto-mouse fade's end) is Colour or Off (`offAction`), off being HSV(0, 0, 0); one with
+// neither (the background effect, an accent's own) is a colour alone. A
+// colour that paints nothing keeps its square, hue strip and fields, dimmed
+// under a note saying what that means here, so the editor is the same size
+// whatever the colour is; choosing Colour again brings them back. An owned
+// colour that is off stays editable, as the black it is (its hue and
+// saturation kept for when its brightness rises). `title`
+// names the colour to a screen reader; the item it belongs to heads the
+// editor on screen. `unused` draws it dimmed under that note with no choice,
+// for a colour its stage keeps but does not paint as set (the fade's end
+// colour in a mode that takes none).
+/** @param {{identity: string, colour: import("../../contracts/edits.js").Colour | null | undefined, title: string, canEdit?: boolean, onChange?: (colour: import("../../contracts/edits.js").Colour) => void, offNote?: string, offTip?: string, offAction?: string, offWord?: string, ledsOffTip?: string, ledsOffNote?: string, unused?: string, maximumBrightness?: number}} options */
+export function colourEditor({identity, colour, title, canEdit = true, onChange, offNote, offTip, offAction = "Off", offWord = "Off", ledsOffTip, ledsOffNote, unused, maximumBrightness}) {
     const [h, s, v] = hsv(colour);
     const maximum = brightnessLimit(maximumBrightness);
-    const node = el(`<div class="stack gap-12"></div>`);
+    const node = el(`<div class="stack gap-12 colour-editor"></div>`);
     /** @param {number[]} next */
     const commit = (next) => onChange?.(clampHsv(next, maximum));
-    // Off keeps the hue, and the saturation when there is one.
-    const ledsOffChoice = () => el(`<button class="btn tiny ghost" data-leds-off data-tip="${esc(ledsOffTip || "")}">Off</button>`);
-    /** @param {HTMLElement} button */
-    const onLedsOff = (button) => button.addEventListener("click", () => commit([h, s || 255, 0]));
-
-    if (off) {
-        node.append(el(`<div class="row colour-head"><span class="swatch-lg swatch-off"></span>
-            <div><div class="colour-title">${esc(title)}</div><div class="note">${esc(offWord)}</div></div></div>`));
-        node.append(el(`<div class="callout">${esc(offNote || "This colour has zero brightness.")}</div>`));
-        if (canEdit) {
-            const give = el(`<button class="btn self-start">Give it a colour</button>`);
-            give.addEventListener("click", () => commit([140, 255, Math.min(200, maximum)]));
-            if (ledsOffTip) {
-                const row = el(`<div class="row gap-8"></div>`), choice = ledsOffChoice();
-                onLedsOff(choice);
-                row.append(give, choice);
-                node.append(row);
-            } else node.append(give);
-        }
-        return node;
-    }
-
-    const head = el(`<div class="row colour-head">
-        <span class="swatch-lg" style="background:${css(colour)}"></span>
-        <div><div class="colour-title">${esc(title)}</div>
-            <div class="note mono">${esc(hsvLabel(colour))} · rgb(${esc(rgb(colour).join(", "))})</div></div>
-        ${canEdit && offTip && !ledsOffTip ? `<button class="btn tiny ghost" data-off data-tip="${esc(offTip)}">${esc(offAction)}</button>` : ""}</div>`);
+    const owned = Boolean(ledsOffTip);
+    const passthrough = owned && isPassthrough(colour);
+    const dark = !passthrough && (owned || offTip ? v === 0 : inheritsStageColour(colour));
+    // An owned colour that is off is still a colour, black: its hue and
+    // saturation stay editable, and raising its brightness brings it back.
+    // One that paints nothing, or a literal 0, 0, 0, has nothing to edit.
+    const idle = passthrough || (dark && !owned) || Boolean(unused);
+    const state = passthrough ? "passthrough" : dark ? "off" : "colour";
+    const bright = Math.min(200, maximum);
+    // Colour brings back the hue and saturation an Off colour kept, and a
+    // fresh one where nothing was kept; Off keeps the hue and saturation
+    // where the colour is owned, and is HSV(0, 0, 0) where it is literal.
+    /** @type {Record<string, () => number[]>} */
+    const to = {
+        colour: () => passthrough || (h === 0 && s === 0) ? [140, 255, bright] : [h, s, bright],
+        off: () => owned ? [h, s || 255, 0] : [0, 0, 0],
+        passthrough: () => [0, 0, 0],
+    };
+    /** @type {[string, string, string][]} */
+    const choices = unused ? [] : owned ? [["colour", "Colour", ""], ["off", "Off", ledsOffTip || ""], ["passthrough", offWord, offTip || ""]]
+        : offTip ? [["colour", "Colour", ""], ["off", offAction, offTip]] : [];
+    const group = `${identity}:state:${++groups}`;
+    const head = el(`<div class="row colour-head"${dark && owned && ledsOffNote ? ` data-tip="${esc(ledsOffNote)}"` : ""}>
+        <span class="swatch-lg ${passthrough ? "swatch-off" : dark ? "swatch-dark" : ""}${unused ? " unused" : ""}" style="${passthrough || dark ? "" : `background:${css(colour)}`}"></span>
+        <div class="colour-readout"><div class="note${idle && !unused ? "" : " mono"}">${idle && !unused ? esc(passthrough ? offWord : "Off") : `${esc(hsvLabel(colour))} · rgb(${esc(rgb(colour).join(", "))})`}</div></div>
+        ${choices.length ? `<div class="seg colour-state" role="radiogroup" aria-label="${esc(title)}">${choices.map(([value, words, tip]) =>
+            `<label ${tip ? `data-tip="${esc(tip)}"` : ""}><input type="radio" name="${esc(group)}" value="${esc(value)}" data-f="${esc(identity)}:state:${esc(value)}" ${value === state ? "checked" : ""} ${canEdit ? "" : "disabled"}><span>${esc(words)}</span></label>`).join("")}</div>` : ""}</div>`);
     node.append(head);
-    // An owner's colour offers its two choices on a row of their own under
-    // its name: Make passthrough, and Off while it is not already off.
-    if (canEdit && ledsOffTip) {
-        const actions = el(`<div class="row gap-8">${offTip ? `<button class="btn tiny ghost" data-off data-tip="${esc(offTip)}">${esc(offAction)}</button>` : ""}</div>`);
-        if (v !== 0) { const choice = ledsOffChoice(); onLedsOff(choice); actions.append(choice); }
-        node.append(actions);
+    head.querySelectorAll(".colour-state input").forEach((input) => input.addEventListener("change", () => {
+        const value = /** @type {HTMLInputElement} */ (input).value;
+        if (value !== state) commit(to[value]());
+    }));
+    // A colour that paints nothing says what that means here, over the
+    // controls it leaves dimmed. One with no choice to bring it back (the
+    // background effect at 0, 0, 0) offers a colour there.
+    const body = el(`<div class="colour-body"${idle ? " data-idle" : ""}></div>`);
+    node.append(body);
+    if (idle) {
+        const words = unused || offNote;
+        const over = el(`<div class="callout colour-idle">${esc(words || "This colour has zero brightness.")}</div>`);
+        if (canEdit && !choices.length && !unused) {
+            const give = el(`<button class="btn tiny self-start">Give it a colour</button>`);
+            give.addEventListener("click", () => commit(to.colour()));
+            over.append(give);
+        }
+        body.append(over);
     }
-    if (v === 0) node.append(el(`<p class="note">${esc(ledsOffTip && ledsOffNote ? ledsOffNote : "Brightness is zero. Hue and saturation are retained; raise brightness to use this colour again.")}</p>`));
-    /** @type {HTMLElement | null} */ (node.querySelector("[data-off]"))?.addEventListener("click", () => commit([0, 0, 0]));
+    const live = canEdit && !idle;
 
     const topWhite = css({h: "0", s: "0", v: String(maximum)});
     const topHue = css({h: String(h), s: "255", v: String(maximum)});
     const field = el(`<div class="sv-field" data-tip="Brightness is limited to ${maximum}, as reported by this keyboard."
         style="background:linear-gradient(to top, ${css({h: "0", s: "0", v: "0"})}, transparent), linear-gradient(to right, ${topWhite}, ${topHue})">
         <span class="thumb" style="left:${(s / 255) * 100}%;top:${100 - valuePercent(v, maximum)}%"></span></div>`);
-    node.append(field);
+    body.append(field);
 
     const ramp = el(`<div class="swatch-pick"><span class="label">Hue</span>
         <span class="hue-ramp"><span class="thumb" style="left:${(h / 255) * 100}%"></span></span></div>`);
-    node.append(ramp);
+    body.append(ramp);
 
     // Three number fields as wide as their three digits, each named with its
     // range, as every other number in the app is.
     const fields = el(`<div class="colour-fields">
         ${[["Hue", h, 255], ["Saturation", s, 255], ["Brightness", v, maximum]].map(([name, value, max], index) =>
-            `<label class="field"><span>${esc(name)} 0–${esc(max)}</span><input type="number" min="0" max="${esc(max)}" step="1" class="input mono num" value="${esc(value)}" data-f="${esc(identity)}:colour:${index}" data-channel="${index}" ${canEdit ? "" : "disabled"}></label>`).join("")}</div>`);
+            `<label class="field"><span>${esc(name)} 0–${esc(max)}</span><input type="number" min="0" max="${esc(max)}" step="1" class="input mono num" value="${esc(value)}" data-f="${esc(identity)}:colour:${index}" data-channel="${index}" ${live ? "" : "disabled"}></label>`).join("")}</div>`);
     /** @type {NodeListOf<HTMLInputElement>} */ (fields.querySelectorAll("[data-channel]")).forEach((input) => input.addEventListener("change", () => {
         const next = [h, s, v];
         next[Number(input.dataset.channel)] = Number(input.value) || 0;
         commit(next);
     }));
-    node.append(fields);
+    body.append(fields);
 
     // Dragging previews locally and commits once on release: every commit
     // round-trips through the model and redraws this control, which would
     // drop the pointer mid-drag.
-    if (canEdit) {
+    if (live) {
         const hueRamp = /** @type {HTMLElement} */ (ramp.querySelector(".hue-ramp"));
         let draft = [h, s, v];
         /** @param {number[]} next */
@@ -101,7 +123,7 @@ export function colourEditor({identity, colour, title, canEdit = true, onChange,
             const [dh, ds, dv] = draft;
             const shown = {h: String(dh), s: String(ds), v: String(dv)};
             /** @type {HTMLElement} */ (head.querySelector(".swatch-lg")).style.background = css(shown);
-            /** @type {HTMLElement} */ (head.querySelector(".note")).textContent = `${hsvLabel(shown)} · rgb(${rgb(shown).join(", ")})`;
+            /** @type {HTMLElement} */ (head.querySelector(".colour-readout .note")).textContent = `${hsvLabel(shown)} · rgb(${rgb(shown).join(", ")})`;
             field.style.background = `linear-gradient(to top, ${css({h: "0", s: "0", v: "0"})}, transparent), linear-gradient(to right, ${topWhite}, ${css({h: String(dh), s: "255", v: String(maximum)})})`;
             /** @type {HTMLElement} */ (field.querySelector(".thumb")).style.left = `${(ds / 255) * 100}%`;
             /** @type {HTMLElement} */ (field.querySelector(".thumb")).style.top = `${100 - valuePercent(dv, maximum)}%`;

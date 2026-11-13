@@ -4,11 +4,12 @@ import {el, esc} from "../../lib/dom.mjs";
 import {css} from "../../lib/colour.mjs";
 import {currentLayer, layers, post, render, showLayer, state} from "../../store.mjs";
 import {editGate} from "../../view/edit-gate.mjs";
-import {colourPaints, isOff, isPassthrough, layerColourRow, offWording} from "../../view/lighting.mjs";
+import {colourPaints, isOff, isPassthrough, layerColourRow, offWording, swatchOf} from "../../view/lighting.mjs";
 import {vocabulary, word, layerCalled} from "../../view/vocabulary.mjs";
 import {draftDot, draftMarks} from "../../view/review.mjs";
 import * as edits from "../../view/edits.mjs";
-import {aboutStage, colourControl, lightingGroup, paintsSection, section, sectionMarked, stack} from "./common.mjs";
+import {colourControl, itemHead, lightingGroup, paintsLine, section, stack, stageSurface} from "./common.mjs";
+import {sectionInfo} from "./help.mjs";
 import {accentsSection} from "./accents.mjs";
 import {layerMarked} from "../marks.mjs";
 import {foldEmptyLayers} from "../../view/empty-layers.mjs";
@@ -18,11 +19,9 @@ import {attachPickRows, groupedTable, pickButton, pickableRow} from "../groups.m
 
 /** @param {import("../../../contracts/panel.js").PublishedModel} model */
 export function stageLayers(model) {
-    const node = el(`<div></div>`);
     const canEdit = editGate(model, "lighting").editable;
     const marks = draftMarks(model?.draft?.changes);
 
-    node.className = "tab-split reach-split";
     // The layers, in the Keymap's grouped table (ui/groups.mjs), scrolling
     // on their own beside the editor. Empty layers fold under the table's
     // last band (D-L76), the picked one apart.
@@ -34,7 +33,7 @@ export function stageLayers(model) {
         const row = layerColourRow(model, index);
         const lit = row && !isPassthrough(row.color) && !isOff(row.color);
         return pickableRow(`${index}`, index === state.layer, [
-            pickButton(`lighting-layers:${index}`, index === state.layer, `<span class="mk-swatch lead ${lit ? "" : "swatch-off"}" style="${lit ? `background:${css(row.color)}` : ""}"></span>${esc(layerCalled(layer))}${marks.lightingLayers.has(index) ? draftDot(model?.draft) : ""}`),
+            pickButton(`lighting-layers:${index}`, index === state.layer, `<span class="mk-swatch lead ${lit ? "" : swatchOf(row?.color)}" style="${lit ? `background:${css(row.color)}` : ""}"></span>${esc(layerCalled(layer))}${marks.lightingLayers.has(index) ? draftDot(model?.draft) : ""}`),
             `<span class="muted">${esc(!row ? "not reported" : !colourPaints(row.color) ? "passthrough" : `${lit ? "" : "off · "}${word(vocabulary(model).paintModesBrief, row.mode)}`)}</span>`,
         ], {data: {layer: index}});
     };
@@ -45,22 +44,22 @@ export function stageLayers(model) {
     attachPickRows(list, (index) => { showLayer(Number(index)); render(); });
     const layer = currentLayer();
     const row = layerColourRow(model, layer?.index);
-    const main = el(`<div class="tab-grid two stage-detail"></div>`);
-    const colour = sectionMarked(`${layerMarked(model, layer)} colour`);
+    const brief = word(vocabulary(model).paintModesBrief, row?.mode);
+    const head = itemHead(layerMarked(model, layer), row ? paintsLine(row.color, brief) : "Not reported");
+    const colour = section(vocabulary(model).lightingFields.colour);
     colour.append(colourControl(model, {
         colour: row?.color, canEdit, title: `${layerCalled(layer)} layer`,
         ...offWording(model, "layers"),
         onChange: (next) => { if (row) post(edits.layerColour(row.layer, row.mode, next)); },
     }));
-    const where = paintsSection(model, "layers", "Where it paints");
+    // Which LEDs the layer lights is its own; what each choice means is on
+    // the section's info mark.
+    const where = section("Where it paints", sectionInfo("layers:mode"));
     const mode = el(choiceField({label: vocabulary(model).lightingFields.paintMode, f: `lighting:layer:${layer?.index}:mode`, choices: vocabulary(model).paintModes,
         current: row?.mode || "KEYS_MAPPED_ON_THIS_LAYER_ONLY", disabled: !canEdit}));
     mode.addEventListener("change", (event) =>
         { if (row) post(edits.layerColour(row.layer, /** @type {HTMLInputElement} */ (event.target).value, row.color)); });
-    where.append(stack(mode, el(`<p class="note">Keys mapped on this layer only leaves its transparent and empty keys unpainted, so what is beneath shows. All LEDs paints every LED, the trackball's included.</p>`)));
-    main.append(colour, where, aboutStage("Each layer that is on paints its colour over the background effect, lowest first, so a higher layer covers a lower one where both paint; where a layer paints nothing, what is beneath shows. The board shows the layer picked, with the layers previewed under it."));
-    const accents = accentsSection(model, "layers");
-    if (accents) main.append(accents);
-    node.append(list, main);
-    return node;
+    where.append(stack(mode));
+    return stageSurface(model, {id: "layers", first: list, head, colour, side: where, accents: accentsSection(model, "layers"),
+        note: "Each layer's colour, LEDs and accents are its own."});
 }

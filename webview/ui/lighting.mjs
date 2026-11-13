@@ -6,7 +6,7 @@
 // Selector assertions refer to elements created by this module's authored markup.
 import {css} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
-import {baseColour, feedbackColours, isPassthrough, layerColourRow, lightingOff, pdColourRow, stageEnabled, stageIdle, stageInEffect} from "../view/lighting.mjs";
+import {baseColour, isOff, isPassthrough, layerColourRow, lightingOff, pdColourRow, stageIdle, stageInEffect} from "../view/lighting.mjs";
 import {said, stageOrder} from "../view/vocabulary.mjs";
 import {currentLayer, currentView, getModel, post, render, state} from "../store.mjs";
 import {editGate} from "../view/edit-gate.mjs";
@@ -18,10 +18,12 @@ import {attachLayersControl} from "./layers.mjs";
 import {topbar} from "./frame.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
 import {stageBody} from "./lighting/stage-body.mjs";
-import {accentPicks, editingOn, glowShown, pickLed} from "./lighting/accents.mjs";
+import {accentActions, accentPicks, editingOn, glowShown, pickLed} from "./lighting/accents.mjs";
+import {boardShortcuts} from "./lighting/help.mjs";
+import {attachInfoMarks} from "./info-mark.mjs";
 import {holdComboFrom} from "../view/combo-held.mjs";
 import {lightingBoard} from "../view/lighting-board.mjs";
-import {replacementOwner, replacementRowOf} from "../view/accents.mjs";
+import {feedbackCase, replacementOwner, replacementRowOf} from "../view/accents.mjs";
 import {durationControl} from "./duration.mjs";
 import {phraseMarked} from "./marks.mjs";
 import {sectionsIn} from "../view/settings-layout.mjs";
@@ -90,7 +92,16 @@ export function screenLighting() {
             ? `Click or drag across keys to pick the accent's LEDs, or take them back · ${esc(editing.leds.length)} picked`
             : phraseMarked(model, shows.caption)}</span>
     </div>`);
-    if (editing) card.appendChild(foot); else drawn.appendChild(foot);
+    if (editing) {
+        // An accent is finished where its LEDs are picked.
+        const actions = accentActions(model, stage);
+        if (actions) foot.append(actions);
+        card.appendChild(foot);
+    } else drawn.appendChild(foot);
+    // The board's shortcuts, on its top-right corner as on the Keymap's.
+    const shortcuts = el(boardShortcuts({picking: Boolean(editing), ringed: Boolean(held?.choice && !editing)}));
+    attachInfoMarks(shortcuts);
+    drawn.appendChild(shortcuts);
     // The same strip as Keys, Rename & Reorder included: a layer is renamed
     // and reordered wherever its tabs are.
     const bar = layerBar();
@@ -104,18 +115,24 @@ export function screenLighting() {
     // them, each in the colour it paints now, a stage that is off drawn off.
     // All accents is no stage: it lists every stage's accents.
     const stages = stageOrder(model);
-    /** @param {{id: string, label: string}} stage @param {number} index */
+    // A tab's swatch is the colour the stage paints for what it has picked:
+    // hollow while the stage paints nothing, hatched for a passthrough
+    // colour, dark and struck through for one that is off. Its label is the
+    // stage's name, or its short word where the window is narrow (its stage
+    // bar says the name whole); the numbers give the paint order.
+    /** @param {{id: string, label: string, short?: string}} stage @param {number} index */
     const stageTab = (stage, index) => {
-        const on = stageInEffect(model, stage.id), colour = stageColour(model, stage.id), lit = on && colour && !isPassthrough(colour);
+        const on = stageInEffect(model, stage.id), colour = stageColour(model, stage.id), lit = on && colour && !isPassthrough(colour) && !isOff(colour);
         const idle = stageIdle(model, stage.id);
-        return `<button role="tab" id="stage-tab-${esc(stage.id)}" class="${on ? "" : "off"}" data-ltab="${esc(stage.id)}" aria-selected="${state.stage === stage.id}"
-            data-tip="Painted ${esc(index + 1)} of ${stages.length}${on ? "" : ` · ${esc(lightingOff(model) ? "All lighting is off, so nothing paints" : idle || "this stage is off")}`}">
-            <span class="n">${esc(index + 1)}</span><i class="swatch ${lit ? "" : "swatch-off"}" style="${lit ? `background:${css(colour)}` : ""}"></i>
-            <span class="tab-label">${esc(stage.label)}</span>${marks.lighting.has(stage.id) ? draftDot(model?.draft) : ""}</button>`;
+        const mark = lit ? "" : !on || !colour ? "swatch-off" : isPassthrough(colour) ? "swatch-pass" : "swatch-dark";
+        return `<button role="tab" id="stage-tab-${esc(stage.id)}" class="${on ? "" : "off"}" data-ltab="${esc(stage.id)}" aria-selected="${state.stage === stage.id}" aria-label="${esc(stage.label)}"
+            data-tip="${esc(stage.label)} · painted ${esc(index + 1)} of ${stages.length}${on ? "" : ` · ${esc(lightingOff(model) ? "All lighting is off, so nothing paints" : idle || "this stage is off")}`}">
+            <span class="n">${esc(index + 1)}</span><i class="swatch ${mark}" style="${lit ? `background:${css(colour)}` : ""}"></i>
+            <span class="tab-label"><span class="long">${esc(stage.label)}</span><span class="short" aria-hidden="true">${esc(stage.short || stage.label)}</span></span>${marks.lighting.has(stage.id) ? draftDot(model?.draft) : ""}</button>`;
     };
     const bench = el(`<div class="card bench workbench lighting-bench">
         <div class="bench-tabs"><div class="bench-tablist" role="tablist" aria-label="Lighting stages, in paint order">
-            ${stages.map(stageTab).join(`<span class="tab-step" aria-hidden="true">›</span>`)}
+            ${stages.map(stageTab).join("")}
             <span class="tab-sep" aria-hidden="true"></span>
             <button role="tab" id="stage-tab-accents" data-ltab="accents" aria-selected="${state.stage === "accents"}"><span class="tab-label">All accents</span>${marks.lighting.has("accents") ? draftDot(model?.draft) : ""}</button></div>
             <span class="bench-right" id="benchRight"></span>
@@ -163,8 +180,8 @@ function powerControls(model) {
 }
 
 // The colour a stage paints now, for its tab: the layer shown, the pointing
-// mode picked, the hold colour for behaviour feedback, the picked case's for
-// replacement feedback.
+// mode picked, the case picked on behaviour feedback and on replacement
+// feedback.
 /** @param {import("../../contracts/panel.js").PublishedModel} model @param {string} id */
 function stageColour(model, id) {
     return /** @type {Record<string, () => import("../../contracts/edits.js").Colour | null | undefined>} */ ({
@@ -173,7 +190,7 @@ function stageColour(model, id) {
         auto: () => model.rgb.automouseFade?.end_color,
         pd: () => pdColourRow(model, state.pointingSlot)?.color,
         combo: () => model.rgb.comboFeedback?.color,
-        key: () => feedbackColours(model).hold,
+        key: () => feedbackCase(model, state.feedbackRow)?.color ?? feedbackCase(model, "tapCommittedColor")?.color,
         autocorrect: () => model.rgb.autocorrectFeedback?.[replacementRowOf(model, replacementOwner(model, state.replacementRow))],
     })[id]?.();
 }

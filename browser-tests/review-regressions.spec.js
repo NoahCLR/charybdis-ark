@@ -92,7 +92,8 @@ test("zero brightness retains editable HSV channels and LED black does not inher
         const model = structuredClone(store.getModel());
         model.rgb.layerAccents = [{index: 0, owner: "Layer 1", ledIndices: [0], leds: "LED 0", color: {h: "85", s: "255", v: "0"}}];
         store.setModel(model); store.render();
-        return document.querySelector('#benchBody [data-accents="layer"]')?.textContent || "";
+        // The list itself: the Accents info mark names "Same as the layer" as a choice.
+        return document.querySelector('#benchBody [data-accents="layer"] .accent-list')?.textContent || "";
     });
     expect(text).toContain("HSV(85, 255, 0)");
     expect(text).not.toContain("Same as the layer");

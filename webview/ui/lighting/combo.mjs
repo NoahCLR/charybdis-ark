@@ -7,13 +7,13 @@ import {vocabulary} from "../../view/vocabulary.mjs";
 import * as edits from "../../view/edits.mjs";
 import {offWording} from "../../view/lighting.mjs";
 import {comboBadge, comboInputChips, comboOutputMarked} from "../marks.mjs";
-import {aboutStage, colourControl, lightingGroup, paintsSection, section, stack} from "./common.mjs";
+import {colourControl, itemHead, lightingGroup, localityField, localityWhole, paintsLine, section, stack, stageSurface} from "./common.mjs";
+import {localityInfo} from "./help.mjs";
 import {accentsSection} from "./accents.mjs";
 import {attachPickRows, groupedTable, pickButton, pickableRow} from "../groups.mjs";
 
 /** @param {import("../../../contracts/panel.js").PublishedModel} model */
 export function stageCombo(model) {
-    const node = el(`<div class="tab-split reach-split"></div>`);
     const canEdit = editGate(model, "lighting").editable;
 
     // The combos that fire in the view the board shows (the Keymap's "On
@@ -35,32 +35,30 @@ export function stageCombo(model) {
         ], {data: {combo: row.id}});
     };
     const lists = vocabulary(model).lightingLists;
-    /** @param {"feedback" | "layer"} id @param {{title: string, empty: string}} words @param {typeof here} rows */
-    const group = (id, words, rows) => ({id, title: words.title, empty: words.empty, ...lightingGroup(`combo:${id}`), rows: rows.map(comboRow)});
+    /** @param {"feedback" | "layer"} id @param {{title: string, empty: string, tip: string}} words @param {typeof here} rows */
+    const group = (id, words, rows) => ({id, title: words.title, empty: words.empty, tip: words.tip, ...lightingGroup(`combo:${id}`), rows: rows.map(comboRow)});
     const list = groupedTable({scroll: "lighting-combos", draft: model?.draft, columns: [["", "12%"], [fields.inputs, "53%"], [fields.sends, "35%"]], groups: [
         group("feedback", lists.comboFeedback, here.filter((entry) => !holdsLayers(entry.combo))),
         group("layer", lists.holdLayer, here.filter((entry) => holdsLayers(entry.combo))),
     ]});
     attachPickRows(list, (picked) => { state.comboPreview = {id: Number(picked), keys: []}; render(); });
+    // Picking a combo picks which one the board holds, never what is edited:
+    // the list says so by how it marks the one held (styles.css).
+    list.classList.add("preview-picks");
 
     /** @type {Partial<import("../../../contracts/panel.js").RgbView["comboFeedback"]>} */
     const combo = model.rgb.comboFeedback || {};
-    const main = el(`<div class="tab-grid two stage-detail"></div>`);
+    // One colour, place and set of accents for every combo, headed so.
+    const head = itemHead(esc(vocabulary(model).accents.combo.every), combo.color ? paintsLine(combo.color, localityWhole(combo.locality)) : "Not reported");
     const colour = section(vocabulary(model).lightingFields.colour);
     colour.append(colourControl(model, {
         colour: combo.color, canEdit, title: "Combo feedback",
         ...offWording(model, "combo"),
         onChange: (next) => { if (combo.locality !== undefined) post(edits.comboFeedback(combo.locality, next)); },
     }));
-    const where = paintsSection(model, "combo", "Where it paints");
-    const locality = el(`<label class="field"><span>${esc(vocabulary(model).lightingFields.locality)}</span><select data-f="lighting:combo:locality" class="input" ${canEdit ? "" : "disabled"}>
-        ${vocabulary(model).localities.map(([id, text]) => `<option value="${esc(id)}" ${combo.locality === id ? "selected" : ""}>${esc(text)}</option>`).join("")}</select></label>`);
-    /** @type {HTMLSelectElement} */ (locality.querySelector("select")).addEventListener("change", (event) =>
-        { if (combo.color) post(edits.comboFeedback(/** @type {HTMLSelectElement} */ (event.target).value, combo.color)); });
-    where.append(stack(locality));
-    main.append(colour, where, aboutStage("While a combo's inputs are held, its keys wear this colour, in the area chosen above; its badges take their outline from it. The board shows the combo picked in the list held, its keys ringed as on the Keymap and the keys holding it ringed solid; where it can be pressed from more than one key, click a ringed key to hold it from that one. A combo that holds a layer shows no combo light: the board turns that layer on, whose own light shows the hold. One that runs a pointing mode paints beneath it, so the mode covers it where both paint."));
-    const accents = accentsSection(model, "combo");
-    if (accents) main.append(accents);
-    node.append(list, main);
-    return node;
+    const where = section("Where it paints", localityInfo("combo"));
+    where.append(stack(localityField(model, {f: "lighting:combo:locality", value: combo.locality, canEdit,
+        onChange: (locality) => { if (combo.color) post(edits.comboFeedback(locality, combo.color)); }})));
+    return stageSurface(model, {id: "combo", first: list, head, colour, side: where, accents: accentsSection(model, "combo"),
+        note: "One colour, place and accents for every combo. The list picks the combo the board holds."});
 }

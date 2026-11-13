@@ -151,11 +151,13 @@ export interface Vocabulary {
     localities: WordList<string>;
     paintModes: WordList<string>;
     paintModesBrief: WordList<string>;
+    /** The localities in a word or two, for a list's cell. */
+    localitiesBrief: WordList<string>;
     fadeModes: WordList<string>;
     tapCommit: WordList<string>;
     /** Lighting's fields, as its tabs label them and the review names them. */
     lightingFields: Readonly<Record<LightingField, string>>;
-    /** What storing HSV(0, 0, 0) does, by lighting stage: the button's tip and the note once stored, and, for a colour an owner has (D-L94), the button's words (Make passthrough), what the colour then reads (Passthrough), and the Black choice's tip and note. */
+    /** What storing HSV(0, 0, 0) does, by lighting stage: its choice's tip and the note once stored, and, for a colour an owner has (D-L94), what that choice and the colour then read (Passthrough), and the Off choice's tip and note; `offAction` names the choice where HSV(0, 0, 0) is off (D-L95). */
     colourOff: Readonly<Record<string, {offTip: string; offNote?: string; offAction?: string; offWord?: string; ledsOffTip?: string; ledsOffNote?: string}>>;
     feedbackOwners: WordList<string>;
     /** The behaviour tier each behaviour state flashes for, by its RGB_KEY_SEMANTICS name; the others have none. */
@@ -175,8 +177,8 @@ export interface Vocabulary {
     /** The case (an RGB_AUTOCORRECT_SEMANTICS name) each Replacement feedback colour shows, by the colour's field. */
     replacementColourOwners: Readonly<Record<AutocorrectFeedbackColourField, string>>;
     /** The groups of Lighting's lists beside an editor. */
-    lightingLists: {inUse: string; tiers: {title: string; tip: string}; tapBranches: {title: string; tip: string}; replacements: {title: string; tip: string}; comboFeedback: {title: string; empty: string}; holdLayer: {title: string; empty: string}};
-    stages: readonly {id: string; label: string; bit?: number}[];
+    lightingLists: {inUse: string; tiers: {title: string; tip: string}; tapBranches: {title: string; tip: string}; replacements: {title: string; tip: string}; comboFeedback: {title: string; empty: string; tip: string}; holdLayer: {title: string; empty: string; tip: string}};
+    stages: readonly {id: string; label: string; short: string; bit?: number}[];
     customKeys: {alwaysOn: {base: string; default: string}; layerKinds: WordList<number>};
     /** A layer key's second line on its cap, by its QMK function (MO, TG…). */
     keyCapLayerVerbs: Readonly<Record<string, string>>;

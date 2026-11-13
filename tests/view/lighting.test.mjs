@@ -366,10 +366,10 @@ const words = {vocabulary: createRequire(import.meta.url)("../../core/model/voca
 // One rule (D-L94, firmware D-F74): every colour a layer, a pointing slot,
 // combo feedback or a feedback case owns is passthrough at saturation and
 // value 0, and Off, value 0 with saturation, is a choice of its own.
-test("every owned colour offers Make passthrough and Off, passthrough never called off; the fade end stays off", () => {
+test("every owned colour offers Passthrough and Off, passthrough never called off; the fade end stays off", () => {
     for (const stage of ["layers", "pd", "combo", "key", "autocorrect"]) {
         const wording = offWording(words, stage);
-        assert.deepEqual([wording.offAction, wording.offWord], ["Make passthrough", "Passthrough"], stage);
+        assert.deepEqual([wording.offAction, wording.offWord], [undefined, "Passthrough"], stage);
         assert.match(wording.offTip, /paints nothing/, stage);
         assert.match(wording.offNote, /[Pp]assthrough.*shows/, stage);
         assert.match(wording.ledsOffTip || "", /LEDs off|go dark/, stage);

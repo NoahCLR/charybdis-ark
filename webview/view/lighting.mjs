@@ -211,6 +211,12 @@ export {colourPaints, inheritsStageColour};
 /** @param {import("../../contracts/edits.js").Colour | null | undefined} colour */
 export const isPassthrough = (colour) => !colourPaints(colour);
 export const isOff = ledsOff;
+// The mark a colour that lights nothing wears in a list or a tab, where its
+// swatch would be (styles.css): passthrough hatched, off dark and struck
+// through, a colour that was never read hollow. A lit colour wears its own
+// and needs none.
+/** @param {import("../../contracts/edits.js").Colour | null | undefined} colour */
+export const swatchOf = (colour) => !colour ? "swatch-none" : isPassthrough(colour) ? "swatch-off" : isOff(colour) ? "swatch-dark" : "";
 
 // The key a replacement case's preview follows (D-L89, D-L92). On the
 // keyboard it is the key that ended the word, the Backspace that undid the
