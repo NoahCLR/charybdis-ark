@@ -1,23 +1,32 @@
 // @ts-check
 import {esc} from "../lib/dom.mjs";
 
-// The info mark, the one there is: a small circled i whose list opens while
-// the pointer is on the mark or the list, or the keyboard's focus is on the
-// mark, a screen reader hearing the list as the mark's description. Escape
-// shuts it (data-shut) until the pointer and the focus have left. It sits
-// beside a heading (Text replacement's sections) or on a corner (the Keymap
-// board's shortcuts, keys/board-card.mjs). An open list is kept inside the
-// screen's area: moved sideways where it would run off an edge, opened upward where
+// The info mark, the one there is: a small circled i holding what a section
+// or an idea means, read once (D-L96). A tip is one control's one line; this
+// is where explanations live. A click on the mark, or Enter or Space on it,
+// opens its list and keeps it open (data-open) until the mark is pressed
+// again, Escape is pressed, or a press lands outside it; opening one closes
+// any other. Resting the pointer on the mark previews the list while it
+// stays there, and Escape shuts that preview (data-shut) until the pointer
+// has left. A screen reader hears the list as the mark's description, and
+// the button says whether it is open (aria-expanded). It sits beside a
+// heading (Text replacement's sections) or on a corner (the Keymap board's
+// shortcuts, keys/board-card.mjs). An open list is kept inside the screen's
+// area: moved sideways where it would run off an edge, opened upward where
 // there is more room above the mark than under it, and no taller than that
 // room, its body scrolling (by the wheel, or the arrow keys from the mark;
-// the body itself is no tab stop, since the list shows only while the mark
-// has the focus).
+// the body itself is no tab stop).
 const ICON = `<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M8 7.2v4.3"/><circle class="dot" cx="8" cy="4.9" r=".55"/></svg>`;
 // The space between a mark and its list (styles.css, .info-pop), and the
 // least height a list is given however short the window.
 const GAP = 6, LEAST = 96;
 
 /** @typedef {{term: string, mono?: boolean, says: string}} InfoRow */
+
+// The mark kept open, by its list's id, so it stays open across the
+// renders that redraw it; null when none is.
+/** @type {string | null} */
+let kept = null;
 
 // An info mark's markup. `label` names the mark and `heading` heads its list
 // (`named` names the list where its heading alone would not say what of);
@@ -27,19 +36,49 @@ const GAP = 6, LEAST = 96;
 // corner. A node that holds one calls `attachInfoMarks`.
 /** @param {{id: string, label: string, heading: string, named?: string, lead?: string, rows: readonly InfoRow[], corner?: boolean}} info */
 export function infoMark({id, label, heading, named = heading, lead = "", rows, corner = false}) {
-    return `<span class="info-mark${corner ? " corner" : ""}" data-info-mark>
-        <button type="button" class="info-button" aria-label="${esc(label)}" aria-describedby="${esc(id)}">${ICON}</button>
+    const open = kept === id;
+    return `<span class="info-mark${corner ? " corner" : ""}" data-info-mark${open ? " data-open" : ""}>
+        <button type="button" class="info-button" aria-label="${esc(label)}" aria-describedby="${esc(id)}" aria-controls="${esc(id)}" aria-expanded="${open}">${ICON}</button>
         <span class="info-pop" id="${esc(id)}" role="group" aria-label="${esc(named)}"><span class="info-body" tabindex="-1"><span class="info-h">${esc(heading)}</span>${lead ? `<span class="info-lead">${esc(lead)}</span>` : ""}<dl>${rows
             .map((row) => `<dt${row.mono ? ` class="mono"` : ""}>${esc(row.term)}</dt><dd>${esc(row.says)}</dd>`).join("")}</dl></span></span></span>`;
 }
 
-// Escape shuts an open info mark's list; true when it did.
+// Closes the mark kept open, if one is.
+const closeKept = () => {
+    kept = null;
+    document.querySelectorAll("[data-info-mark][data-open]").forEach((mark) => {
+        delete /** @type {HTMLElement} */ (mark).dataset.open;
+        mark.querySelector(".info-button")?.setAttribute("aria-expanded", "false");
+    });
+};
+
+// Escape closes the mark kept open, or shuts the list the pointer is
+// previewing; true when it did either.
 export function escapeInfoMark() {
-    const mark = /** @type {HTMLElement | null} */ (document.querySelector("[data-info-mark]:hover, [data-info-mark]:has(:focus-visible)"));
-    if (!mark || mark.dataset.shut !== undefined) return false;
-    mark.dataset.shut = "";
+    const hovered = /** @type {HTMLElement | null} */ (document.querySelector("[data-info-mark]:hover"));
+    if (kept !== null) {
+        closeKept();
+        // Closed, it shows no preview under the pointer either.
+        if (hovered) hovered.dataset.shut = "";
+        return true;
+    }
+    if (!hovered || hovered.dataset.shut !== undefined) return false;
+    hovered.dataset.shut = "";
     return true;
 }
+
+// A press outside the mark kept open closes it; one press listener serves
+// every mark.
+let listening = false;
+const listen = () => {
+    if (listening) return;
+    listening = true;
+    document.addEventListener("pointerdown", (event) => {
+        if (kept === null) return;
+        const mark = /** @type {Element} */ (event.target).closest?.("[data-info-mark]");
+        if (!mark || mark.querySelector(".info-pop")?.id !== kept) closeKept();
+    }, true);
+};
 
 // Puts an open list where there is room for it: inside the screen's own
 // area (.content, which scrolls under the top bar and beside the rail, and
@@ -68,18 +107,31 @@ function place(mark) {
     if (shift) pop.style.transform = `translateX(${shift}px)`;
 }
 
-// Wires the marks in `root`, itself included: a list is placed as it opens,
-// scrolls by the arrow keys while the mark has the focus, and opens again
-// once the pointer and the focus have left.
+// Wires the marks in `root`, itself included: a press on the mark opens its
+// list and keeps it open, or closes it; a list is placed as it opens or is
+// previewed, scrolls by the arrow keys while the mark has the focus, and a
+// shut preview opens again once the pointer has left.
 /** @param {ParentNode} root */
 export function attachInfoMarks(root) {
+    listen();
     const marks = /** @type {HTMLElement[]} */ ([...(root instanceof HTMLElement && root.matches("[data-info-mark]") ? [root] : []), ...root.querySelectorAll("[data-info-mark]")]);
     for (const mark of marks) {
-        const open = () => delete mark.dataset.shut;
-        mark.addEventListener("mouseleave", open);
-        mark.addEventListener("focusout", open);
+        const button = /** @type {HTMLButtonElement} */ (mark.querySelector(".info-button"));
+        const id = mark.querySelector(".info-pop")?.id || "";
+        button.addEventListener("click", () => {
+            const opening = kept !== id;
+            closeKept();
+            // Pressed shut, it stays shut while the pointer is still on it.
+            if (!opening) { mark.dataset.shut = ""; return; }
+            kept = id;
+            delete mark.dataset.shut;
+            mark.dataset.open = "";
+            button.setAttribute("aria-expanded", "true");
+            place(mark);
+        });
+        mark.addEventListener("mouseleave", () => delete mark.dataset.shut);
         mark.addEventListener("mouseenter", () => place(mark));
-        mark.addEventListener("focusin", () => place(mark));
+        if (kept === id) requestAnimationFrame(() => place(mark));
         mark.addEventListener("keydown", (event) => {
             const step = /** @type {Record<string, number>} */ ({ArrowDown: 40, ArrowUp: -40, PageDown: 200, PageUp: -200})[event.key];
             const body = mark.querySelector(".info-body");

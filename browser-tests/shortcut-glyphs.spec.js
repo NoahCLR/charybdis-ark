@@ -46,7 +46,7 @@ test("the board's Shortcuts list names the shortcuts this computer uses", async 
 
 // The board's shortcuts wait behind an info mark on its top-right corner:
 // hovering it, or tabbing to it, shows them; leaving or Escape hides them.
-test("the board's info mark shows its Shortcuts list on hover and on keyboard focus, and Escape hides it", async ({page}) => {
+test("the board's info mark previews its Shortcuts list on hover, opens it on a press until Escape or a press elsewhere, and Escape hides it", async ({page}) => {
     await page.goto("/preview/index.html");
     await page.locator('[data-screen="keys"]').click();
     const board = page.locator(".keys-pad .board");
@@ -79,15 +79,35 @@ test("the board's info mark shows its Shortcuts list on hover and on keyboard fo
     await page.locator(".board-legend").hover();
     await expect(list).toBeHidden();
 
-    // Reached by the keyboard, it shows while the mark has the focus.
+    // Reached by the keyboard, Enter opens it and keeps it open; the focus
+    // alone opens nothing, the list being the mark's description (D-L96).
     await mark.focus();
     await page.keyboard.press("Shift+Tab");
     await page.keyboard.press("Tab");
     await expect(mark).toBeFocused();
+    await expect(list).toBeHidden();
+    await expect(mark).toHaveAttribute("aria-expanded", "false");
+    await page.keyboard.press("Enter");
     await expect(list).toBeVisible();
+    await expect(mark).toHaveAttribute("aria-expanded", "true");
     await page.keyboard.press("Escape");
     await expect(list).toBeHidden();
     await expect(mark).toBeFocused();
+    await expect(mark).toHaveAttribute("aria-expanded", "false");
+
+    // A click keeps it open once the pointer leaves, and across a redraw;
+    // a press elsewhere closes it, and so does a second click.
+    await mark.click();
+    await page.locator(".board-legend").hover();
+    await expect(list).toBeVisible();
+    await page.evaluate(async () => (await import("/webview/store.mjs")).render());
+    await expect(list).toBeVisible();
+    await page.locator(".topbar h1, .topbar").first().click();
+    await expect(list).toBeHidden();
+    await mark.click();
+    await expect(list).toBeVisible();
+    await mark.click();
+    await expect(list).toBeHidden();
 });
 
 test("while the board takes no edit, the Shortcuts list says only selecting and copying", async ({page}) => {
