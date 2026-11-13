@@ -53,7 +53,9 @@ export function stageBar(model, id, {shared = [], note = "", end = null} = {}) {
         box.append(...shared);
         node.append(box);
     }
-    const said = off ? "This stage is off: nothing on it paints, and its colours are kept." : note;
+    // A stage switched off says so where the bar has room: beside its shared
+    // settings the switch's own "Stage off" says it, so the bar keeps one line.
+    const said = off && !shared.length ? "This stage is off: nothing on it paints, and its colours are kept." : note;
     if (said) node.append(el(`<span class="stage-bar-note">${esc(said)}</span>`));
     node.append(el(`<span class="grow"></span>`));
     // That nothing lights is news on every stage; a switch elsewhere that

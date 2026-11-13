@@ -966,7 +966,7 @@ button.tier:hover { background: var(--surface-3); }
    reads by its short word (its stage bar names it whole), at widths of their
    own, so the strip still fits and nothing moves as a tab is picked. */
 .bench-tabs .tab-label .short { display: none; }
-@container content (max-width: 1197px) { /* window 1429 */
+@container content (max-width: 1153px) { /* window 1400 */
   .bench-tabs [data-ltab] .tab-label .long { display: none; }
   .bench-tabs [data-ltab] .tab-label .short { display: inline; }
   .bench-tabs [data-ltab="base"] { width: 107px; }
