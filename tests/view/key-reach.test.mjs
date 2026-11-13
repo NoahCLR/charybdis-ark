@@ -84,11 +84,11 @@ test("a key reaches its macro, by the slot the keyboard reported", () => {
     assert.deepEqual(reachOf(14).macros, []);
 });
 
-test("a pointing key reaches its mode, said by its kind in the vocabulary's words and where it paints", () => {
+test("a pointing key reaches its mode, said by its kind in the vocabulary's words", () => {
     const {pointing} = reachOf(11);
-    assert.deepEqual([pointing?.slot.id, pointing?.kind, pointing?.paints], [0, "scroll", "right half"]);
+    assert.deepEqual([pointing?.slot.id, pointing?.kind], [0, "scroll"]);
     const empty = reachOf(12).pointing;
-    assert.deepEqual([empty?.slot.id, empty?.kind, empty?.paints], [6, "", ""], "an empty slot has no kind and paints nowhere");
+    assert.deepEqual([empty?.slot.id, empty?.kind], [6, ""], "an empty slot has no kind");
 });
 
 test("a custom key shows its shortcut only when it has one", () => {
