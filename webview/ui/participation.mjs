@@ -50,6 +50,18 @@ export function settingOffBanner(name, detail = vocabulary(getModel()).settingOf
     });
     return banner;
 }
+// The same switch said in a word, where a banner would push what is under it
+// down (a Lighting stage's bar): "Combos are off →", going to the switch, its
+// whole sentence, `detail` then the way there, in its tip.
+/** @param {SettingOffSwitch} name @param {string} detail @returns {HTMLElement} */
+export function settingOffWord(name, detail) {
+    const words = vocabulary(getModel()).settingOff.switches[name];
+    const word = settingOffBanner(name, detail);
+    word.className = "stage-held";
+    word.dataset.tip = `${detail} ${words.fix}`;
+    word.textContent = `${words.off.replace(/\.$/, "")} →`;
+    return word;
+}
 // That banner for behaviours or combos while their master switch is off; null
 // while it is on.
 /** @param {"behaviour" | "combo"} noun @returns {HTMLElement | null} */

@@ -4,11 +4,12 @@ import {el, esc} from "../../lib/dom.mjs";
 import {css} from "../../lib/colour.mjs";
 import {post, render, state} from "../../store.mjs";
 import {editGate} from "../../view/edit-gate.mjs";
-import {isOff, isPassthrough, offWording, stageEnabled} from "../../view/lighting.mjs";
+import {isOff, isPassthrough, offWording, swatchOf} from "../../view/lighting.mjs";
 import {branchName, vocabulary, word} from "../../view/vocabulary.mjs";
 import * as edits from "../../view/edits.mjs";
 import {localityOf} from "../../view/edits.mjs";
-import {aboutStage, colourControl, flashSetting, lightingGroup, localityField, paintsCell, paintsSection, section, stack} from "./common.mjs";
+import {colourControl, flashSetting, itemHead, lightingGroup, localityField, localityWhole, paintsCell, pickedMarked, section, stack, stageSurface} from "./common.mjs";
+import {localityInfo, sectionInfo} from "./help.mjs";
 import {accentsSection} from "./accents.mjs";
 import {attachPickRows, groupedTable, pickButton, pickableRow} from "../groups.mjs";
 
@@ -19,7 +20,6 @@ const TIER_FIELDS = ["tapCommittedColor", "holdActiveColor", "longHoldActiveColo
 
 /** @param {import("../../../contracts/panel.js").PublishedModel} model */
 export function stageKey(model) {
-    const node = el(`<div></div>`);
     const canEdit = editGate(model, "lighting").editable;
 
     /** @type {Partial<import("../../../contracts/edits.js").KeyFeedback<import("../../../contracts/edits.js").Colour>>} */
@@ -43,43 +43,51 @@ export function stageKey(model) {
     // The cases, in the Keymap's grouped table (ui/groups.mjs), under a band
     // per group that folds as the Keymap's do; beside each, where it paints,
     // passthrough or off (D-L94).
-    node.className = "tab-split reach-split";
     const list = groupedTable({scroll: "lighting-feedback", draft: model?.draft, columns: [["Case", "52%"], ["Paints", "48%"]],
         groups: groups.map((group) => ({...group, ...lightingGroup(`key:${group.id}`), rows: group.rows.map((row) => {
             const lit = !isPassthrough(row.colour) && !isOff(row.colour);
             const on = row.id === current?.id;
             return pickableRow(row.id, on, [
-                pickButton(`lighting-feedback:${row.id}`, on, `<span class="mk-swatch lead ${lit ? "" : "swatch-off"}" style="${lit ? `background:${css(row.colour)}` : ""}"></span>${esc(row.label)}`),
+                pickButton(`lighting-feedback:${row.id}`, on, `<span class="mk-swatch lead ${swatchOf(row.colour)}" style="${lit ? `background:${css(row.colour)}` : ""}"></span>${esc(row.label)}`),
                 `<span class="muted">${esc(paintsCell(row.colour, row.locality))}</span>`,
             ], {data: {row: row.id}});
         })}))});
     attachPickRows(list, (id) => { state.feedbackRow = /** @type {typeof state.feedbackRow} */ (id); render(); });
-    const main = el(`<div class="tab-grid two stage-detail"></div>`);
-    const colour = section(current?.label || "Feedback");
+    // The case picked heads its pane by when it shows, and how (steady,
+    // blinking, or one flash), as a replacement case is headed; where it
+    // paints is its Locality's and the list's.
+    const owner = current ? words.feedbackColourOwners[current.id] : "";
+    const flashesOnce = current?.id === "tapCommittedColor" && feedback.tapCommitMode === "KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS";
+    const head = current ? itemHead(pickedMarked(model, "key", current.label), `${words.feedbackWhen[owner] || ""}${flashesOnce ? `; ${words.tapCommittedFlash}` : ""}`, {when: true}) : null;
+    const colour = section(words.lightingFields.colour);
     colour.append(colourControl(model, {
         colour: current?.colour, canEdit, title: current?.label || "",
         ...offWording(model, "key"),
         onChange: (next) => { if (current) post(edits.keyFeedback(model.rgb.keyBehaviorFeedback, current.id, next)); },
     }));
     // Where the picked case paints, its own (D-L93), as a pointing slot's.
-    const where = section("Where it paints");
+    const where = section("Where it paints", localityInfo(model, "key"));
     if (current) where.append(stack(localityField(model, {f: `lighting:key:${current.id}:locality`, value: current.locality, canEdit,
-        tip: "Where this case paints while a key shows it. The trigger key choices follow the key showing it, all of a combo's keys for a combo.",
         onChange: (locality) => post(edits.keyFeedbackLocality(feedback, current.id, locality))})));
-    // When the stage flashes is one setting for every case.
-    const policy = paintsSection(model, "key", "When it flashes");
-    const commit = el(choiceField({label: words.lightingFields.tapBranchCommit, f: "lighting:key:tap-commit", choices: words.tapCommit,
-        current: feedback.tapCommitMode, disabled: !canEdit}));
-    commit.addEventListener("change", (event) =>
-        post(edits.keyFeedback(model.rgb.keyBehaviorFeedback, null, null, {tapCommitMode: /** @type {HTMLInputElement} */ (event.target).value})));
-    policy.append(stack(commit, flashSetting(model, "lightingFeedback")));
-    // Where it paints and when it flashes share the column beside the
-    // colour, so the tab is no taller for having both.
-    const side = el(`<div class="stack stage-side"></div>`);
-    side.append(where, policy);
-    main.append(colour, side, aboutStage(`While a key's behaviour fires, the key flashes the colour of what fired, each case in the area chosen for it. The board shows the case picked in the list, from a key whose behaviour has it, ringed. The board's behaviour dots and the behaviour grid's branch numbers wear these colours${stageEnabled(model, "key") ? "" : ", hollow while the stage is off"}.`));
-    const accents = accentsSection(model, "key");
-    if (accents) main.append(accents);
-    node.append(list, main);
-    return node;
+    // Whether a double tap or more also flashes Tap committed (the tap-commit
+    // policy) is Tap committed's alone, though the keyboard stores it with the
+    // stage, so it sits on that case's pane under where it paints.
+    let side = where;
+    if (current?.id === "tapCommittedColor") {
+        const when = section("When it flashes", sectionInfo(model, "key:commit"));
+        const commit = el(choiceField({label: words.lightingFields.doubleTapFlash, f: "lighting:key:tap-commit", choices: words.tapCommit,
+            current: feedback.tapCommitMode, disabled: !canEdit}));
+        commit.addEventListener("change", (event) =>
+            post(edits.keyFeedback(model.rgb.keyBehaviorFeedback, null, null, {tapCommitMode: /** @type {HTMLInputElement} */ (event.target).value})));
+        when.append(stack(commit));
+        side = el(`<div class="stage-side"></div>`);
+        side.append(where, when);
+    }
+    // How fast it blinks is one setting for every case, on the stage bar.
+    // Only Hold active and Long hold active blink, so its dot blinks in Long
+    // hold active's colour while that is picked, else in Hold active's.
+    const blinking = current?.id === "longHoldActiveColor" ? feedback.longHoldActiveColor : feedback.holdActiveColor;
+    const blink = blinking && !isPassthrough(blinking) && !isOff(blinking) ? css(blinking) : "";
+    return stageSurface(model, {id: "key", first: list, head, colour, side, accents: accentsSection(model, "key"),
+        shared: [flashSetting(model, "lightingFeedback", {blink})]});
 }

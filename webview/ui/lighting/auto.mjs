@@ -1,15 +1,15 @@
 // @ts-check
 import {el, esc} from "../../lib/dom.mjs";
-import {css, label as hsvLabel} from "../../lib/colour.mjs";
 import {post, render, state} from "../../store.mjs";
 import {editGate} from "../../view/edit-gate.mjs";
-import {isPassthrough, offWording, stageIdle} from "../../view/lighting.mjs";
+import {offWording} from "../../view/lighting.mjs";
 import {vocabulary} from "../../view/vocabulary.mjs";
 import {draftDot, draftMarks} from "../../view/review.mjs";
 import * as edits from "../../view/edits.mjs";
 import {shareHold} from "../../view/share.mjs";
 import {sectionPath, sectionsIn} from "../../view/settings-layout.mjs";
-import {aboutStage, colourControl, section, stack, stageSwitch} from "./common.mjs";
+import {colourControl, section, stack, stageSurface} from "./common.mjs";
+import {sectionInfo} from "./help.mjs";
 
 // How long the auto-mouse colour holds before it fades, as a share of the
 // timeout. The keyboard stores milliseconds and keeps them with its global
@@ -19,10 +19,7 @@ import {aboutStage, colourControl, section, stack, stageSwitch} from "./common.m
 function fadeTiming(model) {
     const section = sectionsIn(model, "Lighting").find((entry) => entry.stage === "auto");
     const gate = editGate(model, "settings");
-    const node = el(`<section><div class="sect-h"><h4>Timing${section && draftMarks(model?.draft?.changes).settings.has(section.id) ? draftDot(model?.draft) : ""}</h4></div></section>`);
-    // The stage's switch rides here, the last column, as on every stage.
-    const sw = stageSwitch(model, "auto");
-    if (sw) /** @type {HTMLElement} */ (node.querySelector(".sect-h")).appendChild(sw);
+    const node = el(`<section><div class="sect-h"><h4>Timing${section && draftMarks(model?.draft?.changes).settings.has(section.id) ? draftDot(model?.draft) : ""}</h4>${sectionInfo(model, "auto:timing")}</div></section>`);
     if (!section) {
         node.append(el(`<p class="note">${esc(gate.why || "Choose Read keyboard to read the auto-mouse timing.")}</p>`));
         return node;
@@ -35,7 +32,7 @@ function fadeTiming(model) {
     // commit redraws this control and is a step in the draft's history.
     const control = el(`<label class="field share-field"><span>${esc(field.label)}<b class="mono" data-readout></b></span>
         <input type="range" class="share-range" min="0" max="${esc(field.max)}" step="1" value="${esc(field.value)}" data-f="lighting:auto:${esc(field.macro)}" data-macro="${esc(field.macro)}"
-            aria-valuetext="" ${editable ? "" : "disabled"} data-tip="${esc(field.hint)}"></label>`);
+            aria-valuetext="" ${editable ? "" : "disabled"}></label>`);
     const range = /** @type {HTMLInputElement} */ (control.querySelector("input"));
     const note = el(`<p class="note"></p>`);
     const preview = () => {
@@ -43,7 +40,7 @@ function fadeTiming(model) {
         range.style.setProperty("--share", `${percent}%`);
         range.setAttribute("aria-valuetext", `${percent}%, ${hold} ms`);
         /** @type {HTMLElement} */ (control.querySelector("[data-readout]")).textContent = `${percent}%`;
-        note.textContent = `Of the ${whole} ms timeout, the colour holds for ${hold} ms, then fades over the last ${whole - hold} ms. The timeout is set in ${sectionPath(model, "autoMouse")}; changing it keeps this share.`;
+        note.textContent = `Of the ${whole} ms timeout, the colour holds for ${hold} ms, then fades over the last ${whole - hold} ms.`;
     };
     preview();
     range.addEventListener("input", preview);
@@ -60,30 +57,24 @@ function fadeTiming(model) {
 
 /** @param {import("../../../contracts/panel.js").PublishedModel} model */
 export function stageAuto(model) {
-    const node = el(`<div></div>`);
     const canEdit = editGate(model, "lighting").editable;
 
     /** @type {Partial<import("../../../contracts/panel.js").RgbView["automouseFade"]>} */
     const fade = model.rgb.automouseFade || {};
-    node.className = "tab-grid three";
-    // With auto-mouse off the fade never runs (the stage's banner says so,
-    // stage-body.mjs). Its controls stay editable, for when it is back on.
-    if (stageIdle(model, "auto")) node.append(el(`<p class="note span">A pointer layer turned on by hand shows its own layer lighting. The fade settings below take effect once auto-mouse is back on.</p>`));
-    const policy = section("Fade");
+    // With auto-mouse off the fade never runs (its stage bar says so). Its
+    // controls stay editable, for when it is back on.
+    const policy = section("Fade", sectionInfo(model, "auto:fade"));
     const select = el(`<label class="field"><span>${esc(vocabulary(model).lightingFields.fadeMode)}</span><select data-f="lighting:auto:fade-mode" class="input" ${canEdit ? "" : "disabled"}>
         ${vocabulary(model).fadeModes.map(([id, text]) => `<option value="${esc(id)}" ${fade.mode === id ? "selected" : ""}>${esc(text)}</option>`).join("")}</select></label>`);
     /** @type {HTMLSelectElement} */ (select.querySelector("select")).addEventListener("change", (event) =>
         { if (fade.end_color) post(edits.automouseFade(/** @type {HTMLSelectElement} */ (event.target).value, fade.end_color)); });
-    policy.append(stack(select, el(`<p class="note">Where the fade lands once auto-mouse turns the pointer layer off.</p>`)));
+    policy.append(stack(select));
+    // A mode that lands on what the layers beneath show takes no end colour:
+    // the colour is kept, drawn dimmed under why.
     const endColour = section(vocabulary(model).lightingFields.endColour);
     const unused = fade.mode === "FOLLOW_REAL_DESTINATION";
-    endColour.append(unused
-        ? el(`<div class="row colour-head unused"><span class="swatch-lg ${isPassthrough(fade.end_color) ? "swatch-off" : ""}" style="${isPassthrough(fade.end_color) ? "" : `background:${css(fade.end_color)}`}"></span>
-            <div><div class="colour-title">Unused in this mode</div><div class="note mono">${esc(hsvLabel(fade.end_color))}</div></div></div>`)
-        : colourControl(model, {colour: fade.end_color, canEdit, title: "Fade destination", ...offWording(model, "auto"),
-            onChange: (next) => { if (fade.mode !== undefined) post(edits.automouseFade(fade.mode, next)); }}));
-    if (unused) endColour.append(el(`<p class="note">This mode lands on what the board would show without the pointer layer, so it uses no end colour.</p>`));
-    node.append(policy, endColour, fadeTiming(model),
-        aboutStage("While auto-mouse keeps the pointer layer on, its light holds, then fades toward where it lands over the rest of the auto-mouse timeout, in place of the layer colours. The board shows where the fade lands, not the animation."));
-    return node;
+    endColour.append(colourControl(model, {colour: fade.end_color, canEdit, title: "Fade destination", ...offWording(model, "auto"),
+        ...(unused ? {unused: "Unused in this mode: it lands on what the board would show without the pointer layer."} : {}),
+        onChange: (next) => { if (fade.mode !== undefined) post(edits.automouseFade(fade.mode, next)); }}));
+    return stageSurface(model, {id: "auto", first: policy, colour: endColour, side: fadeTiming(model), note: "One fade, for the pointer layer."});
 }

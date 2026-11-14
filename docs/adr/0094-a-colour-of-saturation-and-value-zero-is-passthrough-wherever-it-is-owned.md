@@ -1,6 +1,6 @@
 # A colour of saturation and value zero is passthrough wherever it is owned
 
-Cited as D-L94.
+Cited as D-L94. Amended by D-L95: the choices are one control beside the colour's value, **Colour**, **Off** and **Passthrough**; Colour brings a colour back, and a passthrough colour keeps its square and fields, dimmed under what it means.
 
 HSV(0, 0, 0) meant three things on Lighting: a layer's colour was
 passthrough, a replacement feedback case's was off, and a pointing mode's,

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {createRequire} from "node:module";
-import {baseColour, colourPaints, feedbackColours, inheritsStageColour, isPassthrough, keyLed, keyLight, mappedKeyCount, offWording, ownLight, pdColourRow, replacementTrigger, stageEnabled, stageHeldOffBy, stageIdle, stageInEffect, stageOffDetail, trackballLed, trackballLight} from "../../webview/view/lighting.mjs";
+import {baseColour, colourPaints, feedbackColours, inheritsStageColour, isPassthrough, keyLed, keyLight, mappedKeyCount, offWording, ownLight, pdColourRow, replacementTrigger, stageEnabled, stageHeldOffBy, stageIdle, stageInEffect, stageOffDetail, trackballLed, trackballLight, swatchOf} from "../../webview/view/lighting.mjs";
 
 const colour = (h, s, v) => ({h: String(h), s: String(s), v: String(v)});
 const position = (layoutIndex, keycode) => ({layoutIndex, keycode});
@@ -366,14 +366,13 @@ const words = {vocabulary: createRequire(import.meta.url)("../../core/model/voca
 // One rule (D-L94, firmware D-F74): every colour a layer, a pointing slot,
 // combo feedback or a feedback case owns is passthrough at saturation and
 // value 0, and Off, value 0 with saturation, is a choice of its own.
-test("every owned colour offers Make passthrough and Off, passthrough never called off; the fade end stays off", () => {
+test("every owned colour offers Passthrough and Off, passthrough never called off; the fade end stays off", () => {
     for (const stage of ["layers", "pd", "combo", "key", "autocorrect"]) {
         const wording = offWording(words, stage);
-        assert.deepEqual([wording.offAction, wording.offWord], ["Make passthrough", "Passthrough"], stage);
+        assert.deepEqual([wording.offAction, wording.offWord], [undefined, "Passthrough"], stage);
         assert.match(wording.offTip, /paints nothing/, stage);
         assert.match(wording.offNote, /[Pp]assthrough.*shows/, stage);
         assert.match(wording.ledsOffTip || "", /LEDs off|go dark/, stage);
-        assert.match(wording.ledsOffNote || "", /The colour is off/, stage);
         for (const text of [wording.offTip, wording.offNote]) {
             assert.doesNotMatch(text || "", /\boff\b|Turn off|Stage on/, `${stage}: neither off nor the stage switch stands for passthrough`);
         }
@@ -517,4 +516,15 @@ test("Leader waiting paints the Leader key's half or the key alone, every key of
     const dark = leading("RGB_BOTH_HALVES", colour(0, 0, 0));
     assert.notEqual(keyLight(base, layer, position(7, "KC_U"), dark).source, "replacement");
     assert.deepEqual(keyLight(base, layer, position(13, "KC_A"), dark).colour, own);
+});
+
+// A colour that lights nothing shows why in a list's swatch (D-L94, D-L95):
+// passthrough hatched, off dark and struck through, never read hollow.
+test("a list's swatch says passthrough, off and unread apart, and a lit colour needs none", () => {
+    const colour = (h, s, v) => ({h: String(h), s: String(s), v: String(v)});
+    assert.equal(swatchOf(colour(0, 0, 0)), "swatch-off");
+    assert.equal(swatchOf(colour(40, 0, 0)), "swatch-off", "passthrough at any hue");
+    assert.equal(swatchOf(colour(40, 255, 0)), "swatch-dark");
+    assert.equal(swatchOf(undefined), "swatch-none");
+    assert.equal(swatchOf(colour(40, 255, 200)), "");
 });

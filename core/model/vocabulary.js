@@ -485,6 +485,12 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
         ["RGB_BOTH_HALVES", "All LEDs"], ["RGB_LEFT_HALF", "Left half"], ["RGB_RIGHT_HALF", "Right half"],
         ["RGB_KEY_HALF", "The half holding the trigger key"], ["RGB_KEYS_ONLY", "Only the trigger key"],
     ],
+    // The same places in a word or two, for a list's cell, so a row stays one
+    // line; the Locality field names them whole.
+    localitiesBrief: [
+        ["RGB_BOTH_HALVES", "all LEDs"], ["RGB_LEFT_HALF", "left half"], ["RGB_RIGHT_HALF", "right half"],
+        ["RGB_KEY_HALF", "trigger's half"], ["RGB_KEYS_ONLY", "trigger key"],
+    ],
     paintModes: [["KEYS_MAPPED_ON_THIS_LAYER_ONLY", "Keys mapped on this layer only"], ["ALL_KEYS", "All LEDs"]],
     // The same modes in two words, for a list's cell.
     paintModesBrief: [["KEYS_MAPPED_ON_THIS_LAYER_ONLY", "mapped keys"], ["ALL_KEYS", "all LEDs"]],
@@ -493,24 +499,32 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
         ["END_COLOR_WHERE_BASE_EFFECT_WOULD_SHOW", "End colour where the background effect would show"],
         ["END_COLOR_ON_ALL_KEYS", "End colour on all LEDs"],
     ],
-    tapCommit: [["KEY_FEEDBACK_TAP_COMMIT_OFF", "Off"], ["KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS", "Double taps and more"]],
+    // Whether Tap committed also flashes as a double tap or more fires (the
+    // tap-commit policy, firmware rgb-domain-v1); a tap branch is not touched.
+    tapCommit: [["KEY_FEEDBACK_TAP_COMMIT_OFF", "Off"], ["KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS", "On"]],
     // Lighting's fields, as its tabs label them and the review names them.
     lightingFields: {colour: "Colour", locality: "Locality", paintMode: "Which LEDs light up", fadeMode: "Fade mode", endColour: "End colour",
-        tapBranchCommit: "Tap branch commit"},
+        doubleTapFlash: "Flash on a double tap or more"},
+    // The colour editor's choice for a colour that may paint nothing (D-L94,
+    // D-L95): a colour, or off, its LEDs dark; passthrough is each stage's
+    // `colourOff[stage].offWord`.
+    colourChoice: {colour: "Colour", off: "Off"},
     // What the colour editor says about HSV(0, 0, 0) in each stage (D-L94,
     // firmware D-F74): every colour a layer, a pointing slot, combo feedback
     // or a feedback case owns is passthrough at saturation and value 0, at
     // any hue, painting nothing so what is beneath shows; Off, value 0 with
     // saturation, is a choice of its own that turns its LEDs dark. The
     // auto-mouse fade's end colour is literal, so 0, 0, 0 is off there; the
-    // background effect offers neither.
+    // background effect offers neither. The editor's choice reads Colour,
+    // Off and `offWord` (D-L95); each choice's tip is `ledsOffTip` for Off
+    // and `offTip` for Passthrough, the fade end's Off; a passthrough
+    // colour's note is `offNote`. An off one says it on its item's head.
     colourOff: {
         layers: {
             offTip: "Store HSV(0, 0, 0): this layer then paints nothing, and what is beneath shows through.",
             offNote: "This layer is passthrough: it paints nothing, so what is beneath shows through wherever it would paint.",
-            offAction: "Make passthrough", offWord: "Passthrough",
+            offWord: "Passthrough",
             ledsOffTip: "Store brightness 0 with saturation: this layer's keys then go dark, covering what is beneath.",
-            ledsOffNote: "The colour is off: this layer's keys go dark, covering what is beneath. Make it passthrough to let what is beneath show.",
         },
         auto: {
             offTip: "Store HSV(0, 0, 0): the fade then ends with the LEDs off.",
@@ -518,30 +532,26 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
         pd: {
             offTip: "Store HSV(0, 0, 0): this mode then paints nothing while it runs, and what is beneath shows. Its accents in a colour of their own still light.",
             offNote: "This mode is passthrough: it paints nothing while it runs, so what is beneath shows. Its accents in a colour of their own still light.",
-            offAction: "Make passthrough", offWord: "Passthrough",
+            offWord: "Passthrough",
             ledsOffTip: "Store brightness 0 with saturation: this mode then turns its area's LEDs off while it runs, covering what is beneath.",
-            ledsOffNote: "The colour is off: this mode turns its area's LEDs off while it runs, covering what is beneath. Make it passthrough to let what is beneath show.",
         },
         combo: {
             offTip: "Store HSV(0, 0, 0): combo feedback then paints nothing while a combo's inputs are held, and what is beneath shows. Its accents in a colour of their own still light.",
             offNote: "Combo feedback is passthrough: it paints nothing while a combo's inputs are held, so what is beneath shows. Its accents in a colour of their own still light.",
-            offAction: "Make passthrough", offWord: "Passthrough",
+            offWord: "Passthrough",
             ledsOffTip: "Store brightness 0 with saturation: combo feedback then turns its area's LEDs off while a combo's inputs are held, covering what is beneath.",
-            ledsOffNote: "The colour is off: combo feedback turns its area's LEDs off while a combo's inputs are held, covering what is beneath. Make it passthrough to let what is beneath show.",
         },
         key: {
             offTip: "Store HSV(0, 0, 0): this case then paints nothing, and what is beneath shows. The other cases still light, and so do its accents in a colour of their own.",
             offNote: "This case is passthrough: it paints nothing, so what is beneath shows. The other cases still light, and so do its accents in a colour of their own.",
-            offAction: "Make passthrough", offWord: "Passthrough",
+            offWord: "Passthrough",
             ledsOffTip: "Store brightness 0 with saturation: this case then turns its area's LEDs off, covering what is beneath.",
-            ledsOffNote: "The colour is off: this case turns its area's LEDs off, covering what is beneath. Make it passthrough to let what is beneath show.",
         },
         autocorrect: {
             offTip: "Store HSV(0, 0, 0): this case then paints nothing, and what is beneath shows. The other cases still light, and so do its accents in a colour of their own.",
             offNote: "This case is passthrough: it paints nothing, so what is beneath shows, and its accents that take its colour stay dark. The other cases still light.",
-            offAction: "Make passthrough", offWord: "Passthrough",
+            offWord: "Passthrough",
             ledsOffTip: "Store brightness 0 with saturation: this case then turns its area's LEDs off, covering what is beneath.",
-            ledsOffNote: "The colour is off: this case turns its area's LEDs off, covering what is beneath. Make it passthrough to let what is beneath show.",
         },
     },
     // What Behaviour feedback shows (D-L93; the firmware's behaviour-feedback
@@ -572,15 +582,33 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
         ["AUTOCORRECT_FEEDBACK_GROUP_UNDO", "Replacement undone"],
         ["AUTOCORRECT_FEEDBACK_GROUP_LEADING", "Leader waiting"],
     ],
-    // When each case shows (firmware D-F70, D-F72), said under its name on
-    // the tab: the three flashes, and Leader waiting, held from the Leader
-    // key until the leader sends or gives up.
+    // When each case shows (firmware D-F70, D-F72), said in one line under
+    // its name on the tab: the three flashes, and Leader waiting, held from
+    // the Leader key until the leader sends or gives up. The rest of what a
+    // case does is in the stage's info mark (ui/lighting/help.mjs).
     replacementWhen: {
         AUTOCORRECT_FEEDBACK_GROUP_TEXT: "Flashes once as an input is replaced with text, and as the Leader key sends text.",
         AUTOCORRECT_FEEDBACK_GROUP_MACRO: "Flashes once as an input is erased for its macro, and as the Leader key plays a macro.",
         AUTOCORRECT_FEEDBACK_GROUP_UNDO: "Flashes once as Backspace, straight after a replacement, puts the word back.",
-        AUTOCORRECT_FEEDBACK_GROUP_LEADING: "Held from the moment you press the Leader key until the leader sends a replacement or gives up. A send's text or macro flash then takes its place; when nothing is sent it just goes. It lasts as long as the leader waits, whatever the Flash length.",
+        AUTOCORRECT_FEEDBACK_GROUP_LEADING: "Held, not flashed, from the Leader key until the leader sends or gives up.",
     },
+    // When each Behaviour feedback case shows, and how, in a line short
+    // enough to head its pane at 1280px as replacementWhen heads a
+    // replacement case's (firmware rgb-domain-v1, key runtime feedback.c):
+    // only Hold active and Long hold active blink, at the Blink time; the
+    // rest are steady, and Tap committed may also flash once
+    // (tapCommittedFlash, joined after "; " under the tap-commit policy On).
+    // The stage's info mark says the rest.
+    feedbackWhen: {
+        KEY_FEEDBACK_GROUP_TAP_COMMITTED: "Steady while a tap with no hold is held",
+        KEY_FEEDBACK_GROUP_HOLD_ACTIVE: "Blinks while its action is held; steady before it sends",
+        KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE: "Blinks while its action is held; steady before it sends",
+        KEY_FEEDBACK_GROUP_TAP_COUNT_2: "Steady while a run of taps waits on a double tap",
+        KEY_FEEDBACK_GROUP_TAP_COUNT_3: "Steady while a run of taps waits on a triple tap",
+        KEY_FEEDBACK_GROUP_TAP_COUNT_4: "Steady while a run of taps waits on a quadruple tap",
+        KEY_FEEDBACK_GROUP_TAP_COUNT_5: "Steady while a run of taps waits on a quintuple tap or more",
+    },
+    tapCommittedFlash: "one flash after a double tap or more",
     // The case each Replacement feedback colour shows, by the colour's
     // field, in the order the keyboard stores them. The tab lists its
     // colours by it, the review names them by it, and an accent of the case
@@ -625,22 +653,24 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     // one shows.
     lightingLists: {
         inUse: "In use",
-        tiers: {title: "Tiers", tip: "Flash as a key's tap, hold or long hold fires."},
-        tapBranches: {title: "Tap branches", tip: "Flash while a run of taps waits on that tap count, until it resolves."},
+        tiers: {title: "Tiers", tip: "Light as a key's tap, hold or long hold fires."},
+        tapBranches: {title: "Tap branches", tip: "Light, steady, while a run of taps waits on that tap count, until it resolves."},
         replacements: {title: "Cases", tip: "One flash as text replacement changes what was typed, in the colour of what it did, and a colour held while the leader waits."},
-        comboFeedback: {title: "Combo feedback", empty: "No combo on this view lights combo feedback."},
-        holdLayer: {title: "Hold a layer", empty: "No combo on this view holds a layer."},
+        comboFeedback: {title: "Combo feedback", empty: "No combo on this view lights combo feedback.", tip: "The combos on this view that light combo feedback while held. Pick one for the board to hold it."},
+        holdLayer: {title: "Hold a layer", empty: "No combo on this view holds a layer.", tip: "Combos whose output holds a layer. They light no combo feedback: the layer's own light shows the hold."},
     },
-    // The lighting stages in the order the firmware paints them. A stage is
-    // found by its id or bit, never by its words.
+    // The lighting stages in the order the firmware paints them, each with
+    // the word its tab reads by where the window is too narrow for the
+    // whole name (its stage bar still says it whole). A stage is found by its
+    // id or bit, never by its words.
     stages: [
-        {id: "base", label: "Background effect"},
-        {id: "layers", label: "Layer colours", bit: RGB_STAGE_BITS.LAYER},
-        {id: "auto", label: "Auto-mouse fade", bit: RGB_STAGE_BITS.AUTOMOUSE},
-        {id: "pd", label: "Pointing modes", bit: RGB_STAGE_BITS.POINTING_MODE},
-        {id: "combo", label: "Combo feedback", bit: RGB_STAGE_BITS.COMBO},
-        {id: "key", label: "Behaviour feedback", bit: RGB_STAGE_BITS.KEY_BEHAVIOR},
-        {id: "autocorrect", label: "Replacement feedback", bit: RGB_STAGE_BITS.AUTOCORRECT},
+        {id: "base", label: "Background effect", short: "Background"},
+        {id: "layers", label: "Layer colours", short: "Layers", bit: RGB_STAGE_BITS.LAYER},
+        {id: "auto", label: "Auto-mouse fade", short: "Auto-mouse", bit: RGB_STAGE_BITS.AUTOMOUSE},
+        {id: "pd", label: "Pointing modes", short: "Pointing", bit: RGB_STAGE_BITS.POINTING_MODE},
+        {id: "combo", label: "Combo feedback", short: "Combos", bit: RGB_STAGE_BITS.COMBO},
+        {id: "key", label: "Behaviour feedback", short: "Behaviours", bit: RGB_STAGE_BITS.KEY_BEHAVIOR},
+        {id: "autocorrect", label: "Replacement feedback", short: "Replacement", bit: RGB_STAGE_BITS.AUTOCORRECT},
     ],
 
     // A custom key's shortcut (firmware D-F26): why a layer cannot be one it

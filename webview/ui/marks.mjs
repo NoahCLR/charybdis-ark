@@ -149,14 +149,15 @@ export const slotNamedWithKeycodes = (name, keycodes) => `<span class="sends inl
 export const sendsKind = (model, action) => namedAction(model, action)?.word || "";
 
 // A mark as the core describes it: {kind: "tier", tier, branch?} · {kind:
-// "branches"} · {kind: "layer", layer} · {kind: "pointing", slot} · {kind:
-// "macro"} · {kind: "customKey"} · {kind: "combo", badge?} · {kind: "stage",
-// on}. Anything else draws nothing; a set of layers marks each name instead
-// (valueMarked).
+// "branch", count} · {kind: "branches"} · {kind: "layer", layer} · {kind:
+// "pointing", slot} · {kind: "macro"} · {kind: "customKey"} · {kind: "combo",
+// badge?} · {kind: "stage", on}. Anything else draws nothing; a set of layers
+// marks each name instead (valueMarked).
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {import("../../contracts/model.js").ReviewMark | null | undefined} value */
 export function mark(model, value) {
     switch (value?.kind) {
         case "tier": return `${value.branch ? branchBadge(model, value.branch) : ""}${tierDot(model, value.tier)}`;
+        case "branch": return branchBadge(model, value.count);
         case "branches": return branchesBadge(model);
         case "layer": return kindIcon("layer", layerSwatch(model, {index: value.layer}).colour);
         case "pointing": return kindIcon("pointing", slotLight(model, {id: value.slot}).colour);

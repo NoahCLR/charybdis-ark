@@ -5,16 +5,20 @@ const {openControls, clearPosts, posted, expectPost, change, publishAccepted} = 
 
 const body = page => page.locator("#benchBody");
 const channel = (page, index) => body(page).locator(`[data-channel="${index}"]`);
+// A colour's state, one choice beside its value (D-L94): Colour, Off, Passthrough.
+const colourState = (page, value) => body(page).locator(`.colour-state label:has(input[value="${value}"])`);
+// The stage bar's switch, at its end on every stage (D-L95).
+const stageSwitch = page => page.locator(".bench-body .stage-bar label.sw");
 const stages = [
-    {id: "layers", offTip: /paints nothing/, offAction: "Make passthrough", offWord: "Passthrough", bit: 1, path: ["rgb", "layerColors", 1, "color"], colour: [85, 255, 200],
+    {id: "layers", offTip: /paints nothing/, owned: true, offWord: "Passthrough", bit: 1, path: ["rgb", "layerColors", 1, "color"], colour: [85, 255, 200],
         message: colour => ({type: "updateLayerColor", layer: "Layer 1", mode: "KEYS_MAPPED_ON_THIS_LAYER_ONLY", ...colour})},
     {id: "auto", offTip: /ends with the LEDs off/, bit: 2, path: ["rgb", "automouseFade", "end_color"], colour: [167, 255, 199],
         message: colour => ({type: "updateAutomouseFade", mode: "END_COLOR_ON_ALL_KEYS", ...colour})},
-    {id: "pd", offTip: /paints nothing/, offAction: "Make passthrough", offWord: "Passthrough", bit: 4, path: ["rgb", "pdModeColors", 0, "color"], colour: [21, 255, 200],
+    {id: "pd", offTip: /paints nothing/, owned: true, offWord: "Passthrough", bit: 4, path: ["rgb", "pdModeColors", 0, "color"], colour: [21, 255, 200],
         message: colour => ({type: "updatePdModeColor", pointingMode: "POINTING_MODE_DRAGSCROLL", locality: "RGB_RIGHT_HALF", ...colour})},
-    {id: "combo", offTip: /paints nothing/, offAction: "Make passthrough", offWord: "Passthrough", bit: 8, path: ["rgb", "comboFeedback", "color"], colour: [191, 255, 200],
+    {id: "combo", offTip: /paints nothing/, owned: true, offWord: "Passthrough", bit: 8, path: ["rgb", "comboFeedback", "color"], colour: [191, 255, 200],
         message: colour => ({type: "updateComboFeedback", locality: "RGB_KEY_HALF", ...colour})},
-    {id: "key", offTip: /paints nothing/, offAction: "Make passthrough", offWord: "Passthrough", bit: 16, path: ["rgb", "keyBehaviorFeedback", "holdActiveColor"], colour: [18, 255, 200],
+    {id: "key", offTip: /paints nothing/, owned: true, offWord: "Passthrough", bit: 16, path: ["rgb", "keyBehaviorFeedback", "holdActiveColor"], colour: [18, 255, 200],
         message: colour => ({type: "updateKeyBehaviorFeedback", config: expect.objectContaining({holdActiveColor: colour,
             tapCommitMode: "KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS", holdActiveLocality: "RGB_KEY_HALF"})})},
 ];
@@ -48,34 +52,44 @@ for (const stage of stages) {
             await expect(field).toBeFocused();
             await expect(field).toHaveValue(String(71 + index));
         }
-        // Off (D-L94): brightness 0, the hue and saturation kept, its LEDs dark; the fade end has none, as 0, 0, 0 is off there.
+        // Off (D-L94): brightness 0, the hue and saturation kept, its LEDs dark; the fade end has no passthrough, as 0, 0, 0 is off there.
         await clearPosts(page);
-        if (stage.offAction) {
-            await body(page).locator("[data-leds-off]").click();
+        if (stage.owned) {
+            await colourState(page, "off").click();
             await expectPost(page, stage.message({...colour, v: 0}));
-        } else await expect(body(page).locator("[data-leds-off]")).toHaveCount(0);
+        } else await expect(colourState(page, "passthrough")).toHaveCount(0);
         await clearPosts(page);
-        await expect(body(page).locator("[data-off]")).toHaveAttribute("data-tip", stage.offTip);
-        await expect(body(page).locator("[data-off]")).toHaveText(stage.offAction || "Turn off");
-        await body(page).locator("[data-off]").click();
+        const nothing = stage.owned ? "passthrough" : "off";
+        await expect(colourState(page, nothing)).toHaveAttribute("data-tip", stage.offTip);
+        await expect(colourState(page, nothing)).toHaveText(stage.offWord || "Off");
+        await colourState(page, nothing).click();
         await expectPost(page, stage.message({h: 0, s: 0, v: 0}));
         await publishAccepted(page, stage.path, {h: "0", s: "0", v: "0"});
-        await expect(body(page).locator("[data-channel]")).toHaveCount(0);
+        // The editor keeps its size: the square and fields stay, dimmed and inert, under what it means.
+        await expect(body(page).locator("[data-channel]")).toHaveCount(3);
+        await expect(body(page).locator("[data-channel]:enabled")).toHaveCount(0);
+        await expect(body(page).locator(".colour-body[data-idle] .colour-idle")).toBeVisible();
         await expect(body(page).locator(".colour-head .note")).toHaveText(stage.offWord || "Off");
         await clearPosts(page);
-        await body(page).getByRole("button", {name: "Give it a colour", exact: true}).click();
+        await colourState(page, "colour").click();
         await expectPost(page, stage.message({h: 140, s: 255, v: 200}));
-        if (stage.offAction) {
+        if (stage.owned) {
             // From passthrough, Off stores value 0 with saturation.
             await clearPosts(page);
-            await body(page).locator("[data-leds-off]").click();
+            await colourState(page, "off").click();
             await expectPost(page, stage.message({h: 0, s: 255, v: 0}));
+            // From Off, Colour brings back the hue and saturation it kept.
+            await publishAccepted(page, stage.path, {h: "30", s: "180", v: "0"});
+            await clearPosts(page);
+            await colourState(page, "colour").click();
+            await expectPost(page, stage.message({h: 30, s: 180, v: 200}));
         }
     });
 
     test(`${stage.id}: the stage switch posts its own bit without changing other stages`, async ({page}) => {
         await openStage(page, stage.id);
-        await page.locator(".bench-body .sect-h label.sw").click();
+        await expect(stageSwitch(page)).toHaveCount(1);
+        await stageSwitch(page).click();
         await expectPost(page, {type: "updateRgbStages", stageEnableMask: 31 & ~stage.bit});
     });
 }
@@ -92,14 +106,15 @@ for (const theme of ["dark", "light"]) {
     });
 }
 
-test("the layer colour note describes only the paint modes it offers", async ({page}) => {
+test("the layer's Where it paints explains only the paint modes it offers, on its info mark", async ({page}) => {
     await openStage(page, "layers");
     const where = body(page).locator("section", {has: page.locator('[data-f="lighting:layer:1:mode:ALL_KEYS"]')});
     const offered = await where.locator(".seg label").allInnerTexts();
     expect(offered).toEqual(["Keys mapped on this layer only", "All LEDs"]);
-    const note = where.locator("p.note");
-    for (const mode of offered) await expect(note).toContainText(mode);
-    await expect(note).not.toContainText(/pass-through/i);
+    const terms = where.locator(".sect-h .info-pop dt");
+    for (const mode of offered) await expect(terms.filter({hasText: mode})).toHaveCount(1);
+    await expect(where.locator(".info-pop")).not.toContainText(/pass-through/i);
+    await expect(where.locator("p.note"), "what each mode means is read once, not printed under it").toHaveCount(0);
 });
 
 test("all Lighting policy selects post the chosen policy and retained colour", async ({page}) => {
@@ -108,10 +123,12 @@ test("all Lighting policy selects post the chosen policy and retained colour", a
         ["auto", "Fade mode", "END_COLOR_WHERE_BASE_EFFECT_WOULD_SHOW", {type: "updateAutomouseFade", mode: "END_COLOR_WHERE_BASE_EFFECT_WOULD_SHOW", h: 167, s: 255, v: 199}],
         ["pd", "Locality", "RGB_LEFT_HALF", {type: "updatePdModeColor", pointingMode: "POINTING_MODE_DRAGSCROLL", locality: "RGB_LEFT_HALF", h: 21, s: 255, v: 200}],
         ["combo", "Locality", "RGB_BOTH_HALVES", {type: "updateComboFeedback", locality: "RGB_BOTH_HALVES", h: 191, s: 255, v: 200}],
-        ["key", "Tap branch commit", "KEY_FEEDBACK_TAP_COMMIT_OFF", {type: "updateKeyBehaviorFeedback", config: expect.objectContaining({tapCommitMode: "KEY_FEEDBACK_TAP_COMMIT_OFF", holdActiveColor: {h: 18, s: 255, v: 200}})}],
+        ["key", "Flash on a double tap or more", "KEY_FEEDBACK_TAP_COMMIT_OFF", {type: "updateKeyBehaviorFeedback", config: expect.objectContaining({tapCommitMode: "KEY_FEEDBACK_TAP_COMMIT_OFF", holdActiveColor: {h: 18, s: 255, v: 200}})}],
         ["key", "Locality", "RGB_LEFT_HALF", {type: "updateKeyBehaviorFeedback", config: expect.objectContaining({holdActiveLocality: "RGB_LEFT_HALF", holdActiveColor: {h: 18, s: 255, v: 200}})}],
     ]) {
         await openStage(page, stage);
+        // Whether a double tap or more flashes is on Tap committed's pane.
+        if (label === "Flash on a double tap or more") await body(page).locator('[data-row="tapCommittedColor"]').click();
         // A few short choices are on show; a longer list is a menu.
         const onShow = body(page).locator(`.seg[aria-label="${label}"]`);
         if (await onShow.count()) await onShow.locator("label").filter({has: page.locator(`input[value="${value}"]`)}).click();
@@ -135,9 +152,18 @@ test("behaviour feedback names each colour once, in its list, grouped as the beh
     await expect(list.locator("tr[data-row]")).toHaveCount(3);
     await list.locator('.group-h[data-group="branches"]').click();
     await expect(body(page).locator(".chip")).toHaveCount(0);
-    await expect(body(page).locator(".stage-about")).toContainText("behaviour dots");
-    const commit = body(page).locator('.seg[aria-label="Tap branch commit"] label');
-    await expect(commit).toHaveText(["Off", "Double taps and more"]);
+    await expect(body(page).locator(".stage-bar .info-pop")).toContainText("behaviour dots");
+    // How fast it flashes is every case's, on the stage bar; whether a
+    // double tap or more flashes is Tap committed's, on its pane alone.
+    await expect(body(page).locator(".stage-bar .stage-bar-scope")).toHaveText("Every behaviour state");
+    await expect(body(page).locator(".stage-bar .seg")).toHaveCount(0);
+    const commit = () => body(page).locator('.stage-detail .seg[aria-label="Flash on a double tap or more"]');
+    await expect(commit()).toHaveCount(0);
+    await body(page).locator('[data-row="tapCommittedColor"]').click();
+    await expect(commit().locator("label")).toHaveText(["Off", "On"]);
+    await expect(body(page).locator('.stage-detail h4').filter({hasText: "When it flashes"})).toHaveCount(1);
+    await body(page).locator('[data-row="branch:0"]').click();
+    await expect(commit()).toHaveCount(0);
 });
 
 test("every behaviour feedback colour row posts its own field, preserving all the other colours", async ({page}) => {
@@ -163,7 +189,7 @@ test("every behaviour feedback case's Locality posts that case's locality alone,
     await openStage(page, "key");
     const rows = ["tapCommittedColor", "holdActiveColor", "longHoldActiveColor", "branch:0", "branch:1", "branch:2", "branch:3"];
     const choices = ["RGB_BOTH_HALVES", "RGB_LEFT_HALF", "RGB_RIGHT_HALF", "RGB_KEYS_ONLY", "RGB_BOTH_HALVES", "RGB_LEFT_HALF", "RGB_KEYS_ONLY"];
-    await expect(body(page).locator(".stage-detail > .stage-side > section h4").first()).toHaveText("Where it paints");
+    await expect(body(page).locator(".stage-detail > section:not(.accents) > .sect-h h4")).toHaveText(["Colour", "Where it paints"]);
     for (const [index, row] of rows.entries()) {
         await body(page).locator(`[data-row="${row}"]`).click();
         await clearPosts(page);
@@ -178,7 +204,24 @@ test("every behaviour feedback case's Locality posts that case's locality alone,
     }
     await publishAccepted(page, ["rgb", "keyBehaviorFeedback", "holdActiveLocality"], "RGB_BOTH_HALVES");
     await expect(body(page).locator('[data-row="holdActiveColor"] td').nth(1)).toHaveText("all LEDs");
-    await expect(body(page).locator('[data-row="tapCommittedColor"] td').nth(1)).toHaveText("the half holding the trigger key", "the other cases keep theirs");
+    await expect(body(page).locator('[data-row="tapCommittedColor"] td').nth(1)).toHaveText("trigger's half", "the other cases keep theirs");
+    // The case picked heads its own settings, saying when it shows and how:
+    // only the holds blink; a tap branch is steady; Tap committed is steady
+    // and, under the tap-commit policy On, also flashes once.
+    await body(page).locator('[data-row="holdActiveColor"]').click();
+    await expect(body(page).locator(".stage-item")).toContainText("Hold active");
+    const when = body(page).locator(".stage-item [data-replacement-when]");
+    await expect(when).toHaveText("Blinks while its action is held; steady before it sends");
+    await body(page).locator('[data-row="branch:0"]').click();
+    await expect(when).toHaveText("Steady while a run of taps waits on a double tap");
+    await body(page).locator('[data-row="tapCommittedColor"]').click();
+    await expect(when).toHaveText("Steady while a tap with no hold is held; one flash after a double tap or more");
+    // Every case's line fits its head on one line at 1280px.
+    await page.setViewportSize({width: 1280, height: 900});
+    for (const row of ["tapCommittedColor", "holdActiveColor", "longHoldActiveColor", "branch:3"]) {
+        await body(page).locator(`[data-row="${row}"]`).click();
+        expect(await when.evaluate((node) => node.scrollWidth <= node.clientWidth), row).toBe(true);
+    }
 });
 
 // Each tap branch is its own accent owner (D-L93, firmware D-F73).
@@ -186,7 +229,9 @@ test("an accent on one tap branch lights for that branch alone and posts its own
     await openStage(page, "key");
     await body(page).locator('[data-row="branch:1"]').click();
     const section = body(page).locator('[data-accents="keyBehavior"]');
-    await expect(section.locator("h4")).toHaveText("Accents · Triple tap");
+    // A tap branch is marked by its badge, in the head and its accents' band.
+    await expect(body(page).locator(".stage-item-name .bn")).toHaveText("3×");
+    await expect(section.locator(".accent-band").first()).toHaveText("For 3×Triple tap");
     await clearPosts(page);
     await section.getByRole("button", {name: "Add accent", exact: true}).click();
     const editor = section.locator(".accent-editor");
@@ -257,7 +302,7 @@ test("hue and saturation/brightness dragging preview locally and commit once on 
 test("an accent is added from LEDs picked on the board, posting nothing until it is kept", async ({page}) => {
     await openStage(page, "layers");
     const section = body(page).locator('[data-accents="layer"]');
-    await expect(section.locator("h4")).toHaveText(/^Accents · /);
+    await expect(section.locator(".sect-h h4")).toHaveText("Accents");
     // Every key is numbered by its LED, and the trackball too.
     await expect(page.locator('.board [data-led="0"] .kc-led')).toHaveText("0");
     await expect(page.locator('.board .kc-ball .kc-led')).toHaveText("56");
@@ -289,7 +334,9 @@ test("an accent is added from LEDs picked on the board, posting nothing until it
     await expect(page.locator(".board-foot-text")).toContainText("3 picked");
     for (const [index, value] of [77, 78, 79].entries()) await change(editor.locator(`[data-channel="${index}"]`), value);
     expect(await posted(page)).toEqual([]);
-    await editor.locator('[data-act="keep"]').click();
+    // It is kept from under the board, where its LEDs were picked.
+    await expect(page.locator('.board-foot [data-act="keep-accent"]')).toBeEnabled();
+    await page.locator('.board-foot [data-act="keep-accent"]').click();
     await expectPost(page, {type: "addRgbLedGroup", group: {target: "layer", owner: "Layer 1", ledIndices: [0, 1, 56], h: 77, s: 78, v: 79}});
     await expect(section.locator(".accent-editor")).toHaveCount(0);
 
@@ -319,7 +366,7 @@ test("an accent being added lights for the layer the board shows, and one being 
     await page.locator('.board [data-led="5"]').click();
     // Picking another layer carries the new accent to it, as the list it sits in says.
     await page.locator("#layer-tab-2").click();
-    await expect(section().locator("h4")).toHaveText(/^Accents · /);
+    await expect(section().locator(".accent-band").first()).toHaveText(/^For /);
     await clearPosts(page);
     await section().locator('.accent-editor [data-act="keep"]').click();
     await expectPost(page, {type: "addRgbLedGroup", group: expect.objectContaining({target: "layer", owner: "Layer 2", ledIndices: [5]})});
@@ -417,10 +464,11 @@ test("an accent is changed where it stands or removed, on the stage that paints 
     // and behaviour state, so each shows, and is edited, on every mode's list.
     await openStage(page, "pd");
     const section = body(page).locator('[data-accents="pdMode"]');
-    await expect(section.locator("h4")).toHaveText("Accents · Dragscroll");
+    // Grouped by who they light for: none of Dragscroll's own, then those for every mode.
+    await expect(section.locator(".accent-band")).toHaveText(["For Dragscroll", "For every pointing mode"]);
     const shared = section.locator(".accent-row");
     await expect(shared).toContainText("LEDs 24–28, 53–55");
-    await expect(shared.locator(".tag")).toHaveText("Every pointing mode");
+    await expect(shared.locator('[data-act="remove"]')).toHaveAttribute("data-tip", "Removes it for every pointing mode.");
     await shared.locator('[data-act="change"]').click();
     for (const led of [24, 25, 26, 27, 28, 53, 54, 55]) await expect(page.locator(`.board [data-led="${led}"]`)).toHaveAttribute("aria-pressed", "true");
     await page.locator('.board [data-led="28"]').click();
@@ -452,7 +500,10 @@ test("All accents lists every accent by stage and owner, and Open shows it on it
     await expect(rows.nth(0)).toContainText("LEDs 24–28, 53–55");
     await rows.nth(2).getByRole("button", {name: "Open", exact: true}).click();
     await expect(page.locator('[data-ltab="key"]')).toHaveAttribute("aria-selected", "true");
-    await expect(body(page).locator('[data-accents="keyBehavior"] .accent-row .tag')).toHaveText("Every behaviour state");
+    await expect(body(page).locator('[data-accents="keyBehavior"] [data-band="every"]')).toHaveText("For every behaviour state");
+    // It lands on the accent, shown on the board.
+    await expect(body(page).locator('[data-accents="keyBehavior"] .accent-row[data-picked]')).toHaveCount(1);
+    await expect(page.locator('.board [data-led="24"].led-hover')).toHaveCount(1);
     expect(await posted(page)).toEqual([]);
 });
 
@@ -624,29 +675,68 @@ test("every stage's list is as tall as the others, filling the workbench beside 
         await page.locator(`[data-ltab="${stage}"]`).click();
         heights[stage] = await page.evaluate(() => {
             const height = (/** @type {string} */ selector) => Math.round(document.querySelector(selector)?.getBoundingClientRect().height || 0);
-            return {pane: height(".workbench .bench-pane"), body: height("#benchBody")};
+            return {pane: height(".workbench .bench-pane"), body: height("#benchBody .stage-main")};
         });
     }
     // The tallest stage sets the height for all of them, from the first one
     // shown, as the Keymap's Behaviours tab sets its workbench's.
     expect(new Set(Object.values(heights).map((each) => each.pane)).size, JSON.stringify(heights)).toBe(1);
-    for (const each of Object.values(heights)) expect(each.pane, "the list fills the body, with no gap under it").toBeGreaterThan(each.body - 60);
+    // Under the stage bar, the list fills the rest of the body, with no gap under it.
+    for (const each of Object.values(heights)) expect(each.pane, "the list fills the body, with no gap under it").toBeGreaterThanOrEqual(each.body - 1);
     expect(await posted(page)).toEqual([]);
 });
 
-test("every stage says what it does, behind one fold that stays as it was left", async ({page}) => {
+test("every stage says what it does on its stage bar's info mark, and the bar keeps its place", async ({page}) => {
     await openStage(page, "base");
-    for (const [index, stage] of ["base", "layers", "auto", "pd", "combo", "key"].entries()) {
+    /** @type {number[]} */
+    const tops = [];
+    for (const stage of ["base", "layers", "auto", "pd", "combo", "key", "autocorrect", "accents"]) {
         await page.locator(`[data-ltab="${stage}"]`).click();
-        const about = body(page).locator("section.stage-fold");
-        await expect(about, stage).toHaveCount(1);
-        await expect(about.locator("summary"), stage).toHaveText("What this stage does");
-        // Opened on the first stage, it stays open on every stage after.
-        if (!index) await about.locator("summary").click();
-        await expect(about.locator("details"), stage).toHaveAttribute("open", "");
-        await expect(about.locator(".stage-about"), stage).toBeVisible();
+        const bar = body(page).locator(".stage-bar");
+        await expect(bar, stage).toHaveCount(1);
+        await expect(bar.locator(".info-mark .info-h"), stage).toHaveCount(1);
+        await expect(body(page).locator("section.stage-fold, details"), stage).toHaveCount(0);
+        tops.push(Math.round((await bar.boundingBox())?.y ?? -1));
+        // Its switch, where it has one, is always the bar's last item.
+        if (stage !== "base" && stage !== "accents") expect(await bar.evaluate((node) => node.lastElementChild?.matches("label.sw")), stage).toBe(true);
     }
+    expect(new Set(tops).size, JSON.stringify(tops)).toBe(1);
     expect(await posted(page)).toEqual([]);
+});
+
+// The colour editor, Where it paints and the accents start in the same place
+// on every stage with a list, and the colour editor in the same column on
+// the two without (D-L95).
+test("the colour editor and where it paints keep their place from tab to tab", async ({page}) => {
+    await page.setViewportSize({width: 1440, height: 900});
+    await openControls(page, "lighting", {stage: "layers", layer: 1, pointingSlot: 0}, "dark", "shell=demo");
+    /** @type {Record<string, number[]>} */
+    const at = {};
+    for (const stage of ["base", "layers", "auto", "pd", "combo", "key", "autocorrect"]) {
+        await page.locator(`[data-ltab="${stage}"]`).click();
+        const box = async (selector) => { const rect = await body(page).locator(selector).first().boundingBox(); return rect ? [Math.round(rect.x), Math.round(rect.y)] : []; };
+        at[stage] = [...await box(".stage-detail > section:nth-of-type(1) h4"), ...await box(".stage-detail > section:nth-of-type(1) + :is(section, .stage-side) h4")];
+    }
+    const listed = ["layers", "pd", "combo", "key", "autocorrect"].map((stage) => at[stage].join());
+    expect(new Set(listed).size, JSON.stringify(at)).toBe(1);
+    for (const stage of ["base", "auto"]) {
+        expect(at[stage][0], `${stage}: the colour in the same column`).toBe(at.layers[0]);
+        expect(at[stage][2], `${stage}: where it paints in the same column`).toBe(at.layers[2]);
+    }
+});
+
+// The workbench's height follows the stages, never what was open a moment
+// ago: an accent being added grows it, and cancelling gives the room back.
+test("the workbench gives back the room an accent editor took once it closes", async ({page}) => {
+    await openStage(page, "pd");
+    const height = () => page.locator(".lighting-bench").evaluate((bench) => Math.round(bench.getBoundingClientRect().height));
+    const before = await height();
+    await body(page).locator('[data-accents="pdMode"]').getByRole("button", {name: "Add accent", exact: true}).click();
+    await expect.poll(height).toBeGreaterThan(before);
+    await body(page).locator('.accent-editor [data-act="cancel"]').click();
+    await expect.poll(height).toBe(before);
+    await page.locator('[data-ltab="layers"]').click();
+    await expect.poll(height).toBe(before);
 });
 
 // Replacement feedback (D-L89), on the demo profile, which carries the
@@ -673,26 +763,72 @@ test("every stage tab and All accents fit a 1440px window, whichever stage is se
     }
 });
 
+// Narrower, each tab reads by its short word, its stage bar naming it whole,
+// so the strip still fits a 1280px window and keeps one line.
+test("the stage tabs fit a 1280px window by their short words, and every stage bar keeps one line", async ({page}) => {
+    await page.setViewportSize({width: 1280, height: 800});
+    await openControls(page, "lighting", {stage: "key", layer: 0}, "dark", "shell=demo");
+    const strip = page.locator(".lighting-bench .bench-tablist");
+    expect(await strip.evaluate(list => list.scrollWidth - list.clientWidth), "the strip does not scroll").toBeLessThanOrEqual(0);
+    await expect(page.locator('[data-ltab="key"] .tab-label .short')).toBeVisible();
+    await expect(page.locator('[data-ltab="key"] .tab-label .short')).toHaveText("Behaviours");
+    await expect(page.locator('[data-ltab="key"]')).toHaveAttribute("aria-label", "Behaviour feedback");
+    for (const stage of ["base", "layers", "auto", "pd", "combo", "key", "autocorrect", "accents"]) {
+        await page.locator(`[data-ltab="${stage}"]`).click();
+        expect(await body(page).locator(".stage-bar").evaluate((bar) => Math.round(bar.getBoundingClientRect().height)), stage).toBeLessThanOrEqual(42);
+    }
+});
+
+// A tab wears the colour its stage paints for what it has picked; Behaviour
+// feedback's follows the case picked, as the others follow theirs.
+test("Behaviour feedback's tab wears the colour of the case picked", async ({page}) => {
+    await openStage(page, "key");
+    const swatch = () => page.locator('[data-ltab="key"] .swatch').evaluate((node) => getComputedStyle(node).backgroundColor);
+    const held = await swatch();
+    await body(page).locator('[data-row="branch:0"]').click();
+    await expect.poll(swatch).not.toBe(held);
+    const colour = await page.evaluate(async () => {
+        const store = await import("/webview/store.mjs"), {css} = await import("/webview/lib/colour.mjs");
+        const probe = Object.assign(document.createElement("i"), {style: `background:${css(store.getModel().rgb.keyBehaviorFeedback.tapBranches[0].color)}`});
+        document.body.append(probe); const shown = getComputedStyle(probe).backgroundColor; probe.remove(); return shown;
+    });
+    expect(await swatch()).toBe(colour);
+});
+
+// The Lighting board lists its shortcuts on its corner, as the Keymap's does,
+// with those that work on the tab shown.
+test("the Lighting board lists its shortcuts on its corner", async ({page}) => {
+    await openStage(page, "layers");
+    const mark = page.locator(".board .info-mark.corner");
+    await expect(mark).toHaveCount(1);
+    await expect(mark.locator("dt")).toHaveText([/-click a layer$/, "LED numbers"]);
+    await body(page).locator('[data-accents="layer"]').getByRole("button", {name: "Add accent", exact: true}).click();
+    await expect(page.locator(".board .info-mark.corner dt")).toHaveText([/-click a layer$/, "Click, or drag", "LED numbers"]);
+});
+
 test("replacement feedback is the seventh stage, lists its four cases once, and says what it does", async ({page}) => {
     await openReplacement(page);
     const tab = page.locator("#stage-tab-autocorrect");
     await expect(tab).toHaveAttribute("aria-selected", "true");
     await expect(tab.locator(".n")).toHaveText("7");
-    await expect(tab.locator(".tab-label")).toHaveText("Replacement feedback");
-    await expect(tab).toHaveAttribute("data-tip", "Painted 7 of 7");
+    await expect(tab.locator(".tab-label .long")).toHaveText("Replacement feedback");
+    await expect(tab).toHaveAttribute("data-tip", "Replacement feedback · painted 7 of 7");
     const list = body(page).locator('[data-scroll-list="lighting-replacements"]');
     await expect(list.locator(".group-h .ttl")).toHaveText(["Cases"]);
-    await expect(list.locator("tr[data-row]")).toHaveText(CASES.map(([, label]) => `${label}the half holding the trigger key`), "each with where it paints");
+    await expect(list.locator("tr[data-row]")).toHaveText(CASES.map(([, label]) => `${label}trigger's half`), "each with where it paints, in a word or two");
     expect(await list.locator("tr[data-row]").evaluateAll(rows => rows.map(row => row.getAttribute("data-row")))).toEqual(CASES.map(([field]) => field));
-    await expect(body(page).locator(".stage-detail > section").first().locator("h4")).toHaveText("Replaced with text");
-    await expect(body(page).locator(".stage-about")).toContainText("flashes once");
-    await expect(body(page).locator(".stage-about")).toContainText("holds the Leader waiting colour instead");
+    await expect(body(page).locator(".stage-item")).toContainText("Replaced with text");
+    await expect(body(page).locator(".stage-bar .info-pop")).toContainText("One flash as text replacement changes what you typed");
+    await expect(body(page).locator(".stage-bar .info-pop")).toContainText("a colour held while the leader waits");
     await expect(body(page)).not.toContainText(/autocorrect|typo/i);
     // The words for the trigger key, which here is the key that ended the word.
     const where = body(page).locator("section", {has: page.locator('[data-f="lighting:autocorrect:textColor:locality"]')});
     await expect(where.locator("h4")).toHaveText("Where it paints");
-    await expect(where.locator('.field:has([data-f="lighting:autocorrect:textColor:locality"]) .hint')).toContainText("the key that ended the word (Space, Enter, a punctuation key), or the Backspace that undid the replacement");
-    await expect(where.locator('.field:has([data-f="lighting:autocorrect:textColor:locality"]) .hint')).not.toContainText("Leader waiting");
+    await expect(where.locator('.field:has([data-f="lighting:autocorrect:textColor:locality"]) .hint')).toHaveText("Trigger key: the key that ended the word, or the Backspace that undid it.");
+    // The rest, and every place's meaning, on the section's info mark.
+    await expect(where.locator(".sect-h .info-pop")).toContainText("Space, Enter, a punctuation key");
+    await expect(where.locator(".sect-h .info-pop")).toContainText("The last two choices paint every key.");
+    await expect(where.locator(".sect-h .info-pop")).not.toContainText("paints both halves");
     await expect(body(page).locator("[data-replacement-when]")).toHaveText("Flashes once as an input is replaced with text, and as the Leader key sends text.");
     expect(await where.locator("select option").allInnerTexts()).toEqual(["All LEDs", "Left half", "Right half", "The half holding the trigger key", "Only the trigger key"]);
 });
@@ -715,22 +851,23 @@ test("every replacement feedback case posts its own colour, preserving the other
     }
 });
 
-test("Make passthrough makes one replacement case paint nothing, the list and the board say so, Off turns its LEDs dark and Give it a colour brings it back", async ({page}) => {
+test("Passthrough makes one replacement case paint nothing, the list and the board say so, Off turns its LEDs dark and Colour brings it back", async ({page}) => {
     await openReplacement(page);
-    const where = "the half holding the trigger key";
+    const where = "trigger's half";
     for (const [field, label] of CASES) {
         await body(page).locator(`[data-row="${field}"]`).click();
         await clearPosts(page);
-        const off = body(page).locator("[data-off]");
-        await expect(off).toHaveText("Make passthrough");
-        await expect(off).toHaveAttribute("data-tip", /paints nothing.*The other cases still light/);
-        await off.click();
+        const passthrough = colourState(page, "passthrough");
+        await expect(passthrough).toHaveText("Passthrough");
+        await expect(passthrough).toHaveAttribute("data-tip", /paints nothing.*The other cases still light/);
+        await passthrough.click();
         await expectPost(page, flashPost({[field]: {h: 0, s: 0, v: 0}}));
         await publishAccepted(page, ["rgb", "autocorrectFeedback", field], {h: "0", s: "0", v: "0"});
-        await expect(body(page).locator("[data-channel]")).toHaveCount(0);
+        await expect(body(page).locator("[data-channel]:enabled")).toHaveCount(0);
         await expect(body(page).locator(".colour-head .note")).toHaveText("Passthrough");
-        await expect(body(page).locator(".stage-detail .callout")).toContainText("This case is passthrough: it paints nothing");
+        await expect(body(page).locator(".stage-detail .colour-idle")).toContainText("This case is passthrough: it paints nothing");
         await expect(body(page).locator(`[data-row="${field}"]`)).toHaveText(`${label}passthrough`);
+        await expect(body(page).locator(`[data-row="${field}"] .mk-swatch`)).toHaveClass(/swatch-off/);
         for (const [other, name] of CASES.filter(([each]) => each !== field)) await expect(body(page).locator(`[data-row="${other}"]`)).toHaveText(`${name}${where}`);
         await expect(page.locator(".board-foot-text")).toContainText(`${label} is passthrough, so it does not ${field === "leadingColor" ? "light" : "flash"}`);
         // A keyboard's colour with no saturation or brightness at another hue is passthrough too.
@@ -739,16 +876,19 @@ test("Make passthrough makes one replacement case paint nothing, the list and th
         await expect(body(page).locator(`[data-row="${field}"]`)).toHaveText(`${label}passthrough`);
         // Off, from passthrough: brightness 0 with saturation, the hue kept.
         await clearPosts(page);
-        await body(page).locator("[data-leds-off]").click();
+        await colourState(page, "off").click();
         await expectPost(page, flashPost({[field]: {h: 40, s: 255, v: 0}}));
         // One with brightness alone at zero turns its LEDs off, and says so.
         await publishAccepted(page, ["rgb", "autocorrectFeedback", field], {h: "40", s: "255", v: "0"});
-        await expect(body(page).locator("[data-channel]")).toHaveCount(3);
         await expect(body(page).locator(`[data-row="${field}"]`)).toHaveText(`${label}off · ${where}`);
-        await expect(body(page).locator(".stage-detail p.note").filter({hasText: "The colour is off"})).toHaveCount(1);
+        await expect(body(page).locator(`[data-row="${field}"] .mk-swatch`)).toHaveClass(/swatch-dark/);
+        // Off is a colour, black: its hue and saturation stay editable, and the head says what it does.
+        await expect(colourState(page, "off").locator("input")).toBeChecked();
+        await expect(body(page).locator("[data-channel]:enabled")).toHaveCount(3);
+        await expect(body(page).locator(".colour-head")).not.toHaveAttribute("data-tip", /./);
         await publishAccepted(page, ["rgb", "autocorrectFeedback", field], {h: "0", s: "0", v: "0"});
         await clearPosts(page);
-        await body(page).getByRole("button", {name: "Give it a colour", exact: true}).click();
+        await colourState(page, "colour").click();
         await expectPost(page, flashPost({[field]: {h: 140, s: 255, v: 200}}));
         await publishAccepted(page, ["rgb", "autocorrectFeedback", field], Object.fromEntries(Object.entries(FLASH[field]).map(([key, value]) => [key, String(value)])));
     }
@@ -758,7 +898,7 @@ test("replacement feedback's stage switch posts its own bit, and each case's loc
     await openReplacement(page);
     const mask = await page.evaluate(async () => (await import("/webview/store.mjs")).getModel().rgb.stageEnableMask);
     expect(mask & 32).toBe(32);
-    const sw = page.locator(".bench-body .sect-h label.sw");
+    const sw = stageSwitch(page);
     await expect(sw.locator("input")).toHaveAttribute("data-f", "lighting:autocorrect:enabled");
     await expect(sw).toHaveText("Stage on");
     await sw.click();
@@ -773,18 +913,21 @@ test("replacement feedback's stage switch posts its own bit, and each case's loc
 });
 
 // Each feedback stage's flash has a length of its own, one for every case,
-// set on its tab in a section of its own (firmware settings scalars 15 and
-// 31).
+// set on its stage bar (firmware settings scalars 15 and 31).
 test("the Flash length field posts its own setting edit and keeps its focus across the accepted model", async ({page}) => {
     await openReplacement(page);
-    const where = body(page).locator("section", {has: page.locator('[data-f="setting:replacementFlash"]')});
-    await expect(where.locator("h4")).toHaveText("How long it flashes");
+    const where = body(page).locator(".stage-bar", {has: page.locator('[data-f="setting:replacementFlash"]')});
+    await expect(where.locator(".stage-bar-scope")).toHaveText("Every case");
     await expect(where.locator('[data-act="flash-interval"]')).toHaveCount(0);
     await expect(where).not.toContainText("flash interval");
     const field = where.locator('.field:has([data-f="setting:replacementFlash"])');
     await expect(field.locator("> span").first()).toHaveText("Flash length");
     await expect(field.locator(".affix i")).toHaveText("ms");
-    await expect(field.locator(".hint")).toHaveText("How long one flash lasts.");
+    // What it means is on the stage's info mark alone, never also in a tip.
+    await expect(field).not.toHaveAttribute("data-tip", /./);
+    await expect(where.locator(".info-pop")).toContainText("How long one flash lasts");
+    // Leader waiting lasts as long as the leader waits instead, set on Host settings, a link away.
+    await expect(where.locator('[data-act="leader-waits"]')).toHaveText("Leader waits →");
     const input = field.locator("input");
     await expect(input).toHaveValue("200");
     await clearPosts(page);
@@ -802,17 +945,39 @@ test("the Flash length field posts its own setting edit and keeps its focus acro
     expect(await posted(page)).toEqual([]);
 });
 
-test("Behaviour feedback's Flash interval posts its own setting and no longer speaks for replacement feedback", async ({page}) => {
+test("Behaviour feedback's Blink time posts its own setting, blinks its dot at that pace, and no longer speaks for replacement feedback", async ({page}) => {
     await openStage(page, "key");
     const field = body(page).locator('.field:has([data-f="setting:feedbackFlash"])');
-    await expect(field.locator(".hint")).toHaveText("Time for each on or off phase; a full blink takes twice this value.");
+    await expect(field).not.toHaveAttribute("data-tip", /./);
+    await expect(field).toContainText("Blink time");
+    await expect(body(page).locator(".stage-bar .info-pop")).toContainText("How fast Hold active and Long hold active blink: on for this long, then off. A single flash");
+    // While the field is being changed, and only then, the dot blinks on
+    // for the time typed, then off for as long, in the case picked's colour,
+    // following what is typed before it is saved.
+    const dot = field.locator("[data-blink]");
+    const blink = () => dot.evaluate((node) => { const style = getComputedStyle(node); return [style.animationName, style.animationDuration, style.backgroundColor]; });
+    await expect(dot).toBeHidden();
+    expect((await blink())[0]).toBe("none");
+    await field.locator("input").focus();
+    await expect(dot).toBeVisible();
+    expect(await blink()).toEqual(["blink-time", "0.4s", "rgb(200, 85, 0)"]);
+    await field.locator("input").fill("150");
+    expect((await blink())[1]).toBe("0.3s");
+    await field.locator("input").fill("200");
+    await field.locator("input").blur();
+    await expect(dot).toBeHidden();
+    // Only the holds blink, so with a tap branch picked it blinks in Hold
+    // active's colour, not the branch's.
+    await body(page).locator('[data-row="branch:0"]').click();
+    await field.locator("input").focus();
+    expect((await blink())[2]).toBe("rgb(200, 85, 0)");
     await expect(field).not.toContainText(/replacement/i);
     await expect(field).not.toHaveAttribute("data-tip", /replacement/i);
     await clearPosts(page);
     await change(field.locator("input"), 120);
     await expectPost(page, {type: "updateConfigDefaults", sectionId: "lightingFeedback", fields: [{macro: "feedbackFlash", value: "120"}], expectedFingerprint: expect.any(String)});
-    // With the tap-commit policy, one setting for every case, under its own heading.
-    await expect(body(page).locator("section", {has: page.locator('[data-f="setting:feedbackFlash"]')}).locator("h4")).toHaveText("When it flashes");
+    // One setting for every case, on the stage bar.
+    await expect(body(page).locator(".stage-bar", {has: page.locator('[data-f="setting:feedbackFlash"]')}).locator(".stage-bar-scope")).toHaveText("Every behaviour state");
 });
 
 test("the board flashes the picked replacement case from the key standing in for the one that caused it", async ({page}) => {
@@ -863,20 +1028,21 @@ test("Leader waiting holds from the Leader key, or on every key with none, takes
     await openReplacement(page, {replacementRow: "leadingColor"});
     const css = colour => page.evaluate(async (hsv) => (await import("/webview/lib/colour.mjs")).css(hsv), colour);
     const fill = key => page.locator(`.board [data-key="${key}"] .kc-rect`).evaluate(rect => getComputedStyle(rect).fill);
-    await expect(body(page).locator(".stage-detail > section").first().locator("h4")).toHaveText("Leader waiting");
-    // Under its name, what Leader waiting is: from the Leader key to the send or the end.
-    await expect(body(page).locator("[data-replacement-when]")).toHaveText("Held from the moment you press the Leader key until the leader sends a replacement or gives up. A send's text or macro flash then takes its place; when nothing is sent it just goes. It lasts as long as the leader waits, whatever the Flash length.");
+    await expect(body(page).locator(".stage-item")).toContainText("Leader waiting");
+    // Under its name, in one line, what Leader waiting is: from the Leader key to the send or the end.
+    await expect(body(page).locator("[data-replacement-when]")).toHaveText("Held, not flashed, from the Leader key until the leader sends or gives up.");
     await expect(page.locator(".board-foot-text")).toContainText("Leader waiting held, painting the half holding the trigger key · no Leader key to stand in, so it paints as when the keyboard cannot tell the key");
     await expect(page.locator(".board .kc-ring")).toHaveCount(0);
     // The demo's locality follows the key and it has no Leader key, so it paints both halves.
     for (const key of [7, 13, 49, 54]) expect(await fill(key), `key ${key}`).toBe(await css(FLASH.leadingColor));
     const where = body(page).locator('.field:has([data-f="lighting:autocorrect:leadingColor:locality"]) .hint');
-    await expect(where).toHaveText("Here the trigger key is the Leader key you pressed; for a combo, every key of it. When the Leader came from no key, Leader waiting paints both halves, or every key.");
-    await expect(body(page).locator(".field:has([data-macro=\"replacementFlash\"])")).toHaveAttribute("data-tip", /Leader waiting is no flash: it holds for as long as the leader waits/);
+    await expect(where).toHaveText("Trigger key: the Leader key you pressed.");
+    await expect(body(page).locator(".stage-bar .info-pop")).toContainText("which holds as long as the leader waits");
+    await expect(body(page).locator('[data-act="leader-waits"]')).toHaveAttribute("data-tip", /^Opens Host settings/);
     // An accent for Leader waiting alone.
     const section = body(page).locator('[data-accents="autocorrect"]');
-    await expect(section.locator("h4")).toHaveText("Accents · Leader waiting");
-    await expect(section.locator("p.note").first()).toHaveText("LEDs that light in a colour of their own while the keyboard shows Leader waiting, with those for every case: the same LEDs whichever key caused it, or none.");
+    await expect(section.locator(".accent-band")).toHaveText(["For Leader waiting", "For every case"]);
+    await expect(section.locator(".sect-h .info-pop")).toContainText("Those for every case paint first");
     await clearPosts(page);
     await section.getByRole("button", {name: "Add accent", exact: true}).click();
     const editor = section.locator(".accent-editor");
@@ -886,7 +1052,8 @@ test("Leader waiting holds from the Leader key, or on every key with none, takes
     await expectPost(page, {type: "addRgbLedGroup", group: {target: "autocorrect", owner: "AUTOCORRECT_FEEDBACK_GROUP_LEADING", ledIndices: [5], h: 77, s: 78, v: 79}});
     // Text replacement off: with no leader input the tab is off; with one,
     // the leader still waits, so the tab is live and the banner says it lights.
-    const banner = page.locator(".lighting-bench [data-master-off]");
+    // The stage bar says so in a word and goes to the switch; its tip says the rest.
+    const banner = page.locator(".lighting-bench .stage-bar [data-master-off]");
     const switchOff = (leaders) => page.evaluate(async (count) => {
         const store = await import("/webview/store.mjs");
         const model = structuredClone(store.getModel());
@@ -895,10 +1062,11 @@ test("Leader waiting holds from the Leader key, or on every key with none, takes
         store.setModel(model); store.render();
     }, leaders);
     await switchOff(0);
-    await expect(banner).toContainText("This stage paints nothing.");
+    await expect(banner).toHaveText("Text replacement is off →");
+    await expect(banner).toHaveAttribute("data-tip", /^This stage paints nothing\. Turn it on in /);
     await expect(page.locator('[data-ltab="autocorrect"]')).toHaveClass(/off/);
     await switchOff(1);
-    await expect(banner).toContainText("Words you finish never flash; Leader waiting still lights, and what the Leader key sends still flashes, in the text or macro colour.");
+    await expect(banner).toHaveAttribute("data-tip", /^Words you finish never flash; Leader waiting still lights, and what the Leader key sends still flashes, in the text or macro colour\./);
     await expect(page.locator('[data-ltab="autocorrect"]')).not.toHaveClass(/off/);
     expect(await fill(13)).toBe(await css(FLASH.leadingColor));
 });
@@ -906,12 +1074,11 @@ test("Leader waiting holds from the Leader key, or on every key with none, takes
 test("a replacement feedback accent is added for the picked case or every case, changed and removed", async ({page}) => {
     await openReplacement(page, {replacementRow: "undoColor"});
     const section = body(page).locator('[data-accents="autocorrect"]');
-    await expect(section.locator("h4")).toHaveText("Accents · Replacement undone");
-    await expect(section.locator("p.note").first()).toHaveText("LEDs that light in a colour of their own while the keyboard shows Replacement undone, with those for every case: the same LEDs whichever key caused it, or none.");
-    // The compiled accent for every case is listed on each case, tagged.
+    await expect(section.locator(".accent-band")).toHaveText(["For Replacement undone", "For every case"]);
+    // The compiled accent for every case is listed on each case, under every case's band.
     const row = section.locator('[data-accent="autocorrect:0"]');
     await expect(row.locator(".accent-leds")).toHaveText("LEDs 24–28, 53–55");
-    await expect(row.locator(".tag")).toHaveText("Every case");
+    await expect(row.locator('[data-act="change"]')).toHaveAttribute("data-tip", "Changes it for every case.");
     await expect(row.locator(".accent-colour")).toContainText("Same as the case's colour");
     await section.getByRole("button", {name: "Add accent", exact: true}).click();
     const editor = section.locator(".accent-editor");

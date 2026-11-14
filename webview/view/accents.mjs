@@ -98,13 +98,17 @@ export function ownerPlace(model, target, owner) {
 }
 
 // An owner's mark, as the review marks the same accent: the layer's or
-// pointing mode's icon in its colour, a behaviour state's tier dot; none for
+// pointing mode's icon in its colour, a behaviour state's tier dot, a tap
+// branch's badge, and every tap branch's the badge of every count; none for
 // the owner that is all of them, or combo feedback's.
 /** @param {Model} model @param {AccentTable} target @param {string} owner @returns {import("../../contracts/model.js").ReviewMark | null} */
 export function ownerMark(model, target, owner) {
     const place = ownerPlace(model, target, owner);
     if (place.layer !== undefined) return {kind: "layer", layer: place.layer};
     if (place.slot !== undefined) return {kind: "pointing", slot: place.slot};
+    if (place.group) return {kind: "branches"};
+    const branch = target === "keyBehavior" ? tapBranchOf(String(place.feedbackRow || "")) : null;
+    if (branch !== null) return {kind: "branch", count: branch + 2};
     const tier = target === "keyBehavior" && !place.every ? vocabulary(model).feedbackTiers[owner] : undefined;
     return tier ? {kind: "tier", tier} : null;
 }

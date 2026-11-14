@@ -289,6 +289,21 @@ The words that open at the pointer when it rests on a control, saying what
 the control does or what it shows in full.
 _Avoid_: tooltip, title, hover text
 
+**Info mark**:
+A small circled i beside a heading, on a stage bar or on the board's corner,
+whose list of terms and what each means opens while the pointer or the focus
+is on it (D-L88, D-L95). It holds what is read once, how a section works or
+what its choices mean, so the screen keeps only what is needed every time.
+_Avoid_: help icon, tooltip (that is a tip), info button
+
+**Stage bar**:
+The strip across the top of every Lighting stage that holds what is the
+whole stage's (D-L95): its name and what it does behind an info mark, the
+settings every item on it shares, whether a switch elsewhere keeps it from
+painting, and its **Stage on** switch at the end. Under it, the item picked
+in the stage's list heads what is its own alone.
+_Avoid_: stage header, toolbar, banner (that says a global switch is off)
+
 **Keycode picker**:
 The dialog that chooses what a key, branch, shortcut or output sends.
 _Avoid_: key picker, keycode chooser, selector
@@ -321,8 +336,8 @@ _Avoid_: LED group, LED override, group row, assignment
 A colour that paints nothing, so what is beneath it shows through: for a
 layer, the layers on under it or the background effect; for a pointing mode,
 combo feedback or a feedback case, whatever the stages before it paint
-(D-L94, firmware D-F74). Ark stores it as HSV(0, 0, 0) with **Make
-passthrough**; the keyboard treats any colour a layer, a pointing slot, combo
+(D-L94, firmware D-F74). Ark stores it as HSV(0, 0, 0) with the
+**Passthrough** choice; the keyboard treats any colour a layer, a pointing slot, combo
 feedback or a feedback case owns with no saturation or brightness so, at any
 hue. Its accents in a colour of their own still light. It is not **off**,
 brightness zero with some saturation, whose LEDs go dark. An accent's
@@ -332,8 +347,8 @@ _Avoid_: no colour, off (for passthrough), transparent (that is a key)
 
 **Off** (a colour):
 Brightness zero with some saturation: a colour whose LEDs go dark, covering
-what is beneath, stored with the **Off** choice beside **Make passthrough**
-(D-L94). Not passthrough, which paints nothing and lets what is beneath show.
+what is beneath, stored with the **Off** choice beside **Colour** and
+**Passthrough** (D-L94, D-L95). Not passthrough, which paints nothing and lets what is beneath show.
 _Avoid_: black (in anything a person reads)
 
 **Behaviour feedback**:
@@ -344,8 +359,10 @@ committed**, **Hold active**, **Long hold active**) and each tap branch
 pending (**Double tap**, **Triple tap**, **Quadruple tap**, **Quintuple tap**,
 the last for every deeper count too), each with its own colour, locality and
 accents (D-L93, firmware D-F73); an accent lights for one case, for **Every
-tap branch** (firmware D-F75), or for **Every behaviour state**. Its tap-commit policy and **Flash interval**, how long one
-on or off phase lasts, are one setting for every case. The
+tap branch** (firmware D-F75), or for **Every behaviour state**. Its
+tap-commit policy, **Flash on a double tap or more**, is Tap committed's
+alone, on that case's pane; its **Blink time**, how long the key stays on,
+then off, in each blink, is one setting for every case, on its stage bar. The
 firmware's code and Ark's keep the stage's old name: the stage id `key`, the
 record `keyFeedback`, the accent table `keyBehavior`, the edit
 `updateKeyBehaviorFeedback`.

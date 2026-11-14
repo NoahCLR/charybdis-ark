@@ -56,17 +56,33 @@ layers in view reach:
   per tab. A pick made elsewhere scrolls its row into the pane; unfolding a
   group does not (`tests/view/scroll.test.mjs`,
   `browser-tests/keys-workbench.spec.js`).
+- Every Lighting stage is laid out the same (D-L95, `stageSurface`,
+  `webview/ui/lighting/common.mjs`): its stage bar across the top, then a
+  first column (its list, or the background effect's and the fade's own
+  settings), the colour beside where it paints, and the accents under them;
+  on a stage with a list, the item picked heads its colour, where it paints
+  and its accents, its mark and name over a line saying where it paints
+  (`itemHead`), or for a behaviour or replacement case when it shows, one
+  line at 1280px (`vocabulary.feedbackWhen`, `replacementWhen`). So the colour
+  editor, Where it paints and Add accent keep their place between tabs
+  (`browser-tests/lighting-controls.spec.js`).
 - Lighting's lists beside an editor (layers, pointing modes, combos, feedback
   colours) are the same grouped table (`groupedTable`, `webview/ui/groups.mjs`),
-  in the same 330px column stretched beside the editor, its workbench as
+  in the same 330px column (280px where the stage tabs read by their short
+  words) stretched beside the editor, its workbench as
   tall as its tallest stage with a list whichever is open, as the Keys
   workbench takes the Behaviours tab's (`matchTallestStageHeight`,
-  `webview/ui/lighting/stage-body.mjs`), so the two workbenches read alike: its column header, a counted band per group that
+  `webview/ui/lighting/stage-body.mjs`); that floor is rebuilt from the
+  stages on each render, never from the height the last one carried, so an
+  accent editor that grew the workbench gives the room back once it closes. The two workbenches read alike: its column header, a counted band per group that
   folds (Behaviour feedback's tiers and tap branches; Replacement feedback's
   cases; the combos, parted into those
   lighting combo feedback and those holding a layer), rows ruled as
   a table's that pick themselves (`pickRow`, `pickButton`, `attachPickRows`),
-  the picked one shaded with the bar and kept in view. The layers and slots
+  the picked one shaded with the bar and kept in view; Combo feedback's list,
+  which picks only the combo the board holds, rings the one held instead
+  (`preview-picks`). A list says where each item paints in a word or two
+  (`localitiesBrief`), so a row stays one line. The layers and slots
   in use sit under an "In use" band, and the empty ones fold under the last,
   "Empty layers" or "Empty slots", counted, keeping the open state the
   disclosure elsewhere keeps (D-L76) (`browser-tests/lighting-controls.spec.js`,
@@ -186,9 +202,11 @@ The same kind of control looks and sits the same on every screen.
   does carry one amber banner across their top while it is off, which goes to
   that switch on its Settings screen and marks its row. Lighting's Auto-mouse
   fade, Combo feedback, Behaviour feedback and Replacement feedback tabs read off
-  and carry the same banner while Auto-mouse, combos' or behaviours' master
-  switch, or Text replacement's switch, keeps them from painting
-  (`stageIdle`). All of them stay editable
+  while Auto-mouse, combos' or behaviours' master switch, or Text
+  replacement's switch, keeps them from painting (`stageIdle`); their stage
+  bar is tinted and says so in a word that goes to that switch, the
+  banner's sentence in its tip, so the stage keeps its place (`stageBar`).
+  All of them stay editable
   (`browser-tests/participation.spec.js`). Closed, Timings wears the mark of each timing the behaviour sets, after its name
   (**Marks**), and none when all follow the defaults
   (`browser-tests/participation.spec.js`).
@@ -332,17 +350,35 @@ The same kind of control looks and sits the same on every screen.
   without saying so: an end with more tabs past it fades, and while it does
   not fit an arrow at each end, outside what scrolls, moves it a page; Rename &
   reorder stays outside it (`keepInView`, `webview/ui/layerbar.mjs`).
-  Lighting's stage tabs and All accents fit a 1440px window (no test).
+  Lighting's stage tabs and All accents fit a 1440px window by their names,
+  and a 1280px one by their short words (`stages[].short`), the stage bar
+  naming the stage whole; widths are fixed, so picking a tab moves none.
 - A Keymap workbench tab's own actions sit in its body, by what they open:
   New combo heads the combo builder's column, centred on the table's first
   group band, and stays put when the builder opens under it. The tab bar carries only a tab's way to its screen, centred on the bar
   (`tabCombos`, `webview/ui/keys/combos-tab.mjs`;
   `browser-tests/keys-workbench.spec.js`).
-- A stage's on/off switch rides at the far end of the header line of the
-  section that says where or when the stage paints (Where it paints, When and
-  where, Timing), the body's last column, never in the tab strip or on a row
-  of its own (`stageSwitch`,
-  `webview/ui/lighting/common.mjs`; `browser-tests/lighting-controls.spec.js`).
+- A Lighting stage's stage bar (D-L95, `stageBar`,
+  `webview/ui/lighting/common.mjs`) holds what is the whole stage's, in the
+  same place on every tab: its name and what it does behind an info mark;
+  the settings every item on it shares, under the words its accents use for
+  all of them (Behaviour feedback's Blink time under Every behaviour
+  state, Replacement feedback's Flash length under Every
+  case); a note saying what is the items' own where there is nothing shared;
+  whether a switch elsewhere keeps it from painting; and its Stage on switch,
+  always the bar's last item (`stageSwitch`). The bar keeps one line at
+  1280px (`browser-tests/lighting-controls.spec.js`).
+- Lighting explains behind info marks (`webview/ui/lighting/help.mjs`): what
+  each stage does on its stage bar, what a section's choices mean on its
+  heading (Effect, Which LEDs light up, Fade, Timing, and the same Locality
+  rows on every Where it paints, with that stage's trigger key), how accents
+  work on the Accents heading, and the board's shortcuts on its corner.
+  Visible stays what is needed every time: a range or unit, a live value,
+  the one line saying when a replacement case shows and which key it
+  follows, refusals and state. A tip is one control's one line, what it does
+  or what pressing it changes (Stage on, a shared accent's Change and
+  Remove); it never explains what the info mark explains, nor repeats the
+  hint under it.
 - The commit bar floats over the screen's foot but covers none of it: while
   it shows, the screen's scrolling area ends above it, by its height as drawn
   (`reserveCommitRoom`, `webview/ui/frame.mjs`;
@@ -526,8 +562,8 @@ macro and a custom key, which have none:
   a reach's source ("on ▦ Base, ▦ Numbers when held"), on every Keymap tab
   and the Behaviours tab's notes; the Key tab's headings and notes; why a
   behaviour or combo is not used, there and in the hover card; the board's
-  preview caption on Keymap and Lighting; a layer's colour heading and an
-  accent list's heading and note on Lighting; the keycode picker's header,
+  preview caption on Keymap and Lighting; the layer picked heading its own
+  settings and the group of its accents on Lighting; the keycode picker's header,
   its Layers list and its armed Tap-hold; Settings' sniping keys; and a
   pointing mode's notes. Words the view writes that name layers are a
   `Phrase` (`webview/view/vocabulary.mjs`): text with each layer kept in its
@@ -1427,23 +1463,32 @@ What the board shows and the line under it are `lightingBoard`
 
 Accents (D-L77) are edited on the tab of the stage that paints them, for the
 owner it has picked (`accentOwner`), listing that owner's own accents and
-those of the owner that is all of them, tagged, in paint order and edited
-there too, and, on a layer above Base, Base's, edited on Base (`accentsFor`,
-`webview/view/accents.mjs`; `tests/view/accents.test.mjs`). There is no
+those of the owner that is all of them, edited there too, and, on a layer
+above Base, Base's, edited on Base (`accentsFor`,
+`webview/view/accents.mjs`; `tests/view/accents.test.mjs`). They are grouped
+by whom they light for, each group named: the owner picked's own, a group of
+owners (Every tap branch), all of them, Base's; Change and Remove on a shared
+one say whom they change it for, and the count under them is the keyboard's
+("On the keyboard"). An accent that takes its stage's colour shows that
+colour beside "Same as …". There is no
 switch to the owner that is all of them: an accent's own Lights for chooses it.
 No group is shown: an accent names its LEDs by index in core's words
 (`leds`, `ledsCalled`), core shares and drops groups as accents change, and
 the budget is the profile's usage counts (`accentBudget`). An accent's LEDs
 are picked on the lit board by press or drag (`onLed`, `webview/ui/board.mjs`),
 which shows them in its colour, the stage's when it takes the stage's
-(`stageShade`); nothing posts until it is kept, and a changed accent keeps its
+(`stageShade`); Add and Change bring the board into view, and Keep, Cancel
+and Clear LEDs sit in the row under it while LEDs are picked, as well as at
+the editor's foot (`accentActions`), whose colour editor is as wide as the
+stage's; nothing posts until it is kept, and a changed accent keeps its
 place in its table (`browser-tests/lighting-controls.spec.js`). An unkept
 accent names its row by place, so a draft replaced under it drops it
 (`tests/view/state-fields.test.mjs`). Pointing at an accent in a list, or at
 an owner's line on All accents, glows its LEDs on the board; a click on the
 row, or Enter or Space on the button naming it (`aria-pressed`), keeps them
 glowing across redraws and scrolling until it is clicked again or another
-is, and pointing at another shows that one only while pointed at
+is, and pointing at another shows that one only while pointed at; Open on
+All accents lands on the stage with the owner's first accent shown
 (`shownLeds`, `webview/ui/lighting/accents.mjs`;
 `browser-tests/lighting-controls.spec.js`). The accent shown names its row by
 place, so a replaced draft lets it go, and none is shown while an accent is
@@ -1453,15 +1498,20 @@ Brightness is absolute HSV; the reported limit constrains editing and never
 rescales a read (`tests/session/base-rgb.test.js`). Passthrough is zero
 saturation and brightness, at any hue, for every owned colour
 (`colourPaints`, `isPassthrough`, D-L94); off is zero brightness with
-saturation, its LEDs dark (`isOff`), which the colour editor stores with
-**Off** beside **Make passthrough**, and lists and Review say
-**passthrough** or **off**; LED-row
+saturation, its LEDs dark (`isOff`). The colour editor sets an owned colour
+with one choice beside its value, **Colour**, **Off** and **Passthrough**
+(`colour-state`, `webview/ui/colour-editor.mjs`): Colour brings back the hue
+and saturation Off kept. A passthrough colour keeps its square and fields,
+dimmed and inert under what it means, so the editor is the same size
+whatever the colour; an Off one stays editable, as the black it is. Lists
+and Review say **passthrough** or **off**, and a list's or tab's swatch is
+hatched for passthrough and dark, struck through, for off (`swatchOf`); LED-row
 inheritance is all three channels zero, distinct from an explicit black
 (`tests/view/lighting.test.mjs`, `tests/view/colour.test.mjs`); the auto-mouse
 end colour is literal. Zero brightness never hides the stored hue and
 saturation (`browser-tests/review-regressions.spec.js`).
 Each Behaviour feedback and Replacement feedback case has its own Locality
-under **Where it paints**, posted with only that case's locality changed
+under **Where it paints**, beside its colour, posted with only that case's locality changed
 (`keyFeedbackLocality`, `autocorrectFeedbackLocality`,
 `tests/view/edits.test.mjs`, `browser-tests/lighting-controls.spec.js`),
 and each tap branch is an accent owner of its own (D-L93), with **Every tap

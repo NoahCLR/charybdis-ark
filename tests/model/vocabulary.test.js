@@ -30,6 +30,7 @@ test("every stored enum value has a word", () => {
     covers(VOCABULARY.holdStyles.long, KEY_BEHAVIOR_HOLD_STYLES, "hold styles under Long hold");
     covers(VOCABULARY.holdWithoutLongHold, KEY_BEHAVIOR_HOLD_STYLES, "holds without a long hold");
     covers(VOCABULARY.localities, rgb.RGB_LOCALITIES, "localities");
+    covers(VOCABULARY.localitiesBrief, rgb.RGB_LOCALITIES, "localities, briefly");
     covers(VOCABULARY.paintModes, rgb.RGB_LAYER_MODES, "layer paint modes");
     covers(VOCABULARY.paintModesBrief, rgb.RGB_LAYER_MODES, "layer paint modes, briefly");
     covers(VOCABULARY.fadeModes, rgb.RGB_AUTOMOUSE_MODES, "auto-mouse fades");
@@ -107,14 +108,16 @@ test("every accent table has its words, by the target its edits name, and an own
     // each naming its own case: every case but the one that is all of them.
     assert.deepEqual(Object.keys(VOCABULARY.replacementColourOwners), ["textColor", "macroColor", "undoColor", "leadingColor"]);
     assert.deepEqual(Object.values(VOCABULARY.replacementColourOwners).map(owner => RGB_AUTOCORRECT_SEMANTICS[owner]), [0, 1, 2, 3]);
-    // Each case says when it shows, Leader waiting that it is held while the leader waits.
+    // Each case says when it shows, in one line under its name, Leader
+    // waiting that it is held while the leader waits.
     assert.deepEqual(Object.keys(VOCABULARY.replacementWhen), Object.values(VOCABULARY.replacementColourOwners));
-    assert.match(VOCABULARY.replacementWhen.AUTOCORRECT_FEEDBACK_GROUP_LEADING, /^Held from the moment you press the Leader key until the leader sends a replacement or gives up\./);
+    assert.match(VOCABULARY.replacementWhen.AUTOCORRECT_FEEDBACK_GROUP_LEADING, /^Held, not flashed, from the Leader key until the leader sends or gives up\.$/);
+    for (const line of Object.values(VOCABULARY.replacementWhen)) assert.ok(line.length <= 90, `"${line}" fits one line under the case's name`);
 });
 
 test("replacement feedback is named for what a person calls the feature, and never autocorrect", () => {
     const stage = VOCABULARY.stages.at(-1);
-    assert.deepEqual(stage, {id: "autocorrect", label: "Replacement feedback", bit: rgb.RGB_STAGE_BITS.AUTOCORRECT}, "the last stage painted, by the firmware's name for it in code and Ark's on screen");
+    assert.deepEqual(stage, {id: "autocorrect", label: "Replacement feedback", short: "Replacement", bit: rgb.RGB_STAGE_BITS.AUTOCORRECT}, "the last stage painted, by the firmware's name for it in code and Ark's on screen");
     assert.deepEqual(VOCABULARY.replacementOwners.map(([, words]) => words), ["Every case", "Replaced with text", "Replaced by a macro", "Replacement undone", "Leader waiting"]);
     const read = [...VOCABULARY.replacementOwners.map(([, words]) => words), stage.label, ...Object.values(VOCABULARY.colourOff.autocorrect), ...Object.values(VOCABULARY.lightingLists.replacements),
         VOCABULARY.accents.autocorrect.when, VOCABULARY.accents.autocorrect.every, VOCABULARY.accents.autocorrect.stageColour];
@@ -122,7 +125,6 @@ test("replacement feedback is named for what a person calls the feature, and nev
     // A case of saturation and value 0 is passthrough, as every owned colour
     // is (D-L94, firmware D-F74), whether it flashes or, as Leader waiting
     // does, holds.
-    assert.equal(VOCABULARY.colourOff.autocorrect.offAction, "Make passthrough");
     assert.equal(VOCABULARY.colourOff.autocorrect.offWord, "Passthrough");
     assert.match(VOCABULARY.colourOff.autocorrect.offNote, /paints nothing/);
 });
@@ -135,8 +137,9 @@ test("an accent's LEDs read by index, a run of three or more as a range", () => 
     assert.equal(ledsCalled([56]), "LED 56");
 });
 
-test("tap commit names the taps it flashes for: a double tap or more", () => {
-    assert.equal(word(VOCABULARY.tapCommit, "KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS"), "Double taps and more");
+test("tap commit is Tap committed's flash on a double tap or more, on or off", () => {
+    assert.equal(VOCABULARY.lightingFields.doubleTapFlash, "Flash on a double tap or more");
+    assert.deepEqual(VOCABULARY.tapCommit.map(([, text]) => text), ["Off", "On"]);
 });
 
 test("an unknown value reads as itself, never as nothing", () => {
