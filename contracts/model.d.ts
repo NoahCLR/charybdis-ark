@@ -176,6 +176,9 @@ export interface Vocabulary {
     replacementOwners: WordList<string>;
     /** When each Replacement feedback case shows, by its RGB_AUTOCORRECT_SEMANTICS name. */
     replacementWhen: Readonly<Record<string, string>>;
+    /** When each Behaviour feedback case shows, and how, by its owner. */
+    feedbackWhen: Readonly<Record<string, string>>;
+    tapCommittedFlash: string;
     /** The case (an RGB_AUTOCORRECT_SEMANTICS name) each Replacement feedback colour shows, by the colour's field. */
     replacementColourOwners: Readonly<Record<AutocorrectFeedbackColourField, string>>;
     /** The groups of Lighting's lists beside an editor. */

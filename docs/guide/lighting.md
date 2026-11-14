@@ -51,7 +51,8 @@ share. Across its top, the **stage bar** holds what is the whole stage's:
 Under the bar sits the stage's list, or its own settings, then its colour
 beside **Where it paints**, then its accents. On a stage with a list, the
 item picked heads its colour, where it paints and its accents, which are its
-alone, with a line saying where it paints. The **ⓘ** beside a heading says
+alone, with a line saying where it paints, or, for a feedback case, when it
+shows. The **ⓘ** beside a heading says
 what that section's choices mean.
 
 ### Colours
@@ -181,16 +182,23 @@ controls stay editable. Click those words to go to that switch.
 
 ### Behaviour feedback
 
-The state of a key's behaviour: the colours a key flashes as its behaviour
-fires. Each is a **case** with its own colour, its own place to paint and
-its own accents, in two groups, as the behaviour grid has a column per tier
-and a row per tap count:
+The state of a key's behaviour: the colours a key lights in as its
+behaviour fires, steady, blinking or in one flash. Each is a **case** with
+its own colour, its own place to paint and its own accents, in two groups,
+as the behaviour grid has a column per tier and a row per tap count:
 
-- **Tiers**: **Tap committed**, **Hold active** and **Long hold active**
-  flash as that tier fires.
+- **Tiers**:
+  - **Tap committed** is steady while a key is held on a tap with no hold,
+    once the multi tap window has passed, and can flash once after a double
+    tap or more (below).
+  - **Hold active** blinks while the hold's action is held or repeating, and
+    is steady while the hold is reached but not yet sent.
+  - **Long hold active** does the same for the long hold.
 - **Tap branches**: **Double tap**, **Triple tap**, **Quadruple tap** and
-  **Quintuple tap**, each flashed while a run of taps waits on that count.
-  A deeper run takes **Quintuple tap**'s.
+  **Quintuple tap**, each steady while a run of taps waits on that count;
+  they never blink. A deeper run takes **Quintuple tap**'s.
+
+The case picked heads its pane with a line saying when it shows and how.
 
 The list says beside each case where it paints, in a word or two (**trigger's
 half**, **trigger key**), or **passthrough** or **off**. Pick a case to change
@@ -198,17 +206,18 @@ its colour and, under **Where it paints** beside it, its **Locality**, with
 the same choices as a pointing mode; the trigger key is the key showing it,
 or every key of a combo. Changing it changes that case alone.
 
-**Tap committed** shows while a key is held on a tap with no hold, once the
-multi tap window has passed. Its pane also has **When it flashes**, with
+**Tap committed**'s pane also has **When it flashes**, with
 **Flash on a double tap or more**: **On**, it also flashes once as a double
 tap or more fires, unless that sends a layer or pointing key, whose own stage
 shows it; **Off**, it shows only while held. A single tap gets no flash
 either way, and the tap branches are not touched by it.
 
 On the stage bar, under **Every behaviour state**, one setting for every
-case: **Blink time**, how long the key stays on, then off, in each blink; a
-single flash lasts one of these. While you change it, a dot after it blinks
-at that pace, in the colour of the case picked.
+case: **Blink time**, how fast Hold active and Long hold active blink: on
+for this long, then off. A single flash, such as Tap committed's after a
+double tap, lasts one of these. While you change it, a dot after it blinks at
+that pace, in Long hold active's colour while that is picked, else Hold
+active's.
 
 When keys show cases in different places at once, a narrower place paints
 over a wider one, and where they share one the newest key decides.

@@ -205,10 +205,23 @@ test("every behaviour feedback case's Locality posts that case's locality alone,
     await publishAccepted(page, ["rgb", "keyBehaviorFeedback", "holdActiveLocality"], "RGB_BOTH_HALVES");
     await expect(body(page).locator('[data-row="holdActiveColor"] td').nth(1)).toHaveText("all LEDs");
     await expect(body(page).locator('[data-row="tapCommittedColor"] td').nth(1)).toHaveText("trigger's half", "the other cases keep theirs");
-    // The case picked heads its own settings, saying where it paints whole.
+    // The case picked heads its own settings, saying when it shows and how:
+    // only the holds blink; a tap branch is steady; Tap committed is steady
+    // and, under the tap-commit policy On, also flashes once.
     await body(page).locator('[data-row="holdActiveColor"]').click();
     await expect(body(page).locator(".stage-item")).toContainText("Hold active");
-    await expect(body(page).locator(".stage-item .note")).toHaveText("Paints all LEDs");
+    const when = body(page).locator(".stage-item [data-replacement-when]");
+    await expect(when).toHaveText("Blinks while its action is held; steady before it sends");
+    await body(page).locator('[data-row="branch:0"]').click();
+    await expect(when).toHaveText("Steady while a run of taps waits on a double tap");
+    await body(page).locator('[data-row="tapCommittedColor"]').click();
+    await expect(when).toHaveText("Steady while a tap with no hold is held; one flash after a double tap or more");
+    // Every case's line fits its head on one line at 1280px.
+    await page.setViewportSize({width: 1280, height: 900});
+    for (const row of ["tapCommittedColor", "holdActiveColor", "longHoldActiveColor", "branch:3"]) {
+        await body(page).locator(`[data-row="${row}"]`).click();
+        expect(await when.evaluate((node) => node.scrollWidth <= node.clientWidth), row).toBe(true);
+    }
 });
 
 // Each tap branch is its own accent owner (D-L93, firmware D-F73).
@@ -937,7 +950,7 @@ test("Behaviour feedback's Blink time posts its own setting, blinks its dot at t
     const field = body(page).locator('.field:has([data-f="setting:feedbackFlash"])');
     await expect(field).not.toHaveAttribute("data-tip", /./);
     await expect(field).toContainText("Blink time");
-    await expect(body(page).locator(".stage-bar .info-pop")).toContainText("a single flash lasts one of these");
+    await expect(body(page).locator(".stage-bar .info-pop")).toContainText("How fast Hold active and Long hold active blink: on for this long, then off. A single flash");
     // While the field is being changed, and only then, the dot blinks on
     // for the time typed, then off for as long, in the case picked's colour,
     // following what is typed before it is saved.
@@ -953,6 +966,11 @@ test("Behaviour feedback's Blink time posts its own setting, blinks its dot at t
     await field.locator("input").fill("200");
     await field.locator("input").blur();
     await expect(dot).toBeHidden();
+    // Only the holds blink, so with a tap branch picked it blinks in Hold
+    // active's colour, not the branch's.
+    await body(page).locator('[data-row="branch:0"]').click();
+    await field.locator("input").focus();
+    expect((await blink())[2]).toBe("rgb(200, 85, 0)");
     await expect(field).not.toContainText(/replacement/i);
     await expect(field).not.toHaveAttribute("data-tip", /replacement/i);
     await clearPosts(page);

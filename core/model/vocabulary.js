@@ -592,6 +592,23 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
         AUTOCORRECT_FEEDBACK_GROUP_UNDO: "Flashes once as Backspace, straight after a replacement, puts the word back.",
         AUTOCORRECT_FEEDBACK_GROUP_LEADING: "Held, not flashed, from the Leader key until the leader sends or gives up.",
     },
+    // When each Behaviour feedback case shows, and how, in a line short
+    // enough to head its pane at 1280px as replacementWhen heads a
+    // replacement case's (firmware rgb-domain-v1, key runtime feedback.c):
+    // only Hold active and Long hold active blink, at the Blink time; the
+    // rest are steady, and Tap committed may also flash once
+    // (tapCommittedFlash, joined after "; " under the tap-commit policy On).
+    // The stage's info mark says the rest.
+    feedbackWhen: {
+        KEY_FEEDBACK_GROUP_TAP_COMMITTED: "Steady while a tap with no hold is held",
+        KEY_FEEDBACK_GROUP_HOLD_ACTIVE: "Blinks while its action is held; steady before it sends",
+        KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE: "Blinks while its action is held; steady before it sends",
+        KEY_FEEDBACK_GROUP_TAP_COUNT_2: "Steady while a run of taps waits on a double tap",
+        KEY_FEEDBACK_GROUP_TAP_COUNT_3: "Steady while a run of taps waits on a triple tap",
+        KEY_FEEDBACK_GROUP_TAP_COUNT_4: "Steady while a run of taps waits on a quadruple tap",
+        KEY_FEEDBACK_GROUP_TAP_COUNT_5: "Steady while a run of taps waits on a quintuple tap or more",
+    },
+    tapCommittedFlash: "one flash after a double tap or more",
     // The case each Replacement feedback colour shows, by the colour's
     // field, in the order the keyboard stores them. The tab lists its
     // colours by it, the review names them by it, and an accent of the case
@@ -636,8 +653,8 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     // one shows.
     lightingLists: {
         inUse: "In use",
-        tiers: {title: "Tiers", tip: "Flash as a key's tap, hold or long hold fires."},
-        tapBranches: {title: "Tap branches", tip: "Flash while a run of taps waits on that tap count, until it resolves."},
+        tiers: {title: "Tiers", tip: "Light as a key's tap, hold or long hold fires."},
+        tapBranches: {title: "Tap branches", tip: "Light, steady, while a run of taps waits on that tap count, until it resolves."},
         replacements: {title: "Cases", tip: "One flash as text replacement changes what was typed, in the colour of what it did, and a colour held while the leader waits."},
         comboFeedback: {title: "Combo feedback", empty: "No combo on this view lights combo feedback.", tip: "The combos on this view that light combo feedback while held. Pick one for the board to hold it."},
         holdLayer: {title: "Hold a layer", empty: "No combo on this view holds a layer.", tip: "Combos whose output holds a layer. They light no combo feedback: the layer's own light shows the hold."},

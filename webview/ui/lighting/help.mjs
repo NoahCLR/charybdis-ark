@@ -10,7 +10,7 @@
 import {infoMark} from "../info-mark.mjs";
 import {modifierKey} from "../../view/shortcuts.mjs";
 import {accentBudget} from "../../view/accents.mjs";
-import {listed, vocabulary, word} from "../../view/vocabulary.mjs";
+import {vocabulary, word} from "../../view/vocabulary.mjs";
 import {sectionPath, sectionsIn} from "../../view/settings-layout.mjs";
 
 /** @typedef {import("../info-mark.mjs").InfoRow} InfoRow */
@@ -96,10 +96,13 @@ export function stageInfo(model, id) {
         case "key": {
             const tiers = ["KEY_FEEDBACK_GROUP_TAP_COMMITTED", "KEY_FEEDBACK_GROUP_HOLD_ACTIVE", "KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE"].map(flash);
             const [first, deepest] = [flash("KEY_FEEDBACK_GROUP_TAP_COUNT_2"), flash("KEY_FEEDBACK_GROUP_TAP_COUNT_5")];
-            return mark("How behaviour feedback paints", "While a key's behaviour fires, the key flashes the colour of what fired. Each case has its own colour, place and accents; how fast it flashes is one setting for every case.", [
-                row(words.lightingLists.tiers.title, `${listed(tiers)} flash as that tier fires.`),
-                row(words.lightingLists.tapBranches.title, `${first} to ${deepest}, each flashed while a run of taps waits on that count. A deeper run takes ${deepest}'s.`),
-                row(interval, "How long the key stays on, then off, in each blink; a single flash lasts one of these. While you change it, a dot beside it blinks at that pace."),
+            const [committed, hold, long] = tiers;
+            return mark("How behaviour feedback paints", "While a key's behaviour fires, the key lights in the colour of what it is doing: steady, blinking, or one flash. Each case has its own colour, place and accents; how fast it blinks is one setting for every case.", [
+                row(committed, `Steady while a key is held on a tap with no hold, once the multi tap window has passed; ${words.tapCommittedFlash}, if ${words.lightingFields.doubleTapFlash} is on.`),
+                row(hold, "Blinks while the hold's action is held or repeating; steady while the hold is reached but not yet sent."),
+                row(long, "The same, for the long hold."),
+                row(words.lightingLists.tapBranches.title, `${first} to ${deepest}, each steady while a run of taps waits on that count, until it resolves; they never blink. A deeper run takes ${deepest}'s.`),
+                row(interval, `How fast ${hold} and ${long} blink: on for this long, then off. A single flash, such as ${committed}'s after a double tap, lasts one of these. While you change it, a dot beside it blinks at that pace.`),
                 row("No key has it", "The keyboard never shows that case, and the board shows nothing for it."),
                 row("Marks", "The board's behaviour dots and the behaviour grid's branch numbers wear these colours."),
                 row("Board", "The case picked, from the first key whose behaviour has it, ringed when its Locality follows the key.")]);
@@ -146,11 +149,11 @@ export function sectionInfo(model, id) {
             row(word(words.fadeModes, "END_COLOR_ON_ALL_KEYS"), "The end colour on every LED.")]);
         case "key:commit": {
             const committed = word(words.feedbackOwners, "KEY_FEEDBACK_GROUP_TAP_COMMITTED");
-            return mark(`About when ${committed} flashes`, "When it flashes", `${committed} shows while a key is held on a tap with no hold, once the multi tap window has passed.`, [
+            return mark(`About when ${committed} flashes`, "When it flashes", `${committed} is steady while a key is held on a tap with no hold, once the multi tap window has passed.`, [
                 row(word(words.tapCommit, "KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS"), "It also flashes once as a double tap or more fires, unless that sends a layer or pointing key, whose own stage shows it."),
                 row(word(words.tapCommit, "KEY_FEEDBACK_TAP_COMMIT_OFF"), "It shows only while held."),
                 row("A single tap", "Gets no flash either way."),
-                row(words.lightingLists.tapBranches.title, "Flash while a run of taps waits on their count, either way.")]);
+                row(words.lightingLists.tapBranches.title, "Light while a run of taps waits on their count, either way.")]);
         }
         case "auto:timing": {
             const hold = setting("mouseFadeHold");

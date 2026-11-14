@@ -8,7 +8,7 @@ import {isOff, isPassthrough, offWording, swatchOf} from "../../view/lighting.mj
 import {branchName, vocabulary, word} from "../../view/vocabulary.mjs";
 import * as edits from "../../view/edits.mjs";
 import {localityOf} from "../../view/edits.mjs";
-import {colourControl, flashSetting, itemHead, lightingGroup, localityField, localityWhole, paintsCell, paintsLine, pickedMarked, section, stack, stageSurface} from "./common.mjs";
+import {colourControl, flashSetting, itemHead, lightingGroup, localityField, localityWhole, paintsCell, pickedMarked, section, stack, stageSurface} from "./common.mjs";
 import {localityInfo, sectionInfo} from "./help.mjs";
 import {accentsSection} from "./accents.mjs";
 import {attachPickRows, groupedTable, pickButton, pickableRow} from "../groups.mjs";
@@ -53,7 +53,12 @@ export function stageKey(model) {
             ], {data: {row: row.id}});
         })}))});
     attachPickRows(list, (id) => { state.feedbackRow = /** @type {typeof state.feedbackRow} */ (id); render(); });
-    const head = current ? itemHead(pickedMarked(model, "key", current.label), paintsLine(current.colour, localityWhole(current.locality))) : null;
+    // The case picked heads its pane by when it shows, and how (steady,
+    // blinking, or one flash), as a replacement case is headed; where it
+    // paints is its Locality's and the list's.
+    const owner = current ? words.feedbackColourOwners[current.id] : "";
+    const flashesOnce = current?.id === "tapCommittedColor" && feedback.tapCommitMode === "KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS";
+    const head = current ? itemHead(pickedMarked(model, "key", current.label), `${words.feedbackWhen[owner] || ""}${flashesOnce ? `; ${words.tapCommittedFlash}` : ""}`, {when: true}) : null;
     const colour = section(words.lightingFields.colour);
     colour.append(colourControl(model, {
         colour: current?.colour, canEdit, title: current?.label || "",
@@ -78,9 +83,11 @@ export function stageKey(model) {
         side = el(`<div class="stage-side"></div>`);
         side.append(where, when);
     }
-    // How fast it blinks is one setting for every case, on the stage bar,
-    // its dot blinking in the case picked's colour.
-    const blink = current && !isPassthrough(current.colour) && !isOff(current.colour) ? css(current.colour) : "";
+    // How fast it blinks is one setting for every case, on the stage bar.
+    // Only Hold active and Long hold active blink, so its dot blinks in Long
+    // hold active's colour while that is picked, else in Hold active's.
+    const blinking = current?.id === "longHoldActiveColor" ? feedback.longHoldActiveColor : feedback.holdActiveColor;
+    const blink = blinking && !isPassthrough(blinking) && !isOff(blinking) ? css(blinking) : "";
     return stageSurface(model, {id: "key", first: list, head, colour, side, accents: accentsSection(model, "key"),
         shared: [flashSetting(model, "lightingFeedback", {blink})]});
 }

@@ -42,16 +42,19 @@ existing columns, and tidying only) he picked the stage bar: "B looks good".
   On) under **When it flashes** on Tap committed's pane, beside Where it
   paints, and the review names it under Tap committed.
 - **Behaviour feedback's Flash interval is Blink time**, with a dot after
-  it that, while the field is being changed, blinks at that pace in the
-  colour of the case picked: "interval" never said the key blinks, or that a
-  single flash lasts one of them. Blinking all the time was too intense.
+  it that, while the field is being changed, blinks at that pace in Hold
+  active's colour, or Long hold active's while that is picked, the only
+  cases that blink: "interval" never said what blinks, or that a single
+  flash lasts one of them. Blinking all the time was too intense.
 - **Under it, every stage has the same columns.** A first column (the list,
   or the background effect's Effect and the fade's Fade), the colour beside
   Where it paints, and the accents under both. The background effect's LEDs
   are its Where it paints; the fade's Timing sits there too. On a stage with a
   list, the item picked heads its colour, where it paints and its accents,
   which are its own alone: its mark and name, over a line saying where it
-  paints, or, for a replacement case, when it shows. Combo feedback's list
+  paints, or, for a behaviour or replacement case, when it shows (and for a
+  behaviour case how: steady, blinking, or one flash; only Hold active and
+  Long hold active blink). Combo feedback's list
   picks only the combo the board holds, so its colour is headed **Every
   combo** and its list rings the combo held rather than shading it as an
   edited item.

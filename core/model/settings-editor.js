@@ -131,7 +131,7 @@ const sections = [
         {...byte("effectSpeed", SETTING.RGB_MODE, 16, "Animation speed"), tooltip: "Speed of the background effect's animation. Effects without animation ignore this setting."},
     ]},
     {id: "lightingFeedback", label: SECTION.lightingFeedback, area: AREA.lighting, stage: "key", fields: [
-        number("feedbackFlash", SETTING.FEEDBACK_PERIOD, "Blink time (ms)", "How long the key stays on, then off, in each blink; a single flash lasts one of these.", {min: SETTING_FIELD.FEEDBACK_PERIOD.min, validate: "positive-int"}),
+        number("feedbackFlash", SETTING.FEEDBACK_PERIOD, "Blink time (ms)", "How fast Hold active and Long hold active blink: on for this long, then off. A single flash lasts one of these.", {min: SETTING_FIELD.FEEDBACK_PERIOD.min, validate: "positive-int"}),
     ]},
     // A replacement feedback flash has a length of its own (firmware D-F70,
     // D-L89), drawn on that stage's tab as the blink time is on its.

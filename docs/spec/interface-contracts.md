@@ -62,7 +62,8 @@ layers in view reach:
   settings), the colour beside where it paints, and the accents under them;
   on a stage with a list, the item picked heads its colour, where it paints
   and its accents, its mark and name over a line saying where it paints
-  (`itemHead`), or for a replacement case when it shows. So the colour
+  (`itemHead`), or for a behaviour or replacement case when it shows, one
+  line at 1280px (`vocabulary.feedbackWhen`, `replacementWhen`). So the colour
   editor, Where it paints and Add accent keep their place between tabs
   (`browser-tests/lighting-controls.spec.js`).
 - Lighting's lists beside an editor (layers, pointing modes, combos, feedback
