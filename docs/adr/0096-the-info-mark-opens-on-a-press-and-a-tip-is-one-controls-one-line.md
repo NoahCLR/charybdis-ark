@@ -24,7 +24,8 @@ The two do different jobs, as design systems split tooltips from toggletips:
   has it.
 - **The info mark holds what a section or an idea means, read once.** A press
   on it (a click, or Enter or Space) opens its list and keeps it open until
-  it is pressed again, Escape is pressed, or a press lands elsewhere; it stays
+  it is pressed again, Escape is pressed, or a press or the focus lands
+  elsewhere; it stays
   open across a redraw, and opening one closes any other. Resting the pointer
   on it previews the list, as before. The focus alone opens nothing: a screen
   reader hears the list as the mark's description, and the button says
@@ -32,7 +33,8 @@ The two do different jobs, as design systems split tooltips from toggletips:
 - **What is needed every time is on screen:** state, warnings, refusals,
   values and units. No sentence lives in two of the three.
 
-This amends D-L88, whose marks opened on hover and focus.
+This amends D-L88, whose marks opened on hover and focus, and D-L80, whose
+tips carried the read-only reasons.
 
 ## Considered options
 

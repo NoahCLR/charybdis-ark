@@ -45,8 +45,9 @@ test("the board's Shortcuts list names the shortcuts this computer uses", async 
 });
 
 // The board's shortcuts wait behind an info mark on its top-right corner:
-// hovering it, or tabbing to it, shows them; leaving or Escape hides them.
-test("the board's info mark previews its Shortcuts list on hover, opens it on a press until Escape or a press elsewhere, and Escape hides it", async ({page}) => {
+// hovering it previews them, a press opens them and keeps them open, and
+// the focus alone opens nothing (D-L96).
+test("the board's info mark previews its Shortcuts list on hover, and a press keeps it open until pressed again, Escape or a press elsewhere", async ({page}) => {
     await page.goto("/preview/index.html");
     await page.locator('[data-screen="keys"]').click();
     const board = page.locator(".keys-pad .board");
@@ -94,6 +95,17 @@ test("the board's info mark previews its Shortcuts list on hover, opens it on a 
     await expect(list).toBeHidden();
     await expect(mark).toBeFocused();
     await expect(mark).toHaveAttribute("aria-expanded", "false");
+    // Space opens it as Enter does.
+    await page.keyboard.press(" ");
+    await expect(list).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(list).toBeHidden();
+    // Leaving it by the keyboard is leaving it: the focus moving on closes it.
+    await page.keyboard.press("Enter");
+    await expect(list).toBeVisible();
+    await page.keyboard.press("Tab");
+    await expect(list).toBeHidden();
+    await expect(mark).toHaveAttribute("aria-expanded", "false");
 
     // A click keeps it open once the pointer leaves, and across a redraw;
     // a press elsewhere closes it, and so does a second click.
@@ -102,7 +114,7 @@ test("the board's info mark previews its Shortcuts list on hover, opens it on a 
     await expect(list).toBeVisible();
     await page.evaluate(async () => (await import("/webview/store.mjs")).render());
     await expect(list).toBeVisible();
-    await page.locator(".topbar h1, .topbar").first().click();
+    await page.locator(".topbar h1").click();
     await expect(list).toBeHidden();
     await mark.click();
     await expect(list).toBeVisible();

@@ -285,8 +285,10 @@ listing everything the key reaches. Lighting's board opens none.
 _Avoid_: tooltip, key card, popover
 
 **Tip**:
-The words that open at the pointer when it rests on a control, saying what
-the control does or what it shows in full.
+The words that open at the pointer when it rests on a control: that one
+control's one line, what it does, what pressing it changes, or what it shows
+in full. What a section or an idea means is an info mark's, never a tip's
+(D-L96).
 _Avoid_: tooltip, title, hover text
 
 **Keycode picker**:

@@ -228,8 +228,9 @@ The ⓘ beside **Replacement**, **Inputs** and **Try it** sums up how each
 works: when the keyboard replaces, capitals, Backspace and macros; how an
 input is written with `*`, the wildcard, with examples and where it may go;
 and what the preview can and cannot show. Click
-it, or press Enter on it, and it stays open until you click elsewhere or press
-Escape; resting the pointer on it shows it while it stays. In a small window the list opens
+it, or press Enter on it, and it stays open until you click it again, click
+or tab elsewhere or press Escape; resting the pointer on it shows it while it
+stays. In a small window the list opens
 where there is room, and scrolls when it is taller than that.
 
 ### Fires

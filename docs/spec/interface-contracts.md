@@ -128,8 +128,9 @@ The same kind of control looks and sits the same on every screen.
   sentence case like the captions over it. What the board takes from the
   mouse and the keys is in the list behind the info mark on the board's
   top-right corner: a button named Shortcuts and described by the list,
-  which a press opens and keeps open until it is pressed again, Escape or a
-  press elsewhere, and which the pointer resting on it previews (D-L96).
+  which a press opens and keeps open until it is pressed again, Escape, or a
+  press or the focus elsewhere, and which the pointer resting on it previews
+  (D-L96).
   It names ⌘-clicking (Ctrl-clicking) a layer to preview
   layers together, which reads the board, whether or not the board takes an
   edit; while it takes none, the rest of the list says only what still
@@ -401,7 +402,8 @@ The same kind of control looks and sits the same on every screen.
   idea, repeats text on screen, or holds the only copy of something needed.
   An info mark holds what a section or an idea means: a press on it (a
   click, Enter or Space) opens its list and keeps it open, across a redraw,
-  until it is pressed again, Escape is pressed or a press lands elsewhere;
+  until it is pressed again, Escape is pressed, or a press or the focus
+  lands elsewhere;
   opening one closes any other; the pointer resting on it previews the list;
   the focus alone opens nothing, the list being the button's description,
   its `aria-expanded` saying whether it is open (`infoMark`,

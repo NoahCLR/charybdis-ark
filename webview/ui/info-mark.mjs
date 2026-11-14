@@ -43,13 +43,22 @@ export function infoMark({id, label, heading, named = heading, lead = "", rows, 
             .map((row) => `<dt${row.mono ? ` class="mono"` : ""}>${esc(row.term)}</dt><dd>${esc(row.says)}</dd>`).join("")}</dl></span></span></span>`;
 }
 
+// Shows a mark open or closed: its data-open and its button's
+// aria-expanded, which say the same and so are set together.
+/** @param {Element} mark @param {boolean} open */
+const showOpen = (mark, open) => {
+    if (open) /** @type {HTMLElement} */ (mark).dataset.open = "";
+    else delete /** @type {HTMLElement} */ (mark).dataset.open;
+    mark.querySelector(".info-button")?.setAttribute("aria-expanded", String(open));
+};
+// The id a mark is kept open by: its list's.
+/** @param {Element} mark */
+const markId = (mark) => mark.querySelector(".info-pop")?.id || "";
+
 // Closes the mark kept open, if one is.
 const closeKept = () => {
     kept = null;
-    document.querySelectorAll("[data-info-mark][data-open]").forEach((mark) => {
-        delete /** @type {HTMLElement} */ (mark).dataset.open;
-        mark.querySelector(".info-button")?.setAttribute("aria-expanded", "false");
-    });
+    document.querySelectorAll("[data-info-mark][data-open]").forEach((mark) => showOpen(mark, false));
 };
 
 // Escape closes the mark kept open, or shuts the list the pointer is
@@ -76,7 +85,7 @@ const listen = () => {
     document.addEventListener("pointerdown", (event) => {
         if (kept === null) return;
         const mark = /** @type {Element} */ (event.target).closest?.("[data-info-mark]");
-        if (!mark || mark.querySelector(".info-pop")?.id !== kept) closeKept();
+        if (!mark || markId(mark) !== kept) closeKept();
     }, true);
 };
 
@@ -108,7 +117,8 @@ function place(mark) {
 }
 
 // Wires the marks in `root`, itself included: a press on the mark opens its
-// list and keeps it open, or closes it; a list is placed as it opens or is
+// list and keeps it open, or closes it, and the focus moving elsewhere
+// closes it; a list is placed as it opens or is
 // previewed, scrolls by the arrow keys while the mark has the focus, and a
 // shut preview opens again once the pointer has left.
 /** @param {ParentNode} root */
@@ -117,7 +127,9 @@ export function attachInfoMarks(root) {
     const marks = /** @type {HTMLElement[]} */ ([...(root instanceof HTMLElement && root.matches("[data-info-mark]") ? [root] : []), ...root.querySelectorAll("[data-info-mark]")]);
     for (const mark of marks) {
         const button = /** @type {HTMLButtonElement} */ (mark.querySelector(".info-button"));
-        const id = mark.querySelector(".info-pop")?.id || "";
+        const id = markId(mark);
+        // A mark with no list has nothing to keep open.
+        if (!id) continue;
         button.addEventListener("click", () => {
             const opening = kept !== id;
             closeKept();
@@ -125,9 +137,15 @@ export function attachInfoMarks(root) {
             if (!opening) { mark.dataset.shut = ""; return; }
             kept = id;
             delete mark.dataset.shut;
-            mark.dataset.open = "";
-            button.setAttribute("aria-expanded", "true");
+            showOpen(mark, true);
             place(mark);
+        });
+        // The focus moving on to something else, by Tab say, is leaving it,
+        // as a press elsewhere is. A redraw that replaces the mark moves the
+        // focus nowhere, and keeps it open.
+        mark.addEventListener("focusout", (event) => {
+            const next = /** @type {Node | null} */ (event.relatedTarget);
+            if (kept === id && next && !mark.contains(next)) closeKept();
         });
         mark.addEventListener("mouseleave", () => delete mark.dataset.shut);
         mark.addEventListener("mouseenter", () => place(mark));
