@@ -48,7 +48,7 @@ export function stagePointing(model) {
     const row = pdColourRow(model, state.pointingSlot);
     const name = slotName(model, state.pointingSlot);
     const head = itemHead(pickedMarked(model, "pd", name),
-        row ? paintsLine(row.color, localityWhole(row.locality)) : "Not reported");
+        row ? paintsLine(model, "pd", row.color, localityWhole(row.locality)) : "Not reported");
     const colour = section(vocabulary(model).lightingFields.colour);
     colour.append(colourControl(model, {
         colour: row?.color, canEdit, title: `${name} while active`,

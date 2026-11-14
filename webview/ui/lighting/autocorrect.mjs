@@ -14,7 +14,7 @@ import * as edits from "../../view/edits.mjs";
 import {localityOf} from "../../view/edits.mjs";
 import {colourControl, flashSetting, itemHead, lightingGroup, localityField, paintsCell, pickedMarked, section, stack, stageSurface} from "./common.mjs";
 import {localityInfo} from "./help.mjs";
-import {screenOfSection, sectionPath, sectionsIn} from "../../view/settings-layout.mjs";
+import {screenOfSection, sectionPath, settingField, unitlessLabel} from "../../view/settings-layout.mjs";
 import {accentsSection} from "./accents.mjs";
 import {attachPickRows, groupedTable, pickButton, pickableRow} from "../groups.mjs";
 
@@ -71,8 +71,7 @@ export function stageAutocorrect(model) {
     // How long a flash lasts is one setting for every case, on the stage
     // bar; Leader waiting holds as long as the leader waits instead, which
     // is set on Host settings, a link away.
-    const leaderWaits = sectionsIn(model, "Settings").find((entry) => entry.id === "autocorrect")?.fields.find((field) => field.macro === "leaderTimeout");
-    const waits = (leaderWaits?.label || "").replace(/\s*\(ms\)$/, "");
+    const waits = unitlessLabel(settingField(model, "leaderTimeout"));
     const leader = el(`<button class="btn tiny link" data-act="leader-waits" data-tip="Opens ${esc(sectionPath(model, "autocorrect"))}.">${esc(waits)} →</button>`);
     leader.addEventListener("click", () => { state.screen = screenOfSection("autocorrect") || "host"; state.reveal = '.setrow:has([data-macro="leaderTimeout"])'; render(); });
     return stageSurface(model, {id: "autocorrect", first: list, head, colour, side: where, accents: accentsSection(model, "autocorrect"),

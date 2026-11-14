@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {createRequire} from "node:module";
-import {baseColour, colourPaints, feedbackColours, inheritsStageColour, isPassthrough, keyLed, keyLight, mappedKeyCount, offWording, ownLight, pdColourRow, replacementTrigger, stageEnabled, stageHeldOffBy, stageIdle, stageInEffect, stageOffDetail, trackballLed, trackballLight, swatchOf} from "../../webview/view/lighting.mjs";
+import {baseColour, colourPaints, feedbackColours, inheritsStageColour, isPassthrough, keyLed, keyLight, mappedKeyCount, offWording, ownLight, pdColourRow, replacementTrigger, stageEnabled, stageHeldOffBy, stageIdle, stageInEffect, stageOffDetail, trackballLed, trackballLight, swatchFor, swatchOf} from "../../webview/view/lighting.mjs";
 
 const colour = (h, s, v) => ({h: String(h), s: String(s), v: String(v)});
 const position = (layoutIndex, keycode) => ({layoutIndex, keycode});
@@ -369,7 +369,7 @@ const words = {vocabulary: createRequire(import.meta.url)("../../core/model/voca
 test("every owned colour offers Passthrough and Off, passthrough never called off; the fade end stays off", () => {
     for (const stage of ["layers", "pd", "combo", "key", "autocorrect"]) {
         const wording = offWording(words, stage);
-        assert.deepEqual([wording.offAction, wording.offWord], [undefined, "Passthrough"], stage);
+        assert.equal(wording.offWord, "Passthrough", stage);
         assert.match(wording.offTip, /paints nothing/, stage);
         assert.match(wording.offNote, /[Pp]assthrough.*shows/, stage);
         assert.match(wording.ledsOffTip || "", /LEDs off|go dark/, stage);
@@ -518,13 +518,18 @@ test("Leader waiting paints the Leader key's half or the key alone, every key of
     assert.deepEqual(keyLight(base, layer, position(13, "KC_A"), dark).colour, own);
 });
 
-// A colour that lights nothing shows why in a list's swatch (D-L94, D-L95):
-// passthrough hatched, off dark and struck through, never read hollow.
-test("a list's swatch says passthrough, off and unread apart, and a lit colour needs none", () => {
+// A colour that lights nothing shows why in its swatch (D-L94, D-L95), one
+// class for each why wherever a swatch is drawn: passthrough hatched, off
+// dark and struck through, unlit while its stage paints nothing, never read
+// hollow.
+test("a swatch says passthrough, off, unlit and unread apart, and a lit colour needs none", () => {
     const colour = (h, s, v) => ({h: String(h), s: String(s), v: String(v)});
-    assert.equal(swatchOf(colour(0, 0, 0)), "swatch-off");
-    assert.equal(swatchOf(colour(40, 0, 0)), "swatch-off", "passthrough at any hue");
+    assert.equal(swatchOf(colour(0, 0, 0)), "swatch-pass");
+    assert.equal(swatchOf(colour(40, 0, 0)), "swatch-pass", "passthrough at any hue");
     assert.equal(swatchOf(colour(40, 255, 0)), "swatch-dark");
     assert.equal(swatchOf(undefined), "swatch-none");
     assert.equal(swatchOf(colour(40, 255, 200)), "");
+    assert.equal(swatchOf(colour(40, 255, 200), {stageOn: false}), "swatch-off", "a stage that paints nothing draws its colour unlit");
+    assert.equal(swatchOf(colour(0, 0, 0), {stageOn: false}), "swatch-off");
+    assert.deepEqual(["lit", "passthrough", "off", "unlit", "unread"].map((how) => swatchFor(/** @type {any} */ (how))), ["", "swatch-pass", "swatch-dark", "swatch-off", "swatch-none"]);
 });

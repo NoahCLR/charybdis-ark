@@ -159,8 +159,8 @@ export interface Vocabulary {
     lightingFields: Readonly<Record<LightingField, string>>;
     /** The colour editor's choice: a colour, or off (D-L95). */
     colourChoice: {colour: string; off: string};
-    /** What storing HSV(0, 0, 0) does, by lighting stage: its choice's tip and the note once stored, and, for a colour an owner has (D-L94), what that choice and the colour then read (Passthrough), and the Off choice's tip; `offAction` names the choice where HSV(0, 0, 0) is off (D-L95). */
-    colourOff: Readonly<Record<string, {offTip: string; offNote?: string; offAction?: string; offWord?: string; ledsOffTip?: string}>>;
+    /** What storing HSV(0, 0, 0) does, by lighting stage: its choice's tip and the note once stored, and, for a colour an owner has (D-L94), what that choice and the colour then read (Passthrough), and the Off choice's tip. */
+    colourOff: Readonly<Record<string, {offTip: string; offNote?: string; offWord?: string; ledsOffTip?: string}>>;
     feedbackOwners: WordList<string>;
     /** The behaviour tier each behaviour state flashes for, by its RGB_KEY_SEMANTICS name; the others have none. */
     feedbackTiers: Readonly<Partial<Record<string, Tier>>>;
@@ -176,14 +176,15 @@ export interface Vocabulary {
     replacementOwners: WordList<string>;
     /** When each Replacement feedback case shows, by its RGB_AUTOCORRECT_SEMANTICS name. */
     replacementWhen: Readonly<Record<string, string>>;
-    /** When each Behaviour feedback case shows, and how, by its owner. */
-    feedbackWhen: Readonly<Record<string, string>>;
-    tapCommittedFlash: string;
+    /** When each Behaviour feedback case shows, and how, by kind of case: Tap committed, and Tap committed while the tap-commit policy is On; either hold tier; any tap branch. */
+    feedbackWhen: {tapCommitted: string; tapCommittedFlashes: string; hold: string; tapBranch: string};
     /** The case (an RGB_AUTOCORRECT_SEMANTICS name) each Replacement feedback colour shows, by the colour's field. */
     replacementColourOwners: Readonly<Record<AutocorrectFeedbackColourField, string>>;
     /** The groups of Lighting's lists beside an editor. */
-    lightingLists: {inUse: string; tiers: {title: string; tip: string}; tapBranches: {title: string; tip: string}; replacements: {title: string; tip: string}; comboFeedback: {title: string; empty: string; tip: string}; holdLayer: {title: string; empty: string; tip: string}};
+    lightingLists: {inUse: string; tiers: {title: string}; tapBranches: {title: string}; replacements: {title: string}; comboFeedback: {title: string; empty: string}; holdLayer: {title: string; empty: string}};
     stages: readonly {id: string; label: string; short: string; bit?: number}[];
+    /** Lighting's tab of every stage's accents, which is no stage. */
+    allAccents: string;
     customKeys: {alwaysOn: {base: string; default: string}; layerKinds: WordList<number>};
     /** A layer key's second line on its cap, by its QMK function (MO, TG…). */
     keyCapLayerVerbs: Readonly<Record<string, string>>;
@@ -233,7 +234,7 @@ export interface Vocabulary {
     comboOptions: Readonly<Record<string, string>>;
     /** What a behaviour and a combo share: whether it runs, and on which layers. */
     definitionFields: {use: Readonly<Record<'behaviour' | 'combo', string>>; allowedLayers: string; offInSettings: Readonly<Record<'behaviour' | 'combo', string>>; onceOn: Readonly<Record<'behaviour' | 'combo', string>>};
-    settingOff: {switches: Readonly<Record<SettingOffSwitch, {off: string; fix: string; /** What off means where the banner is, when it says so. */ detail?: string}>>; stage: string;
+    settingOff: {switches: Readonly<Record<SettingOffSwitch, {/** That it is off, in words a sentence or a word on a stage bar takes ("Combos are off"). */ off: string; fix: string; /** What off means where the banner is, when it says so. */ detail?: string}>>; stage: string;
         /** Text replacement off with a leader input on the list (D-L91): what off means on its screen and on the Replacement feedback tab. */ leading: {list: string; stage: string}};
     behaviourFields: Readonly<Record<'anchor' | 'timings', string>>;
     comboFields: Readonly<Record<'inputs' | 'sends' | 'window' | 'conditions', string>>;

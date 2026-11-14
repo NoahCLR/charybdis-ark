@@ -7,7 +7,7 @@
 
 // Selector assertions refer to elements created by this module's authored markup.
 import {brightnessLimit, clampHsv, css, hsv, label as hsvLabel, rgb, valuePercent} from "../lib/colour.mjs";
-import {inheritsStageColour, isPassthrough} from "../view/lighting.mjs";
+import {inheritsStageColour, isPassthrough, swatchFor} from "../view/lighting.mjs";
 import {el, esc} from "../lib/dom.mjs";
 
 // Each colour choice is a radio group of its own: copies of a stage laid out
@@ -33,8 +33,8 @@ let groups = 0;
 // editor on screen. `unused` draws it dimmed under that note with no choice,
 // for a colour its stage keeps but does not paint as set (the fade's end
 // colour in a mode that takes none).
-/** @param {{identity: string, colour: import("../../contracts/edits.js").Colour | null | undefined, title: string, canEdit?: boolean, onChange?: (colour: import("../../contracts/edits.js").Colour) => void, offNote?: string, offTip?: string, offAction?: string, offWord?: string, ledsOffTip?: string, unused?: string, choiceWords?: {colour: string, off: string}, maximumBrightness?: number}} options */
-export function colourEditor({identity, colour, title, canEdit = true, onChange, offNote, offTip, offAction, offWord, ledsOffTip, unused, choiceWords = {colour: "", off: ""}, maximumBrightness}) {
+/** @param {{identity: string, colour: import("../../contracts/edits.js").Colour | null | undefined, title: string, canEdit?: boolean, onChange?: (colour: import("../../contracts/edits.js").Colour) => void, offNote?: string, offTip?: string, offWord?: string, ledsOffTip?: string, unused?: string, choiceWords?: {colour: string, off: string}, maximumBrightness?: number}} options */
+export function colourEditor({identity, colour, title, canEdit = true, onChange, offNote, offTip, offWord, ledsOffTip, unused, choiceWords = {colour: "", off: ""}, maximumBrightness}) {
     const [h, s, v] = hsv(colour);
     const maximum = brightnessLimit(maximumBrightness);
     const node = el(`<div class="stack gap-12 colour-editor"></div>`);
@@ -60,11 +60,11 @@ export function colourEditor({identity, colour, title, canEdit = true, onChange,
     };
     /** @type {[string, string, string][]} */
     const choices = unused ? [] : owned ? [["colour", choiceWords.colour, ""], ["off", choiceWords.off, ledsOffTip || ""], ["passthrough", offWord || "", offTip || ""]]
-        : offTip ? [["colour", choiceWords.colour, ""], ["off", offAction || choiceWords.off, offTip]] : [];
+        : offTip ? [["colour", choiceWords.colour, ""], ["off", choiceWords.off, offTip]] : [];
     const group = `${identity}:state:${++groups}`;
     const head = el(`<div class="row colour-head">
-        <span class="swatch-lg ${passthrough ? "swatch-off" : dark ? "swatch-dark" : ""}${unused ? " unused" : ""}" style="${passthrough || dark ? "" : `background:${css(colour)}`}"></span>
-        <div class="colour-readout"><div class="note${idle && !unused ? "" : " mono"}">${idle && !unused ? esc(passthrough ? offWord || "" : offAction || choiceWords.off) : `${esc(hsvLabel(colour))} · rgb(${esc(rgb(colour).join(", "))})`}</div></div>
+        <span class="swatch-lg ${swatchFor(passthrough ? "passthrough" : dark ? "off" : "lit")}${unused ? " unused" : ""}" style="${passthrough || dark ? "" : `background:${css(colour)}`}"></span>
+        <div class="colour-readout"><div class="note${idle && !unused ? "" : " mono"}">${idle && !unused ? esc(passthrough ? offWord || "" : choiceWords.off) : `${esc(hsvLabel(colour))} · rgb(${esc(rgb(colour).join(", "))})`}</div></div>
         ${choices.length ? `<div class="seg colour-state" role="radiogroup" aria-label="${esc(title)}">${choices.map(([value, words, tip]) =>
             `<label ${tip ? `data-tip="${esc(tip)}"` : ""}><input type="radio" name="${esc(group)}" value="${esc(value)}" data-f="${esc(identity)}:state:${esc(value)}" ${value === state ? "checked" : ""} ${canEdit ? "" : "disabled"}><span>${esc(words)}</span></label>`).join("")}</div>` : ""}</div>`);
     node.append(head);

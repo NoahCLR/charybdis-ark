@@ -63,7 +63,11 @@ layers in view reach:
   on a stage with a list, the item picked heads its colour, where it paints
   and its accents, its mark and name over a line saying where it paints
   (`itemHead`), or for a behaviour or replacement case when it shows, one
-  line at 1280px (`vocabulary.feedbackWhen`, `replacementWhen`). So the colour
+  line at 1280px (`vocabulary.feedbackWhen`, `replacementWhen`). A
+  behaviour case's mark is its tier's dot or its tap branch's badge
+  (`ownerMark`, `webview/view/accents.mjs`), and its line is its kind's:
+  Tap committed's, with its one flash while the tap-commit policy is On;
+  both hold tiers'; every tap branch's. So the colour
   editor, Where it paints and Add accent keep their place between tabs
   (`browser-tests/lighting-controls.spec.js`).
 - Lighting's lists beside an editor (layers, pointing modes, combos, feedback
@@ -378,7 +382,8 @@ The same kind of control looks and sits the same on every screen.
   follows, refusals and state. A tip is one control's one line, what it does
   or what pressing it changes (Stage on, a shared accent's Change and
   Remove); it never explains what the info mark explains, nor repeats the
-  hint under it.
+  hint under it. A list's group band is no control and carries no tip: what
+  a group means is in its stage's info mark.
 - The commit bar floats over the screen's foot but covers none of it: while
   it shows, the screen's scrolling area ends above it, by its height as drawn
   (`reserveCommitRoom`, `webview/ui/frame.mjs`;
@@ -1466,8 +1471,10 @@ owner it has picked (`accentOwner`), listing that owner's own accents and
 those of the owner that is all of them, edited there too, and, on a layer
 above Base, Base's, edited on Base (`accentsFor`,
 `webview/view/accents.mjs`; `tests/view/accents.test.mjs`). They are grouped
-by whom they light for, each group named: the owner picked's own, a group of
-owners (Every tap branch), all of them, Base's; Change and Remove on a shared
+by whom they light for, each group named: the owner picked's own, by its
+mark as its pane's head names it (a tap branch by its badge), a group of
+owners (Every tap branch), all of them, Base's; on All accents Every tap
+branch carries the badge of every count (`branchesBadge`); Change and Remove on a shared
 one say whom they change it for, and the count under them is the keyboard's
 ("On the keyboard"). An accent that takes its stage's colour shows that
 colour beside "Same as …". There is no
@@ -1504,8 +1511,10 @@ with one choice beside its value, **Colour**, **Off** and **Passthrough**
 and saturation Off kept. A passthrough colour keeps its square and fields,
 dimmed and inert under what it means, so the editor is the same size
 whatever the colour; an Off one stays editable, as the black it is. Lists
-and Review say **passthrough** or **off**, and a list's or tab's swatch is
-hatched for passthrough and dark, struck through, for off (`swatchOf`); LED-row
+and Review say **passthrough** or **off**, and a swatch is hatched for
+passthrough, dark and struck through for off, and unlit while its stage
+paints nothing, hatched in a list and hollow in a tab or chip, the one choice
+of class every swatch makes (`swatchFor`, a colour's by `swatchOf`); LED-row
 inheritance is all three channels zero, distinct from an explicit black
 (`tests/view/lighting.test.mjs`, `tests/view/colour.test.mjs`); the auto-mouse
 end colour is literal. Zero brightness never hides the stored hue and

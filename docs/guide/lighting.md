@@ -193,9 +193,10 @@ as the behaviour grid has a column per tier and a row per tap count:
     tap or more (below).
   - **Hold active** goes by the hold's style: **held until release** blinks
     while held, when it sends a key, modifier, macro, custom key or QMK
-    keycode; **repeat while held** blinks while it repeats; **tap at Tap /
-    hold threshold** and **tap on release after Tap / hold threshold** are
-    steady and never blink.
+    keycode; **repeat while held** blinks while it repeats; **tap on release
+    after Tap / hold threshold** is steady from the threshold until it
+    sends; **tap at Tap / hold threshold** flashes once as it sends. After a
+    run of two or more taps, a hold sent on release flashes once too.
   - **Long hold active** does the same for the long hold.
   - A layer or pointing-mode hold shows on its own stage instead. A switch
     key, Leader, or layer go-to or lock held until release, and a hold the
@@ -204,7 +205,9 @@ as the behaviour grid has a column per tier and a row per tap count:
   **Quintuple tap**, each steady while a run of taps waits on that count;
   they never blink. A deeper run takes **Quintuple tap**'s.
 
-The case picked heads its pane with a line saying when it shows and how.
+The case picked heads its pane with its mark, a tier's dot or a tap
+branch's badge, its name, and a line saying when it shows and how; every tap
+branch has the same line under its own name.
 
 The list says beside each case where it paints, in a word or two (**trigger's
 half**, **trigger key**), or **passthrough** or **off**. Pick a case to change
@@ -220,8 +223,8 @@ either way, and the tap branches are not touched by it.
 
 On the stage bar, under **Every behaviour state**, one setting for every
 case: **Blink time**, how fast a hold blinks while held until release or
-repeating: on for this long, then off. A single flash, such as Tap committed's after a
-double tap, lasts one of these. While you change it, a dot after it blinks at
+repeating: on for this long, then off. A single flash, Tap committed's or a
+hold's, lasts one of these. While you change it, a dot after it blinks at
 that pace, in Long hold active's colour while that is picked, else Hold
 active's.
 
@@ -329,7 +332,10 @@ whom each accent lights for: **For** the item picked, then **For every tap
 branch**, **For every layer**, **For every pointing mode**, **For every
 behaviour state** or **For every case**, which you change or remove from any
 of their lists; **Change** and **Remove** on one of those say they change it
-for all of them. Combo accents light for every combo. The background effect
+for all of them. **For** names the item picked by its mark, as its pane's
+head does: a layer's or mode's icon, a tier's dot, or a tap branch's badge.
+On **All accents**, **Every tap branch** carries the badge of every tap
+count. Combo accents light for every combo. The background effect
 and the auto-mouse fade have none. The **ⓘ** on the Accents heading says how
 they work.
 

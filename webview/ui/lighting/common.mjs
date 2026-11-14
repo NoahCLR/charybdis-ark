@@ -2,13 +2,13 @@
 import {el, esc} from "../../lib/dom.mjs";
 
 import {currentLayer, getModel, post, render, state} from "../../store.mjs";
-import {localityInText, vocabulary, word} from "../../view/vocabulary.mjs";
+import {localityInText, stageCalled, vocabulary, word} from "../../view/vocabulary.mjs";
 import {editGate} from "../../view/edit-gate.mjs";
 import {isOff, isPassthrough, lightingOff, stageEnabled, stageHeldOffBy, stageOffDetail} from "../../view/lighting.mjs";
 import * as edits from "../../view/edits.mjs";
 import {colourEditor} from "../colour-editor.mjs";
 import {settingOffWord} from "../participation.mjs";
-import {sectionsIn} from "../../view/settings-layout.mjs";
+import {sectionsIn, unitlessLabel} from "../../view/settings-layout.mjs";
 import {stageInfo} from "./help.mjs";
 import {accentOwner, ownerMark} from "../../view/accents.mjs";
 import {marked} from "../marks.mjs";
@@ -43,7 +43,7 @@ export function stageSurface(model, {id, first, head = null, colour, side, accen
 // The stage bar: what the whole stage is, in the same place on every tab.
 /** @param {Model} model @param {string} id @param {{shared?: HTMLElement[], note?: string, end?: HTMLElement | null}} [options] */
 export function stageBar(model, id, {shared = [], note = "", end = null} = {}) {
-    const label = id === "accents" ? "All accents" : vocabulary(model).stages.find((stage) => stage.id === id)?.label || "";
+    const label = stageCalled(model, id);
     const sw = stageSwitch(model, id);
     const off = Boolean(sw) && !stageEnabled(model, id);
     const node = el(`<div class="stage-bar${off ? " off" : ""}" data-stage-bar="${esc(id)}">
@@ -114,10 +114,14 @@ export function pickedMarked(model, stage, name) {
 }
 
 // Where a colour paints, for an item's head: passthrough, which paints
-// nothing; off, where its LEDs go dark; else where it paints (D-L94).
-/** @param {import("../../../contracts/edits.js").Colour | undefined} colour @param {string} where */
-export const paintsLine = (colour, where) => isPassthrough(colour) ? "Passthrough: paints nothing, so what is beneath shows"
-    : isOff(colour) ? `Off: its LEDs go dark, on ${where}` : `Paints ${where}`;
+// nothing; off, where its LEDs go dark; else where it paints (D-L94). Each
+// state is named in the colour editor's words for it.
+/** @param {Model} model @param {string} stage @param {import("../../../contracts/edits.js").Colour | undefined} colour @param {string} where */
+export function paintsLine(model, stage, colour, where) {
+    const words = vocabulary(model);
+    return isPassthrough(colour) ? `${words.colourOff[stage]?.offWord || ""}: paints nothing, so what is beneath shows`
+        : isOff(colour) ? `${words.colourChoice.off}: its LEDs go dark, on ${where}` : `Paints ${where}`;
+}
 
 // A group of a Lighting list folds as the Keymap's groups do, its open state
 // kept by "stage:group" across renders (state.lightingGroupsShut).
@@ -147,8 +151,7 @@ export function flashSetting(model, sectionId, {blink} = {}) {
     const field = flash?.fields[0];
     if (!flash || !field) return el(`<span></span>`);
     const editable = editGate(model, "settings").editable && !field.readOnly;
-    const label = field.unit ? field.label.replace(new RegExp(`\\s*\\(${field.unit}\\)$`), "") : field.label;
-    const node = el(`<label class="field inline"><span>${esc(label)}</span>
+    const node = el(`<label class="field inline"><span>${esc(unitlessLabel(field))}</span>
         <span class="affix unit"><input class="input mono num" inputmode="numeric" data-macro="${esc(field.macro)}" data-f="setting:${esc(field.macro)}" value="${esc(field.value)}" ${editable ? "" : "disabled"}>${field.unit ? `<i>${esc(field.unit)}</i>` : ""}</span></label>`);
     if (blink !== undefined) {
         /** @param {string} value */

@@ -115,6 +115,18 @@ test("every accent table has its words, by the target its edits name, and an own
     for (const line of Object.values(VOCABULARY.replacementWhen)) assert.ok(line.length <= 90, `"${line}" fits one line under the case's name`);
 });
 
+test("each Behaviour feedback case says when it shows and how, once for each kind of case", () => {
+    // Both hold tiers share a line, every tap branch one under its own name,
+    // and Tap committed has one while the tap-commit policy is On (firmware
+    // rgb-domain-v1): only a hold blinks, and a hold may flash once.
+    const when = VOCABULARY.feedbackWhen;
+    assert.deepEqual(Object.keys(when), ["tapCommitted", "tapCommittedFlashes", "hold", "tapBranch"]);
+    assert.ok(when.tapCommittedFlashes.startsWith(`${when.tapCommitted}; `), "On adds the flash to Off's line");
+    assert.match(when.hold, /^Blinks .*one flash/);
+    for (const line of [when.tapCommitted, when.tapBranch]) assert.doesNotMatch(line, /[Bb]link/);
+    for (const line of Object.values(when)) assert.ok(line.length <= 90, `"${line}" fits one line under the case's name`);
+});
+
 test("replacement feedback is named for what a person calls the feature, and never autocorrect", () => {
     const stage = VOCABULARY.stages.at(-1);
     assert.deepEqual(stage, {id: "autocorrect", label: "Replacement feedback", short: "Replacement", bit: rgb.RGB_STAGE_BITS.AUTOCORRECT}, "the last stage painted, by the firmware's name for it in code and Ark's on screen");

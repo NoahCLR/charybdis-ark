@@ -29,7 +29,7 @@ export function stageKey(model) {
     // do: a tier's flashes as it fires, a tap branch's while a run of taps
     // waits on its count. Each case has its own colour and locality (D-L93).
     const words = vocabulary(model);
-    /** @type {{id: string, title: string, tip: string, rows: Row[]}[]} */
+    /** @type {{id: string, title: string, rows: Row[]}[]} */
     const groups = [
         {id: "tiers", ...words.lightingLists.tiers,
             rows: TIER_FIELDS.map((field) => ({id: field, label: word(words.feedbackOwners, words.feedbackColourOwners[field]), colour: feedback[field], locality: feedback[localityOf(field)]}))},
@@ -55,10 +55,14 @@ export function stageKey(model) {
     attachPickRows(list, (id) => { state.feedbackRow = /** @type {typeof state.feedbackRow} */ (id); render(); });
     // The case picked heads its pane by when it shows, and how (steady,
     // blinking, or one flash), as a replacement case is headed; where it
-    // paints is its Locality's and the list's.
-    const owner = current ? words.feedbackColourOwners[current.id] : "";
-    const flashesOnce = current?.id === "tapCommittedColor" && feedback.tapCommitMode === "KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS";
-    const head = current ? itemHead(pickedMarked(model, "key", current.label), `${words.feedbackWhen[owner] || ""}${flashesOnce ? `; ${words.tapCommittedFlash}` : ""}`, {when: true}) : null;
+    // paints is its Locality's and the list's. Both hold tiers say the same,
+    // every tap branch the same under its own name, and Tap committed also
+    // flashes once while the tap-commit policy is On.
+    const when = words.feedbackWhen;
+    const line = !current ? "" : current.id === "tapCommittedColor"
+        ? feedback.tapCommitMode === "KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS" ? when.tapCommittedFlashes : when.tapCommitted
+        : current.id.startsWith("branch:") ? when.tapBranch : when.hold;
+    const head = current ? itemHead(pickedMarked(model, "key", current.label), line, {when: true}) : null;
     const colour = section(words.lightingFields.colour);
     colour.append(colourControl(model, {
         colour: current?.colour, canEdit, title: current?.label || "",
@@ -74,14 +78,14 @@ export function stageKey(model) {
     // stage, so it sits on that case's pane under where it paints.
     let side = where;
     if (current?.id === "tapCommittedColor") {
-        const when = section("When it flashes", sectionInfo(model, "key:commit"));
+        const flashes = section("When it flashes", sectionInfo(model, "key:commit"));
         const commit = el(choiceField({label: words.lightingFields.doubleTapFlash, f: "lighting:key:tap-commit", choices: words.tapCommit,
             current: feedback.tapCommitMode, disabled: !canEdit}));
         commit.addEventListener("change", (event) =>
             post(edits.keyFeedback(model.rgb.keyBehaviorFeedback, null, null, {tapCommitMode: /** @type {HTMLInputElement} */ (event.target).value})));
-        when.append(stack(commit));
+        flashes.append(stack(commit));
         side = el(`<div class="stage-side"></div>`);
-        side.append(where, when);
+        side.append(where, flashes);
     }
     // How fast it blinks is one setting for every case, on the stage bar.
     // Only Hold active and Long hold active blink, so its dot blinks in Long

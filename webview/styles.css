@@ -557,9 +557,10 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 .layer-tab.on:hover { background: color-mix(in srgb, var(--tab-tint, var(--text-3)) 24%, var(--surface-2)); }
 /* A tab's or chip's swatch is outlined in the theme's own line, so a dark
    colour reads on the dark theme and a pale one on the light; a layer or stage
-   with no colour is the outline alone, as a tier with none is hollow. */
+   with no colour, unlit or never read, is the outline alone, as a tier with
+   none is hollow. */
 :is(.layer-tab, .layer-chip, .bench-tabs) .swatch { width: 9px; height: 9px; border-radius: var(--r-mark); border: 1px solid var(--line-2); flex: none; }
-:is(.layer-tab, .layer-chip, .bench-tabs) .swatch-off { background: none; border-color: var(--line-3); }
+:is(.layer-tab, .layer-chip, .bench-tabs) :is(.swatch-off, .swatch-none) { background: none; border-color: var(--line-3); }
 :is(.layer-tab, .layer-chip, .bench-tabs) .swatch-pass { background: repeating-linear-gradient(45deg, var(--line-3) 0 2px, transparent 2px 4px); }
 .layer-tab .idx { font-family: var(--mono); font-size: var(--fs-xs); color: var(--text-3); }
 /* Rename & Reorder stays in reach at the strip's end, outside what scrolls. */
@@ -1213,9 +1214,10 @@ button.tier:hover { background: var(--surface-3); }
 .recovery-row .recovery-ask { display: flex; align-items: center; gap: var(--sp-3); }
 .recovery-row .recovery-ask > .note { color: var(--text); }
 .swatch-lg { width: 26px; height: 26px; border-radius: var(--r-control); border: 1px solid var(--line-2); flex: none; }
-/* A colour that lights nothing, by why (view/lighting.mjs swatchOf):
-   passthrough hatched (.swatch-pass too, where a tab draws .swatch-off
-   hollow), off dark and struck through, unread hollow. */
+/* A colour that lights nothing, by why (view/lighting.mjs swatchFor):
+   passthrough hatched, and unlit, its stage off, hatched too in a list (a
+   tab or chip draws it hollow, above); off dark and struck through; unread
+   hollow. */
 .swatch-off, .swatch-pass { background: repeating-linear-gradient(45deg, var(--surface-3) 0 4px, transparent 4px 8px); }
 .swatch-dark { background: linear-gradient(to top right, transparent calc(50% - .75px), var(--text-3) calc(50% - .75px), var(--text-3) calc(50% + .75px), transparent calc(50% + .75px)), var(--led-dark); }
 .swatch-none { background: none; border-style: dashed; }

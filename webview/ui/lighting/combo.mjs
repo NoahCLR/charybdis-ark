@@ -35,8 +35,8 @@ export function stageCombo(model) {
         ], {data: {combo: row.id}});
     };
     const lists = vocabulary(model).lightingLists;
-    /** @param {"feedback" | "layer"} id @param {{title: string, empty: string, tip: string}} words @param {typeof here} rows */
-    const group = (id, words, rows) => ({id, title: words.title, empty: words.empty, tip: words.tip, ...lightingGroup(`combo:${id}`), rows: rows.map(comboRow)});
+    /** @param {"feedback" | "layer"} id @param {{title: string, empty: string}} words @param {typeof here} rows */
+    const group = (id, words, rows) => ({id, title: words.title, empty: words.empty, ...lightingGroup(`combo:${id}`), rows: rows.map(comboRow)});
     const list = groupedTable({scroll: "lighting-combos", draft: model?.draft, columns: [["", "12%"], [fields.inputs, "53%"], [fields.sends, "35%"]], groups: [
         group("feedback", lists.comboFeedback, here.filter((entry) => !holdsLayers(entry.combo))),
         group("layer", lists.holdLayer, here.filter((entry) => holdsLayers(entry.combo))),
@@ -49,7 +49,7 @@ export function stageCombo(model) {
     /** @type {Partial<import("../../../contracts/panel.js").RgbView["comboFeedback"]>} */
     const combo = model.rgb.comboFeedback || {};
     // One colour, place and set of accents for every combo, headed so.
-    const head = itemHead(esc(vocabulary(model).accents.combo.every), combo.color ? paintsLine(combo.color, localityWhole(combo.locality)) : "Not reported");
+    const head = itemHead(esc(vocabulary(model).accents.combo.every), combo.color ? paintsLine(model, "combo", combo.color, localityWhole(combo.locality)) : "Not reported");
     const colour = section(vocabulary(model).lightingFields.colour);
     colour.append(colourControl(model, {
         colour: combo.color, canEdit, title: "Combo feedback",

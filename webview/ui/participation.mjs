@@ -36,18 +36,21 @@ const SWITCHES = {behaviour: {section: "behaviorSettings", macro: "behaviorsEnab
 /** @param {{configDefaults?: readonly {id: string, fields: readonly {macro: string, enabled?: boolean}[]}[]} | null | undefined} model @param {SettingOffSwitch} name */
 export const settingSwitchedOff = (model, name) => (model?.configDefaults || []).some((section) => section.id === SWITCHES[name].section
     && section.fields.some((field) => field.macro === SWITCHES[name].macro && field.enabled === false));
+// Going to a global switch: its Settings screen, its row marked.
+/** @param {SettingOffSwitch} name */
+const goToSwitch = (name) => {
+    const {section, macro} = SWITCHES[name];
+    Object.assign(state, {screen: screenOfSection(section), reveal: `.setrow:has([data-macro="${macro}"])`});
+    render();
+};
 // A banner that says a global switch is off, and goes to it, marking its row.
 // `detail` is what that means where the banner is: the vocabulary's own for
 // the switch, unless the place has its own to say.
 /** @param {SettingOffSwitch} name @param {string} [detail] @returns {HTMLElement} */
 export function settingOffBanner(name, detail = vocabulary(getModel()).settingOff.switches[name].detail || "") {
     const words = vocabulary(getModel()).settingOff.switches[name];
-    const {section, macro} = SWITCHES[name];
-    const banner = el(`<button type="button" class="callout master-off" data-master-off><strong>${esc(words.off)}</strong> ${detail ? `${esc(detail)} ` : ""}${esc(words.fix)}</button>`);
-    banner.addEventListener("click", () => {
-        Object.assign(state, {screen: screenOfSection(section), reveal: `.setrow:has([data-macro="${macro}"])`});
-        render();
-    });
+    const banner = el(`<button type="button" class="callout master-off" data-master-off><strong>${esc(words.off)}.</strong> ${detail ? `${esc(detail)} ` : ""}${esc(words.fix)}</button>`);
+    banner.addEventListener("click", () => goToSwitch(name));
     return banner;
 }
 // The same switch said in a word, where a banner would push what is under it
@@ -56,10 +59,8 @@ export function settingOffBanner(name, detail = vocabulary(getModel()).settingOf
 /** @param {SettingOffSwitch} name @param {string} detail @returns {HTMLElement} */
 export function settingOffWord(name, detail) {
     const words = vocabulary(getModel()).settingOff.switches[name];
-    const word = settingOffBanner(name, detail);
-    word.className = "stage-held";
-    word.dataset.tip = `${detail} ${words.fix}`;
-    word.textContent = `${words.off.replace(/\.$/, "")} →`;
+    const word = el(`<button type="button" class="stage-held" data-master-off data-tip="${esc(`${detail} ${words.fix}`)}">${esc(words.off)} →</button>`);
+    word.addEventListener("click", () => goToSwitch(name));
     return word;
 }
 // That banner for behaviours or combos while their master switch is off; null

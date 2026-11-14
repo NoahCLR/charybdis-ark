@@ -206,14 +206,15 @@ test("every behaviour feedback case's Locality posts that case's locality alone,
     await expect(body(page).locator('[data-row="holdActiveColor"] td').nth(1)).toHaveText("all LEDs");
     await expect(body(page).locator('[data-row="tapCommittedColor"] td').nth(1)).toHaveText("trigger's half", "the other cases keep theirs");
     // The case picked heads its own settings, saying when it shows and how:
-    // only the holds blink; a tap branch is steady; Tap committed is steady
-    // and, under the tap-commit policy On, also flashes once.
+    // only the holds blink, and a hold may flash once; a tap branch is
+    // steady, in the line every branch has under its own name; Tap committed
+    // is steady and, under the tap-commit policy On, also flashes once.
     await body(page).locator('[data-row="holdActiveColor"]').click();
     await expect(body(page).locator(".stage-item")).toContainText("Hold active");
     const when = body(page).locator(".stage-item [data-replacement-when]");
-    await expect(when).toHaveText("Blinks if held until release or repeating; else steady");
+    await expect(when).toHaveText("Blinks if held until release or repeating; else steady or one flash");
     await body(page).locator('[data-row="branch:0"]').click();
-    await expect(when).toHaveText("Steady while a run of taps waits on a double tap");
+    await expect(when).toHaveText("Steady while a run of taps waits on this count");
     await body(page).locator('[data-row="tapCommittedColor"]').click();
     await expect(when).toHaveText("Steady while a tap with no hold is held; one flash after a double tap or more");
     // Every case's line fits its head on one line at 1280px.
@@ -867,7 +868,7 @@ test("Passthrough makes one replacement case paint nothing, the list and the boa
         await expect(body(page).locator(".colour-head .note")).toHaveText("Passthrough");
         await expect(body(page).locator(".stage-detail .colour-idle")).toContainText("This case is passthrough: it paints nothing");
         await expect(body(page).locator(`[data-row="${field}"]`)).toHaveText(`${label}passthrough`);
-        await expect(body(page).locator(`[data-row="${field}"] .mk-swatch`)).toHaveClass(/swatch-off/);
+        await expect(body(page).locator(`[data-row="${field}"] .mk-swatch`)).toHaveClass(/swatch-pass/);
         for (const [other, name] of CASES.filter(([each]) => each !== field)) await expect(body(page).locator(`[data-row="${other}"]`)).toHaveText(`${name}${where}`);
         await expect(page.locator(".board-foot-text")).toContainText(`${label} is passthrough, so it does not ${field === "leadingColor" ? "light" : "flash"}`);
         // A keyboard's colour with no saturation or brightness at another hue is passthrough too.
@@ -951,7 +952,7 @@ test("Behaviour feedback's Blink time posts its own setting, blinks its dot at t
     await expect(field).not.toHaveAttribute("data-tip", /./);
     await expect(field).toContainText("Blink time");
     await expect(body(page).locator(".stage-bar .info-pop")).toContainText("How fast a hold blinks while “held until release” or repeating: on for this long, then off. A single flash");
-    await expect(body(page).locator(".stage-bar .info-pop")).toContainText("“repeat while held” blinks while it repeats; “tap at Tap / hold threshold” and “tap on release after Tap / hold threshold” are steady, never blinking.");
+    await expect(body(page).locator(".stage-bar .info-pop")).toContainText("“repeat while held” blinks while it repeats; “tap on release after Tap / hold threshold” is steady from the threshold until it sends; “tap at Tap / hold threshold” flashes once as it sends. After a run of two or more taps, a hold sent on release flashes once.");
     // While the field is being changed, and only then, the dot blinks on
     // for the time typed, then off for as long, in the case picked's colour,
     // following what is typed before it is saved.

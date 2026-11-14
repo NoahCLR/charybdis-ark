@@ -10,8 +10,8 @@
 import {infoMark} from "../info-mark.mjs";
 import {modifierKey} from "../../view/shortcuts.mjs";
 import {accentBudget} from "../../view/accents.mjs";
-import {vocabulary, word} from "../../view/vocabulary.mjs";
-import {sectionPath, sectionsIn} from "../../view/settings-layout.mjs";
+import {stageCalled, vocabulary, word} from "../../view/vocabulary.mjs";
+import {sectionPath, settingField, unitlessLabel} from "../../view/settings-layout.mjs";
 
 /** @typedef {import("../info-mark.mjs").InfoRow} InfoRow */
 /** @typedef {import("../../../contracts/panel.js").PublishedModel} Model */
@@ -20,11 +20,8 @@ import {sectionPath, sectionsIn} from "../../view/settings-layout.mjs";
 const row = (term, says) => ({term, says});
 
 // A setting's label, as its Settings section publishes it, without its unit.
-/** @param {Model} model @param {string} area @param {string} macro */
-const settingLabel = (model, area, macro) => {
-    const field = sectionsIn(model, area).flatMap((section) => section.fields).find((entry) => entry.macro === macro);
-    return field ? field.label.replace(/\s*\([^)]*\)$/, "") : "";
-};
+/** @param {Model} model @param {string} macro */
+const settingLabel = (model, macro) => unitlessLabel(settingField(model, macro));
 
 // The five places a colour may paint, in the vocabulary's words and said
 // the same on every tab that has a Locality (D-L93), then which key is the
@@ -58,15 +55,15 @@ export function localityInfo(model, stage) {
 /** @param {Model} model @param {string} id */
 export function stageInfo(model, id) {
     const words = vocabulary(model);
-    const label = id === "accents" ? "All accents" : words.stages.find((stage) => stage.id === id)?.label || "this stage";
+    const label = stageCalled(model, id) || "this stage";
     /** @param {string} heading @param {string} lead @param {InfoRow[]} rows */
-    const mark = (heading, lead, rows) => infoMark({id: `lighting-info-stage-${id}`, label: id === "accents" ? "About all accents" : `How ${label.toLowerCase()} paints`, heading, lead, rows});
+    const mark = (heading, lead, rows) => infoMark({id: `lighting-info-stage-${id}`, label: `${id === "accents" ? "About" : "How"} ${label.toLowerCase()}${id === "accents" ? "" : " paints"}`, heading, lead, rows});
     const passthrough = words.colourOff.layers?.offWord || "", off = words.colourChoice.off;
     /** @param {string} owner */
     const flash = (owner) => word(words.feedbackOwners, owner);
     /** @param {string} owner */
     const replacement = (owner) => word(words.replacementOwners, owner);
-    const flashLength = settingLabel(model, "Lighting", "replacementFlash"), interval = settingLabel(model, "Lighting", "feedbackFlash");
+    const flashLength = settingLabel(model, "replacementFlash"), blinkTime = settingLabel(model, "feedbackFlash");
     switch (id) {
         case "base": return mark("How the background effect paints", "QMK's own effect, drawn first, under every other stage. Each stage paints over it, and a passthrough layer shows it.", [
             row(words.lightingFields.colour, "Solid colour shows it as it is; most animated effects build on it."),
@@ -90,7 +87,7 @@ export function stageInfo(model, id) {
             row("Board", "The mode picked, running, as it paints with no linked layer on.")]);
         case "combo": return mark("How combo feedback paints", "While a combo's inputs are held, its keys wear this colour, where the Locality says. One colour, place and set of accents serves every combo, and the combo badges take their outline from it.", [
             row(words.lightingLists.comboFeedback.title, "The combos on this view that light this colour."),
-            row(words.lightingLists.holdLayer.title, words.lightingLists.holdLayer.tip),
+            row(words.lightingLists.holdLayer.title, "Combos whose output holds a layer. They light no combo feedback: the layer's own light shows the hold."),
             row("Pointing mode", "A combo that runs a pointing mode paints beneath it; the mode covers it where both paint."),
             row("Board", "The combo picked in the list, held: its keys ringed as on the Keymap, the keys holding it ringed solid. Click another ringed key to hold it from there.")]);
         case "key": {
@@ -101,12 +98,12 @@ export function stageInfo(model, id) {
             const [heldStyle, tapAt, tapOnRelease, repeatStyle] = ["PRESS_AND_HOLD_UNTIL_RELEASE", "TAP_AT_HOLD_THRESHOLD", "TAP_ON_RELEASE_AFTER_HOLD", "REPEAT_WHILE_HELD"]
                 .map((style) => `“${word(words.holdStyles.hold, style)}”`);
             return mark("How behaviour feedback paints", "While a key's behaviour fires, the key lights in the colour of what it is doing: steady, blinking, or one flash. Each case has its own colour, place and accents; how fast it blinks is one setting for every case.", [
-                row(committed, `Steady while a key is held on a tap with no hold, once the multi tap window has passed; ${words.tapCommittedFlash}, if ${words.lightingFields.doubleTapFlash} is on.`),
-                row(hold, `By its hold style: ${heldStyle} blinks while held, when it sends a key, modifier, macro, custom key or QMK keycode; ${repeatStyle} blinks while it repeats; ${tapAt} and ${tapOnRelease} are steady, never blinking.`),
+                row(committed, `Steady while a key is held on a tap with no hold, once the multi tap window has passed. ${words.lightingFields.doubleTapFlash}, on its pane, adds one flash.`),
+                row(hold, `By its hold style: ${heldStyle} blinks while held, when it sends a key, modifier, macro, custom key or QMK keycode; ${repeatStyle} blinks while it repeats; ${tapOnRelease} is steady from the threshold until it sends; ${tapAt} flashes once as it sends. After a run of two or more taps, a hold sent on release flashes once.`),
                 row(long, "The same, for the long hold, at the Long hold threshold."),
                 row("Shows nothing here", "A layer or pointing-mode hold, which its own stage shows; a switch key, Leader, or layer go-to or lock held until release; a hold the keyboard fills in where the behaviour sets none."),
                 row(words.lightingLists.tapBranches.title, `${first} to ${deepest}, each steady while a run of taps waits on that count, until it resolves; they never blink. A deeper run takes ${deepest}'s.`),
-                row(interval, `How fast a hold blinks while ${heldStyle} or repeating: on for this long, then off. A single flash, such as ${committed}'s after a double tap, lasts one of these. While you change it, a dot beside it blinks at that pace.`),
+                row(blinkTime, `How fast a hold blinks while ${heldStyle} or repeating: on for this long, then off. A single flash, ${committed}'s or a hold's, lasts one of these. While you change it, a dot beside it blinks at that pace.`),
                 row("No key has it", "The keyboard never shows that case, and the board shows nothing for it."),
                 row("Marks", "The board's behaviour dots and the behaviour grid's branch numbers wear these colours."),
                 row("Board", "The case picked, from the first key whose behaviour has it, ringed when its Locality follows the key.")]);
@@ -118,7 +115,7 @@ export function stageInfo(model, id) {
                 row(replacement("AUTOCORRECT_FEEDBACK_GROUP_MACRO"), "Flashes as an input is erased for its macro, before the macro plays, and as the Leader key plays a macro."),
                 row(replacement("AUTOCORRECT_FEEDBACK_GROUP_UNDO"), "Flashes as Backspace, straight after a replacement, puts the word back."),
                 row(leading, "Held from the Leader key until the leader sends or gives up. A send's text or macro flash takes its place; when nothing is sent it just goes."),
-                row(flashLength, `How long one flash lasts, from when the replacement starts to be typed. One for every case but ${leading}, which holds as long as the leader waits (${settingLabel(model, "Settings", "leaderTimeout")}, on ${sectionPath(model, "autocorrect")}).`),
+                row(flashLength, `How long one flash lasts, from when the replacement starts to be typed. One for every case but ${leading}, which holds as long as the leader waits (${settingLabel(model, "leaderTimeout")}, on ${sectionPath(model, "autocorrect")}).`),
                 row("One at a time", "An undo straight after a replacement takes its flash's place. A word left as you typed it never flashes."),
                 row("Board", `The case picked. Space stands in for the key that ends a word, Backspace for an undo and the Leader key for ${leading}, ringed when the Locality follows the key.`)]);
         }
@@ -136,7 +133,7 @@ export function sectionInfo(model, id) {
     /** @param {string} label @param {string} heading @param {string} lead @param {InfoRow[]} rows */
     const mark = (label, heading, lead, rows) => infoMark({id: `lighting-info-${id.replace(":", "-")}`, label, heading, lead, rows});
     /** @param {string} macro */
-    const setting = (macro) => settingLabel(model, "Lighting", macro);
+    const setting = (macro) => settingLabel(model, macro);
     switch (id) {
         case "base:effect": return mark("About the effect", "The background effect", "", [
             row(setting("effectMode"), "The effects this keyboard has. Every stage paints over it."),

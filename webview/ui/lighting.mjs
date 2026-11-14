@@ -6,8 +6,8 @@
 // Selector assertions refer to elements created by this module's authored markup.
 import {css} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
-import {baseColour, isOff, isPassthrough, layerColourRow, lightingOff, pdColourRow, stageIdle, stageInEffect} from "../view/lighting.mjs";
-import {said, stageOrder} from "../view/vocabulary.mjs";
+import {baseColour, layerColourRow, lightingOff, pdColourRow, stageIdle, stageInEffect, swatchOf} from "../view/lighting.mjs";
+import {said, stageOrder, vocabulary} from "../view/vocabulary.mjs";
 import {currentLayer, currentView, getModel, post, render, state} from "../store.mjs";
 import {editGate} from "../view/edit-gate.mjs";
 import * as edits from "../view/edits.mjs";
@@ -122,19 +122,18 @@ export function screenLighting() {
     // bar says the name whole); the numbers give the paint order.
     /** @param {{id: string, label: string, short?: string}} stage @param {number} index */
     const stageTab = (stage, index) => {
-        const on = stageInEffect(model, stage.id), colour = stageColour(model, stage.id), lit = on && colour && !isPassthrough(colour) && !isOff(colour);
+        const on = stageInEffect(model, stage.id), colour = stageColour(model, stage.id), mark = swatchOf(colour, {stageOn: on});
         const idle = stageIdle(model, stage.id);
-        const mark = lit ? "" : !on || !colour ? "swatch-off" : isPassthrough(colour) ? "swatch-pass" : "swatch-dark";
         return `<button role="tab" id="stage-tab-${esc(stage.id)}" class="${on ? "" : "off"}" data-ltab="${esc(stage.id)}" aria-selected="${state.stage === stage.id}" aria-label="${esc(stage.label)}"
             data-tip="${esc(stage.label)} · painted ${esc(index + 1)} of ${stages.length}${on ? "" : ` · ${esc(lightingOff(model) ? "All lighting is off, so nothing paints" : idle || "this stage is off")}`}">
-            <span class="n">${esc(index + 1)}</span><i class="swatch ${mark}" style="${lit ? `background:${css(colour)}` : ""}"></i>
+            <span class="n">${esc(index + 1)}</span><i class="swatch ${mark}" style="${colour && !mark ? `background:${css(colour)}` : ""}"></i>
             <span class="tab-label"><span class="long">${esc(stage.label)}</span><span class="short" aria-hidden="true">${esc(stage.short || stage.label)}</span></span>${marks.lighting.has(stage.id) ? draftDot(model?.draft) : ""}</button>`;
     };
     const bench = el(`<div class="card bench workbench lighting-bench">
         <div class="bench-tabs"><div class="bench-tablist" role="tablist" aria-label="Lighting stages, in paint order">
             ${stages.map(stageTab).join("")}
             <span class="tab-sep" aria-hidden="true"></span>
-            <button role="tab" id="stage-tab-accents" data-ltab="accents" aria-selected="${state.stage === "accents"}"><span class="tab-label">All accents</span>${marks.lighting.has("accents") ? draftDot(model?.draft) : ""}</button></div>
+            <button role="tab" id="stage-tab-accents" data-ltab="accents" aria-selected="${state.stage === "accents"}"><span class="tab-label">${esc(vocabulary(model).allAccents)}</span>${marks.lighting.has("accents") ? draftDot(model?.draft) : ""}</button></div>
             <span class="bench-right" id="benchRight"></span>
         </div>
         <div class="bench-body" id="benchBody"></div>

@@ -21,7 +21,7 @@ import {macroChips} from "../view/macro.mjs";
 import {sequenceFace} from "../view/macro-sequence.mjs";
 import {layerTapAction, namedAction} from "../view/named-action.mjs";
 import {keyIdentity, reachKind, slotKeycodeNames} from "../view/key-identity.mjs";
-import {feedbackColours, isPassthrough, pdColourRow, stageEnabled} from "../view/lighting.mjs";
+import {feedbackColours, isPassthrough, pdColourRow, stageEnabled, swatchFor} from "../view/lighting.mjs";
 import {REACH_ICONS, SCREENS} from "../view/screens.mjs";
 import {layerAt, layerCalled, layerCalledAt, vocabulary} from "../view/vocabulary.mjs";
 import {boardOutlineMarkup} from "../view/geometry.mjs";
@@ -82,7 +82,7 @@ export function comboBadge(model, badge = "C") {
 export function slotLight(model, slot) {
     const row = pdColourRow(model, slot.id);
     const lit = Boolean(row && !isPassthrough(row.color) && stageEnabled(model, "pd"));
-    return {row, lit, colour: lit && row ? css(row.color) : null, swatch: (klass = "") => `<span class="pd-swatch ${esc(klass)} ${lit ? "" : "swatch-off"}"
+    return {row, lit, colour: lit && row ? css(row.color) : null, swatch: (klass = "") => `<span class="pd-swatch ${esc(klass)} ${swatchFor(lit ? "lit" : "unlit")}"
         ${lit && row ? `style="background:${css(row.color)}"` : ""}></span>`};
 }
 

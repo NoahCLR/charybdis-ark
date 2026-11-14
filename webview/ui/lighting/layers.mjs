@@ -45,7 +45,7 @@ export function stageLayers(model) {
     const layer = currentLayer();
     const row = layerColourRow(model, layer?.index);
     const brief = word(vocabulary(model).paintModesBrief, row?.mode);
-    const head = itemHead(layerMarked(model, layer), row ? paintsLine(row.color, brief) : "Not reported");
+    const head = itemHead(layerMarked(model, layer), row ? paintsLine(model, "layers", row.color, brief) : "Not reported");
     const colour = section(vocabulary(model).lightingFields.colour);
     colour.append(colourControl(model, {
         colour: row?.color, canEdit, title: `${layerCalled(layer)} layer`,

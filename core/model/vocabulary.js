@@ -594,23 +594,21 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     },
     // When each Behaviour feedback case shows, and how, in a line short
     // enough to head its pane at 1280px as replacementWhen heads a
-    // replacement case's (firmware rgb-domain-v1, key runtime feedback.c):
-    // only Hold active and Long hold active blink, at the Blink time, and only
-    // for a hold held until release or repeating (holdStyles; feedback.c,
-    // handled_key_policy.h); the rest are steady, and Tap committed may also
-    // flash once
-    // (tapCommittedFlash, joined after "; " under the tap-commit policy On).
+    // replacement case's (firmware rgb-domain-v1, key runtime feedback.c),
+    // by kind of case: Tap committed, while the tap-commit policy is Off and
+    // On; Hold active and Long hold active alike, the only cases that blink,
+    // at the Blink time, and only for a hold held until release or repeating
+    // (holdStyles; feedback.c, handled_key_policy.h), any other steady while
+    // reached and still to send, or one flash as it sends (the spec's hold
+    // pulse, as after a run of two or more taps); and every tap branch, its
+    // name heading the line.
     // The stage's info mark says the rest.
     feedbackWhen: {
-        KEY_FEEDBACK_GROUP_TAP_COMMITTED: "Steady while a tap with no hold is held",
-        KEY_FEEDBACK_GROUP_HOLD_ACTIVE: "Blinks if held until release or repeating; else steady",
-        KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE: "Blinks if held until release or repeating; else steady",
-        KEY_FEEDBACK_GROUP_TAP_COUNT_2: "Steady while a run of taps waits on a double tap",
-        KEY_FEEDBACK_GROUP_TAP_COUNT_3: "Steady while a run of taps waits on a triple tap",
-        KEY_FEEDBACK_GROUP_TAP_COUNT_4: "Steady while a run of taps waits on a quadruple tap",
-        KEY_FEEDBACK_GROUP_TAP_COUNT_5: "Steady while a run of taps waits on a quintuple tap or more",
+        tapCommitted: "Steady while a tap with no hold is held",
+        tapCommittedFlashes: "Steady while a tap with no hold is held; one flash after a double tap or more",
+        hold: "Blinks if held until release or repeating; else steady or one flash",
+        tapBranch: "Steady while a run of taps waits on this count",
     },
-    tapCommittedFlash: "one flash after a double tap or more",
     // The case each Replacement feedback colour shows, by the colour's
     // field, in the order the keyboard stores them. The tab lists its
     // colours by it, the review names them by it, and an accent of the case
@@ -652,14 +650,15 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     // groupedTable): the layers and slots in use, ahead of the empty ones;
     // Behaviour feedback's two groups of colours, as the behaviour grid's columns
     // and rows; Replacement feedback's cases; and the combos by what holding
-    // one shows.
+    // one shows. A group's band is no control, so it carries no tip: what a
+    // group means is said once, in its stage's info mark.
     lightingLists: {
         inUse: "In use",
-        tiers: {title: "Tiers", tip: "Light as a key's tap, hold or long hold fires."},
-        tapBranches: {title: "Tap branches", tip: "Light, steady, while a run of taps waits on that tap count, until it resolves."},
-        replacements: {title: "Cases", tip: "One flash as text replacement changes what was typed, in the colour of what it did, and a colour held while the leader waits."},
-        comboFeedback: {title: "Combo feedback", empty: "No combo on this view lights combo feedback.", tip: "The combos on this view that light combo feedback while held. Pick one for the board to hold it."},
-        holdLayer: {title: "Hold a layer", empty: "No combo on this view holds a layer.", tip: "Combos whose output holds a layer. They light no combo feedback: the layer's own light shows the hold."},
+        tiers: {title: "Tiers"},
+        tapBranches: {title: "Tap branches"},
+        replacements: {title: "Cases"},
+        comboFeedback: {title: "Combo feedback", empty: "No combo on this view lights combo feedback."},
+        holdLayer: {title: "Hold a layer", empty: "No combo on this view holds a layer."},
     },
     // The lighting stages in the order the firmware paints them, each with
     // the word its tab reads by where the window is too narrow for the
@@ -674,6 +673,8 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
         {id: "key", label: "Behaviour feedback", short: "Behaviours", bit: RGB_STAGE_BITS.KEY_BEHAVIOR},
         {id: "autocorrect", label: "Replacement feedback", short: "Replacement", bit: RGB_STAGE_BITS.AUTOCORRECT},
     ],
+    // Lighting's last tab, which lists every stage's accents and is no stage.
+    allAccents: "All accents",
 
     // A custom key's shortcut (firmware D-F26): why a layer cannot be one it
     // turns on, said in the layer's row of the shortcut picker, and how it
@@ -856,10 +857,12 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
             combo: "This switch takes effect once that is on again."}},
     // A banner while a global switch keeps something off, which goes to that
     // switch, and what a lighting stage adds when it is the thing kept off.
-    settingOff: {switches: {behaviour: {off: "Behaviours are off.", fix: `Turn them on in ${SETTINGS_SCREENS.behaviours} →`},
-        combo: {off: "Combos are off.", fix: `Turn them on in ${SETTINGS_SCREENS.combos} →`},
-        autoMouse: {off: "Auto-mouse is off.", fix: `Turn it on in ${SETTINGS_SCREENS.pointer} →`},
-        autocorrect: {off: "Text replacement is off.", detail: "The keyboard keeps this list and replaces nothing.", fix: `Turn it on in ${SETTINGS_SCREENS.host} →`}}, stage: "This stage paints nothing.",
+    // `off` is said as the banner's first sentence and, alone, on a Lighting
+    // stage's bar.
+    settingOff: {switches: {behaviour: {off: "Behaviours are off", fix: `Turn them on in ${SETTINGS_SCREENS.behaviours} →`},
+        combo: {off: "Combos are off", fix: `Turn them on in ${SETTINGS_SCREENS.combos} →`},
+        autoMouse: {off: "Auto-mouse is off", fix: `Turn it on in ${SETTINGS_SCREENS.pointer} →`},
+        autocorrect: {off: "Text replacement is off", detail: "The keyboard keeps this list and replaces nothing.", fix: `Turn it on in ${SETTINGS_SCREENS.host} →`}}, stage: "This stage paints nothing.",
         // With a leader input on the list the leader still sends, and its
         // sends still flash (firmware D-F71, D-L91).
         leading: {list: "Words you finish are left as you typed them; the Leader key still sends your leader inputs.", stage: "Words you finish never flash; Leader waiting still lights, and what the Leader key sends still flashes, in the text or macro colour."}},

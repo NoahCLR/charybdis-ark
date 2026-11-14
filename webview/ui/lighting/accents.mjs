@@ -14,7 +14,7 @@ import {editWords} from "../../view/edit-mode.mjs";
 import * as edits from "../../view/edits.mjs";
 import {vocabulary} from "../../view/vocabulary.mjs";
 import {accentBudget, accentOwner, accentsFor, allAccents, everyOwner, groupOwner, ownerCalled, ownerMark, ownerPlace, stageShade} from "../../view/accents.mjs";
-import {inheritsStageColour} from "../../view/lighting.mjs";
+import {inheritsStageColour, swatchFor} from "../../view/lighting.mjs";
 import {colourEditor} from "../colour-editor.mjs";
 import {pickButton} from "../groups.mjs";
 import {choiceField, choiceValue} from "../segmented.mjs";
@@ -147,7 +147,7 @@ function colourCell(model, target, row) {
 /** @param {Model} model @param {AccentTable} target @param {Accent} row */
 function accentSwatch(model, target, row) {
     const shade = inheritsStageColour(row.color) ? stageShade(model, target, row.owner, picked()) : row.color;
-    return `<span class="led-swatch${shade ? "" : " swatch-off"}" style="${shade ? `background:${css(shade)}` : ""}"></span>`;
+    return `<span class="led-swatch ${swatchFor(shade ? "lit" : "unlit")}" style="${shade ? `background:${css(shade)}` : ""}"></span>`;
 }
 
 // Dropping the accent being edited posts nothing.

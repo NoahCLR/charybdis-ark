@@ -130,8 +130,10 @@ const sections = [
         {...byte("brightness", SETTING.RGB_COLOR, 16, "Brightness", "Saved brightness, 0–255. The keyboard applies its hardware brightness limit."), tooltip: "Brightness of the background effect. Layer colours and feedback have their own brightness."},
         {...byte("effectSpeed", SETTING.RGB_MODE, 16, "Animation speed"), tooltip: "Speed of the background effect's animation. Effects without animation ignore this setting."},
     ]},
+    // What the blink time means is said once, in Behaviour feedback's info
+    // mark (webview/ui/lighting/help.mjs), so its hint is its range alone.
     {id: "lightingFeedback", label: SECTION.lightingFeedback, area: AREA.lighting, stage: "key", fields: [
-        number("feedbackFlash", SETTING.FEEDBACK_PERIOD, "Blink time (ms)", "How fast a hold blinks while held until release or repeating: on for this long, then off. A single flash lasts one of these.", {min: SETTING_FIELD.FEEDBACK_PERIOD.min, validate: "positive-int"}),
+        number("feedbackFlash", SETTING.FEEDBACK_PERIOD, "Blink time (ms)", undefined, {min: SETTING_FIELD.FEEDBACK_PERIOD.min, validate: "positive-int"}),
     ]},
     // A replacement feedback flash has a length of its own (firmware D-F70,
     // D-L89), drawn on that stage's tab as the blink time is on its.
