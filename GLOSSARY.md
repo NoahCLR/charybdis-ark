@@ -291,9 +291,9 @@ _Avoid_: tooltip, title, hover text
 
 **Info mark**:
 A small circled i beside a heading, on a stage bar or on the board's corner,
-whose list of terms and what each means opens while the pointer or the focus
-is on it (D-L88, D-L95). It holds what is read once, how a section works or
-what its choices mean, so the screen keeps only what is needed every time.
+whose list says what its terms mean (D-L88). It holds what is read once, how
+a section works or what its choices mean, so the screen keeps only what is
+needed every time.
 _Avoid_: help icon, tooltip (that is a tip), info button
 
 **Stage bar**:
@@ -379,8 +379,8 @@ waiting**, held from the Leader key until the leader sends or gives up. A
 passthrough case does not light; the others still do (D-L94). Its accents
 light for one case or for **Every case**. A flash follows the key that ended
 the word, or the Backspace that undid the replacement, and lasts its **Flash
-length**, one for every case, apart from behaviour feedback's Flash
-interval; Leader waiting follows the Leader key that began it. The firmware's
+length**, one for every case, apart from behaviour feedback's Blink
+time; Leader waiting follows the Leader key that began it. The firmware's
 code and Ark's call the stage `autocorrect` feedback
 (`autocorrectFeedback`, the accent table `autocorrect`).
 _Avoid_: autocorrect feedback, autocorrect flash, typo light, correction

@@ -6,7 +6,7 @@ Each Lighting stage laid itself out its own way. Background effect and
 Auto-mouse fade used three columns, the stages with a list a list and two
 columns, so the colour editor started in a different place on each tab. The
 **Stage on** switch rode on whichever section said where or when the stage
-painted (LIT-03, option D, 2026-11-06). On Layer colours, Pointing modes and
+painted, as D-L89 and D-L93 placed it. On Layer colours, Pointing modes and
 Combo feedback that section held only the picked item's settings, so "Stage
 off" sat beside Dragscroll's Locality and read as "Dragscroll off". On
 Behaviour feedback the switch moved down to When it flashes, and on
@@ -86,9 +86,9 @@ the stage shares is on the bar.
   everywhere, the fold an info mark in the tab strip. Most movement gone,
   but the switch would sit on the per-case Where it paints on Behaviour and
   Replacement feedback, the confusion this set out to end.
-- **Keep the switch on a section heading (LIT-03).** It saved a row; the row
-  now carries the stage's name, its info mark and what it shares, and keeps
-  the switch in one place.
+- **Keep the switch on a section heading (D-L89, D-L93).** It saved a row;
+  the row now carries the stage's name, its info mark and what it shares,
+  and keeps the switch in one place.
 
 ## Consequences
 
