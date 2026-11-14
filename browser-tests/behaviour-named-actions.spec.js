@@ -2,6 +2,7 @@
 "use strict";
 const {test, expect} = require("@playwright/test");
 const {openControls, publishBehaviour, behaviourSteps} = require("./control-preview");
+const {demoDocument, openDraft, panelModel} = require("../tests/fixtures/published-model");
 
 // A branch that acts on a layer reads the way one that sends a pointing mode
 // does: its kind's icon in its colour, its name and a tag, with the kind leading
@@ -91,6 +92,38 @@ test("the hover card names layer actions and pointing modes as the grid does", a
     await expect(card).toContainText("Right Option");
     expect(await reading(card.locator(".hc-act .sends").first())).toEqual({icon: "pointing", coloured: true, name: "Arrow", tags: ["lock"]});
     await expect(card.locator(".hc-act .hc-under").first()).toHaveText(/^pointing mode/);
+});
+
+// A pointing key's card says what its mode does beside its keycode, or that
+// its slot is empty, in its heading: it repeats the mode in no section of
+// its own.
+test("a pointing key's hover card says its mode's kind, or its empty slot, in its heading", async ({page}) => {
+    await openControls(page, "keys");
+    // Key 0 starts the first mode in use and key 1 the first empty slot, in
+    // the demo profile as the core publishes it.
+    const doc = demoDocument();
+    const opened = openDraft(doc), {pdModes} = panelModel(opened.draft, opened.state);
+    const used = pdModes.find((slot) => slot.kind), free = pdModes.find((slot) => !slot.kind);
+    const edits = [{type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 0, keycode: `PD_MODE_${used.id}`}, {layoutIndex: 1, keycode: `PD_MODE_${free.id}`}]}];
+    const {draft, state} = openDraft(openDraft(doc, {edits}).draft.document);
+    const kind = await page.evaluate(async ({model, kind}) => {
+        window.dispatchEvent(new MessageEvent("message", {data: {type: "model", model}}));
+        const {vocabulary, word} = await import("/webview/view/vocabulary.mjs");
+        return word(vocabulary(model).pointing.kinds, kind).toLowerCase();
+    }, {model: panelModel(draft, state), kind: used.kind});
+    const card = page.locator(".hovercard").first();
+    await page.locator('.board [data-key="0"]').first().hover();
+    await expect(card).toBeVisible();
+    await expect(card.locator(".hc-head .hc-kind")).toHaveText(`· ${kind}`);
+    await expect(card.locator(".hc-h").getByText("Pointing mode", {exact: true})).toHaveCount(0);
+    await expect(card).not.toContainText("while the mode runs");
+
+    await page.mouse.move(0, 0);
+    await expect(card).toBeHidden();
+    await page.locator('.board [data-key="1"]').first().hover();
+    await expect(card.locator(".hc-head .hc-code")).toHaveText(`PD_MODE_${free.id}`);
+    await expect(card.locator(".hc-head .sends-tag")).toContainText(["empty"]);
+    await expect(card.locator(".hc-head")).toContainText("This slot is empty, so the key does nothing until it is configured.");
 });
 
 // Right Option sets a single tap, a double-tap hold and, here, a triple tap of

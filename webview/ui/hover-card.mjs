@@ -28,7 +28,7 @@ export function hoverCard(index) {
     const {position} = reach;
     const own = reachSections(reach.own, position);
     return `<div class="hc-head"><div class="hc-title"><span class="t">${keyNameMarked(model, keyName(position, model), keyMeaning(position))}</span></div>
-        <code class="hc-code">${esc(visibleKeycode(model, position.keycode))}</code>${headline(model, keyMeaning(position))}</div>${own.join("")}${seenThrough(view, reach)}`;
+        <code class="hc-code">${esc(visibleKeycode(model, position.keycode))}${pointingKind(reach.own)}</code>${headline(model, keyMeaning(position))}${pointingEmpty(reach.own)}</div>${own.join("")}${seenThrough(view, reach)}`;
 }
 
 // One card per behaviour the key's combos run, as the key that behaviour
@@ -43,10 +43,11 @@ export function behaviourCards(index) {
     const tint = comboTint(model);
     const cards = runs.slice(0, SIDE_CARDS).map((run) => {
         const target = /** @type {import("../../contracts/panel.js").Position} */ ({keycode: run.output, semantic: run.keycode, layoutIndex: -1});
+        const reach = keyReach(view, layer, target, -1, []);
         return `<div class="hovercard hc-side"${tint ? ` style="--combo:${tint}"` : ""}><div class="hc-head"><div class="hc-eyebrow">Combo behaviour</div><div class="hc-title"><span class="t">${keyNameMarked(model, run.shown, run.keycode)}</span>
             <span class="hc-badges">${run.badges.map((badge) => comboBadge(model, badge)).join("")}</span></div>
-            <code class="hc-code">${esc(visibleKeycode(model, run.output))}</code>${headline(model, run.keycode)}
-            <div class="hc-sub hc-foot">Runs when ${esc(run.badges.join(" or "))} fires.</div></div>${reachSections(keyReach(view, layer, target, -1, []), target, {foot: false}).join("")}</div>`;
+            <code class="hc-code">${esc(visibleKeycode(model, run.output))}${pointingKind(reach)}</code>${headline(model, run.keycode)}${pointingEmpty(reach)}
+            <div class="hc-sub hc-foot">Runs when ${esc(run.badges.join(" or "))} fires.</div></div>${reachSections(reach, target, {foot: false}).join("")}</div>`;
     });
     if (runs.length > SIDE_CARDS) cards.push(`<div class="hc-more">+${runs.length - SIDE_CARDS} more behaviour${runs.length - SIDE_CARDS === 1 ? "" : "s"} run by this key's combos</div>`);
     return cards.join("");
@@ -66,14 +67,15 @@ function seenThrough(view, {answer, through}) {
     return `<div class="hc-through"><div class="hc-sect">
             <div class="hc-h">Falls through to ${layerMarked(model, from)}</div>
             <div class="hc-flow"><span class="hc-name">${keyNameMarked(model, keyName(position, model), keyMeaning(position))}</span>
-            <code class="hc-stored">${esc(visibleKeycode(model, position.keycode))}</code></div>${headline(model, keyMeaning(position))}
+            <code class="hc-stored">${esc(visibleKeycode(model, position.keycode))}${pointingKind(through)}</code></div>${headline(model, keyMeaning(position))}${pointingEmpty(through)}
             ${view.previewing ? "" : `<div class="hc-sub hc-foot">With no layer previewed. ${modifierKey()}-click a layer tab to see what answers while it is held.</div>`}</div>
         ${sections.join("")}</div>`;
 }
 
 // What one stored key, `position`, reaches, as webview/view/key-reach.mjs
-// keyReach decides it: its behaviour, macros, pointing mode and combos. Empty
-// when it reaches none of them.
+// keyReach decides it: its behaviour, macros and combos. Empty when it reaches
+// none of them. Its pointing mode is the heading's (pointingKind,
+// pointingEmpty): the key's name already names the mode.
 /** @param {ReturnType<typeof keyReach>} reach @param {import("../../contracts/panel.js").Position} position @param {{foot?: boolean}} [options] */
 function reachSections(reach, position, {foot = true} = {}) {
     const model = getModel();
@@ -123,19 +125,10 @@ function reachSections(reach, position, {foot = true} = {}) {
     if (reach.macros.length) {
         sections.push(`<div class="hc-sect"><div class="hc-h">Macro</div>${reach.macros.map(({keycode, slot}) => {
             if (!slot) return `<div class="hc-sub">${esc(keycode)} · not reported by the keyboard</div>`;
-            // Named as the Pointing mode section names its mode: its mark, its
-            // name and, when it holds no steps, its empty tag; then its steps.
+            // Named as the heading names a pointing mode: its mark, its name
+            // and, when it holds no steps, its empty tag; then its steps.
             return `<div class="hc-flow">${sends(model, keycode) || esc(macroNamed(slot, keycode))}</div>${slot.payload ? macroSteps(model, slot.payload) : ""}`;
         }).join("")}</div>`);
-    }
-    if (reach.pointing) {
-        const {kind, paints} = reach.pointing;
-        sections.push(`<div class="hc-sect"><div class="hc-h">Pointing mode</div>
-            <div class="hc-flow">${sends(model, keyMeaning(position))}
-            ${kind ? `<span class="hc-life">${esc(kind)}</span>` : ""}</div>
-            <div class="hc-sub hc-foot">${kind
-                ? `Its colour paints ${esc(paints)} while the mode runs.`
-                : "This slot is empty, so the key does nothing until it is configured. The keyboard keeps the keycode either way."}</div></div>`);
     }
     if (reach.combos.length) {
         // What a combo sends leads; the keys that press it follow, with this
@@ -171,6 +164,16 @@ function shortcutSection(model, custom) {
         ${under(shortcutLayerUnder(custom))}</span></div>`);
     return `<div class="hc-sect"><div class="hc-h">Shortcut</div><div class="hc-sub">${esc(shortcutWhen(custom))}</div>${rows.join("")}</div>`;
 }
+
+// A pointing key's mode, said in the heading after its keycode: what the mode
+// does, in the vocabulary's words. Empty for an empty slot, which
+// pointingEmpty says instead, and for any other key.
+/** @param {ReturnType<typeof keyReach>} reach */
+const pointingKind = ({pointing}) => pointing?.kind ? `<span class="hc-kind"> · ${esc(pointing.kind)}</span>` : "";
+// Under the heading of a key whose pointing slot is empty: it does nothing yet.
+/** @param {ReturnType<typeof keyReach>} reach */
+const pointingEmpty = ({pointing}) => pointing && !pointing.kind
+    ? `<div class="hc-sub hc-foot">This slot is empty, so the key does nothing until it is configured. The keyboard keeps the keycode either way.</div>` : "";
 
 // What the custom key a keycode is sends, in the card's header (firmware
 // D-F26).
