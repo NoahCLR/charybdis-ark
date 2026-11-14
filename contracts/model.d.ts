@@ -334,6 +334,8 @@ export type ReviewMark =
     | {kind: 'macro'}
     | {kind: 'customKey'}
     | {kind: 'tier'; tier: string; branch?: number}
+    /** A tap branch, by its tap count (2 and up), as its badge. */
+    | {kind: 'branch'; count: number}
     /** Every tap count from 2× up, as the Multi tap window governs them. */
     | {kind: 'branches'}
     | {kind: 'combo'; badge?: string}

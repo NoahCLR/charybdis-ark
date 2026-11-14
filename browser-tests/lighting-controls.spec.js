@@ -207,7 +207,9 @@ test("an accent on one tap branch lights for that branch alone and posts its own
     await openStage(page, "key");
     await body(page).locator('[data-row="branch:1"]').click();
     const section = body(page).locator('[data-accents="keyBehavior"]');
-    await expect(section.locator(".accent-band").first()).toHaveText("For Triple tap");
+    // A tap branch is marked by its badge, in the head and its accents' band.
+    await expect(body(page).locator(".stage-item-name .bn")).toHaveText("3×");
+    await expect(section.locator(".accent-band").first()).toHaveText("For 3×Triple tap");
     await clearPosts(page);
     await section.getByRole("button", {name: "Add accent", exact: true}).click();
     const editor = section.locator(".accent-editor");
