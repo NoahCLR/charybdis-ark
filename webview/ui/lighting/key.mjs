@@ -9,7 +9,7 @@ import {branchName, vocabulary, word} from "../../view/vocabulary.mjs";
 import * as edits from "../../view/edits.mjs";
 import {localityOf} from "../../view/edits.mjs";
 import {colourControl, flashSetting, itemHead, lightingGroup, localityField, localityWhole, paintsCell, paintsLine, pickedMarked, section, stack, stageSurface} from "./common.mjs";
-import {localityInfo} from "./help.mjs";
+import {localityInfo, sectionInfo} from "./help.mjs";
 import {accentsSection} from "./accents.mjs";
 import {attachPickRows, groupedTable, pickButton, pickableRow} from "../groups.mjs";
 
@@ -64,12 +64,21 @@ export function stageKey(model) {
     const where = section("Where it paints", localityInfo(model, "key"));
     if (current) where.append(stack(localityField(model, {f: `lighting:key:${current.id}:locality`, value: current.locality, canEdit,
         onChange: (locality) => post(edits.keyFeedbackLocality(feedback, current.id, locality))})));
-    // When the stage flashes, and how fast, is one setting for every case,
-    // on the stage bar.
-    const commit = el(choiceField({label: words.lightingFields.tapBranchCommit, f: "lighting:key:tap-commit", choices: words.tapCommit,
-        current: feedback.tapCommitMode, disabled: !canEdit}));
-    commit.addEventListener("change", (event) =>
-        post(edits.keyFeedback(model.rgb.keyBehaviorFeedback, null, null, {tapCommitMode: /** @type {HTMLInputElement} */ (event.target).value})));
-    return stageSurface(model, {id: "key", first: list, head, colour, side: where, accents: accentsSection(model, "key"),
-        shared: [commit, flashSetting(model, "lightingFeedback")]});
+    // Whether a double tap or more also flashes Tap committed (the tap-commit
+    // policy) is Tap committed's alone, though the keyboard stores it with the
+    // stage, so it sits on that case's pane under where it paints.
+    let side = where;
+    if (current?.id === "tapCommittedColor") {
+        const when = section("When it flashes", sectionInfo(model, "key:commit"));
+        const commit = el(choiceField({label: words.lightingFields.doubleTapFlash, f: "lighting:key:tap-commit", choices: words.tapCommit,
+            current: feedback.tapCommitMode, disabled: !canEdit}));
+        commit.addEventListener("change", (event) =>
+            post(edits.keyFeedback(model.rgb.keyBehaviorFeedback, null, null, {tapCommitMode: /** @type {HTMLInputElement} */ (event.target).value})));
+        when.append(stack(commit));
+        side = el(`<div class="stage-side"></div>`);
+        side.append(where, when);
+    }
+    // How fast it flashes is one setting for every case, on the stage bar.
+    return stageSurface(model, {id: "key", first: list, head, colour, side, accents: accentsSection(model, "key"),
+        shared: [flashSetting(model, "lightingFeedback")]});
 }

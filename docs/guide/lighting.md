@@ -198,13 +198,15 @@ its colour and, under **Where it paints** beside it, its **Locality**, with
 the same choices as a pointing mode; the trigger key is the key showing it,
 or every key of a combo. Changing it changes that case alone.
 
-On the stage bar, under **Every behaviour state**, one setting for every
-case:
+**Tap committed** shows while a key is held on a tap with no hold, once the
+multi tap window has passed. Its pane also has **When it flashes**, with
+**Flash on a double tap or more**: **On**, it also flashes once as a double
+tap or more fires, unless that sends a layer or pointing key, whose own stage
+shows it; **Off**, it shows only while held. A single tap gets no flash
+either way, and the tap branches are not touched by it.
 
-- **Tap branch commit**: **Double taps and more** flashes when a double tap
-  or more fires, unless it sends a layer or pointing key, whose own stage
-  shows it; **Off** doesn't flash for taps.
-- **Flash interval**: how long each on or off phase lasts.
+On the stage bar, under **Every behaviour state**, one setting for every
+case: **Flash interval**, how long each on or off phase lasts.
 
 When keys show cases in different places at once, a narrower place paints
 over a wider one, and where they share one the newest key decides.

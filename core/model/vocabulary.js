@@ -499,10 +499,12 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
         ["END_COLOR_WHERE_BASE_EFFECT_WOULD_SHOW", "End colour where the background effect would show"],
         ["END_COLOR_ON_ALL_KEYS", "End colour on all LEDs"],
     ],
-    tapCommit: [["KEY_FEEDBACK_TAP_COMMIT_OFF", "Off"], ["KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS", "Double taps and more"]],
+    // Whether Tap committed also flashes as a double tap or more fires (the
+    // tap-commit policy, firmware rgb-domain-v1); a tap branch is not touched.
+    tapCommit: [["KEY_FEEDBACK_TAP_COMMIT_OFF", "Off"], ["KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS", "On"]],
     // Lighting's fields, as its tabs label them and the review names them.
     lightingFields: {colour: "Colour", locality: "Locality", paintMode: "Which LEDs light up", fadeMode: "Fade mode", endColour: "End colour",
-        tapBranchCommit: "Tap branch commit"},
+        doubleTapFlash: "Flash on a double tap or more"},
     // The colour editor's choice for a colour that may paint nothing (D-L94,
     // D-L95): a colour, or off, its LEDs dark; passthrough is each stage's
     // `colourOff[stage].offWord`.

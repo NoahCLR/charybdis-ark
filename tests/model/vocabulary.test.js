@@ -137,8 +137,9 @@ test("an accent's LEDs read by index, a run of three or more as a range", () => 
     assert.equal(ledsCalled([56]), "LED 56");
 });
 
-test("tap commit names the taps it flashes for: a double tap or more", () => {
-    assert.equal(word(VOCABULARY.tapCommit, "KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS"), "Double taps and more");
+test("tap commit is Tap committed's flash on a double tap or more, on or off", () => {
+    assert.equal(VOCABULARY.lightingFields.doubleTapFlash, "Flash on a double tap or more");
+    assert.deepEqual(VOCABULARY.tapCommit.map(([, text]) => text), ["Off", "On"]);
 });
 
 test("an unknown value reads as itself, never as nothing", () => {

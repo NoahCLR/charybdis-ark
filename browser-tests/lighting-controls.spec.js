@@ -123,10 +123,12 @@ test("all Lighting policy selects post the chosen policy and retained colour", a
         ["auto", "Fade mode", "END_COLOR_WHERE_BASE_EFFECT_WOULD_SHOW", {type: "updateAutomouseFade", mode: "END_COLOR_WHERE_BASE_EFFECT_WOULD_SHOW", h: 167, s: 255, v: 199}],
         ["pd", "Locality", "RGB_LEFT_HALF", {type: "updatePdModeColor", pointingMode: "POINTING_MODE_DRAGSCROLL", locality: "RGB_LEFT_HALF", h: 21, s: 255, v: 200}],
         ["combo", "Locality", "RGB_BOTH_HALVES", {type: "updateComboFeedback", locality: "RGB_BOTH_HALVES", h: 191, s: 255, v: 200}],
-        ["key", "Tap branch commit", "KEY_FEEDBACK_TAP_COMMIT_OFF", {type: "updateKeyBehaviorFeedback", config: expect.objectContaining({tapCommitMode: "KEY_FEEDBACK_TAP_COMMIT_OFF", holdActiveColor: {h: 18, s: 255, v: 200}})}],
+        ["key", "Flash on a double tap or more", "KEY_FEEDBACK_TAP_COMMIT_OFF", {type: "updateKeyBehaviorFeedback", config: expect.objectContaining({tapCommitMode: "KEY_FEEDBACK_TAP_COMMIT_OFF", holdActiveColor: {h: 18, s: 255, v: 200}})}],
         ["key", "Locality", "RGB_LEFT_HALF", {type: "updateKeyBehaviorFeedback", config: expect.objectContaining({holdActiveLocality: "RGB_LEFT_HALF", holdActiveColor: {h: 18, s: 255, v: 200}})}],
     ]) {
         await openStage(page, stage);
+        // Whether a double tap or more flashes is on Tap committed's pane.
+        if (label === "Flash on a double tap or more") await body(page).locator('[data-row="tapCommittedColor"]').click();
         // A few short choices are on show; a longer list is a menu.
         const onShow = body(page).locator(`.seg[aria-label="${label}"]`);
         if (await onShow.count()) await onShow.locator("label").filter({has: page.locator(`input[value="${value}"]`)}).click();
@@ -151,10 +153,17 @@ test("behaviour feedback names each colour once, in its list, grouped as the beh
     await list.locator('.group-h[data-group="branches"]').click();
     await expect(body(page).locator(".chip")).toHaveCount(0);
     await expect(body(page).locator(".stage-bar .info-pop")).toContainText("behaviour dots");
-    // When it flashes is every case's: it sits on the stage bar, said so.
-    const commit = body(page).locator('.stage-bar .seg[aria-label="Tap branch commit"] label');
-    await expect(commit).toHaveText(["Off", "Double taps and more"]);
+    // How fast it flashes is every case's, on the stage bar; whether a
+    // double tap or more flashes is Tap committed's, on its pane alone.
     await expect(body(page).locator(".stage-bar .stage-bar-scope")).toHaveText("Every behaviour state");
+    await expect(body(page).locator(".stage-bar .seg")).toHaveCount(0);
+    const commit = () => body(page).locator('.stage-detail .seg[aria-label="Flash on a double tap or more"]');
+    await expect(commit()).toHaveCount(0);
+    await body(page).locator('[data-row="tapCommittedColor"]').click();
+    await expect(commit().locator("label")).toHaveText(["Off", "On"]);
+    await expect(body(page).locator('.stage-detail h4').filter({hasText: "When it flashes"})).toHaveCount(1);
+    await body(page).locator('[data-row="branch:0"]').click();
+    await expect(commit()).toHaveCount(0);
 });
 
 test("every behaviour feedback colour row posts its own field, preserving all the other colours", async ({page}) => {
@@ -693,7 +702,7 @@ test("the colour editor and where it paints keep their place from tab to tab", a
     for (const stage of ["base", "layers", "auto", "pd", "combo", "key", "autocorrect"]) {
         await page.locator(`[data-ltab="${stage}"]`).click();
         const box = async (selector) => { const rect = await body(page).locator(selector).first().boundingBox(); return rect ? [Math.round(rect.x), Math.round(rect.y)] : []; };
-        at[stage] = [...await box(".stage-detail > section:nth-of-type(1) h4"), ...await box(".stage-detail > section:nth-of-type(2) h4")];
+        at[stage] = [...await box(".stage-detail > section:nth-of-type(1) h4"), ...await box(".stage-detail > section:nth-of-type(1) + :is(section, .stage-side) h4")];
     }
     const listed = ["layers", "pd", "combo", "key", "autocorrect"].map((stage) => at[stage].join());
     expect(new Set(listed).size, JSON.stringify(at)).toBe(1);
@@ -933,7 +942,7 @@ test("Behaviour feedback's Flash interval posts its own setting and no longer sp
     await clearPosts(page);
     await change(field.locator("input"), 120);
     await expectPost(page, {type: "updateConfigDefaults", sectionId: "lightingFeedback", fields: [{macro: "feedbackFlash", value: "120"}], expectedFingerprint: expect.any(String)});
-    // With the tap-commit policy, one setting for every case, on the stage bar.
+    // One setting for every case, on the stage bar.
     await expect(body(page).locator(".stage-bar", {has: page.locator('[data-f="setting:feedbackFlash"]')}).locator(".stage-bar-scope")).toHaveText("Every behaviour state");
 });
 

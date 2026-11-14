@@ -361,8 +361,8 @@ The same kind of control looks and sits the same on every screen.
   `webview/ui/lighting/common.mjs`) holds what is the whole stage's, in the
   same place on every tab: its name and what it does behind an info mark;
   the settings every item on it shares, under the words its accents use for
-  all of them (Behaviour feedback's Tap branch commit and Flash interval under
-  Every behaviour state, Replacement feedback's Flash length under Every
+  all of them (Behaviour feedback's Flash interval under Every behaviour
+  state, Replacement feedback's Flash length under Every
   case); a note saying what is the items' own where there is nothing shared;
   whether a switch elsewhere keeps it from painting; and its Stage on switch,
   always the bar's last item (`stageSwitch`). The bar keeps one line at

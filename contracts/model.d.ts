@@ -97,7 +97,7 @@ export interface ApplyView {
 export type WordList<T = Scalar> = readonly (readonly [T, string])[];
 export type HalvesId = 'agree' | 'alone' | 'apart' | 'unread';
 /** A Lighting field the tabs and the review both name. */
-export type LightingField = 'colour' | 'locality' | 'paintMode' | 'fadeMode' | 'endColour' | 'tapBranchCommit';
+export type LightingField = 'colour' | 'locality' | 'paintMode' | 'fadeMode' | 'endColour' | 'doubleTapFlash';
 
 export interface Vocabulary {
     phases: Readonly<Record<PhaseId, Readonly<PhaseWords>>>;

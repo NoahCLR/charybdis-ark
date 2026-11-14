@@ -96,11 +96,9 @@ export function stageInfo(model, id) {
         case "key": {
             const tiers = ["KEY_FEEDBACK_GROUP_TAP_COMMITTED", "KEY_FEEDBACK_GROUP_HOLD_ACTIVE", "KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE"].map(flash);
             const [first, deepest] = [flash("KEY_FEEDBACK_GROUP_TAP_COUNT_2"), flash("KEY_FEEDBACK_GROUP_TAP_COUNT_5")];
-            const [never, more] = [word(words.tapCommit, "KEY_FEEDBACK_TAP_COMMIT_OFF"), word(words.tapCommit, "KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS")];
-            return mark("How behaviour feedback paints", "While a key's behaviour fires, the key flashes the colour of what fired. Each case has its own colour, place and accents; when it flashes and how fast is one setting for every case.", [
+            return mark("How behaviour feedback paints", "While a key's behaviour fires, the key flashes the colour of what fired. Each case has its own colour, place and accents; how fast it flashes is one setting for every case.", [
                 row(words.lightingLists.tiers.title, `${listed(tiers)} flash as that tier fires.`),
                 row(words.lightingLists.tapBranches.title, `${first} to ${deepest}, each flashed while a run of taps waits on that count. A deeper run takes ${deepest}'s.`),
-                row(words.lightingFields.tapBranchCommit, `${more} flashes as a double tap or more fires, unless it sends a layer or pointing key, whose own stage shows it. ${never} doesn't flash for taps.`),
                 row(interval, "How long each on or off phase lasts; a full blink takes twice this."),
                 row("No key has it", "The keyboard never shows that case, and the board shows nothing for it."),
                 row("Marks", "The board's behaviour dots and the behaviour grid's branch numbers wear these colours."),
@@ -146,6 +144,14 @@ export function sectionInfo(model, id) {
             row(word(words.fadeModes, "FOLLOW_REAL_DESTINATION"), "What the board would show without the pointer layer. Uses no end colour."),
             row(word(words.fadeModes, "END_COLOR_WHERE_BASE_EFFECT_WOULD_SHOW"), "The layers beneath where they paint, and the end colour where the background effect would show."),
             row(word(words.fadeModes, "END_COLOR_ON_ALL_KEYS"), "The end colour on every LED.")]);
+        case "key:commit": {
+            const committed = word(words.feedbackOwners, "KEY_FEEDBACK_GROUP_TAP_COMMITTED");
+            return mark(`About when ${committed} flashes`, "When it flashes", `${committed} shows while a key is held on a tap with no hold, once the multi tap window has passed.`, [
+                row(word(words.tapCommit, "KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS"), "It also flashes once as a double tap or more fires, unless that sends a layer or pointing key, whose own stage shows it."),
+                row(word(words.tapCommit, "KEY_FEEDBACK_TAP_COMMIT_OFF"), "It shows only while held."),
+                row("A single tap", "Gets no flash either way."),
+                row(words.lightingLists.tapBranches.title, "Flash while a run of taps waits on their count, either way.")]);
+        }
         case "auto:timing": {
             const hold = setting("mouseFadeHold");
             return mark("About the timing", hold, "", [
