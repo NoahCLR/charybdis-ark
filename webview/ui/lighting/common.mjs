@@ -130,15 +130,18 @@ export function lightingGroup(id) {
     }};
 }
 
-// How long a feedback stage's flash lasts: Behaviour feedback's flash
-// interval (lightingFeedback) or Replacement feedback's flash length
+// How long a feedback stage's flash lasts: Behaviour feedback's blink time
+// (lightingFeedback) or Replacement feedback's flash length
 // (replacementFeedback), each a stored setting of its own, on the stage
 // bar since it is every case's. The keyboard keeps them with its settings,
 // so each saves as a settings section of one field. What it means is in the
 // stage's info mark alone (a tip is one control's one line, never an
-// explanation the info mark already gives).
-/** @param {Model} model @param {string} sectionId */
-export function flashSetting(model, sectionId) {
+// explanation the info mark already gives). With `blink`, a dot after the
+// field blinks at the time typed, on for one, off for one, in that colour
+// (the case picked), or the text's where the case paints nothing; with
+// reduced motion it stays lit.
+/** @param {Model} model @param {string} sectionId @param {{blink?: string}} [options] */
+export function flashSetting(model, sectionId, {blink} = {}) {
     const flash = sectionsIn(model, "Lighting").find((entry) => entry.id === sectionId);
     const field = flash?.fields[0];
     if (!flash || !field) return el(`<span></span>`);
@@ -146,6 +149,20 @@ export function flashSetting(model, sectionId) {
     const label = field.unit ? field.label.replace(new RegExp(`\\s*\\(${field.unit}\\)$`), "") : field.label;
     const node = el(`<label class="field inline"><span>${esc(label)}</span>
         <span class="affix unit"><input class="input mono num" inputmode="numeric" data-macro="${esc(field.macro)}" data-f="setting:${esc(field.macro)}" value="${esc(field.value)}" ${editable ? "" : "disabled"}>${field.unit ? `<i>${esc(field.unit)}</i>` : ""}</span></label>`);
+    if (blink !== undefined) {
+        /** @param {string} value */
+        const phase = (value) => /^\d+$/.test(value.trim()) && Number(value) > 0 ? `${Number(value)}ms` : "";
+        const dot = el(`<i class="blink-dot" aria-hidden="true" data-blink></i>`);
+        if (blink) dot.style.setProperty("--blink-colour", blink);
+        const time = phase(field.value);
+        if (time) dot.style.setProperty("--blink-phase", time);
+        node.append(dot);
+        // It follows what is typed before it is saved.
+        /** @type {HTMLInputElement} */ (node.querySelector("input")).addEventListener("input", (event) => {
+            const typed = phase(/** @type {HTMLInputElement} */ (event.target).value);
+            if (typed) dot.style.setProperty("--blink-phase", typed);
+        });
+    }
     /** @type {HTMLInputElement} */ (node.querySelector("input")).addEventListener("change", (event) => {
         const written = /** @type {HTMLInputElement} */ (event.target).value.trim();
         if (!written) { /** @type {HTMLInputElement} */ (event.target).value = field.value; return; }

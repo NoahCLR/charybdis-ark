@@ -538,7 +538,7 @@ test("each feedback flash's length is reviewed with its own stage, and discarded
     assert.deepEqual({title: length.title, area: length.area, place: length.place, fields: length.fields.map(field => [field.label, field.before, field.after])},
         {title: "Replacement feedback flash", area: "Lighting", place: {kind: "settings", area: "Lighting", section: "replacementFeedback", stage: "autocorrect"}, fields: [["Flash length", "200 ms", "350 ms"]]});
     const interval = items.find(row => row.unit === "settings:lightingFeedback");
-    assert.deepEqual(interval.fields.map(field => [field.label, field.before, field.after]), [["Flash interval", "200 ms", "120 ms"]]);
+    assert.deepEqual(interval.fields.map(field => [field.label, field.before, field.after]), [["Blink time", "200 ms", "120 ms"]]);
     // Discarding one puts back that length alone.
     const kept = validateSnapshot(revertUnits(before, both, new Set(["settings:replacementFeedback"]))).settings.values;
     assert.deepEqual([kept[15], kept[31]], [120, 200]);

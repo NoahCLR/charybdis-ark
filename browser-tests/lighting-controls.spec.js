@@ -932,11 +932,19 @@ test("the Flash length field posts its own setting edit and keeps its focus acro
     expect(await posted(page)).toEqual([]);
 });
 
-test("Behaviour feedback's Flash interval posts its own setting and no longer speaks for replacement feedback", async ({page}) => {
+test("Behaviour feedback's Blink time posts its own setting, blinks its dot at that pace, and no longer speaks for replacement feedback", async ({page}) => {
     await openStage(page, "key");
     const field = body(page).locator('.field:has([data-f="setting:feedbackFlash"])');
     await expect(field).not.toHaveAttribute("data-tip", /./);
-    await expect(body(page).locator(".stage-bar .info-pop")).toContainText("a full blink takes twice this");
+    await expect(field).toContainText("Blink time");
+    await expect(body(page).locator(".stage-bar .info-pop")).toContainText("a single flash lasts one of these");
+    // The dot blinks on for the time typed, then off for as long, in the
+    // case picked's colour, and follows what is typed before it is saved.
+    const dot = field.locator("[data-blink]");
+    const blink = () => dot.evaluate((node) => { const style = getComputedStyle(node); return [style.animationDuration, style.backgroundColor]; });
+    expect(await blink()).toEqual(["0.4s", "rgb(200, 85, 0)"]);
+    await field.locator("input").fill("150");
+    expect((await blink())[0]).toBe("0.3s");
     await expect(field).not.toContainText(/replacement/i);
     await expect(field).not.toHaveAttribute("data-tip", /replacement/i);
     await clearPosts(page);

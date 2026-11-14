@@ -78,7 +78,9 @@ export function stageKey(model) {
         side = el(`<div class="stage-side"></div>`);
         side.append(where, when);
     }
-    // How fast it flashes is one setting for every case, on the stage bar.
+    // How fast it blinks is one setting for every case, on the stage bar,
+    // its dot blinking in the case picked's colour.
+    const blink = current && !isPassthrough(current.colour) && !isOff(current.colour) ? css(current.colour) : "";
     return stageSurface(model, {id: "key", first: list, head, colour, side, accents: accentsSection(model, "key"),
-        shared: [flashSetting(model, "lightingFeedback")]});
+        shared: [flashSetting(model, "lightingFeedback", {blink})]});
 }

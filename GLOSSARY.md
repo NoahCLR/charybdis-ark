@@ -361,8 +361,8 @@ the last for every deeper count too), each with its own colour, locality and
 accents (D-L93, firmware D-F73); an accent lights for one case, for **Every
 tap branch** (firmware D-F75), or for **Every behaviour state**. Its
 tap-commit policy, **Flash on a double tap or more**, is Tap committed's
-alone, on that case's pane; its **Flash interval**, how long one on or off
-phase lasts, is one setting for every case, on its stage bar. The
+alone, on that case's pane; its **Blink time**, how long the key stays on,
+then off, in each blink, is one setting for every case, on its stage bar. The
 firmware's code and Ark's keep the stage's old name: the stage id `key`, the
 record `keyFeedback`, the accent table `keyBehavior`, the edit
 `updateKeyBehaviorFeedback`.

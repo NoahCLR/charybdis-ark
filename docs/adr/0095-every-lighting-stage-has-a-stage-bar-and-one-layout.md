@@ -27,7 +27,7 @@ existing columns, and tidying only) he picked the stage bar: "B looks good".
 - **A stage bar across the top of every stage holds what is the whole
   stage's.** Its name, with what it does behind the info mark; the settings
   every item on the stage shares, headed by the words its accents already use
-  for all of them (**Every behaviour state** over Flash interval; **Every
+  for all of them (**Every behaviour state** over Blink time; **Every
   case** over Flash length, with a link to Leader waits on
   Host settings, which Leader waiting lasts as long as); a short note where
   nothing is shared; whether a switch elsewhere, or All lighting, keeps the
@@ -41,6 +41,9 @@ existing columns, and tidying only) he picked the stage bar: "B looks good".
   commit, it read as theirs, so it is **Flash on a double tap or more** (Off,
   On) under **When it flashes** on Tap committed's pane, beside Where it
   paints, and the review names it under Tap committed.
+- **Behaviour feedback's Flash interval is Blink time**, with a dot after
+  it blinking at that pace in the colour of the case picked: "interval" never
+  said the key blinks, or that a single flash lasts one of them.
 - **Under it, every stage has the same columns.** A first column (the list,
   or the background effect's Effect and the fade's Fade), the colour beside
   Where it paints, and the accents under both. The background effect's LEDs

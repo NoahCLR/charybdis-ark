@@ -2204,6 +2204,11 @@ select.input.pd-add { height: var(--h-chip); width: 124px; min-width: 0; padding
 .stage-bar-note, .stage-bar-aside { color: var(--text-3); font-size: var(--fs-sm); }
 .stage-bar-aside { margin-right: calc(-1 * var(--sp-2)); }
 .stage-bar > .grow { flex: 1; }
+/* Behaviour feedback's blink time, shown: on for one, off for one (flashSetting). */
+.blink-dot { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--blink-colour, var(--text-2));
+  animation: blink-time calc(2 * var(--blink-phase, 200ms)) step-end infinite; }
+@keyframes blink-time { 50% { opacity: .15; } }
+@media (prefers-reduced-motion: reduce) { .blink-dot { animation: none; } }
 .stage-bar > .accent-budget { margin: 0; }
 .stage-bar.off .stage-bar-title > span:first-child { color: var(--text-2); }
 /* A switch elsewhere that keeps the stage from painting, or All lighting
