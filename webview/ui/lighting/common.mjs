@@ -113,13 +113,14 @@ export function pickedMarked(model, stage, name) {
     return whose ? marked(model, ownerMark(model, whose.target, whose.owner), name) : esc(name);
 }
 
-// Where a colour paints, for an item's head: passthrough, which paints
-// nothing; off, where its LEDs go dark; else where it paints (D-L94). Each
-// state is named in the colour editor's words for it.
+// Where a colour paints, for an item's head: passthrough, named alone, since
+// what it means is the note under the colour (offNote) and is said there
+// once (D-L96); off, where its LEDs go dark; else where it paints (D-L94).
+// Each state is named in the colour editor's words for it.
 /** @param {Model} model @param {string} stage @param {import("../../../contracts/edits.js").Colour | undefined} colour @param {string} where */
 export function paintsLine(model, stage, colour, where) {
     const words = vocabulary(model);
-    return isPassthrough(colour) ? `${words.colourOff[stage]?.offWord || ""}: paints nothing, so what is beneath shows`
+    return isPassthrough(colour) ? words.colourOff[stage]?.offWord || ""
         : isOff(colour) ? `${words.colourChoice.off}: its LEDs go dark, on ${where}` : `Paints ${where}`;
 }
 
