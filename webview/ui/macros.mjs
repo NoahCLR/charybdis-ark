@@ -24,6 +24,7 @@ import {editGate} from "../view/edit-gate.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
 import {vocabulary} from "../view/vocabulary.mjs";
 import {topbar} from "./frame.mjs";
+import {attachInfoMarks, infoMark} from "./info-mark.mjs";
 import {editor} from "./macros/editor.mjs";
 import {slotBank} from "../view/slot-bank.mjs";
 import {SWAP_TIP, allSlotsShown, slotBankControls, swappable} from "./slot-bank.mjs";
@@ -59,6 +60,7 @@ export function screenMacros() {
         <input class="input search card-search" id="macroSearch" data-f="macros:search" type="search" aria-label="Search macros by name" placeholder="Search by name" value="${esc(state.macroSearch || "")}">
         <span class="tag" data-tip="${esc(available)} of ${bank.length} slots have room in macro memory">${filled} of ${bank.length} used${available < bank.length ? ` · ${bank.length - available} without room` : ""}</span></div>
         <div class="card-b"><div class="macro-grid"></div>${memoryMeter(memory)}</div></div>`);
+    attachInfoMarks(grid);
     /** @type {HTMLInputElement} */ (grid.querySelector("#macroSearch")).addEventListener("input", (event) => { state.macroSearch = /** @type {HTMLInputElement} */ (event.target).value; render(); });
     const cells = /** @type {HTMLElement} */ (grid.querySelector(".macro-grid"));
     const query = state.macroSearch || "";
@@ -128,8 +130,13 @@ function memoryMeter(memory) {
     if (!memory) return "";
     const used = memory.stored, share = Math.min(100, (used / memory.capacity) * 100);
     const unavailable = memory.slots - memory.available;
-    return `<div class="sect-h memory-h"><h4>Macro memory</h4>
+    // What takes room is its info mark, read once (D-L96); what is free, and
+    // the slots without room, are on show.
+    const info = infoMark({id: "macro-info-memory", label: "What takes macro memory", heading: "Macro memory", rows: [
+        {term: "A key tap", says: "3 bytes."}, {term: "Text", says: "Its UTF-8 bytes; an accented letter takes two or more."},
+        {term: "An empty slot", says: `Keeps room for ${memory.reserveTaps} key taps. When memory runs short, the highest empty slots become unavailable until there is room again.`}]});
+    return `<div class="sect-h memory-h"><h4>Macro memory</h4>${info}
             <span class="right note">${esc(used.toLocaleString("en-US"))} / ${esc(memory.capacity.toLocaleString("en-US"))} bytes</span></div>
         <div class="meter">${meterFill(share)}</div>
-        <p class="note meter-note">${esc(memory.free.toLocaleString("en-US"))} bytes free. A key tap takes 3 bytes; text uses its UTF-8 bytes. Every empty slot keeps room for ${esc(memory.reserveTaps)} key taps${unavailable ? `; ${esc(unavailable)} slot${unavailable === 1 ? " is" : "s are"} unavailable until there is room again` : ""}.</p>`;
+        <p class="note meter-note">${esc(memory.free.toLocaleString("en-US"))} bytes free${unavailable ? `; ${esc(unavailable)} slot${unavailable === 1 ? " is" : "s are"} unavailable until there is room again` : ""}.</p>`;
 }

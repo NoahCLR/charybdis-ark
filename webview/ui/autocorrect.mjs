@@ -81,7 +81,7 @@ const replacementInfo = (list) => infoMark({id: "ac-info-replacement", label: "H
     {term: "When", says: "As you finish a word with a space, punctuation, Enter or Tab. A word you are still typing is never touched."},
     {term: "Capitals", says: "Follow what you typed: Teh becomes The, TEH becomes THE. A replacement written with capitals keeps them."},
     {term: "Backspace", says: "Right after a replacement, Backspace puts back what you typed. Not after Enter or Tab."},
-    {term: "Text", says: `One line, up to ${list.usage.correctionMax} bytes: a word, a phone number, an address.`},
+    {term: "Text", says: `One line of up to ${list.usage.correctionMax} bytes, an accented letter taking two or more: a word, a phone number, an address.`},
     {term: "Macro", says: "For anything longer or on several lines. It plays for whole-word inputs only, keeps no capitals rule, and Backspace does not take it back."},
     {term: "Starting over", says: "A click, a shortcut or an arrow key starts a new word. The keyboard cannot see a password field or a terminal: turn text replacement off there."},
     {term: "On and off", says: "Settings → Host, or a key set to Text replacement on, off or toggle."}]});
@@ -107,7 +107,7 @@ const firesInfo = (model) => {
     const modes = vocabulary(model).inputModes;
     return infoMark({id: "ac-info-fires", label: "How a replacement fires", heading: "How a replacement fires", lead: "Its inputs stay the same whichever you choose.", rows: [
         {term: word(modes, "word"), says: "Replaced as you finish the word."},
-        {term: word(modes, "leader"), says: "Typed after the Leader key, and sent the moment it is typed: the computer never sees what you typed."},
+        {term: word(modes, "leader"), says: "Press the Leader key, then type one of its inputs: the keyboard sends the replacement the moment it is typed, and the computer never sees what you typed. How long it waits for you is Leader waits, on Host."},
         {term: word(modes, "both"), says: "Either way."}]});
 };
 
@@ -446,7 +446,7 @@ function bank(model, list, rows, open, canEdit) {
             <p class="note profile-drop-status" data-ac-file-status role="status" hidden></p>
             <div class="sect-h memory-h"><h4>Text replacement memory</h4><span class="right note" data-ac-memory>${esc(bytesWords(list.usage))}</span></div>
             <div class="meter" data-ac-meter data-tip="Part of the profile, within its own limit.">${meterFill(list.usage.share * 100)}</div>
-            <p class="note meter-note"><span data-ac-free>${esc(freeWords(list.usage))}</span>, in <span data-ac-count>${esc(countWords(list.usage))}</span>. A replacement holds up to ${esc(list.usage.correctionMax)} bytes of text and an input up to ${esc(list.usage.textMax)}; an accented letter takes two or more.</p>
+            <p class="note meter-note"><span data-ac-free>${esc(freeWords(list.usage))}</span>, in <span data-ac-count>${esc(countWords(list.usage))}</span>.</p>
         </div></div>`);
     const cells = /** @type {HTMLElement} */ (card.querySelector(".ac-bank"));
     /** @type {HTMLInputElement} */ (card.querySelector("#replacementSearch")).addEventListener("input", (event) => { state.autocorrectSearch = /** @type {HTMLInputElement} */ (event.target).value; render(); });
@@ -579,17 +579,15 @@ const firesField = (model, f, canEdit, current) => choiceField({label: "How it f
 const inputPlaceholder = (fires, macro, words = "teh or recieve*") => `${macro ? "sig" : fires === "leader" ? "pn or sig" : words}, then Enter`;
 // A new replacement's first input gives a word's example of its own.
 const FIRST_INPUT = "becuase or recieve*";
-// What the Leader key is, said where a replacement fires after it; what each
-// choice of how it fires means is its info mark (firesInfo).
-const LEADER_NOTE = "Press the Leader key, then type one of its inputs: the keyboard sends this replacement, and the computer never sees what you typed. How long it waits for you is Leader waits, on Host.";
 // The Leader key as core names it (LEADER_KEY_NAME in core/schema/actions.js).
 const LEADER_KEY = "QK_LEADER";
-// Under the switch while a replacement fires after Leader: what the Leader
-// key does, where it is placed (keys by layer, behaviours, combos), and Place
-// on a key →, as a macro's and a pointing mode's editors have it.
+// Under the switch while a replacement fires after Leader: where the Leader
+// key is placed (keys by layer, behaviours, combos), and Place on a key →, as
+// a macro's and a pointing mode's editors have it. What the Leader key does
+// is the Fires info mark (firesInfo).
 /** @param {Model} model */
 function leaderRow(model) {
-    return `<div class="stack ac-leader" data-ac-leader-note><p class="note">${esc(LEADER_NOTE)}</p>
+    return `<div class="stack ac-leader" data-ac-leader-note>
         <div class="ac-leader-place" role="group" aria-label="Where the Leader key is">${leaderCap(model)}
             <span class="note" data-ac-leader-placed>${phraseMarked(model, reachLine(keycodePlacements(model, [LEADER_KEY])))}</span>
             <button type="button" class="btn tiny link" data-act="ac-place-leader" ${editGate(model, "keys").editable ? "" : "disabled"}

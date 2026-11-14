@@ -18,10 +18,10 @@ import {movementChoice} from "./movement-choice.mjs";
 import {movement} from "./movement.mjs";
 import {lightRow, placeButton} from "./keys-and-light.mjs";
 import {placedOnMarkup, showPlacements} from "../keys/reach.mjs";
-import {startStep} from "./link.mjs";
+import {startAbout, startStep} from "./link.mjs";
 import {advancedControls} from "./advanced.mjs";
 import {step as pdStep} from "./step.mjs";
-import {tipFor, words} from "./common.mjs";
+import {choicesPart, tipFor, words} from "./common.mjs";
 
 /** @param {import("../../../contracts/panel.js").PublishedModel} model @param {import("../surface-types.js").PresentedSlot} slot @param {boolean} canEdit @param {import("../surface-types.js").PresentedSlot[]} slots */
 export function editor(model, slot, canEdit, slots) {
@@ -69,23 +69,28 @@ export function editor(model, slot, canEdit, slots) {
     attachTitleName(card, {stored: slot.name || "", perName: NAME_MAX_BYTES, rename: () => stage()});
 
     const steps = /** @type {HTMLElement} */ (card.querySelector(".pd-steps"));
-    /** @param {number} n @param {string} title @param {string} [hint] */
-    const step = (n, title, hint = "") => pdStep(steps, slot.id, n, title, hint);
+    /** @param {number} n @param {string} title @param {Parameters<typeof pdStep>[5]} [about] */
+    const step = (n, title, about) => pdStep(steps, slot.id, n, title, "", about);
+    const P = words(model);
     step(1, "What the ball does").append(movementChoice(model, slot.id, kind, {disabled: !canEdit,
         // Switching movement only redraws the form for the other kind: its
         // fields start empty, so staging now would post an invalid record.
         // The slot is staged once a field of the new form is changed.
         pick: (picked) => { state.pdKind = {slot: slot.id, kind: picked}; render(); }}));
-    step(2, scrolling ? "How it scrolls" : "What each direction sends").append(movement(model, slot, scrolling, controls, stage));
-    step(3, "What starts it").append(startStep(model, slot, controls, stage));
+    // What a step's choices mean is its info mark, read once, not each
+    // field's tip (D-L96).
+    step(2, scrolling ? "How it scrolls" : "What each direction sends", scrolling ? {} : {parts: [
+        choicesPart(model, "emptyDirection", P.fieldLabels.emptyDirection), choicesPart(model, "directionOutput", P.fieldLabels.directionOutput)]})
+        .append(movement(model, slot, scrolling, controls, stage));
+    step(3, "What starts it", startAbout(model, slot)).append(startStep(model, slot, controls, stage));
     // The same four columns step 2 lays its fields in.
     const runs = el(`<div class="pd-cols"></div>`);
-    const pointerLayer = controls.choice(words(model).pointerLayerLabel, words(model).pointerLayer, slot.pointerLayer, "pointerLayer", {tip: tipFor(model, "pointerLayer")});
+    const pointerLayer = controls.choice(P.pointerLayerLabel, P.pointerLayer, slot.pointerLayer, "pointerLayer");
     pointerLayer.classList.add("span2");
     runs.append(controls.choice(words(model).fieldLabels.dpi, dpiOptions(model.pdModeEditing?.dpiChoices, slot.dpi), slot.dpi ?? 0, "dpi",
         {tip: `${tipFor(model, "dpi")} Normal pointer speed keeps the DPI set in ${sectionPath(model, "normalPointerSpeed")}.`}),
     lightRow(model, slot), pointerLayer);
-    step(4, "While it runs").append(runs);
+    step(4, "While it runs", {parts: [choicesPart(model, "pointerLayer", P.pointerLayerLabel)]}).append(runs);
     wrap.append(card, advancedControls(model, slot, scrolling, controls));
 
     wrap.addEventListener("change", (event) => {

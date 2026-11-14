@@ -805,10 +805,16 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 .info-h { display: block; margin-bottom: var(--sp-2); font-size: var(--fs-sm); color: var(--text-3); }
 .info-pop dl { display: grid; grid-template-columns: auto 1fr; gap: var(--sp-2) var(--sp-4); margin: 0; font-size: var(--fs-sm); }
 .info-mark.corner .info-pop dl { font-size: var(--fs-md); }
-.info-pop dt { color: var(--text); font-weight: var(--fw-regular); white-space: nowrap; }
-.info-pop dt.mono { font-family: var(--mono); font-size: var(--fs-sm); }
+/* A term of a few words wraps rather than squeezing what it says; a typed
+   one (a shortcut) stays whole. */
+.info-pop dt { max-width: 18ch; color: var(--text); font-weight: var(--fw-regular); }
+.info-pop dt.mono { max-width: none; font-family: var(--mono); font-size: var(--fs-sm); white-space: nowrap; }
 .info-pop dd { margin: 0; color: var(--text-2); }
 .info-lead { display: block; max-width: 400px; margin-bottom: var(--sp-3); font-size: var(--fs-sm); line-height: 1.45; color: var(--text); }
+/* A part's heading, under the list before it, as the list's own heading is. */
+.info-part { display: block; margin: var(--sp-2) 0; font-size: var(--fs-sm); font-weight: var(--fw-strong); color: var(--text); }
+.info-pop dl + .info-part, .info-lead + .info-part { margin-top: var(--sp-4); }
+.info-part + .info-lead { margin-bottom: var(--sp-2); color: var(--text-2); }
 
 /* ── sections ────────────────────────────────────────────────────────── */
 .sect { border-bottom: 1px solid var(--line); padding: var(--sp-4) var(--sp-4); }
@@ -1097,7 +1103,6 @@ button.tier:hover { background: var(--surface-3); }
 /* The Key tab (ui/keys/key-tab.mjs): the position's details, the stack's
    note and swatches, what the key reaches and its participation. */
 .key-details, .key-unavailable, .answered-below { margin-top: var(--sp-3); }
-.stack-note { margin-top: var(--sp-2); }
 /* Its position details fold away under the key's action; a run of
    transparent layers folds into one row. */
 .key-more { margin-top: var(--sp-2); }
@@ -1601,6 +1606,8 @@ table.t tr.quiet > td { color: var(--text-3); }
 .sheet.picker .sheet-h > div:first-child { flex: 1 1 0; min-width: 0; }
 .pk-search { flex: 0 0 300px; width: 300px; margin-left: var(--sp-3); }
 .sheet.picker .sheet-h > .right { flex: none; margin-left: var(--sp-3); }
+/* The title, and beside it how to pick in the section shown (D-L96). */
+.pk-title { display: flex; align-items: center; gap: var(--sp-2); }
 @container sheet (max-width: 820px) {
   .pk-search { flex-basis: 200px; width: 200px; }
 }
@@ -2002,11 +2009,6 @@ select.input.pd-add { height: var(--h-chip); width: 124px; min-width: 0; padding
 .macro-legend span { font-size: var(--fs-xs); }
 .macro-utilities { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2) var(--sp-4); }
 .macro-footer { border-top: 1px solid var(--line); padding-top: var(--sp-4); }
-/* Typing & playback help folds under its one button, with the chevron every
-   disclosure has. */
-.macro-guidance { border-radius: var(--r-control); padding: var(--sp-3); background: var(--surface-2); }
-.macro-guidance .note { line-height: 1.55; }
-.macro-guidance > * + * { margin-top: var(--sp-3); }
 .macro-editor-card [data-recorder], .card.editor-section { border: 0; border-top: 1px solid var(--line); border-radius: 0; background: transparent; padding-top: var(--sp-4); }
 .macro-editor-card [data-recorder] .card-h, .editor-section .card-h { border-bottom: 0; padding: 0; margin-bottom: var(--sp-3); }
 .macro-editor-card [data-recorder] .card-b, .editor-section .card-b { padding: 0; gap: var(--sp-3); }

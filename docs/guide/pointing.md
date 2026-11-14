@@ -79,7 +79,8 @@ behaviour, a combo, or the layer itself when the mode is linked to it
 tab. An empty slot shows the keys still bound to it, which do nothing until it
 holds a mode.
 
-The editor runs in four steps, top to bottom.
+The editor runs in four steps, top to bottom. The ⓘ beside a step's title
+says what each of its choices does; a click keeps it open.
 
 ### Starting a mode
 
@@ -230,13 +231,14 @@ that start it, since a layer starts only one mode; set those on the copy.
 **Advanced** holds the finer settings and stays open as you move between
 slots:
 
-- **Distance**: how far the ball moves before a direction sends, shown in millimetres at
-  the mode's DPI. With **Every step**, one key per this distance; with **Once
-  per movement**, how far it must go before the key is sent at all.
+- **Distance**: how far the ball moves before a direction sends, shown under
+  each field in millimetres at the mode's DPI. Its ⓘ says what the distance
+  is: with **Every step**, one key per this distance; with **Once per
+  movement**, how far it must go before the key is sent at all.
 - **Held modifiers**: what each direction does when you are already holding
   modifiers. **Inherit modifiers** adds them, **Ignore** leaves out the ones
   you pick, and **Exact shortcut** sends only its own. A macro always inherits.
-- **Scroll tuning** for scrolling modes. Each setting says what it does under it:
+- **Scroll tuning** for scrolling modes. Its ⓘ says what each setting does:
   - **Horizontal** and **Vertical activation threshold**: how far the ball
     must move on an axis before a scroll can use it. When both axes are below
     their thresholds, the scroll lets go of its axis.

@@ -12,7 +12,7 @@ import {listed} from "../../view/vocabulary.mjs";
 import {linkIgnored, linkRows, pointerLayerCovers, withLayer} from "../../view/pointing-link.mjs";
 import {EMPTY_LAYERS_TITLE, emptyLayers} from "../../view/empty-layers.mjs";
 import {layerMarked, marked} from "../marks.mjs";
-import {tipFor, words} from "./common.mjs";
+import {choicesPart, tipFor, words} from "./common.mjs";
 import {keysRow} from "./keys-and-light.mjs";
 import {choiceField, choiceValue} from "../segmented.mjs";
 
@@ -20,14 +20,25 @@ import {choiceField, choiceValue} from "../segmented.mjs";
 /** @typedef {import("../../view/pointing-link.mjs").LinkRow} LinkRow */
 /** @typedef {import("../../../contracts/panel.js").PublishedModel} Model */
 
+// The step's rows, as it heads them.
+const ROWS = {keys: "Its keys", layers: "Layers"};
+
+// What the step's lists and its ending mean, read once in the step's info
+// mark (D-L96): the ending only while layers start the mode, as its field is.
+/** @param {Model} model @param {import("../surface-types.js").PresentedSlot} slot */
+export const startAbout = (model, slot) => ({
+    rows: [{term: ROWS.layers, says: tipFor(model, "linkedLayers")}, {term: words(model).linkLabels.keyTurnsOnShort, says: tipFor(model, "linkTurnsOn")}],
+    parts: slot.linkedLayers ? [choicesPart(model, "linkEnds", words(model).linkLabels.endsWhen)] : [],
+});
+
 /** @param {Model} model @param {import("../surface-types.js").PresentedSlot} slot @param {FormControls} controls @param {() => void} stage */
 export function startStep(model, slot, {form, disabled}, stage) {
     const P = words(model), L = P.linkLabels;
     const rows = linkRows(model, slot);
     const node = el(`<div class="pd-starts stack">
-        <div class="pd-row"><span class="pd-row-l">Its keys</span></div>
-        <div class="pd-row" data-tip="${esc(tipFor(model, "linkedLayers"))}"><span class="pd-row-l" id="pd-starts-${esc(slot.id)}">Layers</span></div>
-        <div class="pd-row" data-tip="${esc(tipFor(model, "linkTurnsOn"))}"><span class="pd-row-l" id="pd-turns-${esc(slot.id)}">${esc(L.keyTurnsOnShort)}</span></div></div>`);
+        <div class="pd-row"><span class="pd-row-l">${esc(ROWS.keys)}</span></div>
+        <div class="pd-row"><span class="pd-row-l" id="pd-starts-${esc(slot.id)}">${esc(ROWS.layers)}</span></div>
+        <div class="pd-row"><span class="pd-row-l" id="pd-turns-${esc(slot.id)}">${esc(L.keyTurnsOnShort)}</span></div></div>`);
     const [keys, starts, turns] = /** @type {HTMLElement[]} */ ([...node.querySelectorAll(".pd-row")]);
     keys.append(keysRow(slot));
     let linked = slot.linkedLayers, turnsOn = slot.linkTurnsOn;
@@ -42,8 +53,7 @@ export function startStep(model, slot, {form, disabled}, stage) {
     // What ends a mode its layers started, so only beside layers that start it.
     if (slot.linkedLayers) {
         const ends = el(`<div class="pd-row"><span class="pd-row-l" aria-hidden="true">${esc(L.endsWhen)}</span>${choiceField({label: L.linkEnds, f: `pointing:${slot.id}:linkEnds`,
-            choices: P.linkEnds, current: slot.linkEnds, disabled: Boolean(disabled), hideLabel: true,
-            tip: tipFor(model, "linkEnds")})}</div>`);
+            choices: P.linkEnds, current: slot.linkEnds, disabled: Boolean(disabled), hideLabel: true})}</div>`);
         form.linkEnds = () => Number(choiceValue(ends) || LINK_ENDS.NOTHING);
         node.append(ends);
     }

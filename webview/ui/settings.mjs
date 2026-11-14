@@ -28,6 +28,7 @@ import {layerSwitchGrid} from "./layer-switches.mjs";
 import {fieldParts, isLayerSwitch, sectionsOn} from "../view/settings-layout.mjs";
 import {foldEmptyLayers} from "../view/empty-layers.mjs";
 import {emptyLayersButton, emptyLayersShown} from "./empty-layers.mjs";
+import {attachInfoMarks, infoMark} from "./info-mark.mjs";
 
 /** @typedef {import("../../contracts/panel.js").PublishedModel} Model */
 /** @typedef {import("../../contracts/panel.js").PresentedSection} Section */
@@ -161,7 +162,7 @@ function comboTimingRow(model, entry) {
  */
 function sectionCard(model, section, canEdit, {extra} = {}) {
     const node = el(`<section class="card settings-group" data-section="${esc(section.id)}">
-        <div class="card-h"><h3>${esc(section.label)}${draftMarks(model?.draft?.changes).settings.has(section.id) ? draftDot(model?.draft) : ""}</h3></div>
+        <div class="card-h"><h3>${esc(section.label)}${draftMarks(model?.draft?.changes).settings.has(section.id) ? draftDot(model?.draft) : ""}</h3>${keyboardKeysInfo(section)}</div>
         ${section.description ? `<div class="card-b settings-intro"><p class="note">${esc(section.description)}</p></div>` : ""}
         <div class="rows"></div>
         ${section.warning ? `<div class="card-b"><div class="callout warn" role="note">${esc(section.warning)}</div></div>` : ""}
@@ -206,6 +207,7 @@ function sectionCard(model, section, canEdit, {extra} = {}) {
         node.querySelectorAll(".rows .kk-mark").forEach((mark) => mark.remove());
         node.querySelector(":scope > .card-h > h3")?.insertAdjacentHTML("afterend", html(keyboardKeysMark(section.fields[0])));
     }
+    attachInfoMarks(node);
     return node;
 }
 
@@ -314,10 +316,11 @@ function snipingKeys(model, canEdit) {
 // or DPI key) changes it too, until the keyboard restarts: the profile is
 // their only saved owner (firmware D-F32), and a switch key (CM_*, BH_*,
 // AM_*, firmware D-F66) sets the keyboard's override over it, shown beside
-// the switch rather than as a change.
-const KEYBOARD_KEYS_TIP = "Keys on the keyboard can change this too, until the keyboard restarts; it then comes back to the value set here.";
+// the switch rather than as a change. The marks are short; what they mean is
+// the section's info mark (keyboardKeysInfo, D-L96).
+const KEYBOARD_KEYS = "↺ keyboard keys change this too", OFF_BY_KEY = "turned off by key";
 /** @param {import("../../contracts/panel.js").PresentedField | undefined} field */
-const keyboardKeysMark = (field) => field?.keyboardKeys ? ` <span class="kk-mark" data-tip="${esc(KEYBOARD_KEYS_TIP)}">↺ keyboard keys change this too</span>` : "";
+const keyboardKeysMark = (field) => field?.keyboardKeys ? ` <span class="kk-mark">${esc(KEYBOARD_KEYS)}</span>` : "";
 
 // A switch key turned this off over a stored "on" (plan answer 10): said
 // beside the switch, never a change in the review. The field names its
@@ -325,7 +328,18 @@ const keyboardKeysMark = (field) => field?.keyboardKeys ? ` <span class="kk-mark
 /** @param {import("../../contracts/panel.js").PresentedField | undefined} field */
 function offByKeyMark(field) {
     const off = field?.offSwitch ? getModel()?.offByKey?.[field.offSwitch] : false;
-    return off ? ` <span class="kk-mark off-by-key" data-tip="${esc("A key on the keyboard turned this off for now. It stays on here; the key turns it back on, and so does unplugging the keyboard. Nothing to save.")}">turned off by key</span>` : "";
+    return off ? ` <span class="kk-mark off-by-key">${esc(OFF_BY_KEY)}</span>` : "";
+}
+
+// What the marks mean, read once, on a section that can show them: beside
+// its title, whichever of its rows carries one.
+/** @param {Section} section */
+function keyboardKeysInfo(section) {
+    /** @type {import("./info-mark.mjs").InfoRow[]} */
+    const rows = [];
+    if (section.fields.some((field) => field.keyboardKeys)) rows.push({term: KEYBOARD_KEYS, says: "Keys on the keyboard can change this too, until the keyboard restarts; it then comes back to the value set here."});
+    if (section.fields.some((field) => field.offSwitch)) rows.push({term: OFF_BY_KEY, says: "Shown while a key on the keyboard has turned this off. It stays on here: the key turns it back on, and so does unplugging the keyboard. Nothing to save."});
+    return rows.length ? infoMark({id: `settings-info-${section.id}`, label: "What keyboard keys change here", heading: "Keyboard keys", named: `${section.label}: keyboard keys`, rows}) : "";
 }
 
 /** @param {string} value */

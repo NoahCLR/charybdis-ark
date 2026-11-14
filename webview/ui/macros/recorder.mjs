@@ -9,6 +9,7 @@ import {capturedKey, finishedPart, recordedKeycode, recordedTakePayload, takeSta
 import {onMac} from "../../view/shortcuts.mjs";
 import {rememberMacroEdit} from "./history.mjs";
 import {stageMacro} from "./validation.mjs";
+import {attachInfoMarks, infoMark} from "../info-mark.mjs";
 /* ── the recorder ──────────────────────────────────────────────────────── */
 // Keys pressed during a take that a macro cannot send: named in the recorder,
 // never silently turned into a pause.
@@ -26,30 +27,40 @@ const recordingOptions = () => ({explicit: state.recordPreserveHoldTiming,
     delays: state.recordPreserveHoldTiming || state.recordDelays !== false,
     threshold: state.recordDelayThreshold, round: state.recordDelayRound});
 
+// The recorder's two switches, as they are labelled and its info mark names them.
+const RECORD_DELAYS = "Record delays", PRESERVE = "Preserve hold timing";
+// What a take does and what its options change, read once beside the
+// recorder's title (D-L96); while it records, how to stop is on show.
+/** @param {MacroSlot} slot */
+const recordInfo = (slot) => infoMark({id: `macro-info-record-${slot.keycode}`, label: "How recording works", heading: "How recording works",
+    lead: "Appends what you type as key steps: overlapping keys become one chord, and held modifiers join each shortcut. Leaving this recorder finishes the take.",
+    rows: [{term: RECORD_DELAYS, says: "Keeps the pauses longer than the time after each step, rounded to the second time."},
+        {term: PRESERVE, says: "Keeps individual presses and releases with their timing. Record delays stays on; its two times set the precision."}]});
+
 /** @param {Model} model @param {MacroSlot} slot @param {boolean} canEdit */
 export function recorder(model, slot, canEdit) {
     const recording = state.recording?.slot === slot.keycode;
     const delays = state.recordPreserveHoldTiming || state.recordDelays !== false;
     const node = el(`<div class="card" data-recorder="${esc(slot.keycode)}">
-        <div class="card-h"><h3>Record</h3>${recording ? `<span class="tag">recording</span>` : state.lastTake?.slot === slot.keycode ? `<span class="tag">recorded</span>` : ""}
+        <div class="card-h"><h3>Record</h3>${recordInfo(slot)}${recording ? `<span class="tag">recording</span>` : state.lastTake?.slot === slot.keycode ? `<span class="tag">recorded</span>` : ""}
             <button class="btn right" data-act="record" ${canEdit ? "" : "disabled"}>${recording ? "Stop" : "● Record"}</button></div>
         <div class="card-b stack">
             ${skippedKeys.length && (recording || state.lastTake?.slot === slot.keycode) ? `<p class="note warn" data-skipped-keys>Not recorded: ${esc(skippedKeys.join(", "))}. A macro cannot send ${skippedKeys.length === 1 ? "this key" : "these keys"}.</p>` : ""}
             <div class="row record-opts">
                 <label class="sw"><input type="checkbox" data-f="macro:${esc(slot.keycode)}:record-delays" data-delays ${delays ? "checked" : ""} ${state.recordPreserveHoldTiming ? "disabled" : ""}>
-                    <span class="track"></span><span class="txt">Record delays</span></label>
+                    <span class="track"></span><span class="txt">${esc(RECORD_DELAYS)}</span></label>
                 <label class="ms-field"><span class="affix unit"><input class="input mono num" aria-label="Delay after each step" data-f="macro:${esc(slot.keycode)}:record-threshold" data-threshold inputmode="numeric" value="${esc(state.recordDelayThreshold)}" ${delays ? "" : "disabled"}><i>ms</i></span><span>after each step,</span></label>
                 <label class="ms-field"><span>rounded to</span><span class="affix unit"><input class="input mono num" aria-label="Round delays to" data-f="macro:${esc(slot.keycode)}:record-round" data-round inputmode="numeric" value="${esc(state.recordDelayRound)}" ${delays ? "" : "disabled"}><i>ms</i></span></label>
-                <label class="sw" data-tip="Keeps individual presses and releases with their timing. Record delays stays on; its two times set the precision."><input type="checkbox" data-f="macro:${esc(slot.keycode)}:record-preserve-hold-timing" data-preserve-hold-timing ${state.recordPreserveHoldTiming ? "checked" : ""} ${recording ? "disabled" : ""}>
-                    <span class="track"></span><span class="txt">Preserve hold timing</span></label>
+                <label class="sw"><input type="checkbox" data-f="macro:${esc(slot.keycode)}:record-preserve-hold-timing" data-preserve-hold-timing ${state.recordPreserveHoldTiming ? "checked" : ""} ${recording ? "disabled" : ""}>
+                    <span class="track"></span><span class="txt">${esc(PRESERVE)}</span></label>
             </div>
-            <p class="note">${state.recordPreserveHoldTiming ? "Preserving hold timing: keeps every press and release, with recorded delays." : "Overlapping keys become one chord; held modifiers join each shortcut."}</p>
             <div class="row gap-8">
-                <span class="note">${recording ? "Typing is captured for this slot, Escape included. Holding Escape, Stop or clicking outside this recorder finishes the take." : "Appends key steps. Leaving this recorder finishes the take."}</span>
+                ${recording ? `<span class="note">Typing is captured for this slot, Escape included. Holding Escape, Stop or clicking outside this recorder finishes the take.</span>` : ""}
                 <button class="btn tiny ghost destructive right" data-act="clear-take" ${recording || state.lastTake?.slot === slot.keycode ? "" : "disabled"}>Clear take</button>
             </div>
         </div></div>`);
 
+    attachInfoMarks(node);
     /** @type {HTMLInputElement} */ (node.querySelector("[data-preserve-hold-timing]")).addEventListener("change", event => {
         state.recordPreserveHoldTiming = /** @type {HTMLInputElement} */ (event.target).checked;
         render();

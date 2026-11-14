@@ -41,10 +41,9 @@ function directions(model, slot, {choice, form, disabled}, stage) {
     /** @type {HTMLElement} */ (node.querySelector(".pd-direction-reads")).append(choice(words(model).fieldLabels.axis, words(model).axes, slot.axis, "axis",
         {tip: tipFor(model, "axis")}));
     const fields = /** @type {HTMLElement} */ (node.querySelector(".pd-direction-fields"));
-    fields.append(choice(words(model).fieldLabels.emptyDirection, words(model).emptyDirection, slot.emptyDirection ?? 0, "emptyDirection",
-        {tip: tipFor(model, "emptyDirection")}));
-    fields.append(choice(words(model).fieldLabels.directionOutput, words(model).directionOutput, slot.directionOutput ?? 0, "directionOutput",
-        {tip: tipFor(model, "directionOutput")}));
+    // What each choice does is the step's info mark (editor.mjs).
+    fields.append(choice(words(model).fieldLabels.emptyDirection, words(model).emptyDirection, slot.emptyDirection ?? 0, "emptyDirection"));
+    fields.append(choice(words(model).fieldLabels.directionOutput, words(model).directionOutput, slot.directionOutput ?? 0, "directionOutput"));
     return node;
 }
 

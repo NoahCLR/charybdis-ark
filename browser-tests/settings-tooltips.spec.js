@@ -45,3 +45,20 @@ test("a read-only setting says why on screen, and its row's tip what it does", a
     await expect(page.locator(".tip")).toContainText("Trackball sensitivity");
     await expect(page.locator(".tip")).not.toContainText("Read the keyboard");
 });
+
+// The marks beside a setting a key on the keyboard can change are short, with
+// no tip; what they mean is said once, in the info mark beside the section's
+// title (D-L96), and only on a section that has such a setting.
+test("what keyboard keys change is the section's info mark, and the marks carry no tip", async ({page}) => {
+    await openControls(page, "behaviours");
+    const section = page.locator('.settings-group[data-section="behaviorSettings"]');
+    await expect(section.locator(".kk-mark")).toHaveText(["↺ keyboard keys change this too"]);
+    await expect(section.locator(".kk-mark")).not.toHaveAttribute("data-tip", /./);
+    const mark = section.locator(":scope > .card-h .info-mark");
+    await expect(mark.locator("dt")).toHaveText(["↺ keyboard keys change this too", "turned off by key"]);
+    await expect(mark.locator(".info-pop")).toContainText("until the keyboard restarts");
+    await mark.locator(".info-button").click();
+    await expect(mark.locator(".info-pop")).toBeVisible();
+    // A section no key changes has none.
+    await expect(page.locator('.settings-group[data-section="keyTiming"] .info-mark')).toHaveCount(0);
+});
