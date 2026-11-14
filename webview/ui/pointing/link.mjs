@@ -26,7 +26,7 @@ const ROWS = {keys: "Its keys", layers: "Layers"};
 // What the step's lists and its ending mean, read once in the step's info
 // mark (D-L96): the ending only while layers start the mode, as its field is.
 /** @param {Model} model @param {import("../surface-types.js").PresentedSlot} slot */
-export const startAbout = (model, slot) => ({
+export const startInfo = (model, slot) => ({
     rows: [{term: ROWS.layers, says: tipFor(model, "linkedLayers")}, {term: words(model).linkLabels.keyTurnsOnShort, says: tipFor(model, "linkTurnsOn")}],
     parts: slot.linkedLayers ? [choicesPart(model, "linkEnds", words(model).linkLabels.endsWhen)] : [],
 });

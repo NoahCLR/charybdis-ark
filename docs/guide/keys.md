@@ -246,4 +246,5 @@ because replacements are typed through the layout chosen there.
 An option this firmware was built without says **Not in this firmware** and
 does nothing. These options are marked **↺ keyboard keys change this too**:
 a key on the keyboard can change them until the keyboard restarts, and they
-then come back to what is set here.
+then come back to what is set here. The ⓘ beside the section's title says
+so too.

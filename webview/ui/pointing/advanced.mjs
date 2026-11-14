@@ -18,9 +18,9 @@ export function advancedControls(model, slot, scrolling, {form, disabled, field,
     const advancedBody = /** @type {HTMLElement} */ (advanced.querySelector(".card-b"));
     // A section, and what its settings do beside its title, read once
     // (D-L96): what is on show under a field is its value alone.
-    /** @param {string} title @param {{lead?: string, rows?: import("../info-mark.mjs").InfoRow[]}} [about] */
-    const section = (title, {lead, rows = []} = {}) => {
-        const info = lead || rows.length ? infoMark({id: `pd-info-${slot.id}-${title.toLowerCase().replace(/\W+/g, "-")}`, label: `About ${title}`, heading: title, lead, rows}) : "";
+    /** @param {string} key names its info mark, which stays open across redraws @param {string} title @param {import("../info-mark.mjs").InfoContent} [content] */
+    const section = (key, title, content = {}) => {
+        const info = infoMark({id: `pd-info-${slot.id}-${key}`, label: `About ${title}`, heading: title, ...content});
         const node = el(`<section class="pd-sect"><div class="sect-h"><h4>${esc(title)}</h4>${info}</div></section>`);
         attachInfoMarks(node);
         advancedBody.append(node);
@@ -46,14 +46,14 @@ export function advancedControls(model, slot, scrolling, {form, disabled, field,
         };
         if (readsHorizontal(slot.axis)) distances.append(field(`${words(model).fieldLabels.horizontal} ${per}`, slot.thresholdX, "thresholdX", distance(slot.thresholdX)));
         if (readsVertical(slot.axis)) distances.append(field(`${words(model).fieldLabels.vertical} ${per}`, slot.thresholdY, "thresholdY", distance(slot.thresholdY)));
-        section("Distance", {lead: does}).append(distances);
+        section("distance", "Distance", {lead: does}).append(distances);
     }
 
     if (!scrolling) {
         // Each shortcut's own handling of modifiers held while it sends. A
         // direction with no shortcut stores none, so only those with one
         // are listed; an "Ignore" still being set up is drawn as chosen.
-        const mods = section("Held modifiers");
+        const mods = section("modifiers", "Held modifiers");
         const unfinished = state.pdTaps?.slot === slot.id ? state.pdTaps.rows : {};
         const rows = TAP_ROWS.filter(({group, name}) => (group === "diagonals" ? slot.axis === AXIS.EIGHT : axisReads(slot.axis).includes(name))
             && Number(slot[group]?.[name]?.keycode));
@@ -91,15 +91,15 @@ export function advancedControls(model, slot, scrolling, {form, disabled, field,
         const drawn = new Set(SCROLL_LEAD.map(([key]) => key));
         // What each does, by its label, in the section's info mark.
         /** @type {import("../info-mark.mjs").InfoRow[]} */
-        const about = [];
+        const says = [];
         for (const [key, unit] of SCROLL_SINGLES) {
             tuning.append(field(scrollLabel(model, key, unit), slot.scroll?.[key], `scroll:${key}`, {unit}));
-            about.push({term: scrollLabel(model, key, unit), says: tipFor(model, key)});
+            says.push({term: scrollLabel(model, key, unit), says: tipFor(model, key)});
             drawn.add(key);
         }
         for (const [top, bottom] of SCROLL_RATIOS) {
             const label = scrollLabel(model, top).replace(/\s*·\s*numerator$/, "");
-            about.push({term: label, says: tipFor(model, top)});
+            says.push({term: label, says: tipFor(model, top)});
             const pair = el(`<div class="field"><span>${esc(label)}</span><div class="pd-ratio"></div></div>`);
             const inputs = /** @type {HTMLElement} */ (pair.querySelector(".pd-ratio"));
             for (const [index, key] of [top, bottom].entries()) {
@@ -117,7 +117,7 @@ export function advancedControls(model, slot, scrolling, {form, disabled, field,
             const label = scrollLabel(model, key);
             if (!drawn.has(key)) tuning.append(field(label, slot.scroll?.[key], `scroll:${key}`));
         }
-        section("Scroll tuning", {rows: about}).append(tuning);
+        section("tuning", "Scroll tuning", {rows: says}).append(tuning);
     }
 
     // Open stays open from slot to slot, so two modes' tuning can be compared.

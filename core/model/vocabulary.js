@@ -378,7 +378,12 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     // playback"), as its field and Review name it, and Automatic as it says
     // whether it plays the macro uninterruptibly now ("Automatic · on").
     macroUninterruptible: {label: "Uninterruptible playback",
-        automatic: {on: `${word(MACRO_PROTECTION, "auto")} · on`, off: `${word(MACRO_PROTECTION, "auto")} · off`}},
+        automatic: {on: `${word(MACRO_PROTECTION, "auto")} · on`, off: `${word(MACRO_PROTECTION, "auto")} · off`},
+        // How playing uninterruptibly works (firmware D-F17), and what each
+        // choice of macroProtection means, by its value: read once in the
+        // setting's info mark (D-L96).
+        plays: "A macro that plays uninterruptibly starts immediately and suspends ordinary keys already held. Only the macro types; new presses are ignored and releases still work. Held modifiers resume afterward. Suspended ordinary keys need to be released and pressed again; ignored presses are never replayed. Pointing and other keyboards can still interfere.",
+        means: [["auto", "Turns it on when this layout needs Unicode entry for the macro's text."], ["on", "The whole macro plays uninterruptibly."], ["off", "Your typing can mix with it."]]},
     // Why a macro does not read, by the macro grammar's reason
     // (rules/macro-payload.mjs), as the step editor and core's refusals both
     // say it; a key the reason names leads the words of unknown and notHeld
@@ -408,6 +413,11 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     // How a replacement fires (D-L91): as you type, after the Leader key, or
     // both; its inputs are one list whichever. The switch on its editor.
     inputModes: [["word", "As you type"], ["leader", "After Leader"], ["both", "Both"]],
+    // What each means, by the same value, read once in the Fires info mark
+    // (D-L96); how long the Leader key waits is said after it, by its setting.
+    inputModesMean: [["word", "Replaced as you finish the word."],
+        ["leader", "Press the Leader key, then type one of its inputs: the keyboard sends the replacement the moment it is typed, and the computer never sees what you typed."],
+        ["both", "Either way."]],
     // The Leader key as its cap names it: before Try it's After Leader field
     // and where a replacement's editor says the key is placed.
     leaderKey: "Leader",
@@ -799,16 +809,16 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
             startNumerator: "To pick an axis, its movement must be at least this many times the other axis's: 7 : 4 is 1.75 times. Higher needs a straighter movement before a scroll starts; when neither axis wins, it waits.",
             sustainNumerator: "A scroll keeps its axis while that axis moves at least this many times the other (5 : 4 is 1.25 times, never more than the selection ratio). Below it, the other axis takes over only if it reaches the selection ratio; otherwise the scroll stays on its axis through the wobble.",
         },
-        // What each choice of a step does, by the value it stores, read once
+        // What each choice of a step means, by the value it stores, read once
         // in its step's info mark (D-L96); each choice's own words are its
         // table's above, and `lead` is what holds whichever is chosen.
-        about: {
+        choicesMean: {
             emptyDirection: {rows: [[0, "Moving toward it, the directions either side take over its share."],
                 [1, "Moving toward it sends both directions either side: a diagonal's two straight directions, a straight direction's two diagonals. In eight directions only; elsewhere its neighbours take over."],
                 [2, "Moving toward it does nothing."]]},
             directionOutput: {rows: [[0, "Sends the key again each time the ball moves a threshold further."],
                 [1, "Sends it once, however far the ball goes. A movement starts again after a 150 ms pause; before then, only turning more than 90 degrees from the direction that sent sends again."]]},
-            linkEnds: {lead: "Only a mode its layers started is ended, until that layer goes off; one its key runs never is. The pointer layer and the default layers never end one.",
+            linkEnds: {lead: "That layer ends a mode its layers started, and the mode comes back when the layer goes off. A mode its key runs is never ended, and the pointer layer and the default layers never end one.",
                 rows: [[0, "No other layer ends it."], [1, "A layer above the highest layer that starts this mode and is on."],
                     [2, "Any layer that is on and neither starts this mode nor is turned on by its key."]]},
             pointerLayer: {lead: "A mode its layers started never keeps the pointer layer on.",

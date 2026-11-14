@@ -97,7 +97,8 @@ function scrollingFields(model, slot, {field, choice, form, disabled, modifiers}
             <div class="sect-h pd-sub span2"><h5>Speed</h5></div><div class="sect-h pd-sub span2"><h5>Feel</h5></div>
         </div></div>`);
     const group = (/** @type {string} */ name) => /** @type {HTMLElement} */ (node.querySelector(`[data-group="${name}"]`));
-    const which = choice(words(model).fieldLabels.scrollAxes, words(model).scrollAxes, scrollAxesOf(slot), "scrollAxes", {tip: tipFor(model, "scrollAxes")});
+    // What the choice means is the step's info mark (editor.mjs).
+    const which = choice(words(model).fieldLabels.scrollAxes, words(model).scrollAxes, scrollAxesOf(slot), "scrollAxes");
     const invert = reverse(model, slot, form, disabled);
     which.classList.add("span2"); invert.classList.add("span2");
     group("which").append(which, invert);

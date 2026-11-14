@@ -67,6 +67,8 @@ export type ApplyStep = 'check' | 'backup' | 'upload' | 'validate' | 'slave' | '
 /** `verdict` is the sentence for `saved` (core/session/interruption.js APPLY_VERDICTS) that every notice about this Apply starts with. */
 /** `advice`: what to do next, as whole sentences, for an Apply cut short; empty otherwise. Its notice is `verdict`, `reason` and these, joined. */
 export interface ApplyFailure {step: ApplyStep; label: string; reason: string; saved: string; verdict: string; advice: string[]}
+/** A pointing mode's choice whose meanings its step's info mark lists (vocabulary pointing.choicesMean). */
+export type PointingChoice = 'emptyDirection' | 'directionOutput' | 'linkEnds' | 'pointerLayer';
 /** What the connected firmware reports about itself (core/session/firmware-support.js firmwareView). */
 export interface FirmwareView {
     version: string | null; versionWord: string | null; defaultsDigest: string | null;
@@ -116,12 +118,14 @@ export interface Vocabulary {
     macroPlayback?: Readonly<Record<string, string>>;
     macroProtection: WordList<'auto' | 'on' | 'off'>;
     /** The setting macroProtection chooses, by its name, and Automatic as it says whether it plays uninterruptibly now ("Automatic · on"). */
-    macroUninterruptible: Readonly<{label: string; automatic: Readonly<{on: string; off: string}>}>;
+    macroUninterruptible: Readonly<{label: string; automatic: Readonly<{on: string; off: string}>; plays: string; means: WordList<'auto' | 'on' | 'off'>}>;
     macroSteps: WordList<MacroStepKind>;
     /** What a text replacement is, text or a macro, as its editor's choice and its tag say it. */
     replacementKinds: WordList<'text' | 'macro'>;
     /** How a replacement fires (D-L91): as you type, after the Leader key, or both; the switch on its editor and its tag in the bank. */
     inputModes: WordList<'word' | 'leader' | 'both'>;
+    /** What each way a replacement fires means, by the same value. */
+    inputModesMean: WordList<'word' | 'leader' | 'both'>;
     /** The Leader key's name, on its cap before Try it's After Leader field and where the editor says the key is placed. */
     leaderKey: string;
     /** The formats a text replacement list is saved in, by extension, in the order Export offers them. */
@@ -219,7 +223,7 @@ export interface Vocabulary {
         heldModifiers: string;
         tips: Readonly<Record<string, string>>;
         /** What each choice of a step does, by the value it stores, read once in its step's info mark; `lead` holds whichever is chosen. */
-        about: Readonly<Record<'emptyDirection' | 'directionOutput' | 'linkEnds' | 'pointerLayer', {lead?: string; rows: WordList<number>}>>;
+        choicesMean: Readonly<Record<PointingChoice, {lead?: string; rows: WordList<number>}>>;
         pointerLayerLabel: string;
         /** The editor's other field labels, which the review names its fields by. */
         fieldLabels: Readonly<Record<'name' | 'dpi' | 'axis' | 'emptyDirection' | 'directionOutput' | 'scrollAxes' | 'invert' | 'horizontal' | 'vertical', string>>;

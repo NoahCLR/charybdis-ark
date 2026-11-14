@@ -141,6 +141,8 @@ test("the picker's info mark says how to pick, and Escape closes it before the p
     await page.locator('.tab-grid [data-act="pick"]').first().click();
     const picker = page.getByRole("dialog", {name: "Pick a keycode"});
     const mark = picker.locator(".pk-title .info-mark");
+    // Each section's mark is its own, so one kept open stays with its section.
+    await expect(mark.locator(".info-pop")).toHaveAttribute("id", "picker-info-board");
     await expect(mark.locator(".info-lead")).toContainText("Click a key. A modifier, picked above or on the board, is held down with it");
     await expect(picker.locator(".pk-note")).toHaveCount(0);
     await mark.locator(".info-button").click();

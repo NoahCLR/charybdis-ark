@@ -419,7 +419,11 @@ The same kind of control looks and sits the same on every screen.
   memory, which layer's key the Key tab's stack shows, the combo builder,
   and Text replacement's sections (`browser-tests/settings-tooltips.spec.js`,
   `browser-tests/pointing-controls.spec.js`, `browser-tests/macro-ux.spec.js`,
-  `browser-tests/marks.spec.js`). What is needed every time stays on show
+  `browser-tests/marks.spec.js`). A choice's meaning in one comes from the
+  vocabulary, by the value it stores (`pointing.choicesMean`,
+  `inputModesMean`, `macroUninterruptible.means`), and a setting it names by
+  its label (`settingLabel`, `webview/view/settings-layout.mjs`); the
+  picker's mark is its section's own. What is needed every time stays on show
   beside it: a layout that does not fit the computer, what is free in
   memory, an armed tap-hold, how to stop a take that is recording, what a
   custom key output sends with its behaviour off.
@@ -1577,9 +1581,10 @@ own folded card (`browser-tests/pointing-controls.spec.js`).
    Every setting, Reverse scrolling and the held modifiers included, says what it does once (D-L96): as its field's tip,
    or in the info mark beside its step's title or its Advanced section's (Distance, Scroll tuning), by its name or by
    each of its choices' words, with no tip saying it again. A step's choices (When a direction has no key, How often it
-   sends, Ends when, Pointer layer) are explained there, each in a part headed by the field's label; the line under a
+   sends, Scrolls, Ends when, Pointer layer) are explained there, each in a part headed by the field's label, or a row; the line under a
    Distance field is its value alone. The words come from `vocabulary.pointing.tips`, keyed by the field it sets (as
-   the firmware runs it), and `vocabulary.pointing.about`, keyed by the value a choice stores
+   the firmware runs it), and `vocabulary.pointing.choicesMean`, keyed by the value a choice stores, every choice and
+   only those (`tests/model/vocabulary.test.js`)
    (`browser-tests/pointing-controls.spec.js`).
 3. **What starts it**: the mode's hold and lock keys named by the mode, never
    by `PD_MODE_n`, and where they sit; then its link as layer chips

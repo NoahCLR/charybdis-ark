@@ -7,11 +7,11 @@
 import {el, esc} from "../../lib/dom.mjs";
 import {attachInfoMarks, infoMark} from "../info-mark.mjs";
 
-/** @param {HTMLElement} steps the card's `.pd-steps` body @param {number | string} slot @param {number} n @param {string} title @param {string} [hint] @param {{rows?: readonly import("../info-mark.mjs").InfoRow[], parts?: readonly import("../info-mark.mjs").InfoPart[]}} [about] */
-export function step(steps, slot, n, title, hint = "", {rows = [], parts = []} = {}) {
-    const info = rows.length || parts.length ? infoMark({id: `pd-info-${slot}-${n}`, label: `About step ${n}, ${title}`, heading: title, rows, parts}) : "";
+/** @param {HTMLElement} steps the card's `.pd-steps` body @param {number | string} slot @param {number} n @param {string} title @param {{hint?: string, info?: import("../info-mark.mjs").InfoContent}} [options] */
+export function step(steps, slot, n, title, {hint = "", info: content = {}} = {}) {
+    const mark = infoMark({id: `pd-info-${slot}-${n}`, label: `About step ${n}, ${title}`, heading: title, ...content});
     const node = el(`<section class="pd-step" aria-labelledby="pd-step-${esc(slot)}-${n}">
-        <div class="pd-step-h"><span class="pd-n" aria-hidden="true">${n}</span><h4 id="pd-step-${esc(slot)}-${n}">${esc(title)}</h4>${info}${hint ? `<span class="note">${esc(hint)}</span>` : ""}</div>
+        <div class="pd-step-h"><span class="pd-n" aria-hidden="true">${n}</span><h4 id="pd-step-${esc(slot)}-${n}">${esc(title)}</h4>${mark}${hint ? `<span class="note">${esc(hint)}</span>` : ""}</div>
         <div class="pd-step-b"></div></section>`);
     attachInfoMarks(node);
     steps.append(node);

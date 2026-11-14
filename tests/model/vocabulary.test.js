@@ -287,3 +287,16 @@ test("a list reads as a sentence lists it", () => {
     assert.equal(listed(["Base", "Number"]), "Base and Number");
     assert.equal(listed(["Base", "Number", "Symbol"]), "Base, Number and Symbol");
 });
+
+// What a choice means, read once in an info mark (D-L96), is keyed by the
+// value the choice stores: every choice is explained, and nothing else is,
+// so a choice added or dropped cannot leave its info mark silent or stale.
+test("every choice an info mark explains has its meaning, and every meaning a choice", () => {
+    const ids = (list) => list.map(([id]) => id);
+    for (const key of ["emptyDirection", "directionOutput", "linkEnds", "pointerLayer"]) {
+        assert.deepEqual(ids(VOCABULARY.pointing.choicesMean[key].rows), ids(VOCABULARY.pointing[key]), `pointing ${key}`);
+    }
+    assert.deepEqual(Object.keys(VOCABULARY.pointing.choicesMean).sort(), ["directionOutput", "emptyDirection", "linkEnds", "pointerLayer"]);
+    assert.deepEqual(ids(VOCABULARY.inputModesMean), ids(VOCABULARY.inputModes), "how a replacement fires");
+    assert.deepEqual(ids(VOCABULARY.macroUninterruptible.means), ids(VOCABULARY.macroProtection), "uninterruptible playback");
+});

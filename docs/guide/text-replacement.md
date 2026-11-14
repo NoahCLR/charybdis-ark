@@ -172,7 +172,8 @@ replacement** (`AC_TOGG`), with **Text replacement On** (`AC_ON`) to switch
 it back. They are [switch keys](behaviours.md#switch-keys): they work until
 the keyboard restarts, save nothing, and can't turn on what is off in Host.
 That is why the switch says **↺ keyboard keys change this too**, and
-**turned off by key** while a key has it off. The picker lists them under
+**turned off by key** while a key has it off; the ⓘ beside its section's
+title says what each means. The picker lists them under
 **Other QMK**, in **Switch keys**, beside those for combos, behaviours and
 auto-mouse; searching it for "autocorrect" finds them too.
 

@@ -71,6 +71,16 @@ export function sectionPath(model, id) {
     return [screen && words.settingsScreens[screen], words.settingsSections[id]].filter(Boolean).join(" → ");
 }
 
+// A setting's label as its Settings section names it, for a note that points
+// at it: the field the keyboard published, its unit left off ("Leader
+// waits", not "Leader waits (ms)"), so the words have one home
+// (core/model/settings-editor.js). Empty when the keyboard published none.
+/** @param {{configDefaults?: readonly Section[]} | null | undefined} model @param {string} macro */
+export function settingLabel(model, macro) {
+    const field = (model?.configDefaults || []).flatMap((section) => section.fields).find((entry) => entry.macro === macro);
+    return field ? field.label.replace(/\s*\([^)]*\)$/, "") : "";
+}
+
 // A section's one-per-layer switches are one setting to a person, drawn as
 // one row of layers.
 /** @param {Field} field */

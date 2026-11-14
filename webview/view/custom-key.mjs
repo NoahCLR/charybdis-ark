@@ -341,14 +341,17 @@ export const shortcutPickChord = (model, shortcut) => shortcutChord(shortcut, {k
 
 // The kinds a shortcut's layers can be turned on as, in the picker: each
 // kind's verb, as its layer key reads ("Lock"), and what it does, for its tip.
-/** @param {Model} model @returns {{kind: number, label: string, tip: string, column: string}[]} */
+/** @param {Model} model @returns {{kind: number, label: string, tip: string, column: string, sentAlone?: string}[]} */
 export function shortcutLayerKinds(model) {
-    /** @type {Record<number, {tip: string, column: string}>} */
+    // `sentAlone`, where a kind acts otherwise when the shortcut is sent by
+    // something other than its key, is read once in the picker's info mark.
+    /** @type {Record<number, {tip: string, column: string, sentAlone?: string}>} */
     const words = {
         [LAYER_KIND.HOLD]: {tip: "As MO(): on while the shortcut is held, and only for a tap when it is tapped.", column: "Held on while the shortcut is"},
         [LAYER_KIND.LOCK]: {tip: "As TG(): pressing it locks them all on, or all off again once all are locked.", column: "Locked by the shortcut"},
         [LAYER_KIND.MOVE]: {tip: "As TO(): pressing it locks them alone, letting every other lock go.", column: "Locked alone by the shortcut"},
-        [LAYER_KIND.TAP_TOGGLE]: {tip: `As TT(): on from every press of the key; tapping it ${TAPPING_TOGGLE} times locks them, unless its behaviour has steps. Sent by another key's step, or by a combo that does not run the key's behaviour, they are only held; a combo that runs it acts as the key.`, column: "Held; locked by its taps"},
+        [LAYER_KIND.TAP_TOGGLE]: {tip: `As TT(): on from every press of the key; tapping it ${TAPPING_TOGGLE} times locks them, unless its behaviour has steps.`, column: "Held; locked by its taps",
+            sentAlone: "Sent by another key's step, or by a combo that does not run the key's behaviour, its layers are only held; a combo that runs it acts as the key."},
         [LAYER_KIND.ONESHOT]: {tip: "As OSL(): on from every press of the key; a tap, or holding it alone and letting go, turns them on for the next key press, and a quick second tap cancels that.", column: "Held; one-shot when tapped"},
     };
     return (vocabulary(model).customKeys?.layerKinds || []).map(([kind, label]) => ({kind, label, ...(words[kind] || words[LAYER_KIND.HOLD])}));

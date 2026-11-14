@@ -199,8 +199,9 @@ function sectionBody(model) {
 
 // How to pick in the section shown, read once beside the picker's title
 // (D-L96): on the keyboard, what a click does and what its legends mean; in
-// a combo's Layers, why Tap-hold is not there. None while searching, which
-// shows every section.
+// a combo's Layers, why Tap-hold is not there; in a shortcut's Layers, how a
+// kind acts when the shortcut is sent by something other than its key. None
+// while searching, which shows every section.
 /** @param {Model} model @param {Picker} picker */
 function pickerInfo(model, picker) {
     const section = shownSection(model, picker);
@@ -212,8 +213,10 @@ function pickerInfo(model, picker) {
             : picker.mode === "list" ? "" : `Click a key. A modifier, picked above or on the board, is held down with it: ${gui} and C make one key that sends ${gui}+C.`
         : section.kind === "layers" && picker.comboOutput && !picker.shortcut ? "A combo can't send Tap-hold, which needs a key of its own." : "";
     const rows = section.kind === "board" && model?.hostLayoutLegends
-        ? [{term: "Legends", says: `Shift above; ${vocabulary(model).thirdLevel} on the right. ◌ marks a dead key: press it, then a letter.`}] : [];
-    return lead || rows.length ? infoMark({id: "picker-info", label: `How to pick in ${section.label}`, heading: section.label, lead, rows}) : "";
+        ? [{term: "Legends", says: `Shift above; ${vocabulary(model).thirdLevel} on the right. ◌ marks a dead key: press it, then a letter.`}]
+        : section.kind === "layers" && picker.shortcut ? shortcutLayerKinds(model).flatMap(({label, sentAlone}) => sentAlone ? [{term: label, says: sentAlone}] : []) : [];
+    // Each section's mark is its own, so one kept open stays with its section.
+    return infoMark({id: `picker-info-${section.id}`, label: `How to pick in ${section.label}`, heading: section.label, lead, rows});
 }
 
 // A shortcut's layers, one row per layer in the tab order: the base layer and

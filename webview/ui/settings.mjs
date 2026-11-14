@@ -339,7 +339,7 @@ function keyboardKeysInfo(section) {
     const rows = [];
     if (section.fields.some((field) => field.keyboardKeys)) rows.push({term: KEYBOARD_KEYS, says: "Keys on the keyboard can change this too, until the keyboard restarts; it then comes back to the value set here."});
     if (section.fields.some((field) => field.offSwitch)) rows.push({term: OFF_BY_KEY, says: "Shown while a key on the keyboard has turned this off. It stays on here: the key turns it back on, and so does unplugging the keyboard. Nothing to save."});
-    return rows.length ? infoMark({id: `settings-info-${section.id}`, label: "What keyboard keys change here", heading: "Keyboard keys", named: `${section.label}: keyboard keys`, rows}) : "";
+    return infoMark({id: `settings-info-${section.id}`, label: "What keyboard keys change here", heading: "Keyboard keys", named: `${section.label}: keyboard keys`, rows});
 }
 
 /** @param {string} value */

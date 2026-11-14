@@ -229,7 +229,8 @@ test("halves apart: the rail says so and the bar offers Revert, not Save", async
 test("halves that stored different modes are settled by choosing the mode again; a mode not stored yet is marked", async ({page}) => {
     await openLive(page, "keys");
     await withModel(page, model => {model.editMode.conflict = true; model.editMode.notStored = true;});
-    await expect(page.locator('.rail-mode [data-tip*="Unplugging it now may lose the mode"]')).toHaveCount(1);
+    await expect(page.locator('.rail-mode [data-tip*="not stored its edit mode yet"]')).toHaveCount(1);
+    await expect(page.locator('.rail-mode [data-tip*="Unplugging"]')).toHaveCount(0);
     await expect(page.locator('.rail-mode [data-tip*="halves stored different modes"]')).toHaveCount(1);
     const menu = await keyboardMenu(page);
     // What unplugging risks is on screen in the menu, not in a tip (D-L96).

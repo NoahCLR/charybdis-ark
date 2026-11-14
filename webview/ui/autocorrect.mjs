@@ -58,6 +58,7 @@ import {topbar} from "./frame.mjs";
 import {dialogFoot} from "./dialog-foot.mjs";
 import {openPicker} from "./picker.mjs";
 import {attachInfoMarks, infoMark} from "./info-mark.mjs";
+import {sectionPath, settingLabel} from "../view/settings-layout.mjs";
 import {marked, phraseMarked, replacementMark} from "./marks.mjs";
 import {titleText} from "./title-name.mjs";
 import {settingOffBanner, settingSwitchedOff} from "./participation.mjs";
@@ -101,14 +102,16 @@ const inputsInfo = (list) => infoMark({id: "ac-info-inputs", label: "How inputs 
     {term: "Overlaps", says: "The longest input wins, and a whole word beats a wildcard."},
     {term: "Macros", says: "A replacement that plays a macro takes whole words only, without *."},
     {term: "After Leader", says: "Typed after the Leader key, an input is matched whole, whatever its *. How it fires is set above."}]});
-// How a replacement fires (D-L91), each choice in the vocabulary's words.
+// How a replacement fires (D-L91), each choice in the vocabulary's words and
+// what it means; after Leader, where the setting is that says how long it
+// waits, by that setting's own label.
 /** @param {Model} model */
 const firesInfo = (model) => {
-    const modes = vocabulary(model).inputModes;
-    return infoMark({id: "ac-info-fires", label: "How a replacement fires", heading: "How a replacement fires", lead: "Its inputs stay the same whichever you choose.", rows: [
-        {term: word(modes, "word"), says: "Replaced as you finish the word."},
-        {term: word(modes, "leader"), says: "Press the Leader key, then type one of its inputs: the keyboard sends the replacement the moment it is typed, and the computer never sees what you typed. How long it waits for you is Leader waits, on Host."},
-        {term: word(modes, "both"), says: "Either way."}]});
+    const {inputModes, inputModesMean} = vocabulary(model);
+    const waits = settingLabel(model, "leaderTimeout");
+    return infoMark({id: "ac-info-fires", label: "How a replacement fires", heading: "How a replacement fires", lead: "Its inputs stay the same whichever you choose.",
+        rows: inputModesMean.map(([mode, says]) => ({term: word(inputModes, mode),
+            says: mode === "leader" && waits ? `${says} How long it waits for you is ${waits}, in ${sectionPath(model, "autocorrect")}.` : says}))});
 };
 
 /** @param {Model} model */
@@ -445,7 +448,7 @@ function bank(model, list, rows, open, canEdit) {
             </div>
             <p class="note profile-drop-status" data-ac-file-status role="status" hidden></p>
             <div class="sect-h memory-h"><h4>Text replacement memory</h4><span class="right note" data-ac-memory>${esc(bytesWords(list.usage))}</span></div>
-            <div class="meter" data-ac-meter data-tip="Part of the profile, within its own limit.">${meterFill(list.usage.share * 100)}</div>
+            <div class="meter" data-ac-meter>${meterFill(list.usage.share * 100)}</div>
             <p class="note meter-note"><span data-ac-free>${esc(freeWords(list.usage))}</span>, in <span data-ac-count>${esc(countWords(list.usage))}</span>.</p>
         </div></div>`);
     const cells = /** @type {HTMLElement} */ (card.querySelector(".ac-bank"));
@@ -1020,7 +1023,7 @@ function trySection(model, list) {
             <div class="field"><span id="ac-try-label">Your keyboard would type</span>
                 <div class="ac-try-preview" data-ac-try-preview role="group" aria-labelledby="ac-try-label"></div></div>
             <div class="row ac-try-tools">
-                <label class="sw" data-tip="Whether the preview takes Caps Lock to be on at the computer. It follows your own Caps Lock when that changes as you type here."><input type="checkbox" data-f="autocorrect:try:caps" ${tried.capsLock ? "checked" : ""}><span class="track"></span><span class="txt">Preview with Caps Lock on</span></label>
+                <label class="sw" data-tip="Whether the preview takes Caps Lock to be on at the computer."><input type="checkbox" data-f="autocorrect:try:caps" ${tried.capsLock ? "checked" : ""}><span class="track"></span><span class="txt">Preview with Caps Lock on</span></label>
                 <span class="note" data-ac-try-said aria-live="polite"></span>
                 <button class="btn tiny link" data-act="ac-try-show" hidden>Show it →</button>
             </div>

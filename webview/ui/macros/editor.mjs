@@ -127,13 +127,11 @@ export function editor(model, slot, canEdit) {
 // info mark, read once (D-L96).
 /** @param {import("../../../contracts/panel.js").PublishedModel} model @param {MacroSlot} slot @param {boolean} canEdit */
 function protectionField(model, slot, canEdit) {
-    const label = vocabulary(model).macroUninterruptible.label, choices = vocabulary(model).macroProtection;
+    const {label, plays, means} = vocabulary(model).macroUninterruptible, choices = vocabulary(model).macroProtection;
     /** @type {[string, string][]} */
     const options = (model.macroProtectionChoices || []).map((choice) => [choice.value, protectionChoiceLabel(model, choice, slot.uninterruptible)]);
     const info = infoMark({id: `macro-info-protection-${slot.keycode}`, label: `What ${label} means`, heading: label,
-        lead: "A macro that plays uninterruptibly starts immediately and suspends ordinary keys already held. Only the macro types; new presses are ignored and releases still work. Held modifiers resume afterward. Suspended ordinary keys need to be released and pressed again; ignored presses are never replayed. Pointing and other keyboards can still interfere.",
-        rows: [{term: word(choices, "auto"), says: "Turns it on when this layout needs Unicode entry for the macro's text."},
-            {term: word(choices, "on"), says: "The whole macro plays uninterruptibly."}, {term: word(choices, "off"), says: "Your typing can mix with it."}]});
+        lead: plays, rows: means.map(([value, says]) => ({term: word(choices, value), says}))});
     return `<div class="macro-protection" data-protection><span aria-hidden="true">${esc(label)}</span>${info}${choiceField({label, f: `macro:${slot.keycode}:protection`,
         choices: options, current: slot.protection, disabled: !canEdit, hideLabel: true})}</div>`;
 }

@@ -134,7 +134,7 @@ function memoryMeter(memory) {
     // the slots without room, are on show.
     const info = infoMark({id: "macro-info-memory", label: "What takes macro memory", heading: "Macro memory", rows: [
         {term: "A key tap", says: "3 bytes."}, {term: "Text", says: "Its UTF-8 bytes; an accented letter takes two or more."},
-        {term: "An empty slot", says: `Keeps room for ${memory.reserveTaps} key taps. When memory runs short, the highest empty slots become unavailable until there is room again.`}]});
+        {term: "An empty slot", says: `Keeps room for ${memory.reserveTaps} key taps. When memory runs short, the highest empty slots become unavailable.`}]});
     return `<div class="sect-h memory-h"><h4>Macro memory</h4>${info}
             <span class="right note">${esc(used.toLocaleString("en-US"))} / ${esc(memory.capacity.toLocaleString("en-US"))} bytes</span></div>
         <div class="meter">${meterFill(share)}</div>

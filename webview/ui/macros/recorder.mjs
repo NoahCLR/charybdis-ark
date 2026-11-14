@@ -28,14 +28,14 @@ const recordingOptions = () => ({explicit: state.recordPreserveHoldTiming,
     threshold: state.recordDelayThreshold, round: state.recordDelayRound});
 
 // The recorder's two switches, as they are labelled and its info mark names them.
-const RECORD_DELAYS = "Record delays", PRESERVE = "Preserve hold timing";
+const RECORD_DELAYS = "Record delays", PRESERVE_HOLD_TIMING = "Preserve hold timing";
 // What a take does and what its options change, read once beside the
 // recorder's title (D-L96); while it records, how to stop is on show.
 /** @param {MacroSlot} slot */
 const recordInfo = (slot) => infoMark({id: `macro-info-record-${slot.keycode}`, label: "How recording works", heading: "How recording works",
     lead: "Appends what you type as key steps: overlapping keys become one chord, and held modifiers join each shortcut. Leaving this recorder finishes the take.",
     rows: [{term: RECORD_DELAYS, says: "Keeps the pauses longer than the time after each step, rounded to the second time."},
-        {term: PRESERVE, says: "Keeps individual presses and releases with their timing. Record delays stays on; its two times set the precision."}]});
+        {term: PRESERVE_HOLD_TIMING, says: `Keeps individual presses and releases with their timing. ${RECORD_DELAYS} stays on; its two times set the precision.`}]});
 
 /** @param {Model} model @param {MacroSlot} slot @param {boolean} canEdit */
 export function recorder(model, slot, canEdit) {
@@ -52,7 +52,7 @@ export function recorder(model, slot, canEdit) {
                 <label class="ms-field"><span class="affix unit"><input class="input mono num" aria-label="Delay after each step" data-f="macro:${esc(slot.keycode)}:record-threshold" data-threshold inputmode="numeric" value="${esc(state.recordDelayThreshold)}" ${delays ? "" : "disabled"}><i>ms</i></span><span>after each step,</span></label>
                 <label class="ms-field"><span>rounded to</span><span class="affix unit"><input class="input mono num" aria-label="Round delays to" data-f="macro:${esc(slot.keycode)}:record-round" data-round inputmode="numeric" value="${esc(state.recordDelayRound)}" ${delays ? "" : "disabled"}><i>ms</i></span></label>
                 <label class="sw"><input type="checkbox" data-f="macro:${esc(slot.keycode)}:record-preserve-hold-timing" data-preserve-hold-timing ${state.recordPreserveHoldTiming ? "checked" : ""} ${recording ? "disabled" : ""}>
-                    <span class="track"></span><span class="txt">${esc(PRESERVE)}</span></label>
+                    <span class="track"></span><span class="txt">${esc(PRESERVE_HOLD_TIMING)}</span></label>
             </div>
             <div class="row gap-8">
                 ${recording ? `<span class="note">Typing is captured for this slot, Escape included. Holding Escape, Stop or clicking outside this recorder finishes the take.</span>` : ""}

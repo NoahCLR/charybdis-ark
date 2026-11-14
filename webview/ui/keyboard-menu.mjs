@@ -35,7 +35,7 @@ export function keyboardMenu() {
         <span class="rail-keyboard-text"><span class="rail-product">${esc(control.name)}</span>${mode ? `
             <span class="rail-mode" data-tip="${esc(mode.detail)}">${esc(mode.label)}${mode.warn ? ` <i class="dot warn" data-tip="${esc(mode.warn)}"></i>` : ""}</span>` : ""}</span>`;
     // What the dot says on hover, said to a screen reader as the button's description.
-    const status = `<span class="sr" id="rail-keyboard-status">${esc([dot.tip, mode?.warn].filter(Boolean).join(" "))}</span>`;
+    const status = `<span class="sr" id="rail-keyboard-status">${esc([dot.tip, mode?.warn, control.edits?.notStored ? NOT_STORED_RISK : ""].filter(Boolean).join(" "))}</span>`;
     if (!control.opens) return `<div class="rail-keyboard-wrap"><div class="rail-keyboard">${inner}</div>${status}</div>`;
     return `<div class="rail-keyboard-wrap">
         <button class="rail-keyboard" id="rail-keyboard" data-act="keyboard-menu" aria-haspopup="menu" aria-expanded="${open}"

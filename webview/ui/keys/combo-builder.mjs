@@ -23,6 +23,7 @@ import {comboFull, comboMissing} from "../../view/combo-form.mjs";
 import {closesInPlace} from "../inline-editor.mjs";
 import {editWords} from "../../view/edit-mode.mjs";
 import {attachInfoMarks, infoMark} from "../info-mark.mjs";
+import {sectionPath, settingLabel} from "../../view/settings-layout.mjs";
 
 // A builder input by the name the core gave its key, as the combo table and
 // the review read it (core/model/key-names.js).
@@ -207,7 +208,7 @@ export function comboBuilder(canEdit, holdTerm) {
 /** @param {Model} model */
 const builderInfo = (model) => infoMark({id: "combo-info-builder", label: "How a combo is made", heading: "How a combo is made",
     lead: `A combo needs its output and at least two inputs, so this form keeps its own state until you ${editWords(model?.draft).keepVerb} it.`,
-    rows: [{term: sentence(vocabulary(model).comboOptions.useOutputBehavior), says: `Off, this combo still fires and sends its normal output action; a custom key sends its shortcut, or nothing if it has none. Enabled in ${vocabulary(model).settingsScreens.behaviours} and Combo outputs use behaviours in ${vocabulary(model).settingsScreens.combos} must also be on.`}]});
+    rows: [{term: sentence(vocabulary(model).comboOptions.useOutputBehavior), says: `Off, this combo still fires and sends its normal output action; a custom key sends its shortcut, or nothing if it has none. ${settingLabel(model, "behaviorsEnabled")} in ${sectionPath(model, "behaviorSettings")} and ${settingLabel(model, "comboOutputBehaviors")} in ${sectionPath(model, "comboSettings")} must also be on.`}]});
 
 // What a bypassed output sends, when it is a custom key: its shortcut, or
 // nothing without one (firmware D-F26). Any other output sends itself.

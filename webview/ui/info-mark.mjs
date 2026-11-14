@@ -23,6 +23,7 @@ const GAP = 6, LEAST = 96;
 
 /** @typedef {{term: string, mono?: boolean, says: string}} InfoRow */
 /** @typedef {{heading: string, lead?: string, rows: readonly InfoRow[]}} InfoPart */
+/** What an info mark's list says: a lead, its rows, then its parts, each optional. @typedef {{lead?: string, rows?: readonly InfoRow[], parts?: readonly InfoPart[]}} InfoContent */
 
 // The mark kept open, by its list's id, so it stays open across the
 // renders that redraw it; null when none is.
@@ -35,10 +36,12 @@ let kept = null;
 // each a term and what it says, all plain text; a mono term is written as it
 // is typed. `parts` follow the rows, each a list of its own under a heading
 // of its own (the choices of one field, say), with an optional lead.
-// `corner` draws the larger mark that rides a card's top-right corner. A node
-// that holds one calls `attachInfoMarks`.
-/** @param {{id: string, label: string, heading: string, named?: string, lead?: string, rows?: readonly InfoRow[], parts?: readonly InfoPart[], corner?: boolean}} info */
+// `corner` draws the larger mark that rides a card's top-right corner. With
+// nothing to say there is no mark: the markup is empty. A node that holds one
+// calls `attachInfoMarks`.
+/** @param {{id: string, label: string, heading: string, named?: string, corner?: boolean} & InfoContent} info */
 export function infoMark({id, label, heading, named = heading, lead = "", rows = [], parts = [], corner = false}) {
+    if (!lead && !rows.length && !parts.length) return "";
     const open = kept === id;
     /** @param {readonly InfoRow[]} list */
     const listed = (list) => list.length ? `<dl>${list.map((row) => `<dt${row.mono ? ` class="mono"` : ""}>${esc(row.term)}</dt><dd>${esc(row.says)}</dd>`).join("")}</dl>` : "";
