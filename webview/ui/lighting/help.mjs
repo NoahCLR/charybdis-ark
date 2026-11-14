@@ -97,12 +97,16 @@ export function stageInfo(model, id) {
             const tiers = ["KEY_FEEDBACK_GROUP_TAP_COMMITTED", "KEY_FEEDBACK_GROUP_HOLD_ACTIVE", "KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE"].map(flash);
             const [first, deepest] = [flash("KEY_FEEDBACK_GROUP_TAP_COUNT_2"), flash("KEY_FEEDBACK_GROUP_TAP_COUNT_5")];
             const [committed, hold, long] = tiers;
+            // The hold styles as the behaviour editor names them, the Hold tier's.
+            const [heldStyle, tapAt, tapOnRelease, repeatStyle] = ["PRESS_AND_HOLD_UNTIL_RELEASE", "TAP_AT_HOLD_THRESHOLD", "TAP_ON_RELEASE_AFTER_HOLD", "REPEAT_WHILE_HELD"]
+                .map((style) => `“${word(words.holdStyles.hold, style)}”`);
             return mark("How behaviour feedback paints", "While a key's behaviour fires, the key lights in the colour of what it is doing: steady, blinking, or one flash. Each case has its own colour, place and accents; how fast it blinks is one setting for every case.", [
                 row(committed, `Steady while a key is held on a tap with no hold, once the multi tap window has passed; ${words.tapCommittedFlash}, if ${words.lightingFields.doubleTapFlash} is on.`),
-                row(hold, "Blinks while the hold's action is held or repeating; steady while the hold is reached but not yet sent."),
-                row(long, "The same, for the long hold."),
+                row(hold, `By its hold style: ${heldStyle} blinks while held, when it sends a key, modifier, macro, custom key or QMK keycode; ${repeatStyle} blinks while it repeats; ${tapAt} and ${tapOnRelease} are steady, never blinking.`),
+                row(long, "The same, for the long hold, at the Long hold threshold."),
+                row("Shows nothing here", "A layer or pointing-mode hold, which its own stage shows; a switch key, Leader, or layer go-to or lock held until release; a hold the keyboard fills in where the behaviour sets none."),
                 row(words.lightingLists.tapBranches.title, `${first} to ${deepest}, each steady while a run of taps waits on that count, until it resolves; they never blink. A deeper run takes ${deepest}'s.`),
-                row(interval, `How fast ${hold} and ${long} blink: on for this long, then off. A single flash, such as ${committed}'s after a double tap, lasts one of these. While you change it, a dot beside it blinks at that pace.`),
+                row(interval, `How fast a hold blinks while ${heldStyle} or repeating: on for this long, then off. A single flash, such as ${committed}'s after a double tap, lasts one of these. While you change it, a dot beside it blinks at that pace.`),
                 row("No key has it", "The keyboard never shows that case, and the board shows nothing for it."),
                 row("Marks", "The board's behaviour dots and the behaviour grid's branch numbers wear these colours."),
                 row("Board", "The case picked, from the first key whose behaviour has it, ringed when its Locality follows the key.")]);

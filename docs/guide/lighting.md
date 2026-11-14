@@ -191,9 +191,15 @@ as the behaviour grid has a column per tier and a row per tap count:
   - **Tap committed** is steady while a key is held on a tap with no hold,
     once the multi tap window has passed, and can flash once after a double
     tap or more (below).
-  - **Hold active** blinks while the hold's action is held or repeating, and
-    is steady while the hold is reached but not yet sent.
+  - **Hold active** goes by the hold's style: **held until release** blinks
+    while held, when it sends a key, modifier, macro, custom key or QMK
+    keycode; **repeat while held** blinks while it repeats; **tap at Tap /
+    hold threshold** and **tap on release after Tap / hold threshold** are
+    steady and never blink.
   - **Long hold active** does the same for the long hold.
+  - A layer or pointing-mode hold shows on its own stage instead. A switch
+    key, Leader, or layer go-to or lock held until release, and a hold the
+    keyboard fills in where the behaviour sets none, show nothing here.
 - **Tap branches**: **Double tap**, **Triple tap**, **Quadruple tap** and
   **Quintuple tap**, each steady while a run of taps waits on that count;
   they never blink. A deeper run takes **Quintuple tap**'s.
@@ -213,8 +219,8 @@ shows it; **Off**, it shows only while held. A single tap gets no flash
 either way, and the tap branches are not touched by it.
 
 On the stage bar, under **Every behaviour state**, one setting for every
-case: **Blink time**, how fast Hold active and Long hold active blink: on
-for this long, then off. A single flash, such as Tap committed's after a
+case: **Blink time**, how fast a hold blinks while held until release or
+repeating: on for this long, then off. A single flash, such as Tap committed's after a
 double tap, lasts one of these. While you change it, a dot after it blinks at
 that pace, in Long hold active's colour while that is picked, else Hold
 active's.

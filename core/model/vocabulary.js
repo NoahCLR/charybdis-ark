@@ -595,14 +595,16 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     // When each Behaviour feedback case shows, and how, in a line short
     // enough to head its pane at 1280px as replacementWhen heads a
     // replacement case's (firmware rgb-domain-v1, key runtime feedback.c):
-    // only Hold active and Long hold active blink, at the Blink time; the
-    // rest are steady, and Tap committed may also flash once
+    // only Hold active and Long hold active blink, at the Blink time, and only
+    // for a hold held until release or repeating (holdStyles; feedback.c,
+    // handled_key_policy.h); the rest are steady, and Tap committed may also
+    // flash once
     // (tapCommittedFlash, joined after "; " under the tap-commit policy On).
     // The stage's info mark says the rest.
     feedbackWhen: {
         KEY_FEEDBACK_GROUP_TAP_COMMITTED: "Steady while a tap with no hold is held",
-        KEY_FEEDBACK_GROUP_HOLD_ACTIVE: "Blinks while its action is held; steady before it sends",
-        KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE: "Blinks while its action is held; steady before it sends",
+        KEY_FEEDBACK_GROUP_HOLD_ACTIVE: "Blinks if held until release or repeating; else steady",
+        KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE: "Blinks if held until release or repeating; else steady",
         KEY_FEEDBACK_GROUP_TAP_COUNT_2: "Steady while a run of taps waits on a double tap",
         KEY_FEEDBACK_GROUP_TAP_COUNT_3: "Steady while a run of taps waits on a triple tap",
         KEY_FEEDBACK_GROUP_TAP_COUNT_4: "Steady while a run of taps waits on a quadruple tap",

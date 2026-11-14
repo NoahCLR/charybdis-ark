@@ -54,7 +54,8 @@ existing columns, and tidying only) he picked the stage bar: "B looks good".
   which are its own alone: its mark and name, over a line saying where it
   paints, or, for a behaviour or replacement case, when it shows (and for a
   behaviour case how: steady, blinking, or one flash; only Hold active and
-  Long hold active blink). Combo feedback's list
+  Long hold active blink, and only for a hold held until release or
+  repeating). Combo feedback's list
   picks only the combo the board holds, so its colour is headed **Every
   combo** and its list rings the combo held rather than shading it as an
   edited item.

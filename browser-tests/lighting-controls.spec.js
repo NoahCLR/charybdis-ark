@@ -211,7 +211,7 @@ test("every behaviour feedback case's Locality posts that case's locality alone,
     await body(page).locator('[data-row="holdActiveColor"]').click();
     await expect(body(page).locator(".stage-item")).toContainText("Hold active");
     const when = body(page).locator(".stage-item [data-replacement-when]");
-    await expect(when).toHaveText("Blinks while its action is held; steady before it sends");
+    await expect(when).toHaveText("Blinks if held until release or repeating; else steady");
     await body(page).locator('[data-row="branch:0"]').click();
     await expect(when).toHaveText("Steady while a run of taps waits on a double tap");
     await body(page).locator('[data-row="tapCommittedColor"]').click();
@@ -950,7 +950,8 @@ test("Behaviour feedback's Blink time posts its own setting, blinks its dot at t
     const field = body(page).locator('.field:has([data-f="setting:feedbackFlash"])');
     await expect(field).not.toHaveAttribute("data-tip", /./);
     await expect(field).toContainText("Blink time");
-    await expect(body(page).locator(".stage-bar .info-pop")).toContainText("How fast Hold active and Long hold active blink: on for this long, then off. A single flash");
+    await expect(body(page).locator(".stage-bar .info-pop")).toContainText("How fast a hold blinks while “held until release” or repeating: on for this long, then off. A single flash");
+    await expect(body(page).locator(".stage-bar .info-pop")).toContainText("“repeat while held” blinks while it repeats; “tap at Tap / hold threshold” and “tap on release after Tap / hold threshold” are steady, never blinking.");
     // While the field is being changed, and only then, the dot blinks on
     // for the time typed, then off for as long, in the case picked's colour,
     // following what is typed before it is saved.
