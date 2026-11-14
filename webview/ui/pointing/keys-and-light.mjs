@@ -38,12 +38,13 @@ export function placeButton(slot, canEdit) {
 export function lightRow(model, slot) {
     const light = slotLight(model, slot);
     const {row} = light;
-    // The swatch shows the colour; the words say where it paints.
+    // The swatch shows the colour; the words say where it paints. How a
+    // mode paints is the Lighting stage's info mark (lighting/help.mjs).
     const lightText = row
         ? `${esc(isPassthrough(row.color) ? "Passthrough" : `${isOff(row.color) ? "Off · " : ""}${word(vocabulary(model).localities, row.locality)}`)}${stageEnabled(model, "pd") ? "" : " · stage off"}`
         : "No colour reported";
     const node = el(`<div class="field pd-light"><span>Light</span><div class="pd-light-row">
-        <div class="val" data-tip="While the mode runs, its colour paints where this says. A mode linked to layers paints beneath the lowest of them that is on, so those layers' own colours show over it.">${light.swatch()}<span class="note">${lightText}</span></div>
+        <div class="val">${light.swatch()}<span class="note">${lightText}</span></div>
         <button class="btn tiny link" data-act="lighting">Edit in Lighting →</button>
     </div></div>`);
     /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="lighting"]')).addEventListener("click", () => {

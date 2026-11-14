@@ -91,7 +91,7 @@ export const customKeyOf = (model, keycode) => {
     return (model?.customKeys || []).find((key) => key.keycode === name);
 };
 
-// What a shortcut is, said above the field that sets it, for someone who has
+// What a shortcut is, behind the info mark beside the field that sets it, for someone who has
 // never met one, against the macro they may know: held as the key is, not
 // played once (docs/guide/keys.md). The line under the field says what this
 // key's shortcut does (customKeyShortcutLine).

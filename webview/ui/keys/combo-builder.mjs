@@ -22,6 +22,7 @@ import {sentence, vocabulary, layerCalled} from "../../view/vocabulary.mjs";
 import {comboFull, comboMissing} from "../../view/combo-form.mjs";
 import {closesInPlace} from "../inline-editor.mjs";
 import {editWords} from "../../view/edit-mode.mjs";
+import {attachInfoMarks, infoMark} from "../info-mark.mjs";
 
 // A builder input by the name the core gave its key, as the combo table and
 // the review read it (core/model/key-names.js).
@@ -51,8 +52,9 @@ export function comboBuilder(canEdit, holdTerm) {
     const made = state.combo.madeKey && form.output === state.combo.madeKey.keycode ? state.combo.madeKey : null;
     const sendsNote = made ? `Custom key · sends ${shortcutPickLabel(model, made.shortcut)} once you keep this combo`
         : customKeySendsNote(model, keyIdentity(model, form.output).canonical);
+    const bypassed = bypassedOutput(model, form.output, made);
     const node = el(`<div class="card combo-builder">
-        <div class="card-h"><h3>${editing ? `Edit ${esc(original?.badge || "combo")}` : "New combo"}</h3>
+        <div class="card-h"><h3>${editing ? `Edit ${esc(original?.badge || "combo")}` : "New combo"}</h3>${builderInfo(model)}
             <span class="right">${editing ? `<button class="btn tiny ghost destructive" data-act="delete" ${canEdit ? "" : "disabled"}>Delete</button>` : ""}</span></div>
         <div class="card-b">
             <div class="field"><span>${esc(vocabulary(model).comboFields.sends)}</span>
@@ -79,7 +81,7 @@ export function comboBuilder(canEdit, holdTerm) {
             <div class="field">
                 <label class="sw"><input type="checkbox" data-output-behavior data-f="combo:${esc(state.combo.editId ?? 'new')}:use-output-behavior" ${form.useOutputBehavior !== false ? "checked" : ""} ${canEdit ? "" : "disabled"}>
                     <span class="track"></span><span class="txt">${esc(sentence(vocabulary(model).comboOptions.useOutputBehavior))}</span></label>
-                <p class="note">Off, this combo still fires and sends its normal output action. ${esc(bypassedOutput(model, form.output, made))} ${esc(`Enabled in ${vocabulary(model).settingsScreens.behaviours} and Combo outputs use behaviours in ${vocabulary(model).settingsScreens.combos} must also be on.`)}</p>
+                ${bypassed ? `<p class="note" data-bypassed-output>${esc(bypassed)}</p>` : ""}
             </div>
             <div class="row combo-flags">
                 ${[["mustHold", `Fires only once its keys are held past the combo hold threshold (${vocabulary(model).settingsScreens.combos}). Released sooner, the keys type themselves.`],
@@ -92,8 +94,8 @@ export function comboBuilder(canEdit, holdTerm) {
                 <button class="btn ghost" data-act="cancel">Cancel</button>
                 <span class="note" data-combo-missing ${note ? "" : "hidden"}>${esc(note)}</span>
             </div>
-            <p class="note">A combo needs its output and at least two inputs, so this form keeps its own state until you ${esc(editWords(model?.draft).keepVerb)} it.</p>
         </div></div>`);
+    attachInfoMarks(node);
 
     /** @type {HTMLElement} */ (node.querySelector(".card-b")).insertBefore(definitionControls(layers().map(layer => ({...layer, label: layerCalled(layer)})), form, canEdit,
         (/** @type {{enabled: boolean, allowedLayers: number}} */ permissions) => Object.assign(form, permissions), `combo:${state.combo.editId ?? "new"}:definition`, "combo"), /** @type {HTMLElement} */ (node.querySelector(".card-b")).firstChild);
@@ -199,12 +201,20 @@ export function comboBuilder(canEdit, holdTerm) {
     return node;
 }
 
+// How the builder keeps its form, and what Use output behaviour off does,
+// read once beside its title (D-L96); what this combo's own output sends
+// with it off is under the switch (bypassedOutput).
+/** @param {Model} model */
+const builderInfo = (model) => infoMark({id: "combo-info-builder", label: "How a combo is made", heading: "How a combo is made",
+    lead: `A combo needs its output and at least two inputs, so this form keeps its own state until you ${editWords(model?.draft).keepVerb} it.`,
+    rows: [{term: sentence(vocabulary(model).comboOptions.useOutputBehavior), says: `Off, this combo still fires and sends its normal output action; a custom key sends its shortcut, or nothing if it has none. Enabled in ${vocabulary(model).settingsScreens.behaviours} and Combo outputs use behaviours in ${vocabulary(model).settingsScreens.combos} must also be on.`}]});
+
 // What a bypassed output sends, when it is a custom key: its shortcut, or
-// nothing without one (firmware D-F26).
+// nothing without one (firmware D-F26). Any other output sends itself.
 /** @param {Model} model @param {string} output @param {{shortcut: {mods: number, keys: readonly number[]}} | null} made */
 function bypassedOutput(model, output, made) {
-    if (made) return `This custom key sends its shortcut, ${shortcutPickLabel(model, made.shortcut)}.`;
+    if (made) return `Off, this custom key sends its shortcut, ${shortcutPickLabel(model, made.shortcut)}.`;
     const key = customKeyOf(model, keyIdentity(model, output).canonical);
-    if (!key) return "A custom key sends its shortcut, or nothing if it has none.";
-    return hasShortcut(key) ? `This custom key ${customKeyShortcutOnly(key)}.` : "This custom key has no shortcut, so it sends nothing.";
+    if (!key) return "";
+    return hasShortcut(key) ? `Off, this custom key ${customKeyShortcutOnly(key)}.` : "Off, this custom key has no shortcut, so it sends nothing.";
 }

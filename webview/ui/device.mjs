@@ -136,7 +136,7 @@ function builtInCard(facts) {
         <summary class="card-h">${DISCLOSURE}<h3>Built into this firmware</h3>
             <span class="right fold-summary">${facts.length} facts</span></summary>
         <div class="card-b settings-intro"><p class="note">Changing any of these needs a new firmware build on both halves.</p></div>
-        <div class="rows">${facts.map((fact) => `<div class="setrow ro" data-tip="${esc(fact.hint)}">
+        <div class="rows">${facts.map((fact) => `<div class="setrow ro">
             <div><div class="nm">${esc(fact.label)}</div><div class="hint">${esc(fact.hint)}</div></div>
             <div class="control"><span class="fact-value">${esc(fact.value)}</span></div></div>`).join("")}</div>
     </details>`;

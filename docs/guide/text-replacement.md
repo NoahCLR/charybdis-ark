@@ -224,21 +224,24 @@ steps yet, Pick… is off and **Make one in Macros →** goes there.
 or change its steps. Choosing Text or Macro changes nothing until you type
 the text or pick the macro, and a line under the choice says so until then.
 
-The ⓘ beside **Replacement**, **Inputs** and **Try it** sums up how each
-works: when the keyboard replaces, capitals, Backspace and macros; how an
+The ⓘ beside **Replacement**, **Fires**, **Inputs** and **Try it** sums up how each
+works: when the keyboard replaces, capitals, Backspace and macros; what each
+way of firing means; how an
 input is written with `*`, the wildcard, with examples and where it may go;
-and what the preview can and cannot show. Hover
-it, or reach it with Tab; Escape closes it. In a small window the list opens
+and what the preview can and cannot show. Click
+it, or press Enter on it, and it stays open until you click elsewhere or press
+Escape; resting the pointer on it shows it while it stays. In a small window the list opens
 where there is room, and scrolls when it is taller than that.
 
 ### Fires
 
 **As you type**, **After Leader** or **Both** says how this replacement
 fires: as you finish a word, after the [Leader key](#after-the-leader-key),
-or either way. It is saved as soon as you choose, and its inputs stay as they
-are. While it fires after Leader, a line under the choice says what the
-Leader key does and where it is placed (keys by layer, behaviours, combos),
-and **Place on a key →** takes you to the board to put it on a key. In the list each replacement is tagged
+or either way; its ⓘ says what each means, what the Leader key does, and
+where to set how long it waits. It is saved as soon as you choose, and its
+inputs stay as they are. While it fires after Leader, a line under the choice
+says where the Leader key is placed (keys by layer, behaviours, combos), and
+**Place on a key →** takes you to the board to put it on a key. In the list each replacement is tagged
 **As you type**, **After Leader** or **Both**.
 
 ### Inputs

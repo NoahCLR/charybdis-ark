@@ -35,7 +35,8 @@ layer it falls through to; **Open this key on** that layer goes there.
 **This key on every layer** lists this position on every layer in use,
 highest first, with the [empty layers](board-and-layers.md#empty-layers)
 folded at its end. Three or more transparent layers in a row fold into one
-line; click it to see each. Click a row to switch to that layer.
+line; click it to see each. Click a row to switch to that layer. The ⓘ
+beside the heading says which one you get: the highest layer that is on.
 
 **What this key reaches** links to its behaviour, its combos (or **New** to
 start one with this key) and any pointing mode it runs. A behaviour or combo
@@ -58,7 +59,9 @@ and the [switch keys](behaviours.md#switch-keys) for combos, text replacement,
 behaviours and auto-mouse, in **Switch keys**.
 Keys sit in named groups, such as Arrows, Function and Modifiers, and **No key**
 in Common keys holds N/A and Transparent. **All keycodes** lists every key the
-picker offers, section by section, in the same groups.
+picker offers, section by section, in the same groups. The ⓘ beside the
+picker's title says how to pick on the board and what its legends mean;
+in Layers and Pointing modes, each key says what it does as you hover it.
 
 **Search every section** finds any key, however many match: by its name, the
 words on its tile in any order, its other QMK spellings such as `KC_BSPC`, or
@@ -147,8 +150,10 @@ and press Shift+Space to hold it, then Shift+Space on the other; Escape lets
 go. Review lists the swaps as one **Custom key order** change.
 
 **Shortcut** is what the key sends: up to six keys held together, any
-modifiers and any layers. Hover its label and it says so: like a one-step
-macro, but it acts as a normal key rather than playing once. The keys and modifiers are held while you hold the
+modifiers and any layers. The ⓘ beside its label says so: like a one-step
+macro, but it acts as a normal key rather than playing once. Click it, or
+press Enter on it, and it stays open until you click elsewhere or press
+Escape. The keys and modifiers are held while you hold the
 custom key and tapped when you tap it: the modifiers go down first, then the
 keys in the order you picked them, and they come back up the other way round.
 **Pick…** opens the picker with only the keys a shortcut can send: keyboard

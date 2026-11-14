@@ -33,3 +33,5 @@ Every surface text replacement touches is the one its neighbours use, not one of
 ## Considered options
 
 Keeping the table and restyling it: it would still have been the only list in Ark edited in place, with a toolbar no other screen has. Tiles in a grid, as Macros has: a tile holds thirteen characters, and a replacement is a sentence with words under it. A × on each chip with the chip's text opening the field: two targets in one chip, one of them a bare ×. An **Add** button for a new replacement: nothing else in an editor is saved by a button, and the first input is the moment it becomes an entry. Giving every switch key the help the `AC_*` keys had: a change to three other features to keep one sentence, which the guide already says.
+
+Amended by D-L96: an info mark opens on a press and stays open until pressed again, Escape or a press elsewhere; resting the pointer on it previews it, and the focus alone opens nothing.

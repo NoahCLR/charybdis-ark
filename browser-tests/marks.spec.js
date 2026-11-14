@@ -208,7 +208,8 @@ test("the Key tab and the preview's caption name their layers by their icons", a
     const heading = page.locator(".tab-grid h4").first();
     await expect(heading).toContainText("Base");
     expect(await heading.evaluate(layerIcons)).toBe(1);
-    expect(await page.locator(".stack-note").evaluate(layerIcons)).toBe(1);
+    // Which layer's key is pressed is the section's info mark, in words.
+    await expect(page.locator("#key-info-stack")).toContainText("The highest layer on wins; a transparent key takes the next one down. Base is always on.");
 
     await page.evaluate(async () => {
         const store = await import("/webview/store.mjs");

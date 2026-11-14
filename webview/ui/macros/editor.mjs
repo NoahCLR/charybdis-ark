@@ -2,7 +2,6 @@
 /** @typedef {import("../../../contracts/panel.js").PublishedModel | null} Model */
 /** @typedef {import("../../../contracts/panel.js").MacroSlot} MacroSlot */
 /** @typedef {import("../../view/types.js").MacroStep} MacroStep */
-import {disclosureButton} from "../disclosure.mjs";
 import {choiceField} from "../segmented.mjs";
 import {el, esc} from "../../lib/dom.mjs";
 import {readMacro} from "../../view/macro-cache.mjs";
@@ -19,6 +18,7 @@ import {EMPTY_MACRO_FIELDS, ensureMacroHistory, finishMacroHistoryGroup, remembe
 import {recorder} from "./recorder.mjs";
 import {placedOnMarkup, showPlacements} from "../keys/reach.mjs";
 import {mark} from "../marks.mjs";
+import {attachInfoMarks, infoMark} from "../info-mark.mjs";
 /** @param {import("../../../contracts/panel.js").PublishedModel} model @param {MacroSlot} slot @param {boolean} canEdit */
 export function editor(model, slot, canEdit) {
     const form = macroForm(slot.keycode);
@@ -29,7 +29,7 @@ export function editor(model, slot, canEdit) {
     ensureMacroHistory(slot, parsed.error && !form.steps ? undefined : steps);
     const editable = canEdit && !state.recording && (!parsed.error || Boolean(form.steps));
     const rawOpen = Boolean(form.rawOpen || (parsed.error && !form.steps));
-    const wrap = el(`<div class="stack"></div>`), uninterruptible = vocabulary(model).macroUninterruptible;
+    const wrap = el(`<div class="stack"></div>`), typing = typingWords(model, slot);
     const card = el(`<div class="card macro-editor-card" data-macro-editor="${esc(slot.keycode)}">
         <div class="card-h name-titlebar macro-titlebar"><span class="mark-lg">${mark(model, {kind: "macro"})}</span>${nameField(model, slot, canEdit)}
             <span class="tag">${esc(slot.defaultName)}</span>
@@ -54,11 +54,9 @@ export function editor(model, slot, canEdit) {
             <div data-macro-feedback role="status" aria-live="polite"></div>
             <div class="stack macro-footer">
             <div class="macro-utilities"><button class="btn tiny link" data-host-settings>${model.macroUnicode?.layoutName ? `${esc(model.macroUnicode.layoutName)} · ` : ""}${esc(vocabulary(model).settingsSections.host)} →</button>
-                ${disclosureButton("Typing & playback help", {open: Boolean(form.guidanceOpen), className: "macro-help-link", attrs: `data-show-help aria-controls="macro-help-${esc(slot.keycode)}"`})}
+                ${infoMark({id: `macro-info-typing-${slot.keycode}`, label: "How a macro's text types", heading: "How text types", lead: typing.about})}
             </div>
-            <div class="macro-guidance" id="macro-help-${esc(slot.keycode)}" data-guidance ${form.guidanceOpen ? "" : "hidden"}>${unicodeSetup(model, slot)}
-                <p class="note">${esc(word(vocabulary(model).macroProtection, "auto"))} turns ${esc(uninterruptible.label)} on when this layout needs Unicode entry. A macro that plays uninterruptibly starts immediately and suspends ordinary keys already held. Only the macro types; new presses are ignored and releases still work. Held modifiers resume afterward. Suspended ordinary keys need to be released and pressed again; ignored presses are never replayed. Pointing and other keyboards can still interfere.</p>
-            </div>
+            ${typing.warning ? `<p class="note warn" data-layout-warning>${esc(typing.warning)}</p>` : ""}
             </div>
         </div></div>`);
     // Clear takes precedence over the change event caused by leaving a field.
@@ -82,14 +80,7 @@ export function editor(model, slot, canEdit) {
     });
     /** @type {HTMLElement} */ (card.querySelector("[data-macro-steps]")).append(sequenceEditor(model, slot, steps, editable));
     card.querySelectorAll("[data-insert-kind]").forEach(button => button.addEventListener("click", () => insertStep(model, slot, steps, /** @type {MacroStep['kind']} */ (/** @type {HTMLElement} */ (button).dataset.insertKind))));
-    // One button opens and closes the help, and says which it is.
-    const guidance = /** @type {HTMLElement} */ (card.querySelector("[data-guidance]"));
-    const helpButton = /** @type {HTMLButtonElement} */ (card.querySelector("[data-show-help]"));
-    helpButton.addEventListener("click", () => {
-        guidance.hidden = !guidance.hidden;
-        setMacroForm(slot.keycode, {guidanceOpen: !guidance.hidden});
-        helpButton.setAttribute("aria-expanded", String(!guidance.hidden));
-    });
+    attachInfoMarks(card);
     const raw = /** @type {HTMLTextAreaElement} */ (card.querySelector("[data-raw-payload]"));
     raw.addEventListener("input", () => {
         rememberMacroEdit(slot, raw.value, undefined, raw.dataset.f || null);
@@ -132,13 +123,18 @@ export function editor(model, slot, canEdit) {
 }
 
 // Uninterruptible playback: its few choices on show, as view/choices.mjs's
-// rule has them, else a menu.
+// rule has them, else a menu; what each choice and the playback mean is its
+// info mark, read once (D-L96).
 /** @param {import("../../../contracts/panel.js").PublishedModel} model @param {MacroSlot} slot @param {boolean} canEdit */
 function protectionField(model, slot, canEdit) {
-    const label = vocabulary(model).macroUninterruptible.label;
+    const label = vocabulary(model).macroUninterruptible.label, choices = vocabulary(model).macroProtection;
     /** @type {[string, string][]} */
     const options = (model.macroProtectionChoices || []).map((choice) => [choice.value, protectionChoiceLabel(model, choice, slot.uninterruptible)]);
-    return `<div class="macro-protection" data-protection><span aria-hidden="true">${esc(label)}</span>${choiceField({label, f: `macro:${slot.keycode}:protection`,
+    const info = infoMark({id: `macro-info-protection-${slot.keycode}`, label: `What ${label} means`, heading: label,
+        lead: "A macro that plays uninterruptibly starts immediately and suspends ordinary keys already held. Only the macro types; new presses are ignored and releases still work. Held modifiers resume afterward. Suspended ordinary keys need to be released and pressed again; ignored presses are never replayed. Pointing and other keyboards can still interfere.",
+        rows: [{term: word(choices, "auto"), says: "Turns it on when this layout needs Unicode entry for the macro's text."},
+            {term: word(choices, "on"), says: "The whole macro plays uninterruptibly."}, {term: word(choices, "off"), says: "Your typing can mix with it."}]});
+    return `<div class="macro-protection" data-protection><span aria-hidden="true">${esc(label)}</span>${info}${choiceField({label, f: `macro:${slot.keycode}:protection`,
         choices: options, current: slot.protection, disabled: !canEdit, hideLabel: true})}</div>`;
 }
 
@@ -159,12 +155,14 @@ function nameField(model, slot, canEdit) {
 // this macro picked in its Macros tab, on the row for the first of those
 // routes, so the board rings its keys and the table marks the row.
 
+// How a macro's text types, read once in the info mark by the Host button
+// (D-L96); a layout that is not the computer's is a warning on show.
 /** @param {Model} model @param {MacroSlot} slot */
-function unicodeSetup(model, slot) {
+function typingWords(model, slot) {
     const {os, layout, layoutFits, layoutName, entry} = model?.macroUnicode || {mode: 0};
-    const typed = layoutFits === false
-        ? `Text types through ${word(vocabulary(model).hostLayouts, layout)}, chosen in ${sectionPath(model, "host")}, which is not a ${word(vocabulary(model).hostOs, os)} layout: macros may type the wrong characters until the layout matches the computer.`
-        : `Text types through the ${layoutName} layout chosen in ${sectionPath(model, "host")}, accented letters included; keep that layout active on the computer.`;
+    const warning = layoutFits === false
+        ? `Text types through ${word(vocabulary(model).hostLayouts, layout)}, chosen in ${sectionPath(model, "host")}, which is not a ${word(vocabulary(model).hostOs, os)} layout: macros may type the wrong characters until the layout matches the computer.` : "";
+    const typed = warning ? "" : `Text types through the ${layoutName} layout chosen in ${sectionPath(model, "host")}, accented letters included; keep that layout active on the computer. `;
     const typing = slot?.uninterruptible ? "" : " Avoid typing while a text macro plays.";
-    return `<p class="note">${esc(typed)} ${esc(entry || "")} The keyboard cannot check your input setup.${esc(typing)}</p>`;
+    return {warning, about: `${typed}${entry ? `${entry} ` : ""}The keyboard cannot check your input setup.${typing}`};
 }

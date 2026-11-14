@@ -32,7 +32,8 @@ The button stays off until the combo has what it sends and at least two
 keys, and the note beside it says which is missing. At 16 keys the note says
 so and **Pick on board** takes no more. Until you press it, the builder holds
 the combo on its own; **Cancel**, or Escape, drops it and closes the
-builder.
+builder. The ⓘ beside the builder's title sums this up, with what **Use
+output behaviour** off does.
 
 Each combo also has:
 
@@ -55,7 +56,7 @@ Must be held and Tap only exclude each other.
 
 A combo can send a custom key. With its output behaviour off, or with no
 behaviour, it sends that key's shortcut, or nothing if it has none; the
-builder says which.
+line under **Use output behaviour** says which, for the key it sends.
 
 ## Combo settings
 
