@@ -42,8 +42,9 @@ existing columns, and tidying only) he picked the stage bar: "B looks good".
   On) under **When it flashes** on Tap committed's pane, beside Where it
   paints, and the review names it under Tap committed.
 - **Behaviour feedback's Flash interval is Blink time**, with a dot after
-  it blinking at that pace in the colour of the case picked: "interval" never
-  said the key blinks, or that a single flash lasts one of them.
+  it that, while the field is being changed, blinks at that pace in the
+  colour of the case picked: "interval" never said the key blinks, or that a
+  single flash lasts one of them. Blinking all the time was too intense.
 - **Under it, every stage has the same columns.** A first column (the list,
   or the background effect's Effect and the fade's Fade), the colour beside
   Where it paints, and the accents under both. The background effect's LEDs

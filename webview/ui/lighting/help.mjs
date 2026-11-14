@@ -99,7 +99,7 @@ export function stageInfo(model, id) {
             return mark("How behaviour feedback paints", "While a key's behaviour fires, the key flashes the colour of what fired. Each case has its own colour, place and accents; how fast it flashes is one setting for every case.", [
                 row(words.lightingLists.tiers.title, `${listed(tiers)} flash as that tier fires.`),
                 row(words.lightingLists.tapBranches.title, `${first} to ${deepest}, each flashed while a run of taps waits on that count. A deeper run takes ${deepest}'s.`),
-                row(interval, "How long the key stays on, then off, in each blink; a single flash lasts one of these. The dot beside it blinks at that pace."),
+                row(interval, "How long the key stays on, then off, in each blink; a single flash lasts one of these. While you change it, a dot beside it blinks at that pace."),
                 row("No key has it", "The keyboard never shows that case, and the board shows nothing for it."),
                 row("Marks", "The board's behaviour dots and the behaviour grid's branch numbers wear these colours."),
                 row("Board", "The case picked, from the first key whose behaviour has it, ringed when its Locality follows the key.")]);

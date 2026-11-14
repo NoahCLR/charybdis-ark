@@ -207,8 +207,8 @@ either way, and the tap branches are not touched by it.
 
 On the stage bar, under **Every behaviour state**, one setting for every
 case: **Blink time**, how long the key stays on, then off, in each blink; a
-single flash lasts one of these. The dot after it blinks at that pace, in
-the colour of the case picked.
+single flash lasts one of these. While you change it, a dot after it blinks
+at that pace, in the colour of the case picked.
 
 When keys show cases in different places at once, a narrower place paints
 over a wider one, and where they share one the newest key decides.

@@ -938,13 +938,21 @@ test("Behaviour feedback's Blink time posts its own setting, blinks its dot at t
     await expect(field).not.toHaveAttribute("data-tip", /./);
     await expect(field).toContainText("Blink time");
     await expect(body(page).locator(".stage-bar .info-pop")).toContainText("a single flash lasts one of these");
-    // The dot blinks on for the time typed, then off for as long, in the
-    // case picked's colour, and follows what is typed before it is saved.
+    // While the field is being changed, and only then, the dot blinks on
+    // for the time typed, then off for as long, in the case picked's colour,
+    // following what is typed before it is saved.
     const dot = field.locator("[data-blink]");
-    const blink = () => dot.evaluate((node) => { const style = getComputedStyle(node); return [style.animationDuration, style.backgroundColor]; });
-    expect(await blink()).toEqual(["0.4s", "rgb(200, 85, 0)"]);
+    const blink = () => dot.evaluate((node) => { const style = getComputedStyle(node); return [style.animationName, style.animationDuration, style.backgroundColor]; });
+    await expect(dot).toBeHidden();
+    expect((await blink())[0]).toBe("none");
+    await field.locator("input").focus();
+    await expect(dot).toBeVisible();
+    expect(await blink()).toEqual(["blink-time", "0.4s", "rgb(200, 85, 0)"]);
     await field.locator("input").fill("150");
-    expect((await blink())[0]).toBe("0.3s");
+    expect((await blink())[1]).toBe("0.3s");
+    await field.locator("input").fill("200");
+    await field.locator("input").blur();
+    await expect(dot).toBeHidden();
     await expect(field).not.toContainText(/replacement/i);
     await expect(field).not.toHaveAttribute("data-tip", /replacement/i);
     await clearPosts(page);

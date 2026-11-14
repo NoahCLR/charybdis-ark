@@ -136,10 +136,11 @@ export function lightingGroup(id) {
 // bar since it is every case's. The keyboard keeps them with its settings,
 // so each saves as a settings section of one field. What it means is in the
 // stage's info mark alone (a tip is one control's one line, never an
-// explanation the info mark already gives). With `blink`, a dot after the
-// field blinks at the time typed, on for one, off for one, in that colour
-// (the case picked), or the text's where the case paints nothing; with
-// reduced motion it stays lit.
+// explanation the info mark already gives). With `blink`, while the field
+// is being changed a dot after it blinks at the time typed, on for one, off
+// for one, in that colour (the case picked), or the text's where the case
+// paints nothing; with reduced motion it stays lit. Always blinking, it was
+// too much to sit beside every case.
 /** @param {Model} model @param {string} sectionId @param {{blink?: string}} [options] */
 export function flashSetting(model, sectionId, {blink} = {}) {
     const flash = sectionsIn(model, "Lighting").find((entry) => entry.id === sectionId);
