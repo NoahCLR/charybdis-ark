@@ -237,10 +237,11 @@ where there is room, and scrolls when it is taller than that.
 
 **As you type**, **After Leader** or **Both** says how this replacement
 fires: as you finish a word, after the [Leader key](#after-the-leader-key),
-or either way; its ⓘ says what each means. It is saved as soon as you
-choose, and its inputs stay as they are. While it fires after Leader, a line under the choice says what the
-Leader key does and where it is placed (keys by layer, behaviours, combos),
-and **Place on a key →** takes you to the board to put it on a key. In the list each replacement is tagged
+or either way; its ⓘ says what each means, what the Leader key does, and
+where to set how long it waits. It is saved as soon as you choose, and its
+inputs stay as they are. While it fires after Leader, a line under the choice
+says where the Leader key is placed (keys by layer, behaviours, combos), and
+**Place on a key →** takes you to the board to put it on a key. In the list each replacement is tagged
 **As you type**, **After Leader** or **Both**.
 
 ### Inputs

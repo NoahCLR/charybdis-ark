@@ -230,7 +230,12 @@ addEventListener("keydown", (event) => {
     if (event.key !== "Escape") return;
     hideHover();
     if (escapeKeyboardMenu()) return;
-    if (state.picker) { state.picker = null; render(); return; }
+    // Over the picker, Esc first closes its info mark's list, then the picker.
+    if (state.picker) {
+        const picker = root.querySelector(".sheet.picker");
+        if (picker && escapeInfoMark(picker)) return;
+        state.picker = null; render(); return;
+    }
     if (state.retarget) { state.retarget = null; render(); return; }
     if (state.layersOpen) { discardLayers(); render(); return; }
     if (state.overlay) {

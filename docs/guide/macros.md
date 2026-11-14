@@ -93,6 +93,8 @@ the recorder finishes the take; so does switching slot or screen, or
 switching to another window. A chord you were in the middle of when you
 switched away (⌘Tab, Alt+Tab) is left out. The recorder's heading says **recording** while
 it captures, and **recorded** while **Clear take** can still put the slot back.
+The ⓘ beside **Record** sums up what a take does and what each option below
+changes.
 
 - **Record delays** keeps the pauses longer than the time after each step,
   rounded to the second time. The wait before the first key is never recorded.
@@ -126,13 +128,16 @@ Each macro has an **Uninterruptible playback** setting:
 While a macro plays uninterruptibly, only the macro types. New key presses
 are ignored, not queued. Keys you were already holding are suspended: modifiers
 come back afterwards, but other keys need to be let go and pressed again. The
-trackball and other keyboards are not held back.
+trackball and other keyboards are not held back. The ⓘ beside the setting
+sums this up.
 
 ## Your computer
 
 Text is typed through your computer's keyboard layout, so Ark needs to know
 which one you use. Set it under **Your computer** on **Host settings**; the
-button at the foot of the macro editor takes you there.
+button at the foot of the macro editor takes you there, and the ⓘ beside it
+says how text types with your setup. If the layout you chose isn't one for
+your computer's system, a warning under the button says so.
 
 - **Operating system**: **Auto** (what the keyboard detects over USB, named
   in the choice, such as **Auto (macOS detected)**), **macOS**, **Windows** or
@@ -174,8 +179,9 @@ same.
 ## Memory
 
 Macros share the profile's memory with everything else, within a macro limit
-of their own. The **Macro memory** bar shows how much is used. A key tap takes
-3 bytes; text takes its UTF-8 bytes. One macro can use all of it.
+of their own. The **Macro memory** bar shows how much is used, and the line
+under it how much is free. A key tap takes 3 bytes; text takes its UTF-8
+bytes; the ⓘ beside the heading says so. One macro can use all of it.
 
 Every empty slot keeps room for ten key taps. When there isn't enough left,
 the highest empty slots become **unavailable** until you shorten or clear a

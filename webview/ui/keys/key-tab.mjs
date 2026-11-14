@@ -22,6 +22,7 @@ import {behaviourKey, selectBehaviourKey} from "./behaviour-selection.mjs";
 import {pickKeycodeFor} from "./key-edits.mjs";
 import {foldEmptyLayers} from "../../view/empty-layers.mjs";
 import {emptyLayersShown, emptyLayersToggle, wireEmptyLayers} from "../empty-layers.mjs";
+import {attachInfoMarks, infoMark} from "../info-mark.mjs";
 
 /** @param {HTMLElement} body */
 export function tabKey(body) {
@@ -64,9 +65,9 @@ export function tabKey(body) {
             ${gate.editable || !gate.why ? "" : `<div class="unavailable key-unavailable">${esc(gate.why)}</div>`}
         </section>
         <section>
-            <div class="sect-h"><h4>This key on every layer</h4></div>
+            <div class="sect-h"><h4>This key on every layer</h4>${infoMark({id: "key-info-stack", label: "Which layer's key is pressed", heading: "Which layer's key is pressed",
+                lead: `The highest layer on wins; a transparent key takes the next one down. ${layerCalled(layers()[0])} is always on.`})}</div>
             <div class="stacklist">${stackRows(model, layer, position)}</div>
-            <p class="note stack-note">The highest layer on wins; a transparent key takes the next one down. ${layerMarked(model, layers()[0])} is always on.</p>
         </section>
         <section>
             <div class="sect-h"><h4>What this key reaches</h4></div>
@@ -111,6 +112,7 @@ export function tabKey(body) {
     }));
     /** @type {HTMLElement | null} */ (node.querySelector("[data-stack-open]"))?.addEventListener("click", () => { keepFold("key:stack", !foldOpen("key:stack")); render(); });
     wireEmptyLayers(node);
+    attachInfoMarks(node);
     /** @type {HTMLDetailsElement | null} */ (node.querySelector(".key-more"))?.addEventListener("toggle", (event) => {
         keepFold("key:stored", /** @type {HTMLDetailsElement} */ (event.target).open);
     });

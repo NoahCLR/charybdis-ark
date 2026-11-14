@@ -47,4 +47,7 @@ This amends D-L88, whose marks opened on hover and focus.
   the same way (`webview/ui/info-mark.mjs`); each screen keeps calling
   `infoMark` and `attachInfoMarks`.
 - A tip that explains is a review finding: move the explanation to the
-  section's info mark, or cut it to the control's one line.
+  section's info mark, or cut it to the control's one line. So is help read
+  once that sits on screen as a note, or in a fold that holds only help:
+  it goes behind an info mark beside its heading, and what is needed every
+  time stays on show beside it.

@@ -1331,7 +1331,9 @@ test("a replacement fires as you type, after Leader or both, its inputs one list
         await accept(page, (model) => { model.autocorrect.entries.find((entry) => entry.id === "because").fires = kind; model.autocorrect.usage.leaders = 3; });
         await expect(fires.locator(`input[value="${kind}"]`)).toBeChecked();
         await expect(inputs()).toHaveText(["beacuse", "becasue", "becuase"]);
-        await expect(editor(page).locator("[data-ac-leader-note]")).toContainText("Press the Leader key, then type one of its inputs: the keyboard sends this replacement, and the computer never sees what you typed.");
+        // What the Leader key does is the Fires info mark; under the switch, only where it is.
+        await expect(editor(page).locator("#ac-info-fires")).toContainText("Press the Leader key, then type one of its inputs");
+        await expect(editor(page).locator("[data-ac-leader-note]")).not.toContainText("the computer never sees");
         await expect(editor(page).locator('[data-ac-leader-note] [data-act="ac-place-leader"]')).toHaveText("Place on a key →");
         await expect(item(page, "because").locator("[data-ac-fires]")).toHaveText(label);
     }

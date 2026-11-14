@@ -218,6 +218,8 @@ export interface Vocabulary {
         scrollFields: WordList<string>;
         heldModifiers: string;
         tips: Readonly<Record<string, string>>;
+        /** What each choice of a step does, by the value it stores, read once in its step's info mark; `lead` holds whichever is chosen. */
+        about: Readonly<Record<'emptyDirection' | 'directionOutput' | 'linkEnds' | 'pointerLayer', {lead?: string; rows: WordList<number>}>>;
         pointerLayerLabel: string;
         /** The editor's other field labels, which the review names its fields by. */
         fieldLabels: Readonly<Record<'name' | 'dpi' | 'axis' | 'emptyDirection' | 'directionOutput' | 'scrollAxes' | 'invert' | 'horizontal' | 'vertical', string>>;

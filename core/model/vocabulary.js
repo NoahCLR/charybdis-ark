@@ -774,21 +774,18 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
         heldModifiers: "Hold modifiers while scrolling",
         // What each setting of a mode does, by the field it sets, as the
         // firmware runs it (its pointing spec; pointing_mode_dragscroll.c for
-        // the scroll fields): said as the field's tip wherever it is drawn. A
-        // ratio's tip is its numerator's; a directional threshold's is by how
+        // the scroll fields): said once, as the field's tip in a step, or in
+        // the info mark of its step or Advanced section (D-L96). A ratio's
+        // words are its numerator's; a directional threshold's are by how
         // often the mode sends (thresholdEvery, thresholdOnce).
         tips: {
             axis: "Which movement this mode turns into keys. Switching to one axis empties the other axis's keys.",
-            emptyDirection: "Moving toward a direction with no key: its neighbours take over its share; both neighbours are sent (a diagonal's two straight directions, a straight direction's two diagonals, so in eight directions only); or the move does nothing.",
-            directionOutput: "Every step sends the key again each time the ball moves a threshold further. Once per movement sends it once, however far the ball goes; a movement starts again after a 150 ms pause, and only turning more than 90 degrees from the direction that sent sends again before then.",
             thresholdEvery: "How far the ball must move for each key a direction sends: one key per this distance. Lower sends more often.",
             thresholdOnce: "How far the ball must move before a direction sends its key; it sends once however far the ball goes.",
             scrollAxes: "Which way this mode scrolls. With one axis, a swipe the other way does nothing, and its slight drift does not scroll the allowed axis.",
             dpi: "Sensor DPI while this mode runs.",
-            pointerLayer: "Keep the pointer layer active: the pointer layer stays on while the mode runs, and a locked mode keeps auto-mouse on. Return to the typing layer: starting the mode turns the pointer layer off, and it stays off while the mode runs. A mode its layers started never keeps the pointer layer on.",
             linkedLayers: "While one of these layers is on, held or locked, it starts this pointing mode. A mode started by its key wins over one its layers started.",
             linkTurnsOn: "While this pointing mode's key runs it, held or locked, these layers stay on; each goes off when the mode ends unless something else keeps it.",
-            linkEnds: "A higher layer: one above the highest layer that starts this pointing mode and is on. Any layer: any layer that is on and starts or is turned on by neither. Either ends the mode until that layer goes off; the pointer layer and the default layers never do, and a mode its key runs is never ended.",
             thresholdH: "How far the ball must move sideways, in sensor counts, before a scroll can go sideways. When both axes are below their thresholds, the scroll lets go of its axis.",
             thresholdV: "How far the ball must move up or down, in sensor counts, before a scroll can go up or down. When both axes are below their thresholds, the scroll lets go of its axis.",
             divisorH: "Sensor counts of sideways movement for one scroll step. Lower scrolls faster.",
@@ -801,6 +798,22 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
             heldModifiers: "Modifiers held down while the mode scrolls, for apps that scroll differently with them: Shift to scroll sideways in some, Command or Ctrl to zoom in others.",
             startNumerator: "To pick an axis, its movement must be at least this many times the other axis's: 7 : 4 is 1.75 times. Higher needs a straighter movement before a scroll starts; when neither axis wins, it waits.",
             sustainNumerator: "A scroll keeps its axis while that axis moves at least this many times the other (5 : 4 is 1.25 times, never more than the selection ratio). Below it, the other axis takes over only if it reaches the selection ratio; otherwise the scroll stays on its axis through the wobble.",
+        },
+        // What each choice of a step does, by the value it stores, read once
+        // in its step's info mark (D-L96); each choice's own words are its
+        // table's above, and `lead` is what holds whichever is chosen.
+        about: {
+            emptyDirection: {rows: [[0, "Moving toward it, the directions either side take over its share."],
+                [1, "Moving toward it sends both directions either side: a diagonal's two straight directions, a straight direction's two diagonals. In eight directions only; elsewhere its neighbours take over."],
+                [2, "Moving toward it does nothing."]]},
+            directionOutput: {rows: [[0, "Sends the key again each time the ball moves a threshold further."],
+                [1, "Sends it once, however far the ball goes. A movement starts again after a 150 ms pause; before then, only turning more than 90 degrees from the direction that sent sends again."]]},
+            linkEnds: {lead: "Only a mode its layers started is ended, until that layer goes off; one its key runs never is. The pointer layer and the default layers never end one.",
+                rows: [[0, "No other layer ends it."], [1, "A layer above the highest layer that starts this mode and is on."],
+                    [2, "Any layer that is on and neither starts this mode nor is turned on by its key."]]},
+            pointerLayer: {lead: "A mode its layers started never keeps the pointer layer on.",
+                rows: [[0, "The pointer layer stays on while the mode runs, and a locked mode keeps auto-mouse on."],
+                    [1, "Starting the mode turns the pointer layer off, and it stays off while the mode runs."]]},
         },
         // What the pointer layer does while a mode its key started runs: on,
         // or off so the typing layer's keys stay under the hand.

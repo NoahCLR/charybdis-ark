@@ -151,11 +151,11 @@ The same kind of control looks and sits the same on every screen.
   (`browser-tests/consistency.spec.js`).
 - A folding card or group starts its summary with `DISCLOSURE`
   (`webview/lib/dom.mjs`): one chevron, turned down while open; a disclosure
-  that is a button (the Keys groups, `groupHeader`; Typing & playback help;
-  a slot bank's Show all; the empty layers) has the same chevron, turned
+  that is a button (the Keys groups, `groupHeader`; a slot bank's Show all;
+  the empty layers) has the same chevron, turned
   down while `aria-expanded`, and is the one control that opens and closes
   what it holds. A fold that is not a heading (Where it is stored, Show all,
-  the empty layers, Typing & playback help, a review item's Show all) is
+  the empty layers, a review item's Show all) is
   `disclosureButton` or a `<summary class="disclose">`
   (`webview/ui/disclosure.mjs`), one look wherever it appears: the chevron,
   then its words at `--fs-md` in `--text-2`, 28 px tall. A card that does
@@ -404,9 +404,23 @@ The same kind of control looks and sits the same on every screen.
   until it is pressed again, Escape is pressed or a press lands elsewhere;
   opening one closes any other; the pointer resting on it previews the list;
   the focus alone opens nothing, the list being the button's description,
-  its `aria-expanded` saying whether it is open (`infoMark`,
+  its `aria-expanded` saying whether it is open; Escape on the mark, or over
+  the picker, closes its list before the editor or dialog around it (`infoMark`,
   `attachInfoMarks`, `webview/ui/info-mark.mjs`;
-  `browser-tests/shortcut-glyphs.spec.js`, `browser-tests/autocorrect.spec.js`).
+  `browser-tests/shortcut-glyphs.spec.js`, `browser-tests/autocorrect.spec.js`,
+  `browser-tests/review-regressions.spec.js`). A list may hold parts, each
+  under its own heading (one field's choices, in their own words). Help read
+  once sits behind one beside its heading, never in a fold or a note on show:
+  a Settings section's keyboard keys marks, each Pointing step's choices and
+  Advanced's Distance and Scroll tuning, how to pick on the picker's board,
+  Uninterruptible playback, how a macro's text types, recording, macro
+  memory, which layer's key the Key tab's stack shows, the combo builder,
+  and Text replacement's sections (`browser-tests/settings-tooltips.spec.js`,
+  `browser-tests/pointing-controls.spec.js`, `browser-tests/macro-ux.spec.js`,
+  `browser-tests/marks.spec.js`). What is needed every time stays on show
+  beside it: a layout that does not fit the computer, what is free in
+  memory, an armed tap-hold, how to stop a take that is recording, what a
+  custom key output sends with its behaviour off.
 - A tip is the words that open when the pointer rests on a control, its
   `data-tip`, and every one is shown by `webview/ui/hover.mjs` at the pointer
   (D-L80): below and to the right of where it rested, kept inside the
@@ -670,7 +684,7 @@ here: its home and tests are in
 
 | Rule | Owner | Held by |
 | --- | --- | --- |
-| Settings help: `hint` stays visible under its name, and a row's `data-tip` is its `tooltip` alone, never the hint again; a read-only row's hint says why (D-L96), shown by `webview/ui/hover.mjs` | `core/model/settings-editor.js` | `browser-tests/settings-tooltips.spec.js` |
+| Settings help: `hint` stays visible under its name, and a row's `data-tip` is its `tooltip` alone, never the hint again; a read-only row's hint says why; the ↺ keyboard keys change this too and turned off by key marks carry no tip, what they mean being the info mark beside the section's title (D-L96), shown by `webview/ui/hover.mjs` | `core/model/settings-editor.js` | `browser-tests/settings-tooltips.spec.js` |
 | Number entry: the input mode a field asks for, what typing keeps, and where range limits sit ([more](#number-entry)) | `webview/lib/number-entry.mjs` | `tests/view/number-entry.test.mjs`, `browser-tests/number-entry.spec.js` |
 | Screens: IDs, labels, rail groups, availability, rendering and redraw; `PanelState.screen` takes its IDs from here; an unknown ID shows an unavailable screen | `webview/view/screens.mjs` | `tests/view/screens.test.mjs`, `browser-tests/screens-registry.spec.js` |
 | Which settings sections each Settings screen draws, and where a section is edited ([more](#settings-screens-and-sections)) | `webview/view/settings-layout.mjs` | `tests/view/settings-layout.test.mjs`, `tests/view/review.test.mjs`, `browser-tests/settings-screens.spec.js` |
@@ -1558,9 +1572,12 @@ own folded card (`browser-tests/pointing-controls.spec.js`).
    the vocabulary's names, and the held modifiers
    (`webview/ui/pointing/movement.mjs`). Each direction's held-modifier handling,
    under Advanced, is a segmented choice too.
-   Every setting, Reverse scrolling and the held modifiers included, says what it does once: as its field's tip in a step,
-   and in the line under it under Advanced, which then has no tip saying it again (D-L96); a scroll field's words come from
-   `vocabulary.pointing.tips`, keyed by the field it sets (as the firmware runs it)
+   Every setting, Reverse scrolling and the held modifiers included, says what it does once (D-L96): as its field's tip,
+   or in the info mark beside its step's title or its Advanced section's (Distance, Scroll tuning), by its name or by
+   each of its choices' words, with no tip saying it again. A step's choices (When a direction has no key, How often it
+   sends, Ends when, Pointer layer) are explained there, each in a part headed by the field's label; the line under a
+   Distance field is its value alone. The words come from `vocabulary.pointing.tips`, keyed by the field it sets (as
+   the firmware runs it), and `vocabulary.pointing.about`, keyed by the value a choice stores
    (`browser-tests/pointing-controls.spec.js`).
 3. **What starts it**: the mode's hold and lock keys named by the mode, never
    by `PD_MODE_n`, and where they sit; then its link as layer chips
@@ -1679,7 +1696,9 @@ input's key under the layers in view (`tests/model/participation.test.js`,
   (`tests/protocol/combo-readback-v1.test.js`), and reach lists honour both
   (`tests/view/combo-reach.test.mjs`).
 - The combo builder names a custom key output's shortcut, or says it sends
-  nothing (no test).
+  nothing, under Use output behaviour, and says nothing there for any other
+  output; what the switch off does is its info mark
+  (`browser-tests/review-regressions.spec.js`).
 
 ## Flash pauses
 

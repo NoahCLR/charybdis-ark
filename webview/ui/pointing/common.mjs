@@ -8,6 +8,14 @@ export const words = (model) => vocabulary(model).pointing;
 // What a setting does, by the field it sets (vocabulary pointing.tips).
 /** @param {import("../../../contracts/panel.js").PublishedModel | null} model @param {string} key */
 export const tipFor = (model, key) => words(model).tips?.[key] || "";
+// What each choice of a field does, as a part of its step's info mark
+// (vocabulary pointing.about): headed by the field's label, each choice
+// named by its own words.
+/** @param {import("../../../contracts/panel.js").PublishedModel | null} model @param {"emptyDirection" | "directionOutput" | "linkEnds" | "pointerLayer"} key @param {string} heading @returns {import("../info-mark.mjs").InfoPart} */
+export const choicesPart = (model, key, heading) => {
+    const about = words(model).about[key];
+    return {heading, lead: about.lead, rows: about.rows.map(([value, says]) => ({term: word(words(model)[key], value), says}))};
+};
 // A scroll field's label; a field that shows its unit beside it drops the
 // "(ms)" its label carries elsewhere.
 /** @param {import("../../../contracts/panel.js").PublishedModel | null} model @param {string} key @param {string} [unit] */

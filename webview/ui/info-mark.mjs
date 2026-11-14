@@ -22,6 +22,7 @@ const ICON = `<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" 
 const GAP = 6, LEAST = 96;
 
 /** @typedef {{term: string, mono?: boolean, says: string}} InfoRow */
+/** @typedef {{heading: string, lead?: string, rows: readonly InfoRow[]}} InfoPart */
 
 // The mark kept open, by its list's id, so it stays open across the
 // renders that redraw it; null when none is.
@@ -32,15 +33,19 @@ let kept = null;
 // (`named` names the list where its heading alone would not say what of);
 // `lead` is an optional sentence or two before the list; `rows` are its list,
 // each a term and what it says, all plain text; a mono term is written as it
-// is typed. `corner` draws the larger mark that rides a card's top-right
-// corner. A node that holds one calls `attachInfoMarks`.
-/** @param {{id: string, label: string, heading: string, named?: string, lead?: string, rows: readonly InfoRow[], corner?: boolean}} info */
-export function infoMark({id, label, heading, named = heading, lead = "", rows, corner = false}) {
+// is typed. `parts` follow the rows, each a list of its own under a heading
+// of its own (the choices of one field, say), with an optional lead.
+// `corner` draws the larger mark that rides a card's top-right corner. A node
+// that holds one calls `attachInfoMarks`.
+/** @param {{id: string, label: string, heading: string, named?: string, lead?: string, rows?: readonly InfoRow[], parts?: readonly InfoPart[], corner?: boolean}} info */
+export function infoMark({id, label, heading, named = heading, lead = "", rows = [], parts = [], corner = false}) {
     const open = kept === id;
+    /** @param {readonly InfoRow[]} list */
+    const listed = (list) => list.length ? `<dl>${list.map((row) => `<dt${row.mono ? ` class="mono"` : ""}>${esc(row.term)}</dt><dd>${esc(row.says)}</dd>`).join("")}</dl>` : "";
     return `<span class="info-mark${corner ? " corner" : ""}" data-info-mark${open ? " data-open" : ""}>
         <button type="button" class="info-button" aria-label="${esc(label)}" aria-describedby="${esc(id)}" aria-controls="${esc(id)}" aria-expanded="${open}">${ICON}</button>
-        <span class="info-pop" id="${esc(id)}" role="group" aria-label="${esc(named)}"><span class="info-body" tabindex="-1"><span class="info-h">${esc(heading)}</span>${lead ? `<span class="info-lead">${esc(lead)}</span>` : ""}<dl>${rows
-            .map((row) => `<dt${row.mono ? ` class="mono"` : ""}>${esc(row.term)}</dt><dd>${esc(row.says)}</dd>`).join("")}</dl></span></span></span>`;
+        <span class="info-pop" id="${esc(id)}" role="group" aria-label="${esc(named)}"><span class="info-body" tabindex="-1"><span class="info-h">${esc(heading)}</span>${lead ? `<span class="info-lead">${esc(lead)}</span>` : ""}${listed(rows)}${parts
+            .map((part) => `<span class="info-part">${esc(part.heading)}</span>${part.lead ? `<span class="info-lead">${esc(part.lead)}</span>` : ""}${listed(part.rows)}`).join("")}</span></span></span>`;
 }
 
 // Closes the mark kept open, if one is.
@@ -53,10 +58,15 @@ const closeKept = () => {
 };
 
 // Escape closes the mark kept open, or shuts the list the pointer is
-// previewing; true when it did either.
-export function escapeInfoMark() {
-    const hovered = /** @type {HTMLElement | null} */ (document.querySelector("[data-info-mark]:hover"));
-    if (kept !== null) {
+// previewing; true when it did either. Given `within` (a dialog over the
+// screen, say), it acts only on a mark inside it.
+/** @param {ParentNode} [within] */
+export function escapeInfoMark(within = document) {
+    // `within` itself, when it is a mark, or a mark inside it.
+    /** @param {string} selector */
+    const find = (selector) => /** @type {HTMLElement | null} */ (within instanceof Element && within.matches(selector) ? within : within.querySelector(selector));
+    const hovered = find("[data-info-mark]:hover");
+    if (kept !== null && (within === document || find("[data-info-mark][data-open]"))) {
         closeKept();
         // Closed, it shows no preview under the pointer either.
         if (hovered) hovered.dataset.shut = "";
@@ -109,8 +119,9 @@ function place(mark) {
 
 // Wires the marks in `root`, itself included: a press on the mark opens its
 // list and keeps it open, or closes it; a list is placed as it opens or is
-// previewed, scrolls by the arrow keys while the mark has the focus, and a
-// shut preview opens again once the pointer has left.
+// previewed, scrolls by the arrow keys while the mark has the focus, closes
+// on Escape there before anything around it does, and a shut preview opens
+// again once the pointer has left.
 /** @param {ParentNode} root */
 export function attachInfoMarks(root) {
     listen();
@@ -133,6 +144,9 @@ export function attachInfoMarks(root) {
         mark.addEventListener("mouseenter", () => place(mark));
         if (kept === id) requestAnimationFrame(() => place(mark));
         mark.addEventListener("keydown", (event) => {
+            // Escape on the mark closes its list, and nothing around it (an
+            // editor that closes on Escape, the picker) closes too.
+            if (event.key === "Escape" && escapeInfoMark(mark)) { event.preventDefault(); event.stopPropagation(); return; }
             const step = /** @type {Record<string, number>} */ ({ArrowDown: 40, ArrowUp: -40, PageDown: 200, PageUp: -200})[event.key];
             const body = mark.querySelector(".info-body");
             if (!step || !body || body.scrollHeight <= body.clientHeight) return;
