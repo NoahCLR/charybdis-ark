@@ -94,7 +94,7 @@ function referenceCard(model, section, canEdit) {
     const node = el(`<section class="card settings-group" data-section="${esc(section.id)}">
         <div class="card-h"><h3>${esc(section.label)}${draftMarks(model?.draft?.changes).settings.has(section.id) ? draftDot(model?.draft) : ""}</h3></div>
         ${section.description ? `<div class="card-b settings-intro"><p class="note">${esc(section.description)}</p></div>` : ""}
-        <div class="rows"><div class="setrow layer-switches" data-tip="${esc(section.description || "")}"><div class="layer-grid reference-grid" role="group" aria-label="${esc(section.label)}"></div></div></div>
+        <div class="rows"><div class="setrow layer-switches"><div class="layer-grid reference-grid" role="group" aria-label="${esc(section.label)}"></div></div></div>
     </section>`);
     const grid = /** @type {HTMLElement} */ (node.querySelector(".reference-grid"));
     const submit = () => post(edits.settingsSection(section, (field) => {
@@ -110,7 +110,7 @@ function referenceCard(model, section, canEdit) {
         const layer = layers().find((entry) => entry.index === at);
         const editable = canEdit && !field.readOnly;
         if (field === folded[0]) grid.appendChild(emptyLayersButton("combo-matching", folded.length, "grid-empties"));
-        const cell = el(`<label class="reference-cell" data-tip="${esc([field.tooltip, field.hint].filter(Boolean).join(" "))}" ${folded.includes(field) && !open ? "hidden" : ""}>
+        const cell = el(`<label class="reference-cell" ${folded.includes(field) && !open ? "hidden" : ""}>
             <span class="txt">${layerCell(model, field, layer)}</span>
             <select class="input compact" data-macro="${esc(field.macro)}" data-f="setting:${esc(field.macro)}" aria-label="${esc(field.label)}" ${editable ? "" : "disabled"}>
             ${layers().map((entry) => `<option value="${esc(entry.name)}" ${field.value === entry.name ? "selected" : ""}>${esc(layerCalled(entry))}</option>`).join("")}</select></label>`);
@@ -136,7 +136,7 @@ function comboTimingRow(model, entry) {
     const stored = String(value ?? "");
     const editable = editGate(model, "combos").editable;
     const hint = entry.hint;
-    const row = el(`<div class="setrow" data-tip="${esc(hint)}" data-timing="${esc(entry.id)}">
+    const row = el(`<div class="setrow" data-timing="${esc(entry.id)}">
         <div><div class="nm">${esc(entry.label)}</div>
             <div class="hint">${esc(hint)}</div></div>
         <div class="control"><span class="affix unit"><input class="input mono num" id="${hold ? "comboHoldTerm" : "comboDefaultWindow"}" data-f="settings:combo:${hold ? "hold" : "default"}" inputmode="numeric" value="${esc(stored)}" ${editable ? "" : "disabled"}><i>ms</i></span></div>
@@ -221,13 +221,13 @@ const layerCell = (model, field, layer) => layer
 // its empty layers fold behind the grid's disclosure (D-L76).
 /** @param {{label: string, hint: string}} group @param {Field[]} fields @param {boolean} canEdit @param {() => void} submit @param {string} place */
 function layerGroupRow(group, fields, canEdit, submit, place) {
-    const row = el(`<div class="setrow layer-switches" data-tip="${esc(group.hint)}">
+    const row = el(`<div class="setrow layer-switches">
         <div><div class="nm">${esc(group.label)}${keyboardKeysMark(fields[0])}</div><div class="hint">${esc(group.hint)}</div></div>
     </div>`);
     const grid = layerSwitchGrid(getModel(), group.label, fields.map((field) => ({
         layer: field.governs?.kind === "layer" ? field.governs.layer : -1, label: field.label, macro: field.macro, f: `setting:${field.macro}`,
         checked: Boolean(field.enabled), disabled: !canEdit || Boolean(field.readOnly),
-        tip: [field.tooltip, field.hint, field.readOnly ? "This setting cannot be edited with the connected firmware." : ""].filter(Boolean).join(" "),
+        tip: [field.tooltip, field.hint].filter(Boolean).join(" "),
     })), {place});
     /** @type {NodeListOf<HTMLInputElement>} */ (grid.querySelectorAll("input")).forEach((input) => input.addEventListener("change", submit));
     row.appendChild(grid);
@@ -242,15 +242,16 @@ function fieldRow(field, canEdit, submit, slot, durations) {
     const affixed = Boolean(field.unit) && !field.readOnly && field.presentation !== "duration"
         && field.kind !== "toggle" && field.kind !== "layer" && !field.choices?.length;
     const label = affixed ? field.label.replace(new RegExp(`\\s*\\(${field.unit}\\)$`), "") : field.label;
-    const row = el(`<div class="setrow ${field.readOnly ? "ro" : ""}" data-tip="${esc([field.tooltip, field.hint].filter(Boolean).join(" "))}">
+    // The row's tip is its tooltip alone: its hint is on screen under its
+    // name, and a read-only row's hint says why (D-L96).
+    const row = el(`<div class="setrow ${field.readOnly ? "ro" : ""}"${field.tooltip ? ` data-tip="${esc(field.tooltip)}"` : ""}>
         <div><div class="nm">${marked(getModel(), field.governs, label, {slot})}${keyboardKeysMark(field)}${offByKeyMark(field)}</div>${field.hint ? `<div class="hint">${esc(field.hint)}</div>` : ""}</div>
         <div class="control"></div>
     </div>`);
     const control = /** @type {HTMLElement} */ (row.querySelector(".control"));
 
     if (field.readOnly) {
-        control.appendChild(el(`<span class="chip"
-            data-tip="${esc([field.tooltip, field.hint, field.notBuilt ? "" : "This setting cannot be edited with the connected firmware."].filter(Boolean).join(" "))}">${field.notBuilt ? "Not in this firmware" : `read-only · ${esc(field.kind === "toggle" ? (field.enabled ? "on" : "off") : field.value)}`}</span>`));
+        control.appendChild(el(`<span class="chip">${field.notBuilt ? "Not in this firmware" : `read-only · ${esc(field.kind === "toggle" ? (field.enabled ? "on" : "off") : field.value)}`}</span>`));
         return row;
     }
     if (field.presentation === "duration") {
@@ -288,15 +289,14 @@ function fieldRow(field, canEdit, submit, slot, durations) {
 
 // Sniping is on while a sniping key is held or toggled, and while an
 // auto-sniping layer is on; these rows, drawn as the card's settings are,
-// say where those keys are and place one, and their tips say what sniping
-// slows.
-const SNIPING_SLOWS = "It slows directional pointing modes too, not scrolling ones.";
+// say where those keys are and place one, and their tips say what each key
+// does. What sniping slows is Sniping DPI's tip.
 /** @param {Model | null} model @param {boolean} canEdit */
 function snipingKeys(model, canEdit) {
     const node = el(`<div class="rows sniping-keys"><div class="setrow-part">Sniping keys</div></div>`);
     for (const [keycode, how] of [["SNIPING", "Sniping is on while this key is held."], ["SNP_TOG", "One press turns sniping on, the next turns it off."]]) {
         const words = keyIdentity(model, keycode).label;
-        const row = el(`<div class="setrow sniping-key" data-tip="${esc(`${how} ${SNIPING_SLOWS}`)}">
+        const row = el(`<div class="setrow sniping-key" data-tip="${esc(how)}">
             <div><div class="nm">${esc(words)}</div><div class="hint">${phraseMarked(model, reachLine(keycodePlacements(model, [keycode])))}</div></div>
             <div class="control"><button class="btn tiny link" data-place="${esc(keycode)}" ${canEdit ? "" : "disabled"}>Place on a key →</button></div></div>`);
         /** @type {HTMLButtonElement} */ (row.querySelector("[data-place]")).addEventListener("click", () => {

@@ -432,19 +432,23 @@ test("Pointer: auto-sniping's layers post one switch each, beside its master swi
     ])});
 });
 
-test("every setting in a mode says what it does, under Advanced too", async ({page}) => {
+test("every setting in a mode says what it does once, under Advanced too", async ({page}) => {
     for (const slot of [0, 4]) {
         await openControls(page, "pointing", {pointingSlot: slot, pdAdvanced: true});
         // Every number field, and every few-option choice outside the
-        // per-direction table, carries a tip on the field itself.
-        const untipped = await editor(page).locator(".field").evaluateAll(fields => fields
+        // per-direction table, says what it does: in a tip on the field, or
+        // in the line under it, never in both (D-L96).
+        const said = await editor(page).locator(".field").evaluateAll(fields => fields
             .filter(field => field.querySelector("input.input, .seg, .pd-switches, .pd-mods") && !field.closest(".pd-taps"))
-            .filter(field => !(field.getAttribute("data-tip") || field.querySelector(".seg[data-tip]")?.getAttribute("data-tip")))
-            .map(field => field.querySelector("span")?.textContent));
-        expect(untipped, `slot ${slot}`).toEqual([]);
+            .map(field => ({name: field.querySelector("span")?.textContent,
+                tip: Boolean(field.getAttribute("data-tip") || field.querySelector(".seg[data-tip]")?.getAttribute("data-tip")),
+                help: Boolean(field.closest(".field-block")?.querySelector(":scope > .field-help")?.textContent?.trim())})));
+        expect(said.filter(field => !field.tip && !field.help).map(field => field.name), `slot ${slot}: unsaid`).toEqual([]);
+        expect(said.filter(field => field.tip && field.help).map(field => field.name), `slot ${slot}: said twice`).toEqual([]);
     }
     await openControls(page, "pointing", {pointingSlot: 0, pdAdvanced: true});
-    await expect(editor(page).locator(".field").filter({hasText: "Axis selection ratio"})).toHaveAttribute("data-tip", /1\.75 times/);
+    const help = (/** @type {string} */ name) => editor(page).locator(".field-block").filter({has: page.locator(".field", {hasText: name})}).locator(".field-help");
+    await expect(help("Axis selection ratio")).toContainText("1.75 times");
     await expect(editor(page).locator(".field").filter({hasText: "Axis kept after the ball stops"})).toHaveAttribute("data-tip", /once the ball stops/);
 });
 

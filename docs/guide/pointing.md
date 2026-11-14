@@ -5,7 +5,8 @@ Settings in the rail) is how it moves the pointer. **Pointing modes**, under
 Configure, make it do something else while a key is held or locked, or while
 a layer is on: scroll, or send arrows and shortcuts as it moves.
 
-Hover any label on Pointer settings for what it does.
+Each setting on Pointer settings says what it does in the line under its
+name; hovering one adds what that line leaves out, such as QMK's own name.
 
 ## Pointer settings
 

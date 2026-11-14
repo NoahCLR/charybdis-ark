@@ -670,7 +670,7 @@ here: its home and tests are in
 
 | Rule | Owner | Held by |
 | --- | --- | --- |
-| Settings help: `hint` stays visible, `tooltip` adds to it, read-only reasons join them in `data-tip`, shown by `webview/ui/hover.mjs` | `core/model/settings-editor.js` | `browser-tests/settings-tooltips.spec.js` |
+| Settings help: `hint` stays visible under its name, and a row's `data-tip` is its `tooltip` alone, never the hint again; a read-only row's hint says why (D-L96), shown by `webview/ui/hover.mjs` | `core/model/settings-editor.js` | `browser-tests/settings-tooltips.spec.js` |
 | Number entry: the input mode a field asks for, what typing keeps, and where range limits sit ([more](#number-entry)) | `webview/lib/number-entry.mjs` | `tests/view/number-entry.test.mjs`, `browser-tests/number-entry.spec.js` |
 | Screens: IDs, labels, rail groups, availability, rendering and redraw; `PanelState.screen` takes its IDs from here; an unknown ID shows an unavailable screen | `webview/view/screens.mjs` | `tests/view/screens.test.mjs`, `browser-tests/screens-registry.spec.js` |
 | Which settings sections each Settings screen draws, and where a section is edited ([more](#settings-screens-and-sections)) | `webview/view/settings-layout.mjs` | `tests/view/settings-layout.test.mjs`, `tests/view/review.test.mjs`, `browser-tests/settings-screens.spec.js` |
@@ -1015,9 +1015,10 @@ no keys and no layers is no shortcut, any part alone is one, and a kind other
 than hold needs layers. Ark reads and writes settings version 12 only (D-L64;
 `tests/schema/settings-domain-v1.test.js`).
 
-- The Custom keys screen's Shortcut field says what a shortcut is in its
-  label's tip (`SHORTCUT_MEANS`) and what this key's does below its input
-  (`customKeyShortcutLine`); the key's keycode reads beside its number in the
+- The Custom keys screen's Shortcut field says what a shortcut is, and what
+  one may hold, behind the info mark beside its label (`SHORTCUT_MEANS`,
+  D-L96; `browser-tests/custom-key-shortcut.spec.js`) and what this key's
+  does below its input (`customKeyShortcutLine`); the key's keycode reads beside its number in the
   card's title bar. Its What it does card holds the behaviour editor without
   the editor's own head, Change key… and Remove behaviour in the card's
   title bar instead (`behaviourEditor(…, {head: false})`,
@@ -1557,9 +1558,10 @@ own folded card (`browser-tests/pointing-controls.spec.js`).
    the vocabulary's names, and the held modifiers
    (`webview/ui/pointing/movement.mjs`). Each direction's held-modifier handling,
    under Advanced, is a segmented choice too.
-   Every setting, Reverse scrolling and the held modifiers included, says what it does as its field's tip: a scroll field's from
-   `vocabulary.pointing.tips`, keyed by the field it sets (as the firmware runs it), in
-   the step and under Advanced alike (`browser-tests/pointing-controls.spec.js`).
+   Every setting, Reverse scrolling and the held modifiers included, says what it does once: as its field's tip in a step,
+   and in the line under it under Advanced, which then has no tip saying it again (D-L96); a scroll field's words come from
+   `vocabulary.pointing.tips`, keyed by the field it sets (as the firmware runs it)
+   (`browser-tests/pointing-controls.spec.js`).
 3. **What starts it**: the mode's hold and lock keys named by the mode, never
    by `PD_MODE_n`, and where they sit; then its link as layer chips
    ([Pointing links](#pointing-links)).

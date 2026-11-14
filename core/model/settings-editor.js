@@ -93,7 +93,7 @@ const sections = [
         // accepts in its own steps, so they offer the part of the list the
         // keyboard accepts. A pointing mode's own speed is set on its slot.
         number("normalDpi", SETTING.DEFAULT_DPI, "Normal pointer DPI", undefined, {tooltip: "Trackball sensitivity for ordinary pointer movement. Higher DPI moves the cursor farther for the same ball movement.", unit: undefined, choices: dpiChoices({accepts: v => validSetting(SETTING.DEFAULT_DPI, v)})}),
-        number("snipingDpi", SETTING.SNIPING_DPI, "Sniping DPI", undefined, {tooltip: "Trackball sensitivity while sniping is active, including auto-sniping. Lower DPI gives finer cursor control.", unit: undefined, choices: dpiChoices({accepts: v => validSetting(SETTING.SNIPING_DPI, v)})}),
+        number("snipingDpi", SETTING.SNIPING_DPI, "Sniping DPI", undefined, {tooltip: "Trackball sensitivity while sniping is on, auto-sniping included. It slows directional pointing modes too, not scrolling ones.", unit: undefined, choices: dpiChoices({accepts: v => validSetting(SETTING.SNIPING_DPI, v)})}),
     ]},
     // Its layers, one switch each, are added with the layers' names below.
     {id: "sniping", label: SECTION.sniping, area: AREA.pointer, fields: [
@@ -270,8 +270,8 @@ function settingsSections(snapshot, settings) {
                 hint: "Off, combos still fire but send their output without its behaviour; a custom key sends only its shortcut."},
             ...everyLayer(i => ({...toggle(`combosOnLayer${i}`, SETTING.LAYER_COMBOS, `On ${name(i)}`, "Keys that come from this layer can join combos."), bitMask: 2 ** i, governs: {kind: /** @type {const} */ ("layer"), layer: i}}))]});
     // A layer's combo reference is in its layer record, not a setting value.
-    result.push({id: "comboReferences", area: AREA.settings, label: SECTION.comboReferences, description: "Each layer matches its combos against the keys of the layer chosen here.", fields:
-        everyLayer(i => ({...layer(`comboReference${i}`, undefined, `Combos on ${name(i)}`, "The layer whose key assignments are used to match combos on this layer. Choose the same layer to keep its combos independent."), record: /** @type {const} */ ("reference"), layer: i, governs: {kind: /** @type {const} */ ("layer"), layer: i}}))});
+    result.push({id: "comboReferences", area: AREA.settings, label: SECTION.comboReferences, description: "Each layer matches its combos against the keys of the layer chosen here. Choose the layer itself to keep its combos independent.", fields:
+        everyLayer(i => ({...layer(`comboReference${i}`, undefined, `Combos on ${name(i)}`), record: /** @type {const} */ ("reference"), layer: i, governs: {kind: /** @type {const} */ ("layer"), layer: i}}))});
     /** @type {import("../../contracts/model.js").StoredSettingField[]} */
     const keyOptions = options ? optionLabels.map(([macro, label, hint, part], i) => ({...toggle(macro, SETTING.KEYMAP_OPTIONS, hostKeyLabel(label, host.effective)), tooltip: hostKeyLabel(hint, host.effective), part, bitMask: options.keymapMasks[i], keyboardKeys: true, readOnly: !(options.supportedKeymapOptions & (1 << i)), notBuilt: !(options.supportedKeymapOptions & (1 << i)), hint: options.supportedKeymapOptions & (1 << i) ? "" : "Not in this firmware (does nothing)."})) : [];
     result.push({id: "keyboardOptions", area: AREA.settings, label: SECTION.keyboardOptions, ...(options ? {} : {description: "Read the keyboard to see the key options it supports."}), fields:

@@ -36,8 +36,8 @@ export function advancedControls(model, slot, scrolling, {form, disabled, field,
         /** @param {number} counts */
         const distance = (counts) => {
             const shown = thresholdDistance(counts, dpi);
-            const tip = shown ? `${does} ${shown.long}` : `${does} In sensor counts at this mode's pointer speed.`;
-            return told(tip, shown ? {unit: shown.short, wide: true} : {});
+            const help = shown ? `${does} ${shown.long}` : `${does} In sensor counts at this mode's pointer speed.`;
+            return told(help, shown ? {unit: shown.short, wide: true} : {});
         };
         if (readsHorizontal(slot.axis)) distances.append(field(`${words(model).fieldLabels.horizontal} ${per}`, slot.thresholdX, "thresholdX", distance(slot.thresholdX)));
         if (readsVertical(slot.axis)) distances.append(field(`${words(model).fieldLabels.vertical} ${per}`, slot.thresholdY, "thresholdY", distance(slot.thresholdY)));
@@ -90,7 +90,7 @@ export function advancedControls(model, slot, scrolling, {form, disabled, field,
         }
         for (const [top, bottom] of SCROLL_RATIOS) {
             const label = scrollLabel(model, top).replace(/\s*·\s*numerator$/, "");
-            const pair = explained(el(`<div class="field" data-tip="${esc(tipFor(model, top))}"><span>${esc(label)}</span><div class="pd-ratio"></div></div>`), tipFor(model, top));
+            const pair = explained(el(`<div class="field"><span>${esc(label)}</span><div class="pd-ratio"></div></div>`), tipFor(model, top));
             const inputs = /** @type {HTMLElement} */ (pair.querySelector(".pd-ratio"));
             for (const [index, key] of [top, bottom].entries()) {
                 const input = /** @type {HTMLInputElement} */ (el(`<input data-f="pointing:${esc(slot.id)}:scroll:${esc(key)}" class="input mono num" value="${esc(slot.scroll?.[key] ?? "")}" inputmode="numeric"

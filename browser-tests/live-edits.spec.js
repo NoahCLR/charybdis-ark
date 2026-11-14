@@ -232,7 +232,9 @@ test("halves that stored different modes are settled by choosing the mode again;
     await expect(page.locator('.rail-mode [data-tip*="Unplugging it now may lose the mode"]')).toHaveCount(1);
     await expect(page.locator('.rail-mode [data-tip*="halves stored different modes"]')).toHaveCount(1);
     const menu = await keyboardMenu(page);
-    await expect(menu.locator(".rail-menu-note")).toHaveAttribute("data-tip", /Unplugging it now may lose the mode/);
+    // What unplugging risks is on screen in the menu, not in a tip (D-L96).
+    await expect(menu.locator(".rail-menu-note")).toContainText("Unplugging it now may lose the mode");
+    await expect(menu.locator(".rail-menu-note")).not.toHaveAttribute("data-tip", /./);
     await menu.locator('[data-act="edit-mode-settle"]').click();
     const ask = page.locator(".sheet.edit-mode-ask");
     await expect(ask).toContainText("settles halves");

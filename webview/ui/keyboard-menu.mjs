@@ -15,7 +15,7 @@ import {menuKey} from "../lib/menu-keys.mjs";
 import * as controls from "../view/controls.mjs";
 import {esc, watchPressOutside} from "../lib/dom.mjs";
 import {getModel, post, postLeavingDemo, render, state} from "../store.mjs";
-import {NOT_STORED_TIP, SETTLE_TIP, keyboardControl} from "../view/keyboard-menu.mjs";
+import {NOT_STORED_RISK, SETTLE_TIP, keyboardControl} from "../view/keyboard-menu.mjs";
 import {chooseKeyboard, forgetKeyboard} from "../view/shell-panel.mjs";
 import {chooseMode} from "./edit-mode.mjs";
 
@@ -58,8 +58,8 @@ function menu(control) {
             ${tick(choice.current)}<span class="rail-menu-text">${esc(choice.label)}${choice.hint ? `<span class="rail-menu-hint">${esc(choice.hint)}</span>` : ""}</span></button>`).join("")}
         ${edits.settle ? `<button class="rail-menu-item" role="menuitem" tabindex="-1" id="rail-menu-settle" data-act="edit-mode-settle" data-tip="${esc(SETTLE_TIP)}">
             <span class="rail-menu-tick" aria-hidden="true"><i class="dot warn"></i></span><span class="rail-menu-text">Settle<span class="rail-menu-hint">Store this mode on both halves</span></span></button>` : ""}
-        ${edits.notStored ? `<div class="rail-menu-note" role="none" data-tip="${esc(NOT_STORED_TIP)}"><span class="rail-menu-tick"><i class="dot warn"></i></span>
-            <span>Not stored on the keyboard yet</span></div>` : ""}</div>`);
+        ${edits.notStored ? `<div class="rail-menu-note" role="none"><span class="rail-menu-tick"><i class="dot warn"></i></span>
+            <span class="rail-menu-text">Not stored on the keyboard yet<span class="rail-menu-hint">${esc(NOT_STORED_RISK)}</span></span></div>` : ""}</div>`);
     if (control.keyboards.length) sections.push(`${heading("rail-menu-keyboards", "Keyboard")}<div role="group" aria-labelledby="rail-menu-keyboards">
         ${control.keyboards.map((entry) => `<button class="rail-menu-item" role="menuitemradio" aria-checked="${entry.current ? "true" : "false"}" tabindex="-1"
             id="rail-menu-device-${esc(entry.id)}" data-act="select-device" data-device="${esc(entry.id)}">
