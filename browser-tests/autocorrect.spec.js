@@ -569,7 +569,7 @@ test("every control of the screen has a name, and the keyboard reaches them in r
         if (order.at(-1) !== at) order.push(at);
     }
     expect(order.map((name) => name.replace(/^autocorrect:entry:because:/, ""))).toEqual(["item", "ac-add", "ac-import", "ac-export-menu", "ac-delete", "ⓘ How a replacement works", "kind:text", "replacement",
-        "fires:word", "ⓘ How inputs are written, and the * wildcard", "ac-chip", "input:becasue", "ac-remove-input", "ac-chip", "ac-more", "ⓘ About the preview", "autocorrect:try:text", "autocorrect:try:caps"]);
+        "ⓘ How a replacement fires", "fires:word", "ⓘ How inputs are written, and the * wildcard", "ac-chip", "input:becasue", "ac-remove-input", "ac-chip", "ac-more", "ⓘ About the preview", "autocorrect:try:text", "autocorrect:try:caps"]);
     // Clear is off with nothing to clear, as Clear take is, and a replaced part of the preview is no tab stop.
     await expect(editor(page).locator('[data-act="ac-try-clear"]')).toBeDisabled();
 });
@@ -769,7 +769,7 @@ for (const [width, height] of [[430, 844], [390, 844], [1280, 620], [900, 480]])
     test(`an info mark's list stays inside a ${width} by ${height} window`, async ({page}) => {
         await page.setViewportSize({width, height});
         await openControls(page, "autocorrect");
-        for (const id of ["ac-info-replacement", "ac-info-inputs", "ac-info-try"]) {
+        for (const id of ["ac-info-replacement", "ac-info-fires", "ac-info-inputs", "ac-info-try"]) {
             const box = await listBox(page, id);
             expect(box.left, `${id} left`).toBeGreaterThanOrEqual(box.area.left);
             expect(box.right, `${id} right`).toBeLessThanOrEqual(box.area.right);
@@ -1310,6 +1310,13 @@ test("a replacement fires as you type, after Leader or both, its inputs one list
     const fires = editor(page).locator('.seg[aria-label="How it fires"]');
     await expect(fires.locator("label")).toHaveText(["As you type", "After Leader", "Both"]);
     await expect(fires.locator('input[value="word"]')).toBeChecked();
+    // What each choice means is the Fires heading's info mark, in the
+    // choices' own words, and no tip on the choice says it again (D-L96).
+    await expect(editor(page).locator("#ac-info-fires dt")).toHaveText(["As you type", "After Leader", "Both"]);
+    await expect(editor(page).locator("#ac-info-fires")).toContainText("the computer never sees what you typed");
+    await expect(fires).not.toHaveAttribute("data-tip", /./);
+    await expect(editor(page).locator('.seg[aria-label="Replacement is"]')).not.toHaveAttribute("data-tip", /./);
+    await expect(usage(page)).not.toHaveAttribute("data-tip", /./);
     for (const kind of ["word", "leader", "both"]) await expect(fires.locator(`input[value="${kind}"]`)).toBeEnabled();
     await expect(editor(page).locator("[data-ac-leader-note]")).toHaveCount(0);
     // Every replacement in the bank is tagged with how it fires, in the switch's words.

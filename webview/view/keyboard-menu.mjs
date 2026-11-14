@@ -13,9 +13,12 @@ import {demoOf} from "./demo.mjs";
 
 /** @typedef {import("../../contracts/panel.js").PublishedModel} Model */
 
-// What the warning beside the mode says, and Settle's hover words.
+// What the warning beside the mode says, and Settle's hover words. What
+// unplugging risks while the mode is not stored is said in the menu too, on
+// screen under its line (NOT_STORED_RISK).
 export const SETTLE_TIP = "The halves stored different modes. Settle stores this one on both.";
-export const NOT_STORED_TIP = "The keyboard has not stored its edit mode yet and keeps trying. Unplugging it now may lose the mode.";
+export const NOT_STORED_RISK = "Unplugging it now may lose the mode.";
+export const NOT_STORED_TIP = `The keyboard has not stored its edit mode yet and keeps trying. ${NOT_STORED_RISK}`;
 
 /**
  * @param {Partial<Model> | null | undefined} model
