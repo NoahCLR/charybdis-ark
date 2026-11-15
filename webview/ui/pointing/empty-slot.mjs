@@ -40,7 +40,7 @@ export function emptySlot(model, slot, slots) {
         <div class="card-b pd-steps"><div class="slot-context">${placedOnMarkup(model, "pointing", String(slot.id),
             "No key, behaviour or combo is bound to this slot.")}</div></div></div></div>`);
     // Step 1 of a mode, where a mode has it, so the choice stays put once made.
-    const first = step(/** @type {HTMLElement} */ (node.querySelector(".pd-steps")), slot.id, 1, "What the ball does", "Nothing is stored here yet.");
+    const first = step(/** @type {HTMLElement} */ (node.querySelector(".pd-steps")), slot.id, 1, "What the ball does", {hint: "Nothing is stored here yet."});
     first.append(el(`<div class="stack"><div data-kinds></div>
         ${inertNote(model, slot)}
         ${sources.length ? `<div class="pd-copy"><label class="field"><span>Or copy a mode</span><select class="input" data-f="pointing:${esc(slot.id)}:copy" data-source ${canEdit ? "" : "disabled"}>

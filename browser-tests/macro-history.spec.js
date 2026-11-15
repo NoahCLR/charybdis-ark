@@ -233,7 +233,7 @@ test('text fields keep native undo and clipboard while typing; renames/protectio
 test('during recording editor shortcuts are captured as chords, and the whole take is one step undo', async ({page}) => {
     await openMacro(page);
     await page.locator('[data-step-tile="0"]').click(); await page.keyboard.press('Control+c');
-    await page.getByText('Record delays', {exact: true}).click();
+    await page.locator('.record-opts').getByText('Record delays', {exact: true}).click();
     await page.locator('[data-act="record"]').click();
     await expect(page.locator('[data-macro-command]')).toHaveCount(0);
     for (const key of ['c', 'v', 'z', 'y']) await page.keyboard.press(`Meta+${key}`);

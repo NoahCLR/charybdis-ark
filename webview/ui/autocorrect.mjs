@@ -58,6 +58,7 @@ import {topbar} from "./frame.mjs";
 import {dialogFoot} from "./dialog-foot.mjs";
 import {openPicker} from "./picker.mjs";
 import {attachInfoMarks, infoMark} from "./info-mark.mjs";
+import {sectionPath, settingLabel} from "../view/settings-layout.mjs";
 import {marked, phraseMarked, replacementMark} from "./marks.mjs";
 import {titleText} from "./title-name.mjs";
 import {settingOffBanner, settingSwitchedOff} from "./participation.mjs";
@@ -81,10 +82,9 @@ const replacementInfo = (list) => infoMark({id: "ac-info-replacement", label: "H
     {term: "When", says: "As you finish a word with a space, punctuation, Enter or Tab. A word you are still typing is never touched."},
     {term: "Capitals", says: "Follow what you typed: Teh becomes The, TEH becomes THE. A replacement written with capitals keeps them."},
     {term: "Backspace", says: "Right after a replacement, Backspace puts back what you typed. Not after Enter or Tab."},
-    {term: "Text", says: `One line, up to ${list.usage.correctionMax} bytes: a word, a phone number, an address.`},
+    {term: "Text", says: `One line of up to ${list.usage.correctionMax} bytes, an accented letter taking two or more: a word, a phone number, an address.`},
     {term: "Macro", says: "For anything longer or on several lines. It plays for whole-word inputs only, keeps no capitals rule, and Backspace does not take it back."},
-    {term: "Starting over", says: "A click, a shortcut or an arrow key starts a new word. The keyboard cannot see a password field or a terminal: turn text replacement off there."},
-    {term: "On and off", says: "Settings → Host, or a key set to Text replacement on, off or toggle."}]});
+    {term: "Starting over", says: "A click, a shortcut or an arrow key starts a new word. The keyboard cannot see a password field or a terminal: turn text replacement off there."}]});
 /** @param {List} list */
 const inputsInfo = (list) => infoMark({id: "ac-info-inputs", label: "How inputs are written, and the * wildcard", heading: "How inputs are written",
     lead: "An input matches a whole word. Add *, the wildcard, where other letters may go: one input then catches every form of a word, and only the part you wrote is replaced.",
@@ -94,13 +94,21 @@ const inputsInfo = (list) => infoMark({id: "ac-info-inputs", label: "How inputs 
     {term: "*mnet", mono: true, says: "* at the start: words that end in mnet. For ment, it fixes developmnet and managemnet."},
     {term: "*tihng*", mono: true, says: "* at both ends: tihng anywhere in a word. For thing, it fixes anytihng and tihngs."},
     {term: "Where * goes", says: "Only at the start, the end or both. Not in the middle: re*ve is refused."},
-    {term: "Short inputs", says: `With *, an input under ${list.usage.shortInput} letters can catch real words, so Ark warns about it.`},
     {term: "Capitals", says: "Do not matter: teh also catches Teh and TEH."},
-    {term: "Characters", says: `Letters, digits and apostrophes, up to ${list.usage.textMax} bytes.`},
     {term: "Several", says: "Type them with spaces between to add more than one at once."},
     {term: "Overlaps", says: "The longest input wins, and a whole word beats a wildcard."},
-    {term: "Macros", says: "A replacement that plays a macro takes whole words only, without *."},
-    {term: "After Leader", says: "Typed after the Leader key instead: the whole input, whatever its *, sent the moment it is typed, and the computer never sees it. Choose After Leader or Both above."}]});
+    {term: "After Leader", says: "Typed after the Leader key, an input is matched whole, whatever its *."}]});
+// How a replacement fires (D-L91), each choice in the vocabulary's words and
+// what it means; after Leader, where the setting is that says how long it
+// waits, by that setting's own label.
+/** @param {Model} model */
+const firesInfo = (model) => {
+    const {inputModes, inputModesMean} = vocabulary(model);
+    const waits = settingLabel(model, "leaderTimeout");
+    return infoMark({id: "ac-info-fires", label: "How a replacement fires", heading: "How a replacement fires", lead: "Its inputs stay the same whichever you choose.",
+        rows: inputModesMean.map(([mode, says]) => ({term: word(inputModes, mode),
+            says: mode === "leader" && waits ? `${says} How long it waits for you is ${waits}, in ${sectionPath(model, "autocorrect")}.` : says}))});
+};
 
 /** @param {Model} model */
 const identityOf = (model) => model?.autocorrectEditing?.identity;
@@ -423,7 +431,7 @@ function bank(model, list, rows, open, canEdit) {
     // else, as Macros' does.
     const card = el(`<div class="card bank" data-ac-bank><div class="card-h"><h3>Replacements</h3>
             <input class="input search card-search" id="replacementSearch" data-f="autocorrect:search" type="search" aria-label="Search replacements and inputs" placeholder="Search replacements and inputs" value="${esc(query)}">
-            <span class="tag" data-ac-usage data-tip="The keyboard holds ${esc(list.usage.maxTypos.toLocaleString("en-US"))} inputs across all replacements.">${esc(usageWords(list.usage))}</span></div>
+            <span class="tag" data-ac-usage>${esc(usageWords(list.usage))}</span></div>
         <div class="card-b">
             <div class="macro-grid ac-bank" role="group" aria-label="Replacements"></div>
             ${searching ? "" : `<button type="button" class="mslot new-slot ac-new" data-act="ac-add" ${off} data-tip="Make a replacement: its text or macro, then its inputs."><span class="v">+ New replacement</span></button>`}
@@ -436,8 +444,8 @@ function bank(model, list, rows, open, canEdit) {
             </div>
             <p class="note profile-drop-status" data-ac-file-status role="status" hidden></p>
             <div class="sect-h memory-h"><h4>Text replacement memory</h4><span class="right note" data-ac-memory>${esc(bytesWords(list.usage))}</span></div>
-            <div class="meter" data-ac-meter data-tip="Part of the profile, within its own limit.">${meterFill(list.usage.share * 100)}</div>
-            <p class="note meter-note"><span data-ac-free>${esc(freeWords(list.usage))}</span>, in <span data-ac-count>${esc(countWords(list.usage))}</span>. A replacement holds up to ${esc(list.usage.correctionMax)} bytes of text and an input up to ${esc(list.usage.textMax)}; an accented letter takes two or more.</p>
+            <div class="meter" data-ac-meter>${meterFill(list.usage.share * 100)}</div>
+            <p class="note meter-note"><span data-ac-free>${esc(freeWords(list.usage))}</span>, in <span data-ac-count>${esc(countWords(list.usage))}</span>.</p>
         </div></div>`);
     const cells = /** @type {HTMLElement} */ (card.querySelector(".ac-bank"));
     /** @type {HTMLInputElement} */ (card.querySelector("#replacementSearch")).addEventListener("input", (event) => { state.autocorrectSearch = /** @type {HTMLInputElement} */ (event.target).value; render(); });
@@ -510,16 +518,14 @@ function replacementControls(model, f, value, canEdit, most, pending = "") {
     const off = canEdit ? "" : "disabled", macros = model?.macros || [];
     const count = textCount(value.text, most);
     const name = macroName(model, value.macro);
-    return `<div class="ac-replacement">${choiceField({label: "Replacement is", f: `${f}:kind`, hideLabel: true, disabled: !canEdit, choices: vocabulary(model).replacementKinds, current: value.kind,
-        tip: "Text is one line the keyboard types. A macro is for anything longer, or of more than one line."})}
+    return `<div class="ac-replacement">${choiceField({label: "Replacement is", f: `${f}:kind`, hideLabel: true, disabled: !canEdit, choices: vocabulary(model).replacementKinds, current: value.kind})}
         ${value.kind === "macro" ? `<div class="input-row ac-macro">
                 <input class="input" data-f="${esc(f)}:macro" data-ac-macro="${esc(value.macro ?? "")}" aria-label="Macro" value="${esc(name)}" placeholder="No macro yet" readonly ${off}
                     data-tip="${esc(name ? `Plays the macro “${name}”.` : "Pick the macro this replacement plays.")}">
                 <button type="button" class="btn" data-act="ac-pick" ${canEdit && (value.macro !== null || macros.some((macro) => !macro.empty)) ? "" : "disabled"}>Pick…</button></div>
             ${value.macro === null && !macros.some((macro) => !macro.empty) ? `<p class="note ac-macro-none">No macro has steps yet. <button type="button" class="btn tiny link" data-act="ac-macros">Make one in Macros →</button></p>` : ""}`
         : `<label class="field ac-text"><span class="sr">Replacement text</span>
-            <input class="input" data-f="${esc(f)}:replacement" data-ac-text autocomplete="off" spellcheck="false" placeholder="because, or +31 6 1234 5678" value="${esc(value.text)}" ${off}
-                data-tip="One line of up to ${esc(most)} bytes: a word, a phone number, a sign-off.">
+            <input class="input" data-f="${esc(f)}:replacement" data-ac-text autocomplete="off" spellcheck="false" placeholder="because, or +31 6 1234 5678" value="${esc(value.text)}" ${off}>
             <span class="note ac-bytes${count.over ? " warn" : ""}" data-ac-bytes>${esc(count.label)}</span></label>`}
         ${pending ? `<p class="note ac-macro-none" data-ac-pending>${esc(pending)}</p>` : ""}</div>`;
 }
@@ -565,25 +571,22 @@ const leaderCap = (model) => `<span class="kbd ac-leader-key" aria-hidden="true"
 // How a replacement fires (D-L91): as you type, after the Leader key, or
 // both. Its inputs are one list whichever.
 /** @param {Model} model @param {string} f @param {boolean} canEdit @param {"word" | "leader" | "both"} current */
-const firesField = (model, f, canEdit, current) => choiceField({label: "How it fires", f: `${f}:fires`, hideLabel: true, disabled: !canEdit, choices: vocabulary(model).inputModes, current, tip: FIRES_TIP});
+const firesField = (model, f, canEdit, current) => choiceField({label: "How it fires", f: `${f}:fires`, hideLabel: true, disabled: !canEdit, choices: vocabulary(model).inputModes, current});
 // What a field for an input shows before it is typed in: an example, a
 // word's as the field gives it (`words`).
 /** @param {"word" | "leader" | "both"} fires @param {boolean} macro @param {string} [words] */
 const inputPlaceholder = (fires, macro, words = "teh or recieve*") => `${macro ? "sig" : fires === "leader" ? "pn or sig" : words}, then Enter`;
 // A new replacement's first input gives a word's example of its own.
 const FIRST_INPUT = "becuase or recieve*";
-// What the choice of how a replacement fires means, and what the Leader key
-// is, said where a replacement fires after it.
-const FIRES_TIP = "As you type: replaced as you finish the word. After Leader: typed after the Leader key, and sent at once; the computer never sees what you typed. Both: either way. The inputs stay the same whichever you choose.";
-const LEADER_NOTE = "Press the Leader key, then type one of its inputs: the keyboard sends this replacement, and the computer never sees what you typed. How long it waits for you is Leader waits, on Host.";
 // The Leader key as core names it (LEADER_KEY_NAME in core/schema/actions.js).
 const LEADER_KEY = "QK_LEADER";
-// Under the switch while a replacement fires after Leader: what the Leader
-// key does, where it is placed (keys by layer, behaviours, combos), and Place
-// on a key →, as a macro's and a pointing mode's editors have it.
+// Under the switch while a replacement fires after Leader: where the Leader
+// key is placed (keys by layer, behaviours, combos), and Place on a key →, as
+// a macro's and a pointing mode's editors have it. What the Leader key does
+// is the Fires info mark (firesInfo).
 /** @param {Model} model */
 function leaderRow(model) {
-    return `<div class="stack ac-leader" data-ac-leader-note><p class="note">${esc(LEADER_NOTE)}</p>
+    return `<div class="stack ac-leader" data-ac-leader-note>
         <div class="ac-leader-place" role="group" aria-label="Where the Leader key is">${leaderCap(model)}
             <span class="note" data-ac-leader-placed>${phraseMarked(model, reachLine(keycodePlacements(model, [LEADER_KEY])))}</span>
             <button type="button" class="btn tiny link" data-act="ac-place-leader" ${editGate(model, "keys").editable ? "" : "disabled"}
@@ -618,7 +621,7 @@ function entryEditor(model, list, entry, canEdit) {
             ${replacementControls(model, `autocorrect:entry:${entry.id}`, value, canEdit, list.usage.correctionMax, pending)}
             ${entry.warnings.map((warning) => `<p class="note warn" data-ac-warning>${esc(warning)}</p>`).join("")}
             <div data-ac-feedback="replacement" hidden></div>
-            <div class="macro-sequence-heading"><h4>Fires</h4></div>
+            <div class="macro-sequence-heading"><h4>Fires</h4>${firesInfo(model)}</div>
             ${firesField(model, `autocorrect:entry:${entry.id}`, canEdit, entry.fires)}
             ${entry.fires === "word" ? "" : leaderRow(model)}
             <div class="macro-sequence-heading"><h4>Inputs</h4>${inputsInfo(list)}</div>
@@ -802,7 +805,7 @@ function newEditor(model, list, fresh, canEdit) {
             <div data-ac-feedback="replacement" hidden></div>
             ${joins ? `<div class="callout ac-joins" data-ac-joins><span>${esc(fresh.joins?.said)}</span>
                     <button type="button" class="btn tiny" data-act="ac-open-joined">Open it</button></div>` : `
-            <div class="macro-sequence-heading"><h4>Fires</h4></div>
+            <div class="macro-sequence-heading"><h4>Fires</h4>${firesInfo(model)}</div>
             ${firesField(model, "autocorrect:new", canEdit && Boolean(named), fresh.fires ?? "word")}
             ${(fresh.fires ?? "word") === "word" ? "" : leaderRow(model)}
             <div class="macro-sequence-heading"><h4>Inputs</h4>${inputsInfo(list)}</div>
@@ -1005,7 +1008,6 @@ function trySection(model, list) {
     const card = el(`<div class="card editor-section" data-ac-try>
         <div class="card-h"><h3>Try it</h3>${infoMark({id: "ac-info-try", label: "About the preview", heading: "About the preview", rows: [
                 {term: "Preview", says: `What your keyboard would type with this draft's list, through ${list.layoutName}.`},
-                {term: "Your text", says: "The box keeps what you type. Only the preview shows replacements."},
                 {term: "Not shown", says: "Clicks, shortcuts, arrow keys and held keys. On the keyboard they start a new word or pause replacing until the next one. A word ended through a dead key is left alone by the keyboard, and replaced here."},
                 {term: "Caps Lock", says: "The switch follows your own Caps Lock when it changes as you type here, or set it yourself for the preview."},
                 ...(leading ? [{term: "After Leader", says: "What you type after the Leader key, tried on its own: whether the keyboard sends a replacement, waits for more, or drops it. The box above never holds the Leader key."}] : [])]})}
@@ -1016,7 +1018,7 @@ function trySection(model, list) {
             <div class="field"><span id="ac-try-label">Your keyboard would type</span>
                 <div class="ac-try-preview" data-ac-try-preview role="group" aria-labelledby="ac-try-label"></div></div>
             <div class="row ac-try-tools">
-                <label class="sw" data-tip="Whether the preview takes Caps Lock to be on at the computer. It follows your own Caps Lock when that changes as you type here."><input type="checkbox" data-f="autocorrect:try:caps" ${tried.capsLock ? "checked" : ""}><span class="track"></span><span class="txt">Preview with Caps Lock on</span></label>
+                <label class="sw" data-tip="Whether the preview takes Caps Lock to be on at the computer."><input type="checkbox" data-f="autocorrect:try:caps" ${tried.capsLock ? "checked" : ""}><span class="track"></span><span class="txt">Preview with Caps Lock on</span></label>
                 <span class="note" data-ac-try-said aria-live="polite"></span>
                 <button class="btn tiny link" data-act="ac-try-show" hidden>Show it →</button>
             </div>

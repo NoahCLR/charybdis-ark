@@ -4,19 +4,19 @@ import {modifierGrid} from "../modifier-grid.mjs";
 import {choiceField, choiceValue} from "../segmented.mjs";
 import {storedChoices} from "../../view/choices.mjs";
 
-// A field that says what it does under itself says it as the Settings rows
-// do, in a hint line under the label, as well as in its tip; the line stays
-// outside the label, so the field keeps its name.
+// A field that shows a line under itself (Distance's, how far its value is)
+// shows it as the Settings rows show a hint; the line stays outside the
+// label, so the field keeps its name.
 /** @param {HTMLElement} field @param {string} help */
-export function explained(field, help) {
+function explained(field, help) {
     const block = el(`<div class="field-block"></div>`);
     block.append(field, el(`<span class="note field-help">${esc(help)}</span>`));
     return block;
 }
 
-// A field's options when its tip is also said under it.
-/** @param {string} tip @param {Omit<import("../surface-types.js").FieldOptions, "tip" | "help">} [rest] @returns {import("../surface-types.js").FieldOptions} */
-export const told = (tip, rest = {}) => ({...rest, tip, help: tip});
+// A field's options with a line under it, in place of a tip.
+/** @param {string} help @param {Omit<import("../surface-types.js").FieldOptions, "tip" | "help">} [rest] @returns {import("../surface-types.js").FieldOptions} */
+export const told = (help, rest = {}) => ({...rest, help});
 
 /** @param {import("../../../contracts/panel.js").PublishedModel} model @param {import("../surface-types.js").PresentedSlot} slot @param {boolean} canEdit */
 export function formControls(model, slot, canEdit) {

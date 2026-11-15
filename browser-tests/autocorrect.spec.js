@@ -366,11 +366,10 @@ test("inputs are chips: + Input adds one or several and stays for the next, and 
     await info.locator(".info-button").hover();
     await expect(list).toBeVisible();
     await expect(list.locator(".info-lead")).toHaveText("An input matches a whole word. Add *, the wildcard, where other letters may go: one input then catches every form of a word, and only the part you wrote is replaced.");
-    await expect(list.locator("dt")).toHaveText(["teh", "recieve*", "*mnet", "*tihng*", "Where * goes", "Short inputs", "Capitals", "Characters", "Several", "Overlaps", "Macros", "After Leader"]);
+    await expect(list.locator("dt")).toHaveText(["teh", "recieve*", "*mnet", "*tihng*", "Where * goes", "Capitals", "Several", "Overlaps", "After Leader"]);
     await expect(list).toContainText("For receive, it also fixes recieved and recieving.");
-    // Its figures are the keyboard's own, as the list publishes them.
-    await expect(list).toContainText("With *, an input under 4 letters can catch real words");
-    await expect(list).toContainText("Letters, digits and apostrophes, up to 32 bytes.");
+    // What a warning or a refusal says when it applies is not repeated here (D-L96).
+    await expect(list).not.toContainText("letters can catch real words");
     await page.keyboard.press("Escape");
     await expect(list).toBeHidden();
     await page.mouse.move(0, 0);
@@ -569,7 +568,7 @@ test("every control of the screen has a name, and the keyboard reaches them in r
         if (order.at(-1) !== at) order.push(at);
     }
     expect(order.map((name) => name.replace(/^autocorrect:entry:because:/, ""))).toEqual(["item", "ac-add", "ac-import", "ac-export-menu", "ac-delete", "ⓘ How a replacement works", "kind:text", "replacement",
-        "fires:word", "ⓘ How inputs are written, and the * wildcard", "ac-chip", "input:becasue", "ac-remove-input", "ac-chip", "ac-more", "ⓘ About the preview", "autocorrect:try:text", "autocorrect:try:caps"]);
+        "ⓘ How a replacement fires", "fires:word", "ⓘ How inputs are written, and the * wildcard", "ac-chip", "input:becasue", "ac-remove-input", "ac-chip", "ac-more", "ⓘ About the preview", "autocorrect:try:text", "autocorrect:try:caps"]);
     // Clear is off with nothing to clear, as Clear take is, and a replaced part of the preview is no tab stop.
     await expect(editor(page).locator('[data-act="ac-try-clear"]')).toBeDisabled();
 });
@@ -769,7 +768,7 @@ for (const [width, height] of [[430, 844], [390, 844], [1280, 620], [900, 480]])
     test(`an info mark's list stays inside a ${width} by ${height} window`, async ({page}) => {
         await page.setViewportSize({width, height});
         await openControls(page, "autocorrect");
-        for (const id of ["ac-info-replacement", "ac-info-inputs", "ac-info-try"]) {
+        for (const id of ["ac-info-replacement", "ac-info-fires", "ac-info-inputs", "ac-info-try"]) {
             const box = await listBox(page, id);
             expect(box.left, `${id} left`).toBeGreaterThanOrEqual(box.area.left);
             expect(box.right, `${id} right`).toBeLessThanOrEqual(box.area.right);
@@ -1310,6 +1309,13 @@ test("a replacement fires as you type, after Leader or both, its inputs one list
     const fires = editor(page).locator('.seg[aria-label="How it fires"]');
     await expect(fires.locator("label")).toHaveText(["As you type", "After Leader", "Both"]);
     await expect(fires.locator('input[value="word"]')).toBeChecked();
+    // What each choice means is the Fires heading's info mark, in the
+    // choices' own words, and no tip on the choice says it again (D-L96).
+    await expect(editor(page).locator("#ac-info-fires dt")).toHaveText(["As you type", "After Leader", "Both"]);
+    await expect(editor(page).locator("#ac-info-fires")).toContainText("the computer never sees what you typed");
+    await expect(fires).not.toHaveAttribute("data-tip", /./);
+    await expect(editor(page).locator('.seg[aria-label="Replacement is"]')).not.toHaveAttribute("data-tip", /./);
+    await expect(usage(page)).not.toHaveAttribute("data-tip", /./);
     for (const kind of ["word", "leader", "both"]) await expect(fires.locator(`input[value="${kind}"]`)).toBeEnabled();
     await expect(editor(page).locator("[data-ac-leader-note]")).toHaveCount(0);
     // Every replacement in the bank is tagged with how it fires, in the switch's words.
@@ -1324,7 +1330,9 @@ test("a replacement fires as you type, after Leader or both, its inputs one list
         await accept(page, (model) => { model.autocorrect.entries.find((entry) => entry.id === "because").fires = kind; model.autocorrect.usage.leaders = 3; });
         await expect(fires.locator(`input[value="${kind}"]`)).toBeChecked();
         await expect(inputs()).toHaveText(["beacuse", "becasue", "becuase"]);
-        await expect(editor(page).locator("[data-ac-leader-note]")).toContainText("Press the Leader key, then type one of its inputs: the keyboard sends this replacement, and the computer never sees what you typed.");
+        // What the Leader key does is the Fires info mark; under the switch, only where it is.
+        await expect(editor(page).locator("#ac-info-fires")).toContainText("Press the Leader key, then type one of its inputs");
+        await expect(editor(page).locator("[data-ac-leader-note]")).not.toContainText("the computer never sees");
         await expect(editor(page).locator('[data-ac-leader-note] [data-act="ac-place-leader"]')).toHaveText("Place on a key →");
         await expect(item(page, "because").locator("[data-ac-fires]")).toHaveText(label);
     }
