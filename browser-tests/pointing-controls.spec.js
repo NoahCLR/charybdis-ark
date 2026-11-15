@@ -432,20 +432,52 @@ test("Pointer: auto-sniping's layers post one switch each, beside its master swi
     ])});
 });
 
-test("every setting in a mode says what it does, under Advanced too", async ({page}) => {
+test("every setting in a mode says what it does once, under Advanced too", async ({page}) => {
     for (const slot of [0, 4]) {
         await openControls(page, "pointing", {pointingSlot: slot, pdAdvanced: true});
         // Every number field, and every few-option choice outside the
-        // per-direction table, carries a tip on the field itself.
-        const untipped = await editor(page).locator(".field").evaluateAll(fields => fields
+        // per-direction table, says what it does once (D-L96): in a tip on the
+        // field, in the line under it, or in the info mark of its step or
+        // Advanced section, by its name or each of its choices' words.
+        const said = await editor(page).locator(".field").evaluateAll(fields => fields
             .filter(field => field.querySelector("input.input, .seg, .pd-switches, .pd-mods") && !field.closest(".pd-taps"))
-            .filter(field => !(field.getAttribute("data-tip") || field.querySelector(".seg[data-tip]")?.getAttribute("data-tip")))
-            .map(field => field.querySelector("span")?.textContent));
-        expect(untipped, `slot ${slot}`).toEqual([]);
+            .map(field => {
+                const name = field.querySelector("span")?.textContent?.trim() || "";
+                const info = field.closest(".pd-step, .pd-sect")?.querySelector(".info-pop");
+                const terms = [...(info?.querySelectorAll("dt, .info-part") || [])].map(term => term.textContent?.trim());
+                const choices = [...field.querySelectorAll(".seg label > span")].map(choice => choice.textContent?.trim());
+                return {name,
+                    tip: Boolean(field.getAttribute("data-tip") || field.querySelector(".seg[data-tip]")?.getAttribute("data-tip")),
+                    help: Boolean(field.closest(".field-block")?.querySelector(":scope > .field-help")?.textContent?.trim()),
+                    info: terms.includes(name) || (choices.length > 0 && choices.every(choice => terms.includes(choice)))};
+            }));
+        const ways = (/** @type {{tip: boolean, help: boolean, info: boolean}} */ field) => [field.tip, field.help, field.info].filter(Boolean).length;
+        expect(said.filter(field => !ways(field)).map(field => field.name), `slot ${slot}: unsaid`).toEqual([]);
+        expect(said.filter(field => ways(field) > 1).map(field => field.name), `slot ${slot}: said twice`).toEqual([]);
     }
     await openControls(page, "pointing", {pointingSlot: 0, pdAdvanced: true});
-    await expect(editor(page).locator(".field").filter({hasText: "Axis selection ratio"})).toHaveAttribute("data-tip", /1\.75 times/);
+    const scrollTuning = editor(page).locator(".pd-sect").filter({has: page.locator("h4", {hasText: "Scroll tuning"})});
+    await expect(scrollTuning.locator(".field-help")).toHaveCount(0);
+    await expect(scrollTuning.locator(".info-pop")).toContainText("1.75 times");
     await expect(editor(page).locator(".field").filter({hasText: "Axis kept after the ball stops"})).toHaveAttribute("data-tip", /once the ball stops/);
+});
+
+// A step's choices are explained once, in its info mark, under the field's
+// own name, each choice in its own words (D-L96); the field has no tip.
+test("a step's info mark says what each of its choices does, and a press keeps it open", async ({page}) => {
+    await openControls(page, "pointing", {pointingSlot: 4});
+    const step = editor(page).locator(".pd-step").nth(1);
+    const mark = step.locator(".pd-step-h .info-mark");
+    await expect(mark.locator(".info-part")).toHaveText(["When a direction has no key", "How often it sends"]);
+    await expect(mark.locator("dt")).toHaveText(["Its neighbours take over", "Send both neighbours", "Nothing", "Every step", "Once per movement"]);
+    await expect(step.locator('.seg[aria-label="How often it sends"]')).not.toHaveAttribute("data-tip", /./);
+    await mark.locator(".info-button").click();
+    await expect(mark.locator(".info-pop")).toBeVisible();
+    await page.mouse.move(0, 0);
+    await expect(mark.locator(".info-pop")).toBeVisible();
+    const running = editor(page).locator(".pd-step").nth(3).locator(".pd-step-h .info-mark");
+    await expect(running.locator(".info-part")).toHaveText(["Pointer layer"]);
+    await expect(running.locator(".info-lead")).toHaveText("A mode its layers started never keeps the pointer layer on.");
 });
 
 test("the pointer layer is set where the mode's running is, and no Advanced section is called Behaviour", async ({page}) => {

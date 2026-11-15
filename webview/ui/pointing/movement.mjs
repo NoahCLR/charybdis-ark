@@ -41,10 +41,9 @@ function directions(model, slot, {choice, form, disabled}, stage) {
     /** @type {HTMLElement} */ (node.querySelector(".pd-direction-reads")).append(choice(words(model).fieldLabels.axis, words(model).axes, slot.axis, "axis",
         {tip: tipFor(model, "axis")}));
     const fields = /** @type {HTMLElement} */ (node.querySelector(".pd-direction-fields"));
-    fields.append(choice(words(model).fieldLabels.emptyDirection, words(model).emptyDirection, slot.emptyDirection ?? 0, "emptyDirection",
-        {tip: tipFor(model, "emptyDirection")}));
-    fields.append(choice(words(model).fieldLabels.directionOutput, words(model).directionOutput, slot.directionOutput ?? 0, "directionOutput",
-        {tip: tipFor(model, "directionOutput")}));
+    // What each choice does is the step's info mark (editor.mjs).
+    fields.append(choice(words(model).fieldLabels.emptyDirection, words(model).emptyDirection, slot.emptyDirection ?? 0, "emptyDirection"));
+    fields.append(choice(words(model).fieldLabels.directionOutput, words(model).directionOutput, slot.directionOutput ?? 0, "directionOutput"));
     return node;
 }
 
@@ -98,7 +97,8 @@ function scrollingFields(model, slot, {field, choice, form, disabled, modifiers}
             <div class="sect-h pd-sub span2"><h5>Speed</h5></div><div class="sect-h pd-sub span2"><h5>Feel</h5></div>
         </div></div>`);
     const group = (/** @type {string} */ name) => /** @type {HTMLElement} */ (node.querySelector(`[data-group="${name}"]`));
-    const which = choice(words(model).fieldLabels.scrollAxes, words(model).scrollAxes, scrollAxesOf(slot), "scrollAxes", {tip: tipFor(model, "scrollAxes")});
+    // What the choice means is the step's info mark (editor.mjs).
+    const which = choice(words(model).fieldLabels.scrollAxes, words(model).scrollAxes, scrollAxesOf(slot), "scrollAxes");
     const invert = reverse(model, slot, form, disabled);
     which.classList.add("span2"); invert.classList.add("span2");
     group("which").append(which, invert);

@@ -428,8 +428,8 @@ const KEY_TABLE_ALLOWED = [
     // of the whole table, which reads no spelling.
     {file: "webview/ui/marks.mjs", line: "const keycodes = marker?.kind === \"layer\" ? Object.entries(model?.qmkKeyLayers || {}).flatMap(([keycode, layer]) => layer === marker.layer ? [keycode] : [])"},
     // Whether the host layout prints legends of its own at all, to explain
-    // them under the board: the table's presence, which reads no key.
-    {file: "webview/ui/picker.mjs", line: "${model?.hostLayoutLegends ? `<p class=\"note pk-note\">Shift above; ${esc(vocabulary(model).thirdLevel)} on the right. ◌ marks a dead key: press it, then a letter.</p>` : \"\"}"},
+    // them in the picker's info mark: the table's presence, which reads no key.
+    {file: "webview/ui/picker.mjs", line: "const rows = section.kind === \"board\" && model?.hostLayoutLegends"},
 ];
 
 test("the key table check catches a keycode-keyed table read outside the key identity", () => {

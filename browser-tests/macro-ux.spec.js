@@ -139,18 +139,21 @@ for (const theme of ["dark", "light"]) {
         await page.locator('.pkb-key[data-pick="KC_ENT"]').click();
         await page.locator('.picker [data-act="use"]').click();
         await page.locator('.macro-step [data-act="done"]:visible').click();
-        await expect(page.locator('[data-guidance]')).toBeHidden();
-        await expect(page.locator('[data-show-help]')).toHaveAttribute("aria-expanded", "false");
-        await expect(page.locator('[data-show-help] .chev')).toHaveCount(1);
         await expect(page.locator('[data-protection]')).toBeVisible();
         await expect(page.locator('[data-preserve-hold-timing]')).toBeVisible();
         await expect(page.locator('[data-host-settings]')).toBeVisible();
-        await page.locator('[data-show-help]').click();
-        await expect(page.locator('[data-guidance]')).toBeVisible();
-        await expect(page.locator('[data-guidance]')).toContainText("Only the macro types");
-        await expect(page.locator('[data-show-help]')).toHaveAttribute("aria-expanded", "true");
-        await page.locator('[data-show-help]').click();
-        await expect(page.locator('[data-guidance]')).toBeHidden();
+        // How playback and typing work are info marks, read once, not a
+        // fold of help (D-L96): a press opens one and keeps it open.
+        const protection = page.locator('[data-protection] .info-mark');
+        await expect(protection.locator(".info-pop")).toBeHidden();
+        await protection.locator(".info-button").click();
+        await expect(protection.locator(".info-pop")).toBeVisible();
+        await expect(protection.locator(".info-pop")).toContainText("Only the macro types");
+        await expect(protection.locator(".info-button")).toHaveAttribute("aria-expanded", "true");
+        await page.keyboard.press("Escape");
+        await expect(protection.locator(".info-pop")).toBeHidden();
+        await expect(page.locator(".macro-utilities .info-pop")).toContainText("The keyboard cannot check your input setup.");
+        await expect(page.locator("[data-layout-warning]")).toHaveCount(0);
         await page.getByRole('textbox', {name: 'Macro name', exact: true}).fill('Quick reply');
         await page.getByRole('textbox', {name: 'Macro name', exact: true}).press('Enter');
         await publishAccepted(page, ['macros', 17, 'name'], 'Quick reply');

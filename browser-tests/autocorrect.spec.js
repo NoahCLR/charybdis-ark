@@ -358,7 +358,7 @@ test("inputs are chips: + Input adds one or several and stays for the next, and 
     await openControls(page, "autocorrect");
     await item(page, "because").click();
     await expect(chips(page)).toHaveText(["beacuse", "becasue", "becuase"]);
-    // How an input is written is behind the Inputs heading's info mark: hovering it, or reaching it by the keyboard, shows it; Escape shuts it.
+    // How an input is written is behind the Inputs heading's info mark: hovering it previews it, a press opens it; Escape shuts it.
     const info = editor(page).locator("[data-info-mark]:has(#ac-info-inputs)");
     const list = info.locator("#ac-info-inputs");
     await expect(info.locator(".info-button")).toHaveAttribute("aria-label", "How inputs are written, and the * wildcard");
@@ -569,7 +569,7 @@ test("every control of the screen has a name, and the keyboard reaches them in r
         if (order.at(-1) !== at) order.push(at);
     }
     expect(order.map((name) => name.replace(/^autocorrect:entry:because:/, ""))).toEqual(["item", "ac-add", "ac-import", "ac-export-menu", "ac-delete", "ⓘ How a replacement works", "kind:text", "replacement",
-        "fires:word", "ⓘ How inputs are written, and the * wildcard", "ac-chip", "input:becasue", "ac-remove-input", "ac-chip", "ac-more", "ⓘ About the preview", "autocorrect:try:text", "autocorrect:try:caps"]);
+        "ⓘ How a replacement fires", "fires:word", "ⓘ How inputs are written, and the * wildcard", "ac-chip", "input:becasue", "ac-remove-input", "ac-chip", "ac-more", "ⓘ About the preview", "autocorrect:try:text", "autocorrect:try:caps"]);
     // Clear is off with nothing to clear, as Clear take is, and a replaced part of the preview is no tab stop.
     await expect(editor(page).locator('[data-act="ac-try-clear"]')).toBeDisabled();
 });
@@ -769,7 +769,7 @@ for (const [width, height] of [[430, 844], [390, 844], [1280, 620], [900, 480]])
     test(`an info mark's list stays inside a ${width} by ${height} window`, async ({page}) => {
         await page.setViewportSize({width, height});
         await openControls(page, "autocorrect");
-        for (const id of ["ac-info-replacement", "ac-info-inputs", "ac-info-try"]) {
+        for (const id of ["ac-info-replacement", "ac-info-fires", "ac-info-inputs", "ac-info-try"]) {
             const box = await listBox(page, id);
             expect(box.left, `${id} left`).toBeGreaterThanOrEqual(box.area.left);
             expect(box.right, `${id} right`).toBeLessThanOrEqual(box.area.right);
@@ -791,6 +791,7 @@ test("an info mark's list too tall for the window scrolls, by the wheel and by t
     await page.keyboard.press("Shift+Tab");
     await page.keyboard.press("Tab");
     await expect(mark.locator(".info-button")).toBeFocused();
+    await page.keyboard.press("Enter");
     await expect(page.locator("#ac-info-inputs")).toBeVisible();
     expect(await body.evaluate((node) => node.scrollHeight > node.clientHeight)).toBe(true);
     await page.keyboard.press("ArrowDown");
@@ -1309,6 +1310,13 @@ test("a replacement fires as you type, after Leader or both, its inputs one list
     const fires = editor(page).locator('.seg[aria-label="How it fires"]');
     await expect(fires.locator("label")).toHaveText(["As you type", "After Leader", "Both"]);
     await expect(fires.locator('input[value="word"]')).toBeChecked();
+    // What each choice means is the Fires heading's info mark, in the
+    // choices' own words, and no tip on the choice says it again (D-L96).
+    await expect(editor(page).locator("#ac-info-fires dt")).toHaveText(["As you type", "After Leader", "Both"]);
+    await expect(editor(page).locator("#ac-info-fires")).toContainText("the computer never sees what you typed");
+    await expect(fires).not.toHaveAttribute("data-tip", /./);
+    await expect(editor(page).locator('.seg[aria-label="Replacement is"]')).not.toHaveAttribute("data-tip", /./);
+    await expect(usage(page)).not.toHaveAttribute("data-tip", /./);
     for (const kind of ["word", "leader", "both"]) await expect(fires.locator(`input[value="${kind}"]`)).toBeEnabled();
     await expect(editor(page).locator("[data-ac-leader-note]")).toHaveCount(0);
     // Every replacement in the bank is tagged with how it fires, in the switch's words.
@@ -1323,7 +1331,9 @@ test("a replacement fires as you type, after Leader or both, its inputs one list
         await accept(page, (model) => { model.autocorrect.entries.find((entry) => entry.id === "because").fires = kind; model.autocorrect.usage.leaders = 3; });
         await expect(fires.locator(`input[value="${kind}"]`)).toBeChecked();
         await expect(inputs()).toHaveText(["beacuse", "becasue", "becuase"]);
-        await expect(editor(page).locator("[data-ac-leader-note]")).toContainText("Press the Leader key, then type one of its inputs: the keyboard sends this replacement, and the computer never sees what you typed.");
+        // What the Leader key does is the Fires info mark; under the switch, only where it is.
+        await expect(editor(page).locator("#ac-info-fires")).toContainText("Press the Leader key, then type one of its inputs");
+        await expect(editor(page).locator("[data-ac-leader-note]")).not.toContainText("the computer never sees");
         await expect(editor(page).locator('[data-ac-leader-note] [data-act="ac-place-leader"]')).toHaveText("Place on a key →");
         await expect(item(page, "because").locator("[data-ac-fires]")).toHaveText(label);
     }
@@ -1448,4 +1458,19 @@ test("in the demo a replacement whose only input is removed stays open off the l
     await expect(page.locator("[data-ac-new], [data-ac-new-item]")).toHaveCount(0);
     await expect(editor(page)).toHaveAttribute("data-ac-editor", "Kind regards, Sam");
     await expect(chips(page)).toHaveText(["ksam"]);
+});
+
+// One info mark is open at a time (D-L96): a press on another closes the first.
+test("opening one info mark closes the one open before it", async ({page}) => {
+    await openControls(page, "autocorrect");
+    const [first, second] = ["#ac-info-replacement", "#ac-info-inputs"].map((id) => page.locator(`[data-info-mark]:has(${id})`));
+    await first.locator(".info-button").click();
+    await expect(page.locator("#ac-info-replacement")).toBeVisible();
+    await second.locator(".info-button").click();
+    await page.mouse.move(0, 0);
+    await expect(page.locator("#ac-info-inputs")).toBeVisible();
+    await expect(page.locator("#ac-info-replacement")).toBeHidden();
+    await expect(first.locator(".info-button")).toHaveAttribute("aria-expanded", "false");
+    await page.keyboard.press("Escape");
+    await expect(page.locator("#ac-info-inputs")).toBeHidden();
 });

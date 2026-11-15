@@ -11,8 +11,18 @@ const shortcut = (mods, keys, layers = 0, layerKind = 0) => expect.objectContain
 for (const theme of ["dark"]) {
     test(`a custom key's shortcut is picked with mixed-side modifiers, and cleared (${theme})`, async ({page}) => {
         await openControls(page, "customKeys", {customKey: "CUSTOM_KEY_1"}, theme);
-        // The field says what a shortcut is, with or without one set.
-        await expect(page.locator("[data-shortcut-means]")).toHaveAttribute("data-tip", /^Like a one-step macro, but it acts as a normal key/);
+        // The field's info mark says what a shortcut is, with or without one
+        // set, opened by a press; neither the label nor the field has a tip
+        // saying it again (D-L96).
+        const means = page.locator("[data-shortcut-means] [data-info-mark]");
+        await expect(means.locator("#custom-key-info-shortcut")).toBeHidden();
+        await means.locator(".info-button").click();
+        await expect(means.locator("#custom-key-info-shortcut")).toBeVisible();
+        await expect(means.locator(".info-lead")).toHaveText(/^Like a one-step macro, but it acts as a normal key/);
+        await expect(page.locator("[data-shortcut-means]")).not.toHaveAttribute("data-tip", /./);
+        await expect(page.locator("[data-shortcut]")).not.toHaveAttribute("data-tip", /./);
+        await page.keyboard.press("Escape");
+        await expect(means.locator("#custom-key-info-shortcut")).toBeHidden();
         await expect(page.locator('[data-f^="custom-key:1:shortcut:modifier"]'), "no separate modifier grid").toHaveCount(0);
         await page.locator('[data-act="pick-shortcut"]').click();
         await expect(page.locator(".picker")).toBeVisible();

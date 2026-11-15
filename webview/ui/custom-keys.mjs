@@ -26,6 +26,7 @@ import {topbar} from "./frame.mjs";
 import {keycodeName} from "../view/key-identity.mjs";
 import {SHORTCUT_MEANS, customKeyInUse, hasShortcut, customKeyShortcutLine, sameShortcut, shortcutAct, shortcutLimitWords} from "../view/custom-key.mjs";
 import {openPicker} from "./picker.mjs";
+import {attachInfoMarks, infoMark} from "./info-mark.mjs";
 import {behaviourEditorRow} from "../view/behavior-editor.mjs";
 import {behaviourActions, behaviourEditor} from "./keys/behaviour-editor.mjs";
 import {masterOffBanner} from "./participation.mjs";
@@ -200,8 +201,8 @@ function behaviourCard(model, key) {
     return card;
 }
 
-// The key's shortcut, its label saying what a shortcut is on hover
-// (SHORTCUT_MEANS), set in the keycode picker as any key is on the Keys screen: a key from those the keyboard accepts, and the modifiers in the
+// The key's shortcut, the info mark beside its label saying what a shortcut
+// is and what it may hold (SHORTCUT_MEANS, D-L96), set in the keycode picker as any key is on the Keys screen: a key from those the keyboard accepts, and the modifiers in the
 // picker's row, here left and right mixed. Each change posts the whole
 // shortcut; Clear posts none. The picker stays open while new models arrive,
 // and what it posts is its own whole choice, so it names the draft, and is
@@ -209,9 +210,11 @@ function behaviourCard(model, key) {
 /** @param {Model} model @param {import("../../contracts/panel.js").CustomKey} key @param {boolean} canEdit */
 function shortcutField(model, key, canEdit) {
     const names = key.shortcut.keys.map((code) => keycodeName(model, code)).filter(Boolean);
-    const node = el(`<div class="field"><span data-shortcut-means data-tip="${esc(SHORTCUT_MEANS)}">Shortcut</span>
-            <div class="input-row"><input data-f="custom-key:${esc(key.slot)}:shortcut" class="input" data-shortcut value="${esc(hasShortcut(key) ? key.shortcutLabel : "")}" placeholder="None" readonly ${canEdit ? "" : "disabled"}
-                data-tip="${shortcutLimitWords(model) ? `${esc(shortcutLimitWords(model, true))}, any` : "Any"} modifiers, left and right mixed, and any layers, held, locked, moved to, tap-toggled or one-shot as a layer key would. Pick… opens the keycode picker with its modifier row and its Layers section.">
+    const holds = `${shortcutLimitWords(model) ? `${shortcutLimitWords(model, true)}, any` : "Any"} modifiers, left and right mixed, and any layers, held, locked, moved to, tap-toggled or one-shot as a layer key would.`;
+    const means = infoMark({id: "custom-key-info-shortcut", label: "What a shortcut is", heading: "What a shortcut is", lead: SHORTCUT_MEANS,
+        rows: [{term: "It holds", says: holds}, {term: "Pick…", says: "Opens the keycode picker with its modifier row and its Layers section."}]});
+    const node = el(`<div class="field"><span data-shortcut-means>Shortcut ${means}</span>
+            <div class="input-row"><input data-f="custom-key:${esc(key.slot)}:shortcut" class="input" data-shortcut value="${esc(hasShortcut(key) ? key.shortcutLabel : "")}" placeholder="None" readonly ${canEdit ? "" : "disabled"}>
             <button class="btn" data-act="pick-shortcut" ${canEdit ? "" : "disabled"}>Pick…</button>
             <button class="btn ghost destructive" data-act="clear-shortcut" ${canEdit && hasShortcut(key) ? "" : "disabled"}
                 data-tip="No shortcut: the key does only what its behaviour says.">Clear</button></div>
@@ -227,5 +230,6 @@ function shortcutField(model, key, canEdit) {
             if (!sameShortcut(shortcut, now.shortcut)) save(shortcut);
         },
     }));
+    attachInfoMarks(node);
     return node;
 }
