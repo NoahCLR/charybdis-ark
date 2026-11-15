@@ -302,11 +302,16 @@ test("the keycode picker marks a pointing mode, a macro and a custom key as it m
 
 test("Lighting names the layer whose colour and accents it edits by its icon", async ({page}) => {
     await openControls(page, "lighting", {stage: "layers", layer: 1});
-    expect(await page.locator("h4", {hasText: / colour$/}).first().evaluate(layerIcons)).toBe(1);
-    const accents = page.locator('[data-accents="layer"]');
-    const when = accents.locator(".note", {hasText: "is on, with those for every layer"});
-    expect(await accents.locator("h4").evaluate(layerIcons)).toBe(1);
-    expect(await when.evaluate(layerIcons)).toBe(1);
+    // The layer picked heads what is its own, by its icon.
+    expect(await page.locator("#benchBody .stage-item-name").evaluate(layerIcons)).toBe(1);
+    // Its accents' group names it the same way.
+    await page.evaluate(async () => {
+        const store = await import("/webview/store.mjs");
+        const model = structuredClone(store.getModel());
+        model.rgb.layerAccents = [{index: 0, owner: "Layer 1", ownerLayer: 1, ledIndices: [0], leds: "LED 0", color: {h: "85", s: "255", v: "200"}}];
+        store.setModel(model); store.render();
+    });
+    expect(await page.locator('[data-accents="layer"] [data-band="own"]').evaluate(layerIcons)).toBe(1);
 });
 
 test("the layer bar keeps its swatches, Settings' per-layer switches mark their layers, and a layer's icon goes grey with its stage", async ({page}) => {

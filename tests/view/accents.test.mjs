@@ -100,6 +100,8 @@ test("an owner's place and mark on its stage: its layer, slot or feedback row, o
     assert.deepEqual(ownerMark(published, "layer", "Layer 2"), {kind: "layer", layer: 2});
     assert.deepEqual(ownerMark(published, "pdMode", "POINTING_MODE_VOLUME"), {kind: "pointing", slot: 1});
     assert.deepEqual(ownerMark(published, "keyBehavior", "KEY_FEEDBACK_GROUP_HOLD_ACTIVE"), {kind: "tier", tier: "hold"});
+    assert.deepEqual(ownerMark(published, "keyBehavior", "KEY_FEEDBACK_GROUP_TAP_COUNT_3"), {kind: "branch", count: 3}, "a tap branch is its badge");
+    assert.deepEqual(ownerMark(published, "keyBehavior", "KEY_FEEDBACK_GROUP_TAP_BRANCH_ANY"), {kind: "branches"}, "every tap branch is the badge of every count");
     assert.equal(ownerMark(published, "layer", "RGB_LAYER_GROUP_ALL"), null, "every layer's has no one mark");
     assert.equal(ownerMark(published, "combo", ""), null);
 });

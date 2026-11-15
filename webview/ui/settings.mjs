@@ -25,7 +25,7 @@ import {durationControl} from "./duration.mjs";
 import {choiceField} from "./segmented.mjs";
 import {settingOptions} from "../view/choices.mjs";
 import {layerSwitchGrid} from "./layer-switches.mjs";
-import {fieldParts, isLayerSwitch, sectionsOn} from "../view/settings-layout.mjs";
+import {fieldParts, isLayerSwitch, sectionsOn, unitlessLabel} from "../view/settings-layout.mjs";
 import {foldEmptyLayers} from "../view/empty-layers.mjs";
 import {emptyLayersButton, emptyLayersShown} from "./empty-layers.mjs";
 
@@ -241,7 +241,7 @@ function fieldRow(field, canEdit, submit, slot, durations) {
     // so the label drops the "(ms)" it carries in the review.
     const affixed = Boolean(field.unit) && !field.readOnly && field.presentation !== "duration"
         && field.kind !== "toggle" && field.kind !== "layer" && !field.choices?.length;
-    const label = affixed ? field.label.replace(new RegExp(`\\s*\\(${field.unit}\\)$`), "") : field.label;
+    const label = affixed ? unitlessLabel(field) : field.label;
     const row = el(`<div class="setrow ${field.readOnly ? "ro" : ""}" data-tip="${esc([field.tooltip, field.hint].filter(Boolean).join(" "))}">
         <div><div class="nm">${marked(getModel(), field.governs, label, {slot})}${keyboardKeysMark(field)}${offByKeyMark(field)}</div>${field.hint ? `<div class="hint">${esc(field.hint)}</div>` : ""}</div>
         <div class="control"></div>

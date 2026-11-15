@@ -100,7 +100,8 @@ test("on Behaviour feedback the board shows the picked case from a key whose beh
     // The demo's first key with a hold on Base is 1, with a long hold and a double tap Escape (0), with a triple tap Left GUI (48).
     assert.deepEqual(hold.behaviourActive, {owner: "KEY_FEEDBACK_GROUP_HOLD_ACTIVE", color: feedback.holdActiveColor, locality: "RGB_KEY_HALF", triggerIndex: 1});
     assert.equal(hold.standIn, 1, "ringed on the board");
-    assert.equal(said(hold.caption), "Base over the background effect · Hold active showing, painting the half holding the trigger key · a key with it stands in for the key that shows it");
+    // The key standing in is named, as Space is for a replacement.
+    assert.equal(said(hold.caption), "Base over the background effect · Hold active showing, painting the half holding the trigger key · 1 stands in for the key that shows it");
     assert.deepEqual(["longHoldActiveColor", "branch:0", "branch:1"].map((row) => shows(view, {stage: "key", feedbackRow: row}).standIn), [0, 0, 48]);
     const triple = shows(view, {stage: "key", feedbackRow: "branch:1"});
     assert.deepEqual([triple.behaviourActive?.owner, triple.behaviourActive?.color], ["KEY_FEEDBACK_GROUP_TAP_COUNT_3", feedback.tapBranches[1].color]);

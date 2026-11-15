@@ -199,13 +199,17 @@ test("a Lighting stage a global switch keeps from painting says so, reads off, a
         settings.values[SETTING.BEHAVIORS_ENABLED] = 0;
         settings.values[SETTING.KEYMAP_OPTIONS] &= ~AUTOCORRECT_OPTION;
     }));
-    for (const [stage, words, screen, macro] of [
-        ["auto", "Auto-mouse is off. This stage paints nothing. Turn it on in Pointer settings →", "pointer", "autoMouse"],
-        ["combo", "Combos are off. This stage paints nothing. Turn them on in Combo settings →", "combos", "combosEnabled"],
-        ["key", "Behaviours are off. This stage paints nothing. Turn them on in Behaviour settings →", "behaviours", "behaviorsEnabled"],
-        ["autocorrect", "Text replacement is off. This stage paints nothing. Turn it on in Host settings →", "host", "autocorrect"]]) {
+    // The stage bar says so in a word, its tip the whole sentence, and the
+    // stage keeps its place: no banner pushes it down.
+    for (const [stage, words, tip, screen, macro] of [
+        ["auto", "Auto-mouse is off →", "This stage paints nothing. Turn it on in Pointer settings →", "pointer", "autoMouse"],
+        ["combo", "Combos are off →", "This stage paints nothing. Turn them on in Combo settings →", "combos", "combosEnabled"],
+        ["key", "Behaviours are off →", "This stage paints nothing. Turn them on in Behaviour settings →", "behaviours", "behaviorsEnabled"],
+        ["autocorrect", "Text replacement is off →", "This stage paints nothing. Turn it on in Host settings →", "host", "autocorrect"]]) {
         await open(stage);
         await expect(banner).toHaveText(words);
+        await expect(banner).toHaveAttribute("data-tip", tip);
+        await expect(page.locator(".lighting-bench .stage-bar.held")).toHaveCount(1);
         if (stage === "auto") {
             // Idle, its controls still post, for when auto-mouse is back on.
             const mode = page.locator('[data-f="lighting:auto:fade-mode"]');
