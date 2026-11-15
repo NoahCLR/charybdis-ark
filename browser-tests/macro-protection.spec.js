@@ -29,18 +29,16 @@ for (const theme of ["dark", "light"]) {
         // Its three choices are on show; Automatic says what it does now.
         await expect(policy.locator("label:has(input:checked)")).toHaveText("Automatic · off");
         await expect(page.locator('[data-macro-editor]')).toContainText("when this layout needs Unicode entry");
-        await expect(page.locator('[data-macro-editor]')).toContainText("starts immediately and suspends ordinary keys already held");
+        await expect(page.locator('[data-macro-editor]')).toContainText("keys already held are suspended");
         await expect(page.locator('[data-macro-editor]')).not.toContainText("Release ordinary keys before starting");
         await page.locator("[data-host-settings]").click();
         await page.locator('[data-macro="hostLayout"]').selectOption("3");
         await stagePosted();
         await page.evaluate(async () => {const store = await import("/webview/store.mjs"); store.state.screen = "macros"; store.render();});
         await expect(policy.locator("label:has(input:checked)")).toHaveText("Automatic · on");
-        await expect(page.locator('[data-macro-editor]')).not.toContainText("Avoid typing while a text macro plays");
         await policy.locator('label:has(input[value="off"])').click();
         expect(await stagePosted()).toMatchObject({type: "updateMacro", keycode: "MACRO_0", protection: "off"});
         await expect(policy.locator('input[value="off"]')).toBeChecked();
-        await expect(page.locator('[data-macro-editor]')).toContainText("Avoid typing while a text macro plays");
         await page.evaluate(async () => {const store = await import("/webview/store.mjs"); store.state.overlay = "review"; store.render();});
         const review = page.getByRole("dialog", {name: "Review changes"});
         await expect(review).toContainText("Uninterruptible playback");

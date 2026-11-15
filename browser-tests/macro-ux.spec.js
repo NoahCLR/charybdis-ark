@@ -152,7 +152,7 @@ for (const theme of ["dark", "light"]) {
         await expect(protection.locator(".info-button")).toHaveAttribute("aria-expanded", "true");
         await page.keyboard.press("Escape");
         await expect(protection.locator(".info-pop")).toBeHidden();
-        await expect(page.locator(".macro-utilities .info-pop")).toContainText("The keyboard cannot check your input setup.");
+        await expect(page.locator(".macro-utilities .info-pop")).toContainText("keep that layout active on the computer");
         await expect(page.locator("[data-layout-warning]")).toHaveCount(0);
         await page.getByRole('textbox', {name: 'Macro name', exact: true}).fill('Quick reply');
         await page.getByRole('textbox', {name: 'Macro name', exact: true}).press('Enter');

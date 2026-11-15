@@ -84,8 +84,7 @@ const replacementInfo = (list) => infoMark({id: "ac-info-replacement", label: "H
     {term: "Backspace", says: "Right after a replacement, Backspace puts back what you typed. Not after Enter or Tab."},
     {term: "Text", says: `One line of up to ${list.usage.correctionMax} bytes, an accented letter taking two or more: a word, a phone number, an address.`},
     {term: "Macro", says: "For anything longer or on several lines. It plays for whole-word inputs only, keeps no capitals rule, and Backspace does not take it back."},
-    {term: "Starting over", says: "A click, a shortcut or an arrow key starts a new word. The keyboard cannot see a password field or a terminal: turn text replacement off there."},
-    {term: "On and off", says: "Settings → Host, or a key set to Text replacement on, off or toggle."}]});
+    {term: "Starting over", says: "A click, a shortcut or an arrow key starts a new word. The keyboard cannot see a password field or a terminal: turn text replacement off there."}]});
 /** @param {List} list */
 const inputsInfo = (list) => infoMark({id: "ac-info-inputs", label: "How inputs are written, and the * wildcard", heading: "How inputs are written",
     lead: "An input matches a whole word. Add *, the wildcard, where other letters may go: one input then catches every form of a word, and only the part you wrote is replaced.",
@@ -95,13 +94,10 @@ const inputsInfo = (list) => infoMark({id: "ac-info-inputs", label: "How inputs 
     {term: "*mnet", mono: true, says: "* at the start: words that end in mnet. For ment, it fixes developmnet and managemnet."},
     {term: "*tihng*", mono: true, says: "* at both ends: tihng anywhere in a word. For thing, it fixes anytihng and tihngs."},
     {term: "Where * goes", says: "Only at the start, the end or both. Not in the middle: re*ve is refused."},
-    {term: "Short inputs", says: `With *, an input under ${list.usage.shortInput} letters can catch real words, so Ark warns about it.`},
     {term: "Capitals", says: "Do not matter: teh also catches Teh and TEH."},
-    {term: "Characters", says: `Letters, digits and apostrophes, up to ${list.usage.textMax} bytes.`},
     {term: "Several", says: "Type them with spaces between to add more than one at once."},
     {term: "Overlaps", says: "The longest input wins, and a whole word beats a wildcard."},
-    {term: "Macros", says: "A replacement that plays a macro takes whole words only, without *."},
-    {term: "After Leader", says: "Typed after the Leader key, an input is matched whole, whatever its *. How it fires is set above."}]});
+    {term: "After Leader", says: "Typed after the Leader key, an input is matched whole, whatever its *."}]});
 // How a replacement fires (D-L91), each choice in the vocabulary's words and
 // what it means; after Leader, where the setting is that says how long it
 // waits, by that setting's own label.
@@ -1012,7 +1008,6 @@ function trySection(model, list) {
     const card = el(`<div class="card editor-section" data-ac-try>
         <div class="card-h"><h3>Try it</h3>${infoMark({id: "ac-info-try", label: "About the preview", heading: "About the preview", rows: [
                 {term: "Preview", says: `What your keyboard would type with this draft's list, through ${list.layoutName}.`},
-                {term: "Your text", says: "The box keeps what you type. Only the preview shows replacements."},
                 {term: "Not shown", says: "Clicks, shortcuts, arrow keys and held keys. On the keyboard they start a new word or pause replacing until the next one. A word ended through a dead key is left alone by the keyboard, and replaced here."},
                 {term: "Caps Lock", says: "The switch follows your own Caps Lock when it changes as you type here, or set it yourself for the preview."},
                 ...(leading ? [{term: "After Leader", says: "What you type after the Leader key, tried on its own: whether the keyboard sends a replacement, waits for more, or drops it. The box above never holds the Leader key."}] : [])]})}

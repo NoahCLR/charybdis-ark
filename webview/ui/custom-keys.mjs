@@ -212,7 +212,7 @@ function shortcutField(model, key, canEdit) {
     const names = key.shortcut.keys.map((code) => keycodeName(model, code)).filter(Boolean);
     const holds = `${shortcutLimitWords(model) ? `${shortcutLimitWords(model, true)}, any` : "Any"} modifiers, left and right mixed, and any layers, held, locked, moved to, tap-toggled or one-shot as a layer key would.`;
     const means = infoMark({id: "custom-key-info-shortcut", label: "What a shortcut is", heading: "What a shortcut is", lead: SHORTCUT_MEANS,
-        rows: [{term: "It holds", says: holds}, {term: "Pick…", says: "Opens the keycode picker with its modifier row and its Layers section."}]});
+        rows: [{term: "It holds", says: holds}]});
     const node = el(`<div class="field"><span data-shortcut-means>Shortcut ${means}</span>
             <div class="input-row"><input data-f="custom-key:${esc(key.slot)}:shortcut" class="input" data-shortcut value="${esc(hasShortcut(key) ? key.shortcutLabel : "")}" placeholder="None" readonly ${canEdit ? "" : "disabled"}>
             <button class="btn" data-act="pick-shortcut" ${canEdit ? "" : "disabled"}>Pick…</button>

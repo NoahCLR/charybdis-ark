@@ -209,7 +209,7 @@ function pickerInfo(model, picker) {
     // The host's name for GUI (Command on a Mac), as the modifier row says it.
     const gui = modifierControls(model).find(({value}) => value === "G")?.label || "GUI";
     const lead = section.kind === "board"
-        ? picker.shortcut ? "Click the keys to hold together, in the order they go down, and the modifiers held with them, left and right mixed; click a key again to take it out. A symbol's modifiers are held for the whole shortcut. Layers adds the layers it turns on, and how. Modifiers alone, a key alone or layers alone are a shortcut too."
+        ? picker.shortcut ? "Click the keys to hold together, in the order they go down, and the modifiers held with them, left and right mixed; click a key again to take it out. A symbol's modifiers are held for the whole shortcut. Modifiers alone, a key alone or layers alone are a shortcut too."
             : picker.mode === "list" ? "" : `Click a key. A modifier, picked above or on the board, is held down with it: ${gui} and C make one key that sends ${gui}+C.`
         : section.kind === "layers" && picker.comboOutput && !picker.shortcut ? "A combo can't send Tap-hold, which needs a key of its own." : "";
     const rows = section.kind === "board" && model?.hostLayoutLegends

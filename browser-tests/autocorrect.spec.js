@@ -366,11 +366,10 @@ test("inputs are chips: + Input adds one or several and stays for the next, and 
     await info.locator(".info-button").hover();
     await expect(list).toBeVisible();
     await expect(list.locator(".info-lead")).toHaveText("An input matches a whole word. Add *, the wildcard, where other letters may go: one input then catches every form of a word, and only the part you wrote is replaced.");
-    await expect(list.locator("dt")).toHaveText(["teh", "recieve*", "*mnet", "*tihng*", "Where * goes", "Short inputs", "Capitals", "Characters", "Several", "Overlaps", "Macros", "After Leader"]);
+    await expect(list.locator("dt")).toHaveText(["teh", "recieve*", "*mnet", "*tihng*", "Where * goes", "Capitals", "Several", "Overlaps", "After Leader"]);
     await expect(list).toContainText("For receive, it also fixes recieved and recieving.");
-    // Its figures are the keyboard's own, as the list publishes them.
-    await expect(list).toContainText("With *, an input under 4 letters can catch real words");
-    await expect(list).toContainText("Letters, digits and apostrophes, up to 32 bytes.");
+    // What a warning or a refusal says when it applies is not repeated here (D-L96).
+    await expect(list).not.toContainText("letters can catch real words");
     await page.keyboard.press("Escape");
     await expect(list).toBeHidden();
     await page.mouse.move(0, 0);
