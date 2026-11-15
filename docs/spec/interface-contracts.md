@@ -400,7 +400,10 @@ The same kind of control looks and sits the same on every screen.
 - A tip and an info mark do different jobs (D-L96). A tip is one control's
   one line: what it does, or what pressing it changes; it never explains an
   idea, repeats text on screen, or holds the only copy of something needed.
-  An info mark holds what a section or an idea means: a press on it (a
+  An info mark holds what a section or an idea means, its rows only what
+  the thing it sits by means and what its choices do, never what the
+  board, a list or another screen shows, how to use a control in view, or
+  what a warning says when it applies: a press on it (a
   click, Enter or Space) opens its list and keeps it open, across a redraw,
   until it is pressed again, Escape is pressed, or a press or the focus
   lands elsewhere;

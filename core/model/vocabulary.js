@@ -382,7 +382,7 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
         // How playing uninterruptibly works (firmware D-F17), and what each
         // choice of macroProtection means, by its value: read once in the
         // setting's info mark (D-L96).
-        plays: "A macro that plays uninterruptibly starts immediately and suspends ordinary keys already held. Only the macro types; new presses are ignored and releases still work. Held modifiers resume afterward. Suspended ordinary keys need to be released and pressed again; ignored presses are never replayed. Pointing and other keyboards can still interfere.",
+        plays: "Only the macro types while it plays: keys already held are suspended, and new presses are ignored and never replayed. Held modifiers resume afterward; a suspended key must be pressed again. Pointing and other keyboards can still interfere.",
         means: [["auto", "Turns it on when this layout needs Unicode entry for the macro's text."], ["on", "The whole macro plays uninterruptibly."], ["off", "Your typing can mix with it."]]},
     // Why a macro does not read, by the macro grammar's reason
     // (rules/macro-payload.mjs), as the step editor and core's refusals both
@@ -796,7 +796,7 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
             dpi: "Sensor DPI while this mode runs.",
             linkedLayers: "While one of these layers is on, held or locked, it starts this pointing mode. A mode started by its key wins over one its layers started.",
             linkTurnsOn: "While this pointing mode's key runs it, held or locked, these layers stay on; each goes off when the mode ends unless something else keeps it.",
-            thresholdH: "How far the ball must move sideways, in sensor counts, before a scroll can go sideways. When both axes are below their thresholds, the scroll lets go of its axis.",
+            thresholdH: "How far the ball must move sideways, in sensor counts, before a scroll can go sideways.",
             thresholdV: "How far the ball must move up or down, in sensor counts, before a scroll can go up or down. When both axes are below their thresholds, the scroll lets go of its axis.",
             divisorH: "Sensor counts of sideways movement for one scroll step. Lower scrolls faster.",
             divisorV: "Sensor counts of up-and-down movement for one scroll step. Lower scrolls faster.",

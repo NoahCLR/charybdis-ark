@@ -29,7 +29,11 @@ The two do different jobs, as design systems split tooltips from toggletips:
   open across a redraw, and opening one closes any other. Resting the pointer
   on it previews the list, as before. The focus alone opens nothing: a screen
   reader hears the list as the mark's description, and the button says
-  whether it is open (`aria-expanded`).
+  whether it is open (`aria-expanded`). Its rows say what the thing it sits
+  by means and what its choices do, and only what the label does not
+  already say. What the board, a list or another screen shows, how to use a
+  control that is in view, and what a warning or refusal says when it
+  applies are no rows: the guide holds those.
 - **What is needed every time is on screen:** state, warnings, refusals,
   values and units. No sentence lives in two of the three.
 

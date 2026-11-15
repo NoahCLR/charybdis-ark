@@ -29,7 +29,7 @@ export function editor(model, slot, canEdit) {
     ensureMacroHistory(slot, parsed.error && !form.steps ? undefined : steps);
     const editable = canEdit && !state.recording && (!parsed.error || Boolean(form.steps));
     const rawOpen = Boolean(form.rawOpen || (parsed.error && !form.steps));
-    const wrap = el(`<div class="stack"></div>`), typing = typingWords(model, slot);
+    const wrap = el(`<div class="stack"></div>`), typing = typingWords(model);
     const card = el(`<div class="card macro-editor-card" data-macro-editor="${esc(slot.keycode)}">
         <div class="card-h name-titlebar macro-titlebar"><span class="mark-lg">${mark(model, {kind: "macro"})}</span>${nameField(model, slot, canEdit)}
             <span class="tag">${esc(slot.defaultName)}</span>
@@ -155,12 +155,11 @@ function nameField(model, slot, canEdit) {
 
 // How a macro's text types, read once in the info mark by the Host button
 // (D-L96); a layout that is not the computer's is a warning on show.
-/** @param {Model} model @param {MacroSlot} slot */
-function typingWords(model, slot) {
+/** @param {Model} model */
+function typingWords(model) {
     const {os, layout, layoutFits, layoutName, entry} = model?.macroUnicode || {mode: 0};
     const warning = layoutFits === false
         ? `Text types through ${word(vocabulary(model).hostLayouts, layout)}, chosen in ${sectionPath(model, "host")}, which is not a ${word(vocabulary(model).hostOs, os)} layout: macros may type the wrong characters until the layout matches the computer.` : "";
     const typed = warning ? "" : `Text types through the ${layoutName} layout chosen in ${sectionPath(model, "host")}, accented letters included; keep that layout active on the computer. `;
-    const typing = slot?.uninterruptible ? "" : " Avoid typing while a text macro plays.";
-    return {warning, about: `${typed}${entry ? `${entry} ` : ""}The keyboard cannot check your input setup.${typing}`};
+    return {warning, about: `${typed}${entry || ""}`.trim()};
 }
