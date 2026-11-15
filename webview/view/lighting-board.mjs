@@ -67,7 +67,8 @@ function showsCase(view, layer, position, row) {
 
 /**
  * The key that stands in for one showing a Behaviour feedback case: the
- * first on the viewed layer, then on the others, whose behaviour shows it.
+ * first on the viewed layer, then on the others, whose behaviour shows it,
+ * as its position (its place, and its keycode, which names it).
  * @param {LayerView} view @param {string} row
  */
 function behaviourTrigger(view, row) {
@@ -75,7 +76,7 @@ function behaviourTrigger(view, row) {
     for (const layer of [view.layer, ...stack.filter((each) => each !== view.layer)]) {
         if (!layer) continue;
         const found = (layer.positions || []).find((position) => showsCase(view, layer, position, row));
-        if (found) return found.layoutIndex;
+        if (found) return found;
     }
     return undefined;
 }
@@ -95,8 +96,9 @@ function behaviourCase(view, row) {
     const picked = row && feedbackCase(model, row) ? row : "tapCommittedColor";
     const shown = feedbackCase(model, picked);
     if (!shown) return null;
-    const standIn = behaviourTrigger(view, picked);
-    return {owner, standIn, active: standIn === undefined ? null : {owner, color: shown.color, locality: shown.locality || "", triggerIndex: standIn}};
+    const key = behaviourTrigger(view, picked);
+    const standIn = key?.layoutIndex;
+    return {owner, standIn, keycode: key ? keyMeaning(key) : undefined, active: standIn === undefined ? null : {owner, color: shown.color, locality: shown.locality || "", triggerIndex: standIn}};
 }
 
 /**
@@ -167,7 +169,9 @@ export function lightingBoard(view, {stage, pointingSlot, comboPreview, feedback
         if (!active) parts.push([`no key has ${called}, so the keyboard never shows it`]);
         else {
             parts.push([`${called} showing, ${painting(active)}`]);
-            if (behaviourFollows) parts.push(["a key with it stands in for the key that shows it"]);
+            // The key standing in is named, as Space is for a replacement.
+            const name = behaviour.keycode ? keyIdentity(model, behaviour.keycode).label : "";
+            if (behaviourFollows) parts.push([name ? `${name} stands in for the key that shows it` : "a key with it stands in for the key that shows it"]);
         }
     }
     if (showing) {

@@ -41,6 +41,21 @@ export const sectionsIn = (model, area) => (model?.configDefaults || []).filter(
 export const settingGoverns = (model, name) =>
     (model?.configDefaults || []).flatMap((section) => section.fields).find((field) => field.macro === name)?.governs ?? null;
 
+// A setting's field, by its name, wherever it is filed; undefined for one the
+// keyboard has not reported.
+/** @param {{configDefaults?: readonly Section[]} | null | undefined} model @param {string} name @returns {Field | undefined} */
+export const settingField = (model, name) => (model?.configDefaults || []).flatMap((section) => section.fields).find((field) => field.macro === name);
+
+// A setting's label without the unit core writes after it for the review
+// ("Blink time (ms)" reads "Blink time"), for a control that shows its unit
+// beside its value, or a sentence that names the setting.
+/** @param {Pick<Field, "label" | "unit"> | null | undefined} field */
+export const unitlessLabel = (field) => {
+    const label = field?.label || "";
+    const unit = field?.unit ? ` (${field.unit})` : "";
+    return unit && label.endsWith(unit) ? label.slice(0, -unit.length) : label;
+};
+
 // The sections a Settings screen draws, in its order; one the keyboard has
 // not reported is left out.
 /** @param {readonly Section[]} sections @param {string} screen @returns {Section[]} */

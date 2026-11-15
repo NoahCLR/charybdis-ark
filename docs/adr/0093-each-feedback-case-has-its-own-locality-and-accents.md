@@ -52,7 +52,10 @@ one case, as the keyboard paints them. The group is one vocabulary entry,
   tap-commit policy and **Flash interval**), **How long it flashes** on
   Replacement feedback (**Flash length**). The **Stage on** switch rides on
   that section. The two sections share the column beside the colour, so the
-  tab is no taller than before.
+  tab is no taller than before. Amended by D-L95: what a stage keeps for
+  every case, and **Stage on**, sit on the stage bar, under **Every behaviour
+  state** or **Every case**; a case's **Where it paints** sits beside its
+  colour.
 - The list's second column, **Paints**, says where each case paints, as the
   Pointing modes list does, or **passthrough** or **off** (D-L94).
 - **Lights for** offers the picked case, **Every tap branch** on a tap branch

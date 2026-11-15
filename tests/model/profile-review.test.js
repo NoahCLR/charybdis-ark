@@ -319,12 +319,12 @@ test("every Lighting field reads in the review as its Lighting tab labels it", (
     const items=profileReview(before,after).filter(entry=>/^rgb:(layer|pd|automouse|combo|key)/.test(entry.unit));
     const cases=[...V.branches,...V.feedbackOwners.map(([,text])=>text)];
     // A case's locality reads by the case and the Locality field (D-L93).
-    const words=new Set([...Object.values(V.lightingFields),...cases,...cases.map(name=>`${name} · ${V.lightingFields.locality}`)]);
+    const words=new Set([...Object.values(V.lightingFields),...cases,...cases.map(name=>`${name} · ${V.lightingFields.locality}`),`Tap committed · ${V.lightingFields.doubleTapFlash}`]);
     for (const entry of items) for (const field of entry.fields) assert.ok(words.has(field.label),`${entry.title}: "${field.label}" is not a Lighting word`);
     const key=items.find(entry=>entry.unit==="rgb:key");
     const where=name=>[name,`${name} · ${V.lightingFields.locality}`];
-    assert.deepEqual(key.fields.map(field=>field.label),[...["Tap committed","Hold active","Long hold active",...V.branches.slice(1,5)].flatMap(where),
-        V.lightingFields.tapBranchCommit],"listed as the Behaviour feedback tab lists them, each case with where it paints");
+    assert.deepEqual(key.fields.map(field=>field.label),[...where("Tap committed"),`Tap committed · ${V.lightingFields.doubleTapFlash}`,
+        ...["Hold active","Long hold active",...V.branches.slice(1,5)].flatMap(where)],"listed as the Behaviour feedback tab lists them, each case with where it paints, Tap committed with its double-tap flash");
     for (const unit of ["rgb:layer","rgb:pd","rgb:automouse","rgb:combo"]) assert.ok(items.some(entry=>entry.unit.startsWith(unit)),`${unit} changed`);
 });
 test("every behaviour, combo and pointing mode field reads in the review as its editor labels it", () => {
@@ -538,7 +538,7 @@ test("each feedback flash's length is reviewed with its own stage, and discarded
     assert.deepEqual({title: length.title, area: length.area, place: length.place, fields: length.fields.map(field => [field.label, field.before, field.after])},
         {title: "Replacement feedback flash", area: "Lighting", place: {kind: "settings", area: "Lighting", section: "replacementFeedback", stage: "autocorrect"}, fields: [["Flash length", "200 ms", "350 ms"]]});
     const interval = items.find(row => row.unit === "settings:lightingFeedback");
-    assert.deepEqual(interval.fields.map(field => [field.label, field.before, field.after]), [["Flash interval", "200 ms", "120 ms"]]);
+    assert.deepEqual(interval.fields.map(field => [field.label, field.before, field.after]), [["Blink time", "200 ms", "120 ms"]]);
     // Discarding one puts back that length alone.
     const kept = validateSnapshot(revertUnits(before, both, new Set(["settings:replacementFeedback"]))).settings.values;
     assert.deepEqual([kept[15], kept[31]], [120, 200]);

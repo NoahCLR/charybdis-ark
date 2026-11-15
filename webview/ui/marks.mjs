@@ -21,7 +21,7 @@ import {macroChips} from "../view/macro.mjs";
 import {sequenceFace} from "../view/macro-sequence.mjs";
 import {layerTapAction, namedAction} from "../view/named-action.mjs";
 import {keyIdentity, reachKind, slotKeycodeNames} from "../view/key-identity.mjs";
-import {feedbackColours, isPassthrough, pdColourRow, stageEnabled} from "../view/lighting.mjs";
+import {feedbackColours, isPassthrough, pdColourRow, stageEnabled, swatchFor} from "../view/lighting.mjs";
 import {REACH_ICONS, SCREENS} from "../view/screens.mjs";
 import {layerAt, layerCalled, layerCalledAt, vocabulary} from "../view/vocabulary.mjs";
 import {boardOutlineMarkup} from "../view/geometry.mjs";
@@ -82,7 +82,7 @@ export function comboBadge(model, badge = "C") {
 export function slotLight(model, slot) {
     const row = pdColourRow(model, slot.id);
     const lit = Boolean(row && !isPassthrough(row.color) && stageEnabled(model, "pd"));
-    return {row, lit, colour: lit && row ? css(row.color) : null, swatch: (klass = "") => `<span class="pd-swatch ${esc(klass)} ${lit ? "" : "swatch-off"}"
+    return {row, lit, colour: lit && row ? css(row.color) : null, swatch: (klass = "") => `<span class="pd-swatch ${esc(klass)} ${swatchFor(lit ? "lit" : "unlit")}"
         ${lit && row ? `style="background:${css(row.color)}"` : ""}></span>`};
 }
 
@@ -149,14 +149,15 @@ export const slotNamedWithKeycodes = (name, keycodes) => `<span class="sends inl
 export const sendsKind = (model, action) => namedAction(model, action)?.word || "";
 
 // A mark as the core describes it: {kind: "tier", tier, branch?} · {kind:
-// "branches"} · {kind: "layer", layer} · {kind: "pointing", slot} · {kind:
-// "macro"} · {kind: "customKey"} · {kind: "combo", badge?} · {kind: "stage",
-// on}. Anything else draws nothing; a set of layers marks each name instead
-// (valueMarked).
+// "branch", count} · {kind: "branches"} · {kind: "layer", layer} · {kind:
+// "pointing", slot} · {kind: "macro"} · {kind: "customKey"} · {kind: "combo",
+// badge?} · {kind: "stage", on}. Anything else draws nothing; a set of layers
+// marks each name instead (valueMarked).
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {import("../../contracts/model.js").ReviewMark | null | undefined} value */
 export function mark(model, value) {
     switch (value?.kind) {
         case "tier": return `${value.branch ? branchBadge(model, value.branch) : ""}${tierDot(model, value.tier)}`;
+        case "branch": return branchBadge(model, value.count);
         case "branches": return branchesBadge(model);
         case "layer": return kindIcon("layer", layerSwatch(model, {index: value.layer}).colour);
         case "pointing": return kindIcon("pointing", slotLight(model, {id: value.slot}).colour);

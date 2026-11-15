@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {createRequire} from "node:module";
-import {SETTINGS_SCREENS, fieldParts, screenOfSection, sectionPath, sectionsIn, sectionsOn, settingGoverns} from "../../webview/view/settings-layout.mjs";
+import {SETTINGS_SCREENS, fieldParts, screenOfSection, sectionPath, sectionsIn, sectionsOn, settingField, settingGoverns, unitlessLabel} from "../../webview/view/settings-layout.mjs";
 
 const require = createRequire(import.meta.url);
 const {publishedModel} = require("../fixtures/published-model");
@@ -40,6 +40,19 @@ test("a behaviour's own timing wears the mark of the default it replaces, as cor
     assert.deepEqual(settingGoverns(model, "multiTapTerm"), {kind: "branches"});
     assert.equal(settingGoverns(model, "noSuchSetting"), null, "a setting the keyboard has not reported marks nothing");
     assert.equal(settingGoverns(null, "tapHoldTerm"), null, "nor does one with no model yet");
+});
+
+test("a setting is found by its name wherever it is filed, and named without the unit its value shows", () => {
+    // Core writes the unit after a label for the review; a control that
+    // shows the unit beside its value, or a sentence naming the setting,
+    // reads the label alone.
+    assert.equal(settingField(model, "feedbackFlash")?.label, "Blink time (ms)");
+    assert.equal(unitlessLabel(settingField(model, "feedbackFlash")), "Blink time");
+    assert.equal(unitlessLabel(settingField(model, "leaderTimeout")), "Leader waits");
+    assert.equal(unitlessLabel(settingField(model, "effectSpeed")), "Animation speed", "a label with no unit is kept whole");
+    assert.equal(unitlessLabel({label: "Hold (ms) delay", unit: "ms"}), "Hold (ms) delay", "only a unit at the end is the unit");
+    assert.equal(settingField(model, "noSuchSetting"), undefined);
+    assert.equal(unitlessLabel(undefined), "");
 });
 
 test("Lighting draws the sections the model files under it, in the model's order", () => {
