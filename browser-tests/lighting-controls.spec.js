@@ -152,7 +152,9 @@ test("behaviour feedback names each colour once, in its list, grouped as the beh
     await expect(list.locator("tr[data-row]")).toHaveCount(3);
     await list.locator('.group-h[data-group="branches"]').click();
     await expect(body(page).locator(".chip")).toHaveCount(0);
-    await expect(body(page).locator(".stage-bar .info-pop")).toContainText("behaviour dots");
+    // The stage's info mark says what each case means, not what the board
+    // or the marks show (D-L96).
+    await expect(body(page).locator(".stage-bar .info-pop dt")).toHaveText(["Tap committed", "Hold active", "Long hold active", "Shows nothing here", "Tap branches", "Blink time"]);
     // How fast it flashes is every case's, on the stage bar; whether a
     // double tap or more flashes is Tap committed's, on its pane alone.
     await expect(body(page).locator(".stage-bar .stage-bar-scope")).toHaveText("Every behaviour state");
