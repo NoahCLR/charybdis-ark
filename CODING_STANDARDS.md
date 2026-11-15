@@ -82,6 +82,11 @@ decisions are cited as D-L<n> (`docs/adr/`) and firmware D-F<n>.
   `webview/lib/focus.mjs`.
 - Colour comes from the model through `webview/view/lighting.mjs`; a stage
   that is off looks off.
+- A tip (`data-tip`) is one control's one line: what it does, or what
+  pressing it changes. What a section or an idea means goes behind its info
+  mark (`webview/ui/info-mark.mjs`), and what is needed every time (state,
+  warnings, values, units) stays on screen; no sentence lives in two of them
+  (D-L96).
 - Look a key up by what it means, `keyMeaning(position)`, never by
   `position.keycode`: behaviour rows, macros and pointing slots are keyed by
   the semantic name.
