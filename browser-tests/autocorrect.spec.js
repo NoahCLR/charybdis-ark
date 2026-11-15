@@ -358,7 +358,7 @@ test("inputs are chips: + Input adds one or several and stays for the next, and 
     await openControls(page, "autocorrect");
     await item(page, "because").click();
     await expect(chips(page)).toHaveText(["beacuse", "becasue", "becuase"]);
-    // How an input is written is behind the Inputs heading's info mark: hovering it, or reaching it by the keyboard, shows it; Escape shuts it.
+    // How an input is written is behind the Inputs heading's info mark: hovering it previews it, a press opens it; Escape shuts it.
     const info = editor(page).locator("[data-info-mark]:has(#ac-info-inputs)");
     const list = info.locator("#ac-info-inputs");
     await expect(info.locator(".info-button")).toHaveAttribute("aria-label", "How inputs are written, and the * wildcard");
@@ -791,6 +791,7 @@ test("an info mark's list too tall for the window scrolls, by the wheel and by t
     await page.keyboard.press("Shift+Tab");
     await page.keyboard.press("Tab");
     await expect(mark.locator(".info-button")).toBeFocused();
+    await page.keyboard.press("Enter");
     await expect(page.locator("#ac-info-inputs")).toBeVisible();
     expect(await body.evaluate((node) => node.scrollHeight > node.clientHeight)).toBe(true);
     await page.keyboard.press("ArrowDown");
@@ -1448,4 +1449,19 @@ test("in the demo a replacement whose only input is removed stays open off the l
     await expect(page.locator("[data-ac-new], [data-ac-new-item]")).toHaveCount(0);
     await expect(editor(page)).toHaveAttribute("data-ac-editor", "Kind regards, Sam");
     await expect(chips(page)).toHaveText(["ksam"]);
+});
+
+// One info mark is open at a time (D-L96): a press on another closes the first.
+test("opening one info mark closes the one open before it", async ({page}) => {
+    await openControls(page, "autocorrect");
+    const [first, second] = ["#ac-info-replacement", "#ac-info-inputs"].map((id) => page.locator(`[data-info-mark]:has(${id})`));
+    await first.locator(".info-button").click();
+    await expect(page.locator("#ac-info-replacement")).toBeVisible();
+    await second.locator(".info-button").click();
+    await page.mouse.move(0, 0);
+    await expect(page.locator("#ac-info-inputs")).toBeVisible();
+    await expect(page.locator("#ac-info-replacement")).toBeHidden();
+    await expect(first.locator(".info-button")).toHaveAttribute("aria-expanded", "false");
+    await page.keyboard.press("Escape");
+    await expect(page.locator("#ac-info-inputs")).toBeHidden();
 });
