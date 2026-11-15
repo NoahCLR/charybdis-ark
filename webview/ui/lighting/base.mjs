@@ -4,23 +4,24 @@ import {settingOptions} from "../../view/choices.mjs";
 import {el, esc} from "../../lib/dom.mjs";
 import {post} from "../../store.mjs";
 import {editGate} from "../../view/edit-gate.mjs";
-import {lightingOff} from "../../view/lighting.mjs";
 import * as edits from "../../view/edits.mjs";
 import {sectionsIn} from "../../view/settings-layout.mjs";
-import {aboutStage, colourControl, section, stack} from "./common.mjs";
+import {colourControl, section, stack, stageSurface} from "./common.mjs";
+import {sectionInfo} from "./help.mjs";
 
 // The background effect is QMK's own RGB Matrix effect: drawn first, under
 // every stage, on the LED classes it is given; a passthrough layer shows
 // it. The keyboard keeps it with its settings, so it saves as one settings
-// section, posted whole whichever control changed.
+// section, posted whole whichever control changed. It lays out as every
+// stage does: its effect where a list would be, its colour, and which LEDs
+// it lights where the others say where they paint.
 /** @param {import("../../../contracts/panel.js").PublishedModel} model */
 export function stageBase(model) {
-    const node = el(`<div class="tab-grid three"></div>`);
     const gate = editGate(model, "settings");
     const effect = sectionsIn(model, "Lighting").find((entry) => entry.id === "rgbAppearance");
     if (!effect) {
-        node.append(el(`<p class="note span">${esc(gate.why || "Choose Read keyboard to read the background effect.")}</p>`));
-        return node;
+        return stageSurface(model, {id: "base", first: el(`<section><p class="note">${esc(gate.why || "Choose Read keyboard to read the background effect.")}</p></section>`),
+            colour: el(`<section></section>`), side: el(`<section></section>`)});
     }
     const editable = gate.editable;
     /** @param {string} macro */
@@ -37,31 +38,31 @@ export function stageBase(model) {
             offNote: "Hue, saturation and brightness are all 0, so the background effect is dark.",
             onChange: (next) => submit({hue: String(next.h), saturation: String(next.s), brightness: brightness.readOnly ? undefined : String(next.v)}),
         }));
-        colour.append(el(`<p class="note">${esc(brightness.readOnly ? brightness.hint || "" : "Solid colour shows it as it is; most animated effects build on it.")}</p>`));
+        if (brightness.readOnly && brightness.hint) colour.append(el(`<p class="note">${esc(brightness.hint)}</p>`));
     }
 
-    const how = section("Effect");
+    // What the choices mean is on the section's info mark (help.mjs) alone,
+    // so no tip repeats it; why one cannot be chosen yet stays under it.
     /** @param {import("../../../contracts/panel.js").PresentedField | undefined} entry */
     const choice = (entry) => {
         if (!entry) return el(`<span></span>`);
-        const control = el(`<div data-tip="${esc([entry.tooltip, entry.hint].filter(Boolean).join(" "))}">${choiceField({label: entry.label, f: `setting:${entry.macro}`,
+        const control = el(`<div>${choiceField({label: entry.label, f: `setting:${entry.macro}`,
             choices: settingOptions(entry), current: String(entry.value), disabled: !(editable && !entry.readOnly), attributes: {"data-macro": entry.macro}})}
-            ${entry.hint ? `<span class="hint">${esc(entry.hint)}</span>` : ""}</div>`);
+            ${entry.readOnly && entry.hint ? `<span class="hint">${esc(entry.hint)}</span>` : ""}</div>`);
         control.addEventListener("change", (event) => submit({[entry.macro]: /** @type {HTMLInputElement | HTMLSelectElement} */ (event.target).value}));
         return control;
     };
     const speed = field("effectSpeed");
-    const speedControl = speed ? el(`<label class="field" data-tip="${esc([speed.tooltip, speed.hint].filter(Boolean).join(" "))}"><span>${esc(speed.label)}</span>
+    const speedControl = speed ? el(`<label class="field"><span>${esc(speed.label)}</span>
         <input class="input mono num" inputmode="numeric" data-macro="${esc(speed.macro)}" data-f="setting:${esc(speed.macro)}" value="${esc(speed.value)}" ${editable && !speed.readOnly ? "" : "disabled"}>
-        <span class="hint">${esc(speed.hint || "")}. Effects without animation ignore it.</span></label>`) : el(`<span></span>`);
+        <span class="hint">${esc(speed.hint || "")}</span></label>`) : el(`<span></span>`);
     speedControl.querySelector("input")?.addEventListener("change", (event) => {
         const written = /** @type {HTMLInputElement} */ (event.target).value.trim();
         if (written && written !== speed?.value) submit({effectSpeed: written});
     });
-    how.append(stack(choice(field("effectMode")), choice(field("effectLeds")), speedControl));
-
-    // That nothing is lit is news, so it stays in view, not behind the fold.
-    if (lightingOff(model)) node.append(el(`<div class="callout span">All lighting is off, so nothing is lit. Its switch is at the top of this screen.</div>`));
-    node.append(colour, how, aboutStage("QMK's own effect, drawn first, under every stage: each one paints over it, and a passthrough layer shows it."));
-    return node;
+    const how = section("Effect", sectionInfo(model, "base:effect"));
+    how.append(stack(choice(field("effectMode")), speedControl));
+    const leds = section("Where it paints", sectionInfo(model, "base:leds"));
+    leds.append(stack(choice(field("effectLeds"))));
+    return stageSurface(model, {id: "base", first: how, colour, side: leds, note: "Drawn first, under every other stage."});
 }

@@ -329,12 +329,17 @@ function lightingRecords(value) {
     const kase = (name, shade, locality) => [[name, shade], [`${name} · ${F.locality}`, where(locality)]];
     const k = r.keyFeedback;
     // Named and ordered as the Behaviour feedback tab lists them: the tiers, then
-    // the tap branches, then the tap-commit policy.
+    // the tap branches; the tap-commit policy is Tap committed's, on its pane,
+    // so it follows Tap committed's own.
+    /** @param {"tapCommittedColor" | "holdActiveColor" | "longHoldActiveColor"} field @param {number} locality */
+    const tier = (field, locality) => kase(word(V.feedbackOwners, V.feedbackColourOwners[field]), owned(k[field]), locality);
+    const committed = word(V.feedbackOwners, V.feedbackColourOwners.tapCommittedColor);
     record(UNIT.rgb("key"), "Behaviour feedback", "key", [
-        ...(/** @type {const} */ ([["tapCommittedColor", "tapCommittedLocality"], ["holdActiveColor", "holdActiveLocality"], ["longHoldActiveColor", "longHoldActiveLocality"]]))
-            .flatMap(([field, locality]) => kase(word(V.feedbackOwners, V.feedbackColourOwners[field]), owned(k[field]), k[locality])),
-        ...k.tapBranches.flatMap((branch, i) => kase(V.branches[i + 1] || `${i + 2} taps`, owned(branch.color), branch.locality)),
-        [F.tapBranchCommit, nameIn(V.tapCommit, rgbEnums.RGB_TAP_COMMIT_MODES, k.tapCommitMode)]]);
+        ...tier("tapCommittedColor", k.tapCommittedLocality),
+        [`${committed} · ${F.doubleTapFlash}`, nameIn(V.tapCommit, rgbEnums.RGB_TAP_COMMIT_MODES, k.tapCommitMode)],
+        ...tier("holdActiveColor", k.holdActiveLocality),
+        ...tier("longHoldActiveColor", k.longHoldActiveLocality),
+        ...k.tapBranches.flatMap((branch, i) => kase(V.branches[i + 1] || `${i + 2} taps`, owned(branch.color), branch.locality))]);
     // Replacement feedback's four cases as its tab lists them, each with
     // where it paints, in the words every owned colour reads by.
     const a = r.autocorrectFeedback;

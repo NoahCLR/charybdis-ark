@@ -130,11 +130,13 @@ const sections = [
         {...byte("brightness", SETTING.RGB_COLOR, 16, "Brightness", "Saved brightness, 0–255. The keyboard applies its hardware brightness limit."), tooltip: "Brightness of the background effect. Layer colours and feedback have their own brightness."},
         {...byte("effectSpeed", SETTING.RGB_MODE, 16, "Animation speed"), tooltip: "Speed of the background effect's animation. Effects without animation ignore this setting."},
     ]},
+    // What the blink time means is said once, in Behaviour feedback's info
+    // mark (webview/ui/lighting/help.mjs), so its hint is its range alone.
     {id: "lightingFeedback", label: SECTION.lightingFeedback, area: AREA.lighting, stage: "key", fields: [
-        number("feedbackFlash", SETTING.FEEDBACK_PERIOD, "Flash interval (ms)", "Time for each on or off phase; a full blink takes twice this value.", {min: SETTING_FIELD.FEEDBACK_PERIOD.min, validate: "positive-int"}),
+        number("feedbackFlash", SETTING.FEEDBACK_PERIOD, "Blink time (ms)", undefined, {min: SETTING_FIELD.FEEDBACK_PERIOD.min, validate: "positive-int"}),
     ]},
     // A replacement feedback flash has a length of its own (firmware D-F70,
-    // D-L89), drawn on that stage's tab as the flash interval is on its.
+    // D-L89), drawn on that stage's tab as the blink time is on its.
     {id: "replacementFeedback", label: SECTION.replacementFeedback, area: AREA.lighting, stage: "autocorrect", fields: [
         number("replacementFlash", SETTING.AUTOCORRECT_FEEDBACK_PERIOD, "Flash length (ms)", "How long one flash lasts.", {min: SETTING_FIELD.AUTOCORRECT_FEEDBACK_PERIOD.min, validate: "positive-int",
             tooltip: `${word(VOCABULARY.replacementOwners, "AUTOCORRECT_FEEDBACK_GROUP_LEADING")} is no flash: it holds for as long as the leader waits (${LEADER_WAITS}, in ${settingsPath("host", "autocorrect")}).`}),

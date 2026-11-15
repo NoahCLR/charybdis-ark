@@ -95,7 +95,7 @@ export function stageIdle(model, id) {
     const needs = stageHeldOffBy(model, id);
     if (!needs || STAGE_NEEDS[id].still?.(model)) return null;
     const words = vocabulary(model).settingOff;
-    return `${words.switches[needs].off} ${words.stage}`;
+    return `${words.switches[needs].off}. ${words.stage}`;
 }
 
 /** @param {Model} model @param {string} id */
@@ -211,6 +211,20 @@ export {colourPaints, inheritsStageColour};
 /** @param {import("../../contracts/edits.js").Colour | null | undefined} colour */
 export const isPassthrough = (colour) => !colourPaints(colour);
 export const isOff = ledsOff;
+// The class a swatch wears for how its colour lights (styles.css), the one
+// choice every swatch makes: "" for a lit colour, whose swatch is its own;
+// swatch-pass, hatched, for passthrough; swatch-dark, dark and struck
+// through, for off, its LEDs dark; swatch-off for a colour its stage keeps
+// from lighting (hatched in a list, hollow in a tab or chip); swatch-none,
+// hollow and dashed, for one never read.
+/** @typedef {"lit" | "passthrough" | "off" | "unlit" | "unread"} SwatchState */
+/** @param {SwatchState} how */
+export const swatchFor = (how) => how === "passthrough" ? "swatch-pass" : how === "off" ? "swatch-dark"
+    : how === "unlit" ? "swatch-off" : how === "unread" ? "swatch-none" : "";
+// The same for a colour an owner has, by the shared rule, unlit where its
+// stage does not paint.
+/** @param {import("../../contracts/edits.js").Colour | null | undefined} colour @param {{stageOn?: boolean}} [options] */
+export const swatchOf = (colour, {stageOn = true} = {}) => swatchFor(!stageOn ? "unlit" : !colour ? "unread" : isPassthrough(colour) ? "passthrough" : isOff(colour) ? "off" : "lit");
 
 // The key a replacement case's preview follows (D-L89, D-L92). On the
 // keyboard it is the key that ended the word, the Backspace that undid the
@@ -218,7 +232,7 @@ export const isOff = ledsOff;
 // cannot know which key will, so one key stands in: the first that sends
 // `keycode` (KC_SPACE, KC_BACKSPACE or QK_LEADER), on the viewed layer first,
 // then from layer 0 up. With none, the case paints as the keyboard paints one
-// whose key it does not know: both halves, or every key.
+// whose key it does not know: every key, under the last two localities.
 /** @param {Model} model @param {Layer} layer @param {string} keycode @returns {{layoutIndex: number, layer: number} | null} */
 export function replacementTrigger(model, layer, keycode) {
     const stack = model?.layers || [];
@@ -234,7 +248,7 @@ export function replacementTrigger(model, layer, keycode) {
 // vocabulary's words (colourOff), spread into its options. A layer colour is
 // the one stage colour where black is not black (an accent's black takes its
 // stage's colour, which the accent editor offers as a choice of its own).
-/** @param {import("./vocabulary.mjs").VocabularyModel | null | undefined} model @param {string} stage @returns {{offTip?: string, offNote?: string, offAction?: string, offWord?: string, ledsOffTip?: string, ledsOffNote?: string}} */
+/** @param {import("./vocabulary.mjs").VocabularyModel | null | undefined} model @param {string} stage @returns {{offTip?: string, offNote?: string, offWord?: string, ledsOffTip?: string}} */
 export const offWording = (model, stage) => vocabulary(model).colourOff[stage] || {};
 
 
