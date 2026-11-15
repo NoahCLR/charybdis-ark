@@ -29,7 +29,11 @@ The two do different jobs, as design systems split tooltips from toggletips:
   open across a redraw, and opening one closes any other. Resting the pointer
   on it previews the list, as before. The focus alone opens nothing: a screen
   reader hears the list as the mark's description, and the button says
-  whether it is open (`aria-expanded`).
+  whether it is open (`aria-expanded`). Its rows say what the thing it sits
+  by means and what its choices do, and only what the label does not
+  already say. What the board, a list or another screen shows, how to use a
+  control that is in view, and what a warning or refusal says when it
+  applies are no rows: the guide holds those.
 - **What is needed every time is on screen:** state, warnings, refusals,
   values and units. No sentence lives in two of the three.
 
@@ -49,4 +53,7 @@ tips carried the read-only reasons.
   the same way (`webview/ui/info-mark.mjs`); each screen keeps calling
   `infoMark` and `attachInfoMarks`.
 - A tip that explains is a review finding: move the explanation to the
-  section's info mark, or cut it to the control's one line.
+  section's info mark, or cut it to the control's one line. So is help read
+  once that sits on screen as a note, or in a fold that holds only help:
+  it goes behind an info mark beside its heading, and what is needed every
+  time stays on show beside it.

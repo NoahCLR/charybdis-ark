@@ -10,7 +10,7 @@ export interface MacroHistory {past: MacroHistoryEntry[]; present: MacroHistoryE
 export interface MacroForm {
     draft?: string; steps?: MacroStep[]; stepError?: string; cancelBlur?: boolean; wantsStage?: boolean; requestId?: number;
     validation?: Extract<PanelResponse, {type: 'macroValidation'}> & {context: string};
-    view?: string; rawOpen?: boolean; guidanceOpen?: boolean;
+    view?: string; rawOpen?: boolean;
     /** Focus metadata only; untouched steps still come from the core's payload. */
     stepFocus?: MacroStep[];
     selectedStep?: string | null;

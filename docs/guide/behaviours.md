@@ -227,7 +227,8 @@ switch key has turned one off while Ark has it on, its settings mark it
 **turned off by key**. Nothing else says so: the board, the Key tab, the hover
 card and Lighting's auto-mouse fade show what the switches in Ark allow. It
 isn't a change and isn't in Review; the key, or unplugging, turns it back on.
-A switch key can't turn on what is off in Ark.
+A switch key can't turn on what is off in Ark. The ⓘ beside the section's
+title says what both marks mean.
 
 A switch key goes on a key, in a behaviour's tap or hold, or as a combo's
 output, but not in a macro. With a behaviour of its own it does what the

@@ -54,7 +54,8 @@ test("Preserve hold timing preserves Command+A as press and release steps", asyn
     await openControls(page, "macros", {macroSlot: "MACRO_17", recordDelays: false, recordDelayThreshold: 1000});
     await page.locator('label:has([data-preserve-hold-timing])').click();
     await expect(page.locator('[data-preserve-hold-timing]')).toBeChecked();
-    await expect(page.locator('[data-recorder]')).toContainText("Preserving hold timing");
+    // What it keeps is the recorder's info mark, read once (D-L96).
+    await expect(page.locator('[data-recorder] .card-h .info-pop')).toContainText("Keeps individual presses and releases with their timing");
     await page.locator('[data-recorder]').screenshot({path: testInfo.outputPath("recorder-options.png")});
     await page.locator('[data-act="record"]').click();
     await expect(page.locator('[data-preserve-hold-timing]')).toBeDisabled();
