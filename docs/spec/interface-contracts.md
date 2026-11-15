@@ -378,6 +378,8 @@ The same kind of control looks and sits the same on every screen.
   heading (Effect, Which LEDs light up, Fade, Timing, and the same Locality
   rows on every Where it paints, with that stage's trigger key), how accents
   work on the Accents heading, and the board's shortcuts on its corner.
+  Each says what the thing it sits by means and what its choices do; what
+  the board, a list or another screen shows is the guide's, not a row.
   Visible stays what is needed every time: a range or unit, a live value,
   the one line saying when a replacement case shows and which key it
   follows, refusals and state. A tip is one control's one line, what it does

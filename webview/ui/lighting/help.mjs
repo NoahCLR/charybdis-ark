@@ -67,29 +67,19 @@ export function stageInfo(model, id) {
     switch (id) {
         case "base": return mark("How the background effect paints", "QMK's own effect, drawn first, under every other stage. Each stage paints over it, and a passthrough layer shows it.", [
             row(words.lightingFields.colour, "Solid colour shows it as it is; most animated effects build on it."),
-            row(off, "It has no Stage on switch. All lighting, beside the title, darkens it with every stage."),
-            row("Accents", "None. Layer colours and the feedback stages have them.")]);
+            row(off, "It has no Stage on switch. All lighting, beside the title, darkens it with every stage.")]);
         case "layers": return mark("How layer colours paint", "Each layer that is on paints its colour over the background effect, lowest first, so a higher layer covers a lower one where both paint.", [
-            row("Each layer", "Its colour, which LEDs it lights and its accents are its own. Pick it in the list."),
             row(passthrough, "Paints nothing: the layers on under it, or the background effect, show through."),
-            row(off, "Its LEDs go dark, covering what is beneath."),
-            row("Empty layers", "Folded at the list's end. A layer with a colour is not empty."),
-            row("Board", "The layer picked, with the layers previewed under it.")]);
+            row(off, "Its LEDs go dark, covering what is beneath.")]);
         case "auto": return mark("How the auto-mouse fade paints", "When auto-mouse turns the pointer layer off, its light holds, then fades over the rest of the auto-mouse timeout, in place of the layer colours.", [
-            row(words.lightingFields.endColour, `Taken as it is: ${off} stores HSV(0, 0, 0), and the fade ends with the LEDs off. It is never passthrough.`),
-            row("Auto-mouse off", "The fade never runs. A pointer layer turned on by hand shows its own layer colour. These settings take effect once auto-mouse is back on."),
-            row("Board", "Where the fade lands, not the animation.")]);
+            row(words.lightingFields.endColour, `${off} ends the fade with the LEDs off; it is never passthrough.`),
+            row("Auto-mouse off", "The fade never runs. A pointer layer turned on by hand shows its own layer colour. These settings take effect once auto-mouse is back on.")]);
         case "pd": return mark("How pointing modes paint", "While a mode runs, its colour paints over the layer's, where its Locality says.", [
-            row("Each mode", "Its colour, where it paints and its accents are its own. Pick it in the list."),
             row("Linked layers", "A mode linked to layers paints beneath the lowest of them that is on instead: their colours show over it, and higher layers cover both."),
-            row(passthrough, "The mode paints nothing while it runs; its accents in a colour of their own still light."),
-            row("Swapped slots", "Swapping two slots on Pointing modes takes each mode's colour and accents with it."),
-            row("Board", "The mode picked, running, as it paints with no linked layer on.")]);
-        case "combo": return mark("How combo feedback paints", "While a combo's inputs are held, its keys wear this colour, where the Locality says. One colour, place and set of accents serves every combo, and the combo badges take their outline from it.", [
-            row(words.lightingLists.comboFeedback.title, "The combos on this view that light this colour."),
-            row(words.lightingLists.holdLayer.title, "Combos whose output holds a layer. They light no combo feedback: the layer's own light shows the hold."),
-            row("Pointing mode", "A combo that runs a pointing mode paints beneath it; the mode covers it where both paint."),
-            row("Board", "The combo picked in the list, held: its keys ringed as on the Keymap, the keys holding it ringed solid. Click another ringed key to hold it from there.")]);
+            row(passthrough, "The mode paints nothing while it runs; its accents in a colour of their own still light.")]);
+        case "combo": return mark("How combo feedback paints", "While a combo's inputs are held, its keys wear this colour, where the Locality says. One colour, place and set of accents serves every combo.", [
+            row(words.lightingLists.holdLayer.title, "They light no combo feedback: the layer's own light shows the hold."),
+            row("Pointing mode", "A combo that runs a pointing mode paints beneath it; the mode covers it where both paint.")]);
         case "key": {
             const tiers = ["KEY_FEEDBACK_GROUP_TAP_COMMITTED", "KEY_FEEDBACK_GROUP_HOLD_ACTIVE", "KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE"].map(flash);
             const [first, deepest] = [flash("KEY_FEEDBACK_GROUP_TAP_COUNT_2"), flash("KEY_FEEDBACK_GROUP_TAP_COUNT_5")];
@@ -103,10 +93,7 @@ export function stageInfo(model, id) {
                 row(long, "The same, for the long hold, at the Long hold threshold."),
                 row("Shows nothing here", "A layer or pointing-mode hold, which its own stage shows; a switch key, Leader, or layer go-to or lock held until release; a hold the keyboard fills in where the behaviour sets none."),
                 row(words.lightingLists.tapBranches.title, `${first} to ${deepest}, each steady while a run of taps waits on that count, until it resolves; they never blink. A deeper run takes ${deepest}'s.`),
-                row(blinkTime, `How fast a hold blinks while ${heldStyle} or repeating: on for this long, then off. A single flash, ${committed}'s or a hold's, lasts one of these. While you change it, a dot beside it blinks at that pace.`),
-                row("No key has it", "The keyboard never shows that case, and the board shows nothing for it."),
-                row("Marks", "The board's behaviour dots and the behaviour grid's branch numbers wear these colours."),
-                row("Board", "The case picked, from the first key whose behaviour has it, ringed when its Locality follows the key.")]);
+                row(blinkTime, `How fast a hold blinks while ${heldStyle} or repeating: on for this long, then off. A single flash, ${committed}'s or a hold's, lasts one of these. While you change it, a dot beside it blinks at that pace.`)]);
         }
         case "autocorrect": {
             const leading = replacement("AUTOCORRECT_FEEDBACK_GROUP_LEADING");
@@ -116,8 +103,7 @@ export function stageInfo(model, id) {
                 row(replacement("AUTOCORRECT_FEEDBACK_GROUP_UNDO"), "Flashes as Backspace, straight after a replacement, puts the word back."),
                 row(leading, "Held from the Leader key until the leader sends or gives up. A send's text or macro flash takes its place; when nothing is sent it just goes."),
                 row(flashLength, `How long one flash lasts, from when the replacement starts to be typed. One for every case but ${leading}, which holds as long as the leader waits (${settingLabel(model, "leaderTimeout")}, on ${sectionPath(model, "autocorrect")}).`),
-                row("One at a time", "An undo straight after a replacement takes its flash's place. A word left as you typed it never flashes."),
-                row("Board", `The case picked. Space stands in for the key that ends a word, Backspace for an undo and the Leader key for ${leading}, ringed when the Locality follows the key.`)]);
+                row("One at a time", "An undo straight after a replacement takes its flash's place. A word left as you typed it never flashes.")]);
         }
         case "accents": return mark("All accents", "Every accent, by the stage that paints it. An accent is changed on its stage's tab: Open goes there with its LEDs glowing.", [
             row("Click a line", "Keeps its LEDs glowing on the board; click it again to let go.")]);
@@ -136,14 +122,12 @@ export function sectionInfo(model, id) {
     const setting = (macro) => settingLabel(model, macro);
     switch (id) {
         case "base:effect": return mark("About the effect", "The background effect", "", [
-            row(setting("effectMode"), "The effects this keyboard has. Every stage paints over it."),
             row(setting("effectSpeed"), "How fast an animated effect moves. Effects without animation ignore it.")]);
         case "base:leds": return mark("About which LEDs it lights", "Which LEDs it lights", "", [
-            row(setting("effectLeds"), "All, none, modifiers, keys, or modifiers and keys. The other stages paint any LED, whichever this leaves dark.")]);
+            row(setting("effectLeds"), "The other stages paint any LED, whichever this leaves dark.")]);
         case "layers:mode": return mark(`About ${words.lightingFields.paintMode.toLowerCase()}`, words.lightingFields.paintMode, "", [
             row(word(words.paintModes, "KEYS_MAPPED_ON_THIS_LAYER_ONLY"), "Leaves the layer's transparent and empty keys unpainted, so what is beneath shows there."),
-            row(word(words.paintModes, "ALL_KEYS"), "Paints every LED, the trackball's included."),
-            row("Transparent keys", "Keep their ▽ on the board either way.")]);
+            row(word(words.paintModes, "ALL_KEYS"), "Paints every LED, the trackball's included.")]);
         case "auto:fade": return mark("About the fade modes", "Where the fade lands", "Where the light fades to once auto-mouse turns the pointer layer off.", [
             row(word(words.fadeModes, "FOLLOW_REAL_DESTINATION"), "What the board would show without the pointer layer. Uses no end colour."),
             row(word(words.fadeModes, "END_COLOR_WHERE_BASE_EFFECT_WOULD_SHOW"), "The layers beneath where they paint, and the end colour where the background effect would show."),
@@ -153,8 +137,7 @@ export function sectionInfo(model, id) {
             return mark(`About when ${committed} flashes`, "When it flashes", `${committed} is steady while a key is held on a tap with no hold, once the multi tap window has passed.`, [
                 row(word(words.tapCommit, "KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS"), "It also flashes once as a double tap or more fires, unless that sends a layer or pointing key, whose own stage shows it."),
                 row(word(words.tapCommit, "KEY_FEEDBACK_TAP_COMMIT_OFF"), "It shows only while held."),
-                row("A single tap", "Gets no flash either way."),
-                row(words.lightingLists.tapBranches.title, "Light while a run of taps waits on their count, either way.")]);
+                row("A single tap", "Gets no flash either way.")]);
         }
         case "auto:timing": {
             const hold = setting("mouseFadeHold");
@@ -181,7 +164,6 @@ export function accentsInfo(model, target) {
             ? `A later accent repaints an earlier one where they share LEDs. Those for ${words.every.toLowerCase()} paint first, so one for the case picked wins an LED they share.`
             : "A later accent repaints an earlier one where they share LEDs."),
         ...(target === "layer" ? [row("Base", "Base's accents stay lit over the layers above it. Go to Base changes them.")] : []),
-        row("Picking", "Add accent, then click keys on the board or drag across them. The number on each key is its LED."),
         ...(sets ? [row("LED sets", `${sets.what} The keyboard holds ${accents ? `${accents.limit} accents and ` : ""}${sets.limit} sets.`)] : []),
     ];
     return infoMark({id: `lighting-info-accents-${target}`, label: "How accents work", heading: "How accents work", rows});
