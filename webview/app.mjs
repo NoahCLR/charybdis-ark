@@ -15,9 +15,10 @@ import {announce, mountAnnouncer} from "./lib/announce.mjs";
 import {announcements} from "./view/announcements.mjs";
 import {getModel, post, postLeavingDemo, setRenderer, state} from "./store.mjs";
 import {historyAction} from "./view/edits.mjs";
-import {chooseKeyboard, shellOf, otherTheme, setTheme} from "./view/shell-panel.mjs";
+import {chooseKeyboard, githubMark, shellOf, otherTheme, setTheme} from "./view/shell-panel.mjs";
 import {DEMO_WORDS, demoOf, leaveDemo, openDemo, openDemoProfile} from "./view/demo.mjs";
 import {readScreen} from "./view/readiness.mjs";
+import {FIRMWARE_NEEDED} from "./view/keyboard-view.mjs";
 import {SCREENS, screenAvailable, screenDefinition, secondaryScreen} from "./view/screens.mjs";
 import {hideHover, mountHover} from "./ui/hover.mjs";
 import {pickerOverlay} from "./ui/picker.mjs";
@@ -128,6 +129,14 @@ function readPlaceholder(read, model) {
     // Titled as the rail item it sits under, which the rail highlights.
     const screenTitle = screenDefinition(state.screen)?.label || "Ark";
     const secondary = secondaryScreen(model, state.screen);
+    // Until a keyboard is reached, a new user may not have the firmware yet:
+    // a card under the placeholder, outside what its status announces.
+    const firmware = !loading && read.state !== "blocked" && !model?.device?.connected ? `<section class="firmware-first" aria-labelledby="firmware-first-title">
+            <div class="firmware-first-copy"><span class="eyebrow">${esc(FIRMWARE_NEEDED.eyebrow)}</span>
+                <h3 id="firmware-first-title">${esc(FIRMWARE_NEEDED.title)}</h3><p>${esc(FIRMWARE_NEEDED.words)}</p></div>
+            <a class="btn firmware-install" href="${esc(FIRMWARE_NEEDED.href)}" target="_blank" rel="noopener">${githubMark("firmware-install-mark")}<span>${esc(FIRMWARE_NEEDED.label)}</span><span aria-hidden="true">↗</span></a>
+            <p class="firmware-first-via"><strong>${esc(FIRMWARE_NEEDED.viaLead)}</strong> ${esc(FIRMWARE_NEEDED.via)}</p>
+        </section>` : "";
     const screen = el(`<div class="main">${topbar(screenTitle, "Change what your Charybdis does. Nothing is saved until you review it.")}
         <div class="content"><div class="pad"><div class="read-placeholder" role="status" aria-live="polite">
             ${loading ? '<span class="spin" aria-hidden="true"></span>' : `<i class="dot ${tone}" aria-hidden="true"></i>`}
@@ -138,7 +147,7 @@ function readPlaceholder(read, model) {
                     ${model?.device?.connected ? '<button class="btn primary" data-act="retry">Read keyboard</button>' : ""}
                     ${demoHere ? exploreButton("ghost") : ""}
                     ${secondary ? `<button class="btn ghost" data-act="secondary">${esc(secondary.label)}</button>` : ""}</div>`}
-        </div></div></div></div>`);
+        </div>${firmware}</div></div></div>`);
     screen.querySelector('[data-act="explore-demo"]')?.addEventListener("click", () => post(openDemo()));
     screen.querySelector('[data-act="choose-keyboard"]')?.addEventListener("click", () => post(chooseKeyboard()));
     screen.querySelector('[data-act="retry"]')?.addEventListener("click", () => post(controls.control("refresh")));

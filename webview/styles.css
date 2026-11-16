@@ -2366,6 +2366,20 @@ details > summary { list-style: none; }
 .read-placeholder h2, .read-placeholder p { margin: 0; }
 .read-placeholder p { max-width: 52ch; color: var(--text-2); }
 .read-actions { display: flex; gap: var(--sp-2); flex-wrap: wrap; justify-content: center; margin-top: var(--sp-2); }
+/* Without a keyboard, what a new user needs first: the firmware, a card of
+   its own centred under the placeholder. */
+.firmware-first { display: flex; align-items: center; gap: var(--sp-3) var(--sp-5); flex-wrap: wrap;
+  width: min(100%, 600px); margin: var(--sp-4) auto 0; padding: var(--sp-4) var(--sp-5);
+  background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--r-card); box-shadow: var(--shadow-raised); }
+.firmware-first-copy { flex: 1 1 280px; display: grid; gap: var(--sp-1); }
+.firmware-first .eyebrow { font-size: var(--fs-xs); line-height: var(--lh-xs); font-weight: var(--fw-label);
+  letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); }
+.firmware-first h3 { margin: 0; font-size: var(--fs-lg); font-weight: var(--fw-strong); color: var(--text); }
+.firmware-first p { margin: 0; color: var(--text-2); font-size: var(--fs-md); line-height: var(--lh-md); }
+.firmware-first .firmware-first-via { flex: 1 1 100%; padding-top: var(--sp-3); border-top: 1px solid var(--line); }
+.firmware-first-via strong { color: var(--text); font-weight: var(--fw-strong); }
+.firmware-install { flex: none; gap: var(--sp-2); text-decoration: none; }
+.firmware-install .firmware-install-mark { width: 15px; height: 15px; fill: currentColor; stroke: none; }
 
 /* ── the demo ──────────────────────────────────────────────────────────── */
 /* A demo is never a keyboard: a strip across the whole window says so on every
