@@ -69,11 +69,12 @@ export const countWords = (usage) => `${counted(usage.corrections, "replacement"
 /** @param {View["usage"]} usage */
 export const usageWords = (usage) => `${n(usage.typos)} of ${n(usage.maxTypos)} inputs`;
 
-// The list's bytes of the memory it has, and what it can still grow by, as
-// Macro memory says its own. How full its meter is drawn is core's too
-// (`usage.share`), the same figure the Keyboard screen's Memory panel draws.
+// The list's text of the text the keyboard holds for it, and what it can
+// still grow by, as Macro memory says its own. How full its meter is drawn is
+// core's too (`usage.share`), the same figure the Keyboard screen's Memory
+// panel draws.
 /** @param {View["usage"]} usage */
-export const bytesWords = (usage) => `${n(usage.bytes)} / ${n(usage.capacity)} bytes`;
+export const bytesWords = (usage) => `${n(usage.textBytes)} of ${n(usage.maxTextBytes)} bytes of text used`;
 /** @param {View["usage"]} usage */
 export const freeWords = (usage) => `${n(usage.free)} ${usage.free === 1 ? "byte" : "bytes"} free`;
 

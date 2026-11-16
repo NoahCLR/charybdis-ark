@@ -68,7 +68,7 @@ test("the screen is a bank of replacements beside the editor of the one picked, 
     await expect(bank(page).locator('[data-act="ac-add"]')).toHaveText("+ New replacement");
     await expect(bank(page).locator(".ac-files button")).toHaveText(["Import…", "Export"]);
     await expect(bank(page).locator(".memory-h h4")).toHaveText("Text replacement memory");
-    await expect(page.locator("[data-ac-memory]")).toHaveText("377 / 36,874 bytes");
+    await expect(page.locator("[data-ac-memory]")).toHaveText("209 of 20,480 bytes of text used");
     await expect(page.locator("[data-ac-meter]")).toBeVisible();
     // What is free, as Macro memory says its own, and the list's size.
     await expect(page.locator("[data-ac-free]")).toHaveText(/^[\d,]+ bytes free$/);
@@ -882,7 +882,7 @@ test("with no replacements the editor's place says where they start, and offers 
     await openControls(page, "autocorrect");
     await publish(page, (model) => {
         model.autocorrect.entries = [];
-        model.autocorrect.usage = {...model.autocorrect.usage, corrections: 0, typos: 0, textBytes: 0, bytes: 8};
+        model.autocorrect.usage = {...model.autocorrect.usage, corrections: 0, typos: 0, textBytes: 0, share: 0};
         model.autocorrect.notices = [];
     });
     // The empty pattern a macro with no steps has: a mark, a line, a sentence.
@@ -922,9 +922,9 @@ test("the Keyboard screen's Memory panel counts the inputs of text replacements 
     await expect(counted).toHaveAttribute("data-tip", /Every input of every text replacement/);
     const memory = usage.locator('[data-usage="replacements"]');
     await expect(memory.locator("h4")).toHaveText("Text replacement memory");
-    await expect(memory.locator(".sect-h .note")).toHaveText("377 of 36,874 bytes used");
+    await expect(memory.locator(".sect-h .note")).toHaveText("209 of 20,480 bytes of text used");
     await expect(memory.locator(".meter i")).toBeVisible();
-    await expect(memory.locator(".meter-note")).toHaveText("Replacements and their inputs are part of the profile above, within their own limit, and listed on Text replacement.");
+    await expect(memory.locator(".meter-note")).toHaveText("The text of replacements and their inputs, part of the profile above and listed on Text replacement.");
     await expect(usage.locator(".card-b > .note")).toContainText("Behaviours, combos, macros, text replacements, custom keys, pointing modes, lighting, settings and names are stored together here");
     // After Macro memory, as its screen follows Macros.
     expect(await usage.locator(".sect-h h4").allTextContents()).toEqual(["Profile", "Macro memory", "Text replacement memory"]);

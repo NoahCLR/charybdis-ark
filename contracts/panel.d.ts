@@ -64,7 +64,7 @@ export interface AutocorrectEntry {id: string; label: string; correction: string
 /** The text replacement list as its screen draws it (core/model/autocorrect-editor.js): entries in stored order; what the list uses against what the keyboard holds (`share`, 0 to 1, its bytes of its own limit, which both memory meters draw; `free`, the bytes it can still grow by, bounded by its text's ceiling and the profile's shared room too; `textMax` the bytes in one input, `correctionMax` in one replacement's text; `shortInput`, the letters under which an input with `*` is warned about); what the chosen host layout cannot type, said once with what to do; and that layout's name. */
 export interface AutocorrectView {
     entries: AutocorrectEntry[];
-    usage: {corrections: number; typos: number; /** The inputs of replacements that fire after the Leader key. */ leaders: number; maxTypos: number; textBytes: number; maxTextBytes: number; bytes: number; capacity: number; share: number; free: number; textMax: number; correctionMax: number; shortInput: number};
+    usage: {corrections: number; typos: number; /** The inputs of replacements that fire after the Leader key. */ leaders: number; maxTypos: number; textBytes: number; /** The bytes of text, replacements and inputs together, the keyboard holds for the list: the memory both meters draw. */ maxTextBytes: number; share: number; free: number; textMax: number; correctionMax: number; shortInput: number};
     notices: string[];
     /** The host layout entries are checked against, by name. */
     layoutName: string;

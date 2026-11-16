@@ -166,8 +166,8 @@ function usageCard(usage) {
                 <div class="meter">${meterFill(usage.macros.share * 100)}</div>
                 <p class="note meter-note">Macro steps are part of the profile above, within their own limit, and counted slot by slot on Macros.</p></div>` : ""}
             ${usage.replacements ? `<div data-usage="replacements"><div class="sect-h"><h4>Text replacement memory</h4>
-                <span class="right note">${esc(bytes(usage.replacements.used))} of ${esc(bytes(usage.replacements.capacity))} bytes used</span></div>
+                <span class="right note">${esc(bytes(usage.replacements.used))} of ${esc(bytes(usage.replacements.capacity))} bytes of text used</span></div>
                 <div class="meter">${meterFill(usage.replacements.share * 100)}</div>
-                <p class="note meter-note">Replacements and their inputs are part of the profile above, within their own limit, and listed on Text replacement.</p></div>` : ""}
+                <p class="note meter-note">The text of replacements and their inputs, part of the profile above and listed on Text replacement.</p></div>` : ""}
         </div></div>`;
 }

@@ -50,12 +50,12 @@ test("an edit names a replacement by its text or its slot", () => {
 });
 
 test("the counts and the memory read what the keyboard holds, in core's own figures, and no ceiling of replacements is shown", () => {
-    const usage = {corrections: 1, typos: 1200, maxTypos: 2048, textBytes: 10, maxTextBytes: 20480, bytes: 34, capacity: 34826, share: 34 / 34826, free: 100, textMax: 32, correctionMax: 128, shortInput: 4};
+    const usage = {corrections: 1, typos: 1200, maxTypos: 2048, textBytes: 10, maxTextBytes: 20480, share: 10 / 20480, free: 100, textMax: 32, correctionMax: 128, shortInput: 4};
     assert.equal(countWords(usage), "1 replacement · 1,200 inputs");
     assert.equal(countWords({corrections: 2, typos: 1}), "2 replacements · 1 input");
     assert.equal(usageWords(usage), "1,200 of 2,048 inputs");
     assert.equal(usageWords({...usage, typos: 15, maxTypos: 1024}), "15 of 1,024 inputs");
-    assert.equal(bytesWords({...usage, bytes: 1234}), "1,234 / 34,826 bytes", "as Macro memory says its own");
+    assert.equal(bytesWords({...usage, textBytes: 1234}), "1,234 of 20,480 bytes of text used", "the text, against the text the keyboard holds, as Macro memory says its own");
     assert.deepEqual([freeWords({...usage, free: 20422}), freeWords({...usage, free: 1}), freeWords({...usage, free: 0})], ["20,422 bytes free", "1 byte free", "0 bytes free"], "as Macro memory says what is free");
     assert.deepEqual(textCount(" café ", 128), {used: 5, max: 128, over: false, label: "5 / 128 bytes"}, "bytes, of the text as it is stored");
     assert.equal(textCount("x".repeat(129), 128).over, true);

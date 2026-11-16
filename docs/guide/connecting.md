@@ -158,7 +158,8 @@ holds, in the order of the rail's Configure screens and then Lighting:
 behaviours, tap counts, combos, macros, the inputs of text replacements,
 custom keys, pointing modes, LED sets and accents. Macro steps live in the
 same space, within a limit of their own, shown as **Macro memory**, and so
-does the text replacement list, shown as **Text replacement memory**. The bar turns orange from 90%, when the next edit may not
+does the text of replacements and their inputs, shown as **Text replacement
+memory**. The bar turns orange from 90%, when the next edit may not
 fit. While your draft has changes, the figures are the draft's. An edit that
 would go past one of these counts, or past the shared space, is refused in the
 draft before the keyboard sees it, saying which is full and what to remove.
