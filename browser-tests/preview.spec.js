@@ -326,6 +326,16 @@ test("with no keyboard the web shell offers its picker first, and without WebHID
     await page.goto("/preview/index.html?shell=none");
     const placeholder = page.locator(".read-placeholder");
     await expect(placeholder.locator("h2")).toHaveText("Connect your keyboard");
+    const card = page.locator(".pad > .firmware-first");
+    await expect(placeholder.locator(".firmware-first"), "the card sits under the box, outside what the status announces").toHaveCount(0);
+    const [box, under] = await Promise.all([placeholder.boundingBox(), card.boundingBox()]);
+    expect(under.y).toBeGreaterThan(box.y + box.height);
+    const install = card.locator("a.firmware-install");
+    await expect(install, "a new user learns the keyboard needs Ark's firmware, and where to get it").toHaveAttribute("href", "https://github.com/NoahCLR/charybdis-4x6/releases");
+    await expect(install).toHaveAttribute("target", "_blank");
+    await expect(card.locator("h3")).toHaveText("Flash the firmware first");
+    await expect(card).toContainText("running the charybdis-4x6 firmware");
+    await expect(card.locator(".firmware-first-via"), "a VIA user saves their layout before flashing, to import it after").toContainText("Save Current Layout");
     await page.evaluate(() => {window.__posted.length = 0;});
     await placeholder.locator('[data-act="choose-keyboard"]').click();
     await expect.poll(() => page.evaluate(() => window.__posted)).toEqual([expect.objectContaining({type: "chooseKeyboard"})]);
@@ -333,6 +343,7 @@ test("with no keyboard the web shell offers its picker first, and without WebHID
     await page.goto("/preview/index.html?shell=unsupported");
     await expect(page.locator(".read-placeholder h2")).toHaveText("Ark needs Chrome or Edge");
     await expect(page.locator('[data-act="choose-keyboard"]')).toHaveCount(0);
+    await expect(page.locator(".firmware-first"), "no keyboard can be reached here, so no firmware to install").toHaveCount(0);
     await expect(page.locator('.rail [data-act="keyboard-menu"]')).toHaveCount(0, {message: "nothing to choose, so the rail's keyboard opens no menu"});
     await expect(page.locator('.rail [data-act="refresh"]')).toHaveCount(0);
 });

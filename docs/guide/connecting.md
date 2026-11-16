@@ -17,7 +17,13 @@ phone it shows a short notice instead: a phone can't reach the keyboard.
 
 With no keyboard, Ark shows **Connect your keyboard**. Choose **Choose
 keyboard…** and pick your Charybdis in Chrome's list. After that the page
-connects to it by itself whenever it opens.
+connects to it by itself whenever it opens. Under it, **Flash the firmware
+first** is for a keyboard that doesn't have the firmware yet: **Firmware
+releases** opens the [firmware's
+releases](https://github.com/NoahCLR/charybdis-4x6/releases). Coming from
+VIA, save your layout there before you flash, and once Ark has read the
+keyboard [import it in Backups](backups.md#import-a-via-layout) to carry over
+your keys and macros.
 
 If something goes wrong, the message beside the rail starts with **Failed:**
 and says what happened and what to do. A problem in Ark itself says only
@@ -38,7 +44,7 @@ If the keyboard runs firmware other than the current one, Ark stops there
 and says **This keyboard's firmware is not current, and Ark supports only
 current firmware. Update both halves, then read the keyboard again.** Every
 control that edits, and the Keyboard screen, says so too. Nothing on the
-keyboard changes. The Keyboard screen links to the firmware release.
+keyboard changes. The Keyboard screen links to the firmware's releases.
 
 If Ark can show the keyboard but can't read its complete profile, the editing
 screens say **Keyboard not ready for edits** and offer **Read keyboard** to
