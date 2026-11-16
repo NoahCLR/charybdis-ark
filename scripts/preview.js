@@ -16,6 +16,7 @@ const {buildPanelModel, portableLayersView, startLayerEdit} = require("../core/s
 const {followService} = require("../core/session/draft-follow");
 const portable = require("../core/model/portable-profile");
 const keycodes = require("../core/schema/keycodes");
+const {MACRO_DOMAIN_V1} = require("../core/schema/macro-domain-v1");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../core/data/charybdis-layout");
 const {PROFILE_WIRE_KNOWN_MASKS} = require("../core/protocol/profile-wire-v1");
 const {document32} = require("../tests/fixtures/pointing-slots-32");
@@ -89,7 +90,7 @@ const capabilities = {
     maxReusableRgbGroups: 128,
     maxRgbTableGroupRows: 255,
     maxRgbStageGroupRows: 640,
-    macroBytes: 34903,
+    macroBytes: MACRO_DOMAIN_V1.MAX_SIZE,
     maxAutocorrectCorrections: 1024,
     maxAutocorrectTypos: 1024,
     autocorrectTextBytes: 20480,

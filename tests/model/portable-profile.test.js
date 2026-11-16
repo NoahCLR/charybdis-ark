@@ -229,7 +229,7 @@ test("portable streams restore across bank sizes with stable fingerprints and ex
     const source = make();
     editMacros(source, macros => macros[127] = Buffer.from("a".repeat(9000)).toString("base64"));
     const old = validateSnapshot(source, {...CURRENT_CAPABILITIES, macroBytes: 10327});
-    const next = validateSnapshot(source, {...CURRENT_CAPABILITIES, featureFlags: 1 << 27, macroBytes: 34903, maxProfilePayload: 53216});
+    const next = validateSnapshot(source, {...CURRENT_CAPABILITIES, featureFlags: 1 << 27, macroBytes: 40960, maxProfilePayload: 53216});
     assert.deepEqual(next.macroSlots, old.macroSlots, "destination geometry does not alter streams");
     assert.deepEqual(next.profile, old.profile, "one canonical profile is retained without bank padding");
     assert.equal(fingerprintOf(next), fingerprintOf(old));
@@ -237,7 +237,7 @@ test("portable streams restore across bank sizes with stable fingerprints and ex
     editMacros(source, macros => macros[127] = Buffer.from("a".repeat(20000)).toString("base64"));
     assert.equal(profileMacros(validateSnapshot(source).document)[127], profileMacros(source)[127], "a large backup is read without a destination");
     assert.throws(() => validateSnapshot(source, {...CURRENT_CAPABILITIES, macroBytes: 10327}), /Macros need 20128 bytes; this keyboard holds 10327/);
-    assert.equal(validateSnapshot(source, {...CURRENT_CAPABILITIES, featureFlags: 1 << 27, macroBytes: 34903}).macroSlots.length, 128);
+    assert.equal(validateSnapshot(source, {...CURRENT_CAPABILITIES, featureFlags: 1 << 27, macroBytes: 40960}).macroSlots.length, 128);
 });
 
 test("current backups preserve retired user assignments without reinterpreting them as custom keys", () => {

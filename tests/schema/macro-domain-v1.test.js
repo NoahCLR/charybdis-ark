@@ -18,7 +18,7 @@ test("the macro domain is the 128 macros, each ended by a zero, slot 0 first", (
     assert.equal(MACRO_DOMAIN_V1.SLOTS, 128);
     const {QK} = require("../../rules/qmk-keycodes.mjs");
     assert.equal(QK.MACRO.last - QK.MACRO.first + 1, MACRO_DOMAIN_V1.SLOTS, "each slot has a keycode in QMK's macro block");
-    assert.equal(MACRO_DOMAIN_V1.MAX_SIZE, 34903);
+    assert.equal(MACRO_DOMAIN_V1.MAX_SIZE, 40960);
     assert.deepEqual(encodeMacroDomain(empty()), Buffer.alloc(128), "every slot its terminator alone");
     const macros = empty();
     macros[0] = Buffer.from("hi");
@@ -41,7 +41,7 @@ test("both firmware fixtures' macro banks decode, and the canonical encoding is 
         assert.deepEqual(canonical, domain.payload.subarray(0, canonical.length), `${name}: the macros are the bank's first bytes`);
         assert.ok(domain.payload.subarray(canonical.length).every((byte, index, tail) => index < tail.length - 1 || byte === 0), name);
     }
-    assert.equal(fixtureDomain("maximum_profile_v4.fixture")?.payload.length, 34903, "the maximum profile fills the bank");
+    assert.equal(fixtureDomain("maximum_profile_v4.fixture")?.payload.length, MACRO_DOMAIN_V1.MAX_SIZE, "the maximum profile fills the bank");
 });
 
 test("unused capacity after the 128th terminator is accepted while the bank ends in zero, and never returned", () => {
@@ -75,14 +75,14 @@ test("the firmware's grammar is checked byte by byte", () => {
 test("a macro domain with too few macros, too many bytes or a zero inside a macro is refused", () => {
     reject(() => decodeMacroDomain(Buffer.alloc(127)), "MISSING_TERMINATOR");
     reject(() => decodeMacroDomain(Buffer.alloc(0)), "INVALID_LENGTH");
-    reject(() => decodeMacroDomain(Buffer.alloc(34904)), "INVALID_LENGTH");
-    assert.equal(decodeMacroDomain(Buffer.alloc(34903)).length, 128);
+    reject(() => decodeMacroDomain(Buffer.alloc(MACRO_DOMAIN_V1.MAX_SIZE + 1)), "INVALID_LENGTH");
+    assert.equal(decodeMacroDomain(Buffer.alloc(MACRO_DOMAIN_V1.MAX_SIZE)).length, 128);
     reject(() => encodeMacroDomain(Array(128)), "INVALID_MACRO");
     reject(() => encodeMacroDomain(empty().slice(1)), "INVALID_SLOTS");
     const zero = empty(); zero[9] = Buffer.from([0x41, 0, 0x42]);
     reject(() => encodeMacroDomain(zero), "INVALID_MACRO");
-    const full = empty(); full[0] = Buffer.alloc(34903 - 128, 0x41);
-    assert.equal(encodeMacroDomain(full).length, 34903, "34,775 bytes of text and 128 terminators fill it");
-    full[0] = Buffer.alloc(34903 - 128 + 1, 0x41);
+    const full = empty(); full[0] = Buffer.alloc(MACRO_DOMAIN_V1.MAX_SIZE - 128, 0x41);
+    assert.equal(encodeMacroDomain(full).length, MACRO_DOMAIN_V1.MAX_SIZE, "one macro's text and 128 terminators fill it");
+    full[0] = Buffer.alloc(MACRO_DOMAIN_V1.MAX_SIZE - 128 + 1, 0x41);
     reject(() => encodeMacroDomain(full), "CAPACITY_EXCEEDED");
 });
