@@ -315,5 +315,6 @@ The [Ark guide](docs/guide/README.md) has a page per screen:
 - [Edit modes and Review](docs/guide/review-and-save.md)
 - [Backups](docs/guide/backups.md)
 
-Working on Ark itself: [Developing Ark](docs/development.md). Ark is GPL-2.0;
-see [LICENSE](LICENSE).
+Working on Ark itself: [Developing Ark](docs/development.md). Ark is licensed
+GPL-2.0-or-later: version 2 of the GNU General Public License
+([LICENSE](LICENSE)) or, at your option, any later version.
