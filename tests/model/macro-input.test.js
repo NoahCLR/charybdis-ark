@@ -71,3 +71,13 @@ test("a macro that does not read says why in the vocabulary's words", () => {
     assert.equal(inspectMacroInput("{KC_A,KC_A}").error, VOCABULARY.macroProblems.chord);
     assert.equal(inspectMacroInput("{KC_A}", {bankFree: 100}).error, "");
 });
+
+// The keyboard report has six key slots whatever the build, so an edit holds
+// at most six keys at once besides its modifiers (firmware D-F65).
+test("an edit that holds more than six keys at once besides modifiers is refused in the vocabulary's words", () => {
+    const {VOCABULARY} = require("../../core/model/vocabulary");
+    assert.equal(inspectMacroInput("{KC_E,KC_Y,KC_K,KC_SCLN,KC_P,KC_0,KC_U}").error, VOCABULARY.macroProblems.reportFull);
+    assert.equal(inspectMacroInput("{KC_LGUI,KC_LALT,KC_LCTL,KC_LSFT,KC_E,KC_Y,KC_K,KC_SCLN,KC_P,KC_0}", {bankFree: 34903}).error, "");
+    assert.equal(inspectMacroInput("{+KC_A}{+KC_B}{+KC_C}{+KC_D}{+KC_E}{+KC_F}z{-KC_F}{-KC_E}{-KC_D}{-KC_C}{-KC_B}{-KC_A}").error, VOCABULARY.macroProblems.reportFull);
+    assert.throws(() => encodeMacroPayload("{KC_E,KC_Y,KC_K,KC_SCLN,KC_P,KC_0,KC_U}"), {code: "INVALID_MACRO"});
+});

@@ -6,6 +6,7 @@ const keycodes = require("./keycodes");
 const {layoutTypes, US_HOST_LAYOUT} = require("../data/host-layouts");
 const MACRO_PROTECTION = Object.freeze({AUTO: "auto", ON: "on", OFF: "off"});
 const {MACRO_LIMITS, readMacroPayload} = require("../../rules/macro-payload.mjs");
+const {MODIFIER_KEYS, inBlock} = require("../../rules/qmk-keycodes.mjs");
 /** @param {string} message */
 const fail = message => Object.assign(new Error(message), {code: "INVALID_MACRO"});
 /** @param {unknown} key @returns {key is number} */
@@ -20,7 +21,7 @@ function macroKeycodes() {
 }
 
 function macroModifierKeycodes() {
-    return catalog.entries().filter(entry => entry.value >= 0xE0 && entry.value <= 0xE7).flatMap(entry => [entry.name, ...entry.aliases]);
+    return catalog.entries().filter(entry => inBlock(entry.value, MODIFIER_KEYS)).flatMap(entry => [entry.name, ...entry.aliases]);
 }
 
 // A stored macro's steps, read in the shared macro grammar
@@ -31,7 +32,8 @@ function macroModifierKeycodes() {
 // name, as the step editor refuses it. A macro that does not read is refused
 // with the grammar's reason (`problem`), which the model words from the
 // vocabulary (wordedMacroError); a macro that leaves a key held is refused
-// too.
+// too, as is one holding more keys at once than the report's six key slots
+// besides its modifiers (firmware D-F65), stored or edited.
 /** @type {Set<string> | undefined} */
 let sendableNames;
 /** @param {string} name */
@@ -41,7 +43,7 @@ function parsePayload(payload, {textEntry = false, layout = US_HOST_LAYOUT} = {}
     if (typeof payload !== "string") throw fail("Enter a macro as text.");
     const {steps, error} = readMacroPayload(payload, {
         identity: name => sendable(name) ? keycodes.encode(name) : name, sendable,
-        textEntry, needsEntry: character => !layoutTypes(layout, character), ordinary: key => /** @type {number} */ (key) < 0xE0,
+        textEntry, needsEntry: character => !layoutTypes(layout, character), ordinary: key => !inBlock(/** @type {number} */ (key), MODIFIER_KEYS),
         skipEmptyNames: true, stopAtTextHold: true, releaseAll: true,
     });
     if (error) throw Object.assign(fail(`This macro does not read (${error.code}).`), {problem: error});

@@ -334,3 +334,13 @@ test("unused macro tails survive names and layer edits, while stream edits recla
     assert.deepEqual(macros(reorderLayers(source, [0, 2, 1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15])), macros(source));
     assert.deepEqual(Buffer.from(JSON.parse(JSON.stringify(source)).profile, "base64"), bytes, "portable JSON retains the exact complete blob");
 });
+
+// No macro is kept for the six-key limit's sake (firmware D-F65): a stored
+// one over it does not read, as any macro that does not read, so a backup
+// holding one is refused.
+test("a stored macro holding more than six keys besides modifiers does not read, and a backup holding one is refused", () => {
+    const {validateMacro} = require("../../core/model/portable-profile");
+    const keys = [0x08, 0x1c, 0x0e, 0x33, 0x13, 0x27, 0x18]; // E Y K ; P 0 U
+    const chord = Buffer.from([...keys.slice(0, -1).flatMap(key => [1, 2, key]), 1, 1, keys.at(-1), ...keys.slice(0, -1).reverse().flatMap(key => [1, 3, key])]);
+    assert.throws(() => validateMacro(chord), {message: VOCABULARY.macroProblems.reportFull});
+});
