@@ -49,6 +49,58 @@ copy's **Use as draft** wait until Ark has read the keyboard's complete
 profile. If it can't, read the keyboard again (see
 [Connecting](connecting.md#reading-the-keyboard)).
 
+## Import a VIA layout
+
+Coming from VIA? Save your layout there (**Save + Load**, **Save Current
+Layout**), then choose or drop that `.layout.json` file on the **Import
+profile** card here, as you would a backup. It opens the same sheet, titled
+"Use this VIA layout as your draft?".
+
+A VIA layout holds keys and macros only, so it changes only those:
+
+- its layers replace Base and the layers after it, as many as the file has,
+  and every layer above them is emptied (all transparent),
+- its macros fill the first macro slots, and every slot above them is
+  emptied,
+- layer and macro names are cleared, since they named what was there before,
+  and so is everything else set per layer: combo matching, the keys taken out
+  of behaviours or combos, default layers, auto-sniping layers, and which
+  layers use behaviours and combos (all of them again). The layers the file
+  doesn't fill also lose their colours and accents; the ones it fills keep
+  theirs.
+- the pointer layer (Auto-mouse's) becomes the file's highest layer above
+  Base with mouse buttons, where VIA keymaps keep them; if no layer has any,
+  Auto-mouse is turned off. Pointing modes stop being started by layers the
+  file empties. The sheet says when the pointer layer moved or Auto-mouse
+  turned off.
+
+Importing a VIA layout is a fresh start, so by default your draft's
+behaviours, combos and custom keys go too. When your draft has any, the
+sheet asks "Start from a blank slate?" with a switch for each, all on to
+begin with; turn one off to keep that kind:
+
+- **Remove the draft's behaviours**: the behaviours on ordinary keys.
+- **Remove the draft's combos**: every combo. Combo timing is a setting, so it
+  stays.
+- **Remove the draft's custom keys, with their behaviours**: each custom key's
+  name, shortcut and behaviour, as **Clear** in Keys does.
+
+Each switch updates the sheet's counts at once, so they always say what
+**Use as draft** does. Whatever you keep still turns on the layers it turned
+on, so those layers stay listed instead of folding away as empty layers.
+Pointing modes, the rest of lighting and settings, and the text replacement
+list stay as your draft has them.
+
+A key Ark doesn't know or can't place, a custom key from older Ark firmware
+(which does nothing on current firmware), or a macro it can't type, is left
+empty, and the sheet lists each with why ("Left empty: 1 key and 1 macro Ark
+cannot bring from this file"). Everything else in the file still comes. Ark
+refuses a layout for another keyboard (its layers don't have the 4x6's 60
+keys) or with more layers than the keyboard holds.
+
+A VIA layout comes into your draft, so it needs the keyboard's complete
+profile read first. **Undo** takes the whole import back.
+
 ## Recovery copies
 
 Before every save and before leaving Live edit, Ark saves a recovery copy of

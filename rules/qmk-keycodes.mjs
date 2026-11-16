@@ -31,6 +31,8 @@ const QK = Object.freeze({
     LAYER_TAP_TOGGLE: block(0x52c0, 0x52df),
     PERSISTENT_DEF_LAYER: block(0x52e0, 0x52ff),
     MACRO: block(0x7700, 0x777f),
+    KB: block(0x7e00, 0x7e3f),
+    USER: block(0x7e40, 0x7fff),
 });
 /** @param {number} code @param {KeycodeBlock} range */
 const inBlock = (code, {first, last}) => code >= first && code <= last;

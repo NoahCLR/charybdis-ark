@@ -46,6 +46,8 @@ export interface ControlPayloads {
         restorePortableProfile: {};
         managePortableLayers: {};
         cancelPortableReview: {};
+        /** A VIA layout's import also removes the draft's behaviours, combos or custom keys, for a blank slate (D-L97). */
+        setViaImportClears: {clear: import('./model.js').ViaClears};
         editPortableLayer: LayerEditPayload;
         savePortableLayers: LayerSavePayload;
         reviewPortableProfile: Omit<Extract<PanelEdit, {type: 'reviewPortableProfile'}>, 'type'>;

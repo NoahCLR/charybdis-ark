@@ -5,7 +5,7 @@ const assert = require("node:assert/strict");
 const {exportedProfile, openPanelLoop, postedModel} = require("../../core/session/panel-loop");
 const {FakeDeviceAdapter} = require("../../core/transport/fake-device-adapter");
 const {LIVE_LINK_ERROR_CODES, liveLinkError} = require("../../core/transport/device-adapter");
-const {fingerprint, summary} = require("../../core/model/portable-profile");
+const {fingerprint, summary, validateSnapshot} = require("../../core/model/portable-profile");
 const {document} = require("../fixtures/pd-profile");
 const {document: currentDocument, CURRENT_CAPABILITIES} = require("../fixtures/portable-profile");
 const {fakeKeyboardAdapter, fakeKeyboard} = require("../fixtures/fake-keyboard");
@@ -105,6 +105,46 @@ test("dropped files use the chooser's validation and review without opening a sh
     await loop.handleMessage(message(JSON.stringify(changed)));
     assert.match(last(shell).notice, /Read the keyboard/);
     assert.deepEqual(service.calls, []);
+});
+
+test("a VIA layout comes into the draft's own profile, says what it left out, and is undone as one import (D-L97)", async () => {
+    const service = fakeService(), shell = fakeShell();
+    const loop = openPanelLoop(shell, {service});
+    loop.serviceChanged();
+    const draft = loop.session.draft, before = draft.document;
+    const keys = Array.from({length: 60}, (_, position) => position === 7 ? "NOT_A_KEY" : "KC_B");
+    const text = JSON.stringify({name: "Charybdis", vendorProductId: 1, macros: ["hi", ...Array(15).fill("")], layers: [keys, keys], encoders: []});
+    await loop.handleMessage({type: "reviewPortableProfile", text, name: "charybdis.layout.json", draftId: draft.id, draftRevision: draft.revision});
+    const review = last(shell).model.portable.review;
+    assert.equal(review.fileName, "charybdis.layout.json");
+    assert.equal(review.via.layers, 2);
+    assert.equal(review.via.macros, 1);
+    assert.deepEqual(review.via.left.keys.map(key => [key.layer, key.position, key.spelling]), [[0, 7, "NOT_A_KEY"], [1, 7, "NOT_A_KEY"]]);
+    assert.ok(review.differences.length, "compared with the keyboard as a backup is");
+    assert.deepEqual(review.via.clear, {behaviors: true, combos: true, customKeys: true}, "a fresh start: the blank slate is whole until something is kept");
+    assert.ok(review.via.clearable.behaviors > 0 && review.via.clearable.customKeys > 0);
+    // Keeping something reads the file again, and the comparison follows.
+    await loop.handleMessage({type: "setViaImportClears", clear: {behaviors: false, combos: true, customKeys: true}});
+    const kept = last(shell).model.portable.review;
+    assert.deepEqual(kept.via.clear, {behaviors: false, combos: true, customKeys: true});
+    assert.deepEqual(kept.via.clearable, review.via.clearable, "counted from the draft, not from the import");
+    assert.equal(kept.fileName, "charybdis.layout.json");
+    assert.ok(kept.differences.length < review.differences.length);
+    assert.ok(validateSnapshot(loop.session.portableReview.document, capabilities).behaviors.rows.length > 0);
+    await loop.handleMessage({type: "setViaImportClears", clear: {behaviors: true, combos: true, customKeys: true}});
+    assert.deepEqual(validateSnapshot(loop.session.portableReview.document, capabilities).behaviors.rows, []);
+    assert.deepEqual(draft.document, before, "nothing changes before Use as draft");
+    await loop.handleMessage({type: "restorePortableProfile"});
+    assert.deepEqual(validateSnapshot(draft.document, capabilities).behaviors.rows, [], "Use as draft takes the blank slate chosen");
+    assert.equal(loop.session.portableReview, undefined);
+    assert.equal(last(shell).model.draft.undoLabel, "Imported a VIA layout");
+    assert.deepEqual(service.calls.filter(call => call !== "readPortableProfile"), [], "nothing reaches the keyboard");
+    await loop.handleMessage({type: "undoProfileDraft", draftId: draft.id, draftRevision: draft.revision});
+    assert.deepEqual(draft.document, before);
+    // A backup's review has no blank slate to choose.
+    await loop.handleMessage({type: "reviewPortableProfile", text: JSON.stringify(before), name: "a.charybdis.json", draftId: draft.id, draftRevision: draft.revision});
+    await loop.handleMessage({type: "setViaImportClears", clear: {behaviors: true, combos: true, customKeys: true}});
+    assert.match(last(shell).notice, /Only a VIA layout's import/);
 });
 
 // A connected keyboard with a complete profile, as panel-controls.test.js fakes it.

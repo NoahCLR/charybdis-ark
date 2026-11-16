@@ -33,6 +33,21 @@ export interface ShellPanel {
     progress: string | null;
     words: Record<string, string>;
 }
+/** What a VIA import also removes from the draft for a blank slate (D-L97), all of it unless the person keeps some: the behaviours on ordinary keys, the combos, the custom keys (with their own behaviours). */
+export interface ViaClears {behaviors: boolean; combos: boolean; customKeys: boolean}
+/** How many of each the draft has for a blank slate to remove; none of a kind, and the sheet does not offer it. */
+export interface ViaClearable {behaviors: number; combos: number; customKeys: number}
+/** A VIA layout read into the draft (core/model/via-layout.js, D-L97): the layers and macros it brought, the blank slate asked, what became of the pointer layer, and each key or macro left empty, with why. */
+export interface ViaImportView {
+    layers: number;
+    macros: number;
+    clearable: ViaClearable;
+    clear: ViaClears;
+    /** What became of Auto-mouse's pointer layer, which the file decides: moved to the file's highest layer above Base with mouse buttons, or Auto-mouse turned off for want of one. Null when neither happened. */
+    pointer: {layer: number; layerName: string; change: 'moved' | 'off'} | null;
+    /** Each left empty, named as core names it: a key by its layer, a macro by its slot. */
+    left: {keys: {layer: number; layerName: string; position: number; spelling: string; reason: string}[]; macros: {slot: number; name: string; reason: string}[]};
+}
 export interface DemoView {
     active: boolean;
     offered: boolean;

@@ -271,7 +271,8 @@ browser tab, and closing it drops them after the browser asks.
 **Save to keyboard** saves the profile on both halves together. Before it
 does, Ark stores a recovery copy in the browser, which **Backups** can bring
 back. **Export profile…** writes the whole profile to one file, and importing
-that file goes through Review like any other change.
+that file goes through Review like any other change. A layout saved from VIA
+imports the same way, bringing its keys and macros.
 
 <a name="install"></a>
 

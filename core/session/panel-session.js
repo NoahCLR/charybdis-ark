@@ -191,7 +191,7 @@ function buildPanelModel(session, state) {
         progress: state.portableProgress,
         review: session.portableReview ? {incoming: summary(session.portableReview.document), current: session.portableReview.before.summary,
             fileName: session.portableReview.fileName || null, differences: importDifferences({...session, portableReview: session.portableReview}),
-            fits: fileFits(session.portableReview.document, state.capabilities)} : null,
+            fits: fileFits(session.portableReview.document, state.capabilities), via: session.portableReview.via ?? null} : null,
         layers: portableLayersView(session.portableLayers),
         usage: usageOf(session, state, draft),
         putBack: keptFor(session, "beforeApply", state)?.savedAt ?? null,

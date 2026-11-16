@@ -1420,6 +1420,26 @@ backup identical to the keyboard says so and is usable only while the draft
 has edits (`browser-tests/web-page.spec.js`). A backup carries no layer order,
 so it is compared slot by slot (no test).
 
+A VIA layout opens the same review (D-L97): read into the draft's own
+profile, its keys and macros only, the layers and macro slots above the
+file's emptied, their names cleared and every layer's own state reset
+(lighting only on the layers emptied). The file decides the pointer layer,
+its highest layer above Base with a mouse button, or Auto-mouse turns off;
+pointing modes' links drop the emptied layers. So a
+layer the file leaves empty folds as an empty layer unless something kept
+turns it on (`tests/model/via-layout.test.js`, `browser-tests/web-page.spec.js`).
+The sheet says what it replaces, by the layer names its table uses, and when
+the pointer layer moved or Auto-mouse turned off, and lists what was left empty, one line per key the
+file names and per macro, each named as core names it, the first
+`VIA_LEFT_SHOWN` in full (`tests/view/backups.test.mjs`); with no draft
+it is refused, and Undo takes it back as one import
+(`tests/session/panel-loop.test.js`). The sheet asks for a blank slate only
+for what the draft has (`viaClearChoices`), each kind on its own switch, all
+on (`BLANK_SLATE`), and its callout names only the kinds the draft has; a
+switch posts `setViaImportClears` and core reads the file again, so the
+counts follow (`tests/model/via-layout.test.js`,
+`browser-tests/web-page.spec.js`).
+
 ## Demo
 
 The demo is a draft with no keyboard behind it (D-L53): the same
