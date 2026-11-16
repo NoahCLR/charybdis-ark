@@ -117,11 +117,14 @@ function autocorrectEditorView(snapshot, capabilities) {
         entries: list.entries.map(entry => ({id: entryKey(entry), label: replacementCalled(entry, host.macroNames), correction: entry.correction, ...(entry.macro === undefined ? {} : {macro: entry.macro}),
             fires: TRIGGER_NAMES[triggerOf(entry)], warnings: said(entryKey(entry)),
             typos: entry.typos.map(typo => ({typo: typo.typo, input: inputForm(typo), warnings: said(entryKey(entry), typo.typo)}))})),
-        // `share` is the list's bytes of its own limit, the one figure both
-        // memory meters draw; `free` is what it can still grow by, which its
-        // text's ceiling and the profile's shared room may bound sooner.
+        // `share` is the list's text of the text the keyboard holds for it,
+        // the one figure both memory meters draw, and `free` what it can
+        // still grow by. The domain's size is not shown: its ceiling is the
+        // text's plus every row at its count's ceiling, so the text or a count
+        // meets its own first. It and the profile's shared room still bound
+        // `free`, in case a keyboard reports them tighter.
         usage: {corrections: used.corrections, typos: used.typos, leaders: used.leaders, maxTypos: room.maxTypos,
-            textBytes: used.textBytes, maxTextBytes: room.maxTextBytes, bytes: used.bytes, capacity: room.capacity, share: room.capacity > 0 ? Math.min(1, used.bytes / room.capacity) : 0,
+            textBytes: used.textBytes, maxTextBytes: room.maxTextBytes, share: room.maxTextBytes > 0 ? Math.min(1, used.textBytes / room.maxTextBytes) : 0,
             free: Math.max(0, Math.min(room.capacity - used.bytes, room.maxTextBytes - used.textBytes, room.sharedFree)), textMax: capabilities?.autocorrectTextMax ?? AUTOCORRECT_DOMAIN_V1.TEXT_MAX,
             correctionMax: capabilities?.autocorrectCorrectionMax ?? AUTOCORRECT_DOMAIN_V1.CORRECTION_MAX, shortInput: SHORT_INPUT_LETTERS},
         notices: notice ? [notice] : [],

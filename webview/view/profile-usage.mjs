@@ -30,7 +30,7 @@ const share = (used, capacity) => (capacity > 0 ? Math.min(1, used / capacity) :
 
 // The card's figures, or null when the core sent none (no keyboard, or
 // firmware that does not advertise its profile size).
-/** @param {import("./vocabulary.mjs").VocabularyModel | null | undefined} model @param {import("../../contracts/model.js").ProfileUsage | null | undefined} usage @param {{stored: number, capacity: number, reserveTaps?: number} | null} [macroBank] @param {{bytes: number, capacity: number, share: number} | null} [replacements] the text replacement list's bytes against what the keyboard holds for it, and how full that is as core works it out (`share`, the one the Text replacement screen draws too) */
+/** @param {import("./vocabulary.mjs").VocabularyModel | null | undefined} model @param {import("../../contracts/model.js").ProfileUsage | null | undefined} usage @param {{stored: number, capacity: number, reserveTaps?: number} | null} [macroBank] @param {{textBytes: number, maxTextBytes: number, share: number} | null} [replacements] the text replacement list's text against the text the keyboard holds for it, and how full that is as core works it out (`share`, the one the Text replacement screen draws too) */
 export function profileUsageView(model, usage, macroBank, replacements) {
     if (!usage) return null;
     const fraction = share(usage.used, usage.capacity);
@@ -53,6 +53,6 @@ export function profileUsageView(model, usage, macroBank, replacements) {
             };
         }),
         macros: macroBank ? {used: macroBank.stored, capacity: macroBank.capacity, share: share(macroBank.stored, macroBank.capacity)} : null,
-        replacements: replacements ? {used: replacements.bytes, capacity: replacements.capacity, share: replacements.share} : null,
+        replacements: replacements ? {used: replacements.textBytes, capacity: replacements.maxTextBytes, share: replacements.share} : null,
     };
 }

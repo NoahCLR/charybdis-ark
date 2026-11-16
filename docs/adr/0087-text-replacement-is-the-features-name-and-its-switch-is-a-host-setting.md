@@ -2,6 +2,8 @@
 
 Cited as D-L87.
 
+Amended 2026-11-16: the Text replacement memory meter was the domain's bytes against the domain's ceiling (36,874), while what is free was bound by the text's ceiling, so the two disagreed and the text's limit appeared nowhere. The domain's ceiling is the text's plus every row at its count's ceiling (firmware `autocorrect-domain.md`), so the text or a count always meets its own first; it is a size, not a limit a person can reach, and is no longer shown. What is free is still bounded by it and by the profile's shared room, in case a keyboard reports them tighter.
+
 ## The name
 
 What the firmware calls autocorrect (firmware D-F68, D-F69) is **Text replacement** wherever a person reads it: the rail, the screen's title, the Host card, the Memory panel, Review's area, the picker's words for the `AC_*` keys, every message, the guide and the README. It fixes typos, and it also types a phone number for `pnumber` and plays a macro for `sig`; "autocorrect" names the first of those and hides the others, and "typo" and "correction" made every abbreviation read as a mistake. An entry is a **replacement** and its **inputs** (D-L84).
@@ -18,7 +20,7 @@ Text replacement follows that. Its stored switch, key option 12 of the settings 
 
 So a section is edited on the screen `SETTINGS_SCREENS` draws it on and nowhere else: `screenOfSection` is the one answer to where Review's Show goes, and no section is special.
 
-The list's memory is the Keyboard screen's with the rest of the profile's: **Text replacement inputs** among the counts in use, the ceiling an edit meets first (D-L84), and **Text replacement memory** after Macro memory, the list's bytes against its own limit. The screen's bank shows the same two figures (D-L88), and both meters draw one share, which core works out (`usage.share`); the bank also says how many bytes are free, as Macro memory does: what the list can still grow by, bounded by its text's ceiling and the profile's shared room too.
+The list's memory is the Keyboard screen's with the rest of the profile's: **Text replacement inputs** among the counts in use, the ceiling an edit meets first (D-L84), and **Text replacement memory** after Macro memory, the list's text against the text the keyboard holds for it (20,480 bytes on current firmware). The screen's bank shows the same two figures (D-L88), and both meters draw one share, which core works out (`usage.share`); the bank also says how many bytes are free, as Macro memory does: what the list can still grow by.
 
 ## Considered options
 

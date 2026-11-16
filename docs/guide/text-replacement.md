@@ -464,16 +464,18 @@ with its reason in a line under what it is about. It never stops you saving.
 
 ## Memory
 
-The list's heading counts your inputs against what the keyboard holds: 1,024
-on current firmware. Under the list, **Text replacement memory** shows the
-bytes the list uses of its 34,824, with a bar, how many bytes are free, and
-your replacements and inputs. What is free is what the list can still grow
-by: its own memory, the 20,480 bytes of text it may hold, or the room left
-in the profile, whichever is least. The list shares the profile's memory
-with everything else; the
+The keyboard limits the list in two ways: by how many inputs it has, and by
+how much text they and their replacements hold together. On current firmware
+that is 1,024 inputs and 20,480 bytes of text, a letter taking one byte and
+an accented letter two or more. The list's heading counts your inputs.
+Under the list, **Text replacement memory** shows the bytes of text you have
+used of the 20,480, with a bar, how many are free, and your replacements and
+inputs. Whichever limit is met first refuses the next edit.
+
+The list is stored with the rest of the profile; the
 [Keyboard screen](connecting.md#the-keyboard-screen)'s **Memory** panel
-shows both, with **Text replacement inputs** among the counts and **Text
-replacement memory** after Macro memory, its bar as full as the one here.
+shows **Text replacement inputs** among the counts and **Text replacement
+memory** after Macro memory, its bar as full as the one here.
 
 ## Review and backups
 

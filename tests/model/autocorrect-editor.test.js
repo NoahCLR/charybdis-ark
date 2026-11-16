@@ -47,10 +47,10 @@ test("the view lists each replacement once with its inputs, as it is written, in
         {id: "thing", label: "thing", correction: "thing", fires: "word", warnings: [], typos: [{typo: "tihng", input: "*tihng*", warnings: []}]},
         {id: entryKey({macro: 5}), label: "Macro 5 named", correction: "", macro: 5, fires: "word", warnings: [], typos: [{typo: "sig", input: "sig", warnings: []}]}],
         "each named once, by core: its text, or its macro's name after the mark");
-    const bytes = autocorrectDomainSize(validateSnapshot(current.document).autocorrect);
-    // The share both memory meters draw is the list's bytes of its own limit;
-    // what is free is bound by the text's ceiling and the profile's room too.
-    assert.deepEqual(view.usage, {corrections: 6, typos: 7, leaders: 0, maxTypos: 1024, textBytes: 58, maxTextBytes: 20480, bytes, capacity: 36874, share: bytes / 36874, free: 20480 - 58, textMax: 32, correctionMax: 128, shortInput: 4});
+    // The share both memory meters draw is the list's text of the text the
+    // keyboard holds for it, the limit met first, so it agrees with what is
+    // free; the domain's own size is not published.
+    assert.deepEqual(view.usage, {corrections: 6, typos: 7, leaders: 0, maxTypos: 1024, textBytes: 58, maxTextBytes: 20480, share: 58 / 20480, free: 20480 - 58, textMax: 32, correctionMax: 128, shortInput: 4});
     assert.equal("starter" in view, false, "Ark ships no list of its own to offer (D-L90)");
     assert.deepEqual([view.notices, view.layoutName], [[], "US"]);
     assert.equal(autocorrectEditorView(null), null);
@@ -61,11 +61,12 @@ test("the keyboard's own ceilings and the profile's free room bound the list's",
     const current = fixture([["the", "teh"]]);
     const stored = validateSnapshot(current.document);
     const view = autocorrectEditorView(current, {...CURRENT_CAPABILITIES, maxAutocorrectCorrections: 10, maxAutocorrectTypos: 20, autocorrectTextBytes: 300, autocorrectBytes: 500, maxProfilePayload: stored.candidate.length + 40});
-    assert.deepEqual([view.usage.maxTypos, view.usage.maxTextBytes, view.usage.capacity, view.usage.free], [20, 300, 500, 40]);
-    assert.equal(view.usage.share, view.usage.bytes / 500);
+    assert.deepEqual([view.usage.maxTypos, view.usage.maxTextBytes, view.usage.free], [20, 300, 40]);
+    assert.equal(view.usage.share, 6 / 300, "the meter is the text against the keyboard's text ceiling");
     // Whichever is tightest: the list's own bytes, its text's ceiling or the profile's room.
+    const bytes = autocorrectDomainSize(stored.autocorrect);
     const tight = capabilities => autocorrectEditorView(current, {...CURRENT_CAPABILITIES, maxProfilePayload: stored.candidate.length + 40, ...capabilities}).usage.free;
-    assert.deepEqual([tight({autocorrectBytes: view.usage.bytes + 7}), tight({autocorrectTextBytes: 6 + 9}), tight({autocorrectBytes: view.usage.bytes - 1})], [7, 9, 0]);
+    assert.deepEqual([tight({autocorrectBytes: bytes + 7}), tight({autocorrectTextBytes: 6 + 9}), tight({autocorrectBytes: bytes - 1})], [7, 9, 0]);
     const lengths = autocorrectEditorView(current, {...CURRENT_CAPABILITIES, autocorrectTextMax: 30, autocorrectCorrectionMax: 100}).usage;
     assert.deepEqual([lengths.textMax, lengths.correctionMax], [30, 100]);
 });
