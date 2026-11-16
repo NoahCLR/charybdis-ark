@@ -129,9 +129,21 @@ Writing the profile the keyboard runs to a backup without changing anything.
 _Avoid_: save (for this), download, backup now
 
 **Import profile**:
-Opening a backup against the keyboard so it can become the draft after
-review.
+Opening a backup, or a VIA layout, against the keyboard so it can become the
+draft after review.
 _Avoid_: restore (alone), load, upload
+
+**VIA layout**:
+The file VIA saves of a keyboard's keys and macros (Save Current Layout, a
+`.layout.json`). Import profile reads one into the draft, its keys and macros
+only (D-L97).
+_Avoid_: VIA backup, VIA profile, VIA keymap (for the file)
+
+**Blank slate**:
+What importing a VIA layout also removes from the draft, since the file
+holds only keys and macros: the behaviours on ordinary keys, the combos and
+the custom keys, each on its own switch, all on unless kept (D-L97).
+_Avoid_: reset, wipe, factory reset (for this)
 
 ## The interface
 

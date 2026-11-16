@@ -207,7 +207,7 @@ export const editWords = (draft) => liveMode(draft) === null ? REVIEW_AND_SAVE_W
 /** @param {Draft | null | undefined} draft */
 export function importNote(draft) {
     const mode = liveMode(draft);
-    return `Choose or drop a backup to compare it first. ${mode === null
+    return `Choose or drop a backup, or a layout saved from VIA, to compare it first. ${mode === null
         ? "It replaces your draft; nothing reaches the keyboard until you review and save it."
         : `Use as draft sends it to the keyboard at once ${unsavedEdits(mode)}`}`;
 }

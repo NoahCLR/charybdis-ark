@@ -168,7 +168,11 @@ export interface LayerEditState {before: import('../model/types.js').CompleteSna
 /** Posted layer-editor data; applyLayerEdit still checks each field it reads. */
 export type LayerEditMessage = import('../../contracts/messages.js').LayerEditControl | import('../../contracts/messages.js').LayerSaveControl;
 export interface ImportDifferences {against: string; items: (import('../../contracts/model.js').ReviewSummary & {unit: string})[]}
-export interface PortableReview {document: import('../model/types.js').PortableDocument; before: import('../model/types.js').ProfileSnapshot; fileName?: string | null; differences?: ImportDifferences; revision?: number; deviceId?: string | null; draftId?: string}
+export interface PortableReview {document: import('../model/types.js').PortableDocument; before: import('../model/types.js').ProfileSnapshot; fileName?: string | null; differences?: ImportDifferences; revision?: number; deviceId?: string | null; draftId?: string;
+    /** A VIA layout's import (core/model/via-layout.js): how many layers and macros came, and what was left out. */
+    via?: import('../../contracts/model.js').ViaImportView;
+    /** The VIA layout the review read, and the blank slate chosen, to read it again with another (panel-controls.js viaClears). */
+    viaSource?: {via: NonNullable<ReturnType<typeof import('../model/via-layout.js').viaLayoutOf>>; clear: import('../../contracts/model.js').ViaClears}}
 export interface PanelShell extends ProfileChooser {words?: Record<string, string>; panel?: () => Partial<import('../../contracts/model.js').ShellPanel>}
 export interface PanelSession extends DemoSession {
     shell?: PanelShell;

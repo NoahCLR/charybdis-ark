@@ -41,6 +41,7 @@ const CONTROLS = Object.freeze({
     managePortableLayers: Object.freeze({route: "portable", action: "manageLayers", binding: "profile", demo: "allow", phase: "panel", identity: false}),
     editPortableLayer: Object.freeze({route: "portable", action: "editLayer", binding: "profile", demo: "allow", phase: "panel", identity: false}),
     savePortableLayers: Object.freeze({route: "portable", action: "saveLayers", binding: "profile", demo: "allow", phase: "restore", identity: false}),
+    setViaImportClears: Object.freeze({route: "portable", action: "viaClears", binding: "profile", demo: "allow", phase: "panel", identity: false}),
     cancelPortableReview: Object.freeze({route: "portable", action: "cancel", binding: "none", demo: "allow", phase: "panel", identity: false}),
     openDemo: Object.freeze({route: "demo", action: "open", binding: "none", demo: "open", phase: "panel", identity: false}),
     openDemoProfile: Object.freeze({route: "demo", action: "openProfile", binding: "none", demo: "replace", phase: "panel", identity: false}),

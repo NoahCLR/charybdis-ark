@@ -94,6 +94,56 @@ for (const demo of [false, true]) test(`drop a profile into the real ${demo ? "d
     ownFilesOnly();
 });
 
+test("a dropped VIA layout opens the import review, says what it leaves empty, and comes into the draft as one undoable import", async ({page, context, baseURL}) => {
+    const {keyboard, ownFilesOnly} = await withKeyboard(context, baseURL);
+    const errors = await open(page);
+    await page.locator('.read-placeholder [data-act="choose-keyboard"]').click();
+    await ready(page);
+    await page.locator('[data-screen="profile"]').click();
+    await expect(page.locator("[data-profile-drop]")).toContainText("or a layout saved from VIA");
+    const keys = Array.from({length: 60}, (_, position) => position === 7 ? "NOT_A_KEY" : position === 8 ? "CUSTOM(80)" : "KC_B");
+    const layout = {name: "Charybdis", vendorProductId: 2834831411, macros: ["hi{KC_ENT}", ...Array(15).fill("")], layers: [keys, keys], encoders: []};
+    await dropFiles(page, [{name: "charybdis.layout.json", text: JSON.stringify(layout), type: ""}]);
+    const sheet = page.locator(".import-sheet");
+    await expect(sheet.locator("h2")).toHaveText("Use this VIA layout as your draft?");
+    await expect(sheet).toContainText("charybdis.layout.json");
+    await expect(sheet).toContainText("Its 2 layers replace Base to Layer 1, and every layer above is emptied");
+    await expect(sheet).toContainText("Auto-mouse is turned off: no layer of this file above Base has mouse buttons.");
+    await expect(sheet.locator(".via-left")).toContainText("Left empty: 4 keys Ark cannot bring from this file");
+    await expect(sheet.locator(".via-left li")).toHaveCount(2);
+    await expect(sheet.locator(".via-left")).toContainText("CUSTOM(80) on Base and Layer 1 (2 keys): It was custom key 16 on older firmware");
+    // The draft has behaviours and custom keys; the blank slate starts whole,
+    // and each kind can be kept.
+    await expect(sheet.locator(".via-slate")).toContainText("Start from a blank slate?");
+    const behaviours = sheet.locator('[data-via-clear="behaviors"]');
+    await expect(behaviours).toBeChecked();
+    await expect(sheet.locator('[data-via-clear="customKeys"]')).toBeChecked();
+    await expect(sheet).toContainText("Your draft's behaviours and custom keys are removed. Combos, pointing modes and the rest of lighting and settings stay as they are.");
+    await sheet.locator('label.sw:has([data-via-clear="behaviors"])').click();
+    await expect(behaviours).not.toBeChecked();
+    await expect(sheet).toContainText("Your draft's custom keys are removed. Behaviours, combos, pointing modes and the rest of lighting and settings stay as they are.");
+    await sheet.locator('label.sw:has([data-via-clear="behaviors"])').click();
+    await expect(behaviours).toBeChecked();
+    await expect(sheet.locator(".import-diff")).toContainText("Behaviours");
+    await page.locator('[data-act="restore"]').click();
+    await expect(page.locator(".commit")).toContainText(/\d+ changes?\s+in your draft/);
+    expect(keyboard.mutations).toEqual([]);
+    // The layers the file left empty fold as empty layers (D-L76): nothing of
+    // theirs is left, lighting included, and nothing kept turns them on. The
+    // pointer layer was Layer 4, and this file has no mouse buttons, so
+    // Auto-mouse is off and nothing points at a layer that is gone.
+    await page.locator('[data-screen="keys"]').click();
+    const bar = page.locator(".layerbar-wrap");
+    await expect(bar.locator('[data-empty-layers="layer-bar"]')).toHaveText("14 empty layers");
+    await expect(bar.locator(".layer-tab")).toHaveCount(2);
+    await page.locator('[data-screen="profile"]').click();
+    await page.keyboard.press("Meta+z");
+    await expect(page.locator(".commit", {hasText: /in your draft/})).toHaveCount(0);
+    expect(keyboard.mutations).toEqual([]);
+    expect(errors).toEqual([]);
+    ownFilesOnly();
+});
+
 test("a file that matches the keyboard changes nothing, but still puts a draft with edits back to it", async ({page, context, baseURL}) => {
     const {keyboard} = await withKeyboard(context, baseURL);
     const errors = await open(page);

@@ -24,6 +24,8 @@ export const selectDevice = (deviceId) => ({type: 'selectDevice', deviceId});
 export const saveLayers = (names) => ({type: 'savePortableLayers', names});
 /** @param {boolean} keysFollow @param {string[]} names @returns {import("../../contracts/messages.js").LayerEditControl} */
 export const layersFollow = (keysFollow, names) => ({type: 'editPortableLayer', keysFollow, names});
+/** @param {import("../../contracts/model.js").ViaClears} clear @returns {Extract<import("../../contracts/messages.js").PortableControl, {type: 'setViaImportClears'}>} */
+export const viaImportClears = (clear) => ({type: 'setViaImportClears', clear});
 /** One move of a layer: to a slot, one step up or down, or swapped with the base. @typedef {{to: number} | {direction: 1 | -1} | {makeBase: true}} LayerMove */
 /** @param {number} id @param {LayerMove} change @param {string[]} names @returns {import("../../contracts/messages.js").LayerEditControl} */
 export const moveLayer = (id, change, names) => ({type: 'editPortableLayer', id, ...change, names});

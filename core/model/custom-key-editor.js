@@ -99,18 +99,32 @@ function editCustomKey(document, message, draft) {
 /** @param {import("./types.js").PortableDocument} document @param {number} slot @param {import("./types.js").Draft} draft */
 function clearCustomKey(document, slot, draft) {
     if (!customKeysSupported(document, draft.capabilities)) throw fail("Custom keys need firmware with the userspace keycode blocks.", "CUSTOM_KEYS_UNSUPPORTED");
-    return editProfileDomains(document, draft, (open, read) => {
-        const {settings, behaviors} = read();
-        /** @param {import("../schema/types.js").BehaviorRow} row */
-        const its = row => row.target.kind === ACTION.CUSTOM_KEY && row.target.operand === slot;
-        if (settings.customKeyNames[slot]) open("settings").customKeyNames[slot] = "";
-        if (shortcutIdentity(settings.customKeyShortcuts[slot]) !== shortcutIdentity(NO_SHORTCUT)) open("settings").customKeyShortcuts[slot] = {mods: 0, keys: [], layers: 0, layerKind: 0};
-        if (behaviors.rows.some(its)) {
-            const opened = open("behaviors");
-            opened.rows = opened.rows.filter(row => !its(row));
-        }
-    });
+    return editProfileDomains(document, draft, (open, read) => emptyCustomKey(open, read, slot));
 }
 const NO_SHORTCUT = {mods: 0, keys: [], layers: 0, layerKind: 0};
 
-module.exports = {customKeyEditorView, editCustomKey};
+/** @param {import("../schema/types.js").BehaviorRow} row @param {number} slot */
+const behavesFor = (row, slot) => row.target.kind === ACTION.CUSTOM_KEY && row.target.operand === slot;
+
+// Whether a custom key is in use: it has a name, a shortcut or a behaviour.
+/** @param {Pick<import("./types.js").DecodedProfile, "settings" | "behaviors">} decoded @param {number} slot */
+function customKeyInUse({settings, behaviors}, slot) {
+    return Boolean(settings.customKeyNames[slot]) || shortcutIdentity(settings.customKeyShortcuts[slot]) !== shortcutIdentity(NO_SHORTCUT)
+        || behaviors.rows.some(row => behavesFor(row, slot));
+}
+
+// Empties one custom key within an edit (editProfileDomains): its name, its
+// shortcut and its behaviour rows. Every way Ark empties a custom key does it
+// here: the Keys editor's Clear, and an import's blank slate (D-L97).
+/** @param {import("./types.js").OpenDomain} open @param {() => import("./types.js").DecodedProfile} read @param {number} slot */
+function emptyCustomKey(open, read, slot) {
+    const {settings, behaviors} = read();
+    if (settings.customKeyNames[slot]) open("settings").customKeyNames[slot] = "";
+    if (shortcutIdentity(settings.customKeyShortcuts[slot]) !== shortcutIdentity(NO_SHORTCUT)) open("settings").customKeyShortcuts[slot] = {...NO_SHORTCUT, keys: []};
+    if (behaviors.rows.some(row => behavesFor(row, slot))) {
+        const opened = open("behaviors");
+        opened.rows = opened.rows.filter(row => !behavesFor(row, slot));
+    }
+}
+
+module.exports = {customKeyEditorView, editCustomKey, customKeyInUse, emptyCustomKey, customKeysSupported};

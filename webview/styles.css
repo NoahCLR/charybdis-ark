@@ -2134,6 +2134,10 @@ select.input.pd-add { height: var(--h-chip); width: 124px; min-width: 0; padding
 .sheet.import-sheet { width: min(720px, 100%); }
 .import-sheet .sheet-b { padding: var(--sp-4); }
 .import-fits.warn { color: var(--warning); }
+/* A VIA layout's blank-slate switches: a group in words, not a framed box. */
+.import-sheet .via-slate { border: 0; margin: 0; padding: 0; min-width: 0; }
+.import-sheet .via-slate legend { padding: 0; margin-bottom: var(--sp-2); }
+.import-sheet .via-left ul { margin: var(--sp-2) 0 0; padding-left: var(--sp-5); }
 .setrow { display: grid; grid-template-columns: minmax(0,1fr) 190px; gap: var(--sp-4); align-items: center; padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--line); }
 .setrow:last-child { border-bottom: 0; }
 /* Every control ends at the same right edge, whatever its width: a switch
