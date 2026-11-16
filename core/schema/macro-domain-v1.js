@@ -20,7 +20,7 @@ const {copyBytes, protocolError} = require("./bytes");
 const MACRO_DOMAIN_V1 = Object.freeze({
     VERSION: 1,
     SLOTS: 128,
-    MAX_SIZE: 34903,
+    MAX_SIZE: 40960,
     PREFIX: 0x01,
     TAP: 0x01,
     DOWN: 0x02,

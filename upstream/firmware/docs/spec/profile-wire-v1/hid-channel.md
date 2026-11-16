@@ -12,7 +12,7 @@ pages carry are [blob-and-digests.md](blob-and-digests.md).
 ## Raw HID reports
 
 The firmware answers Raw HID itself (D-F31,
-[`0031`](https://github.com/NoahCLR/charybdis-4x6/blob/15e470cbb58d52009239d8864750333a6478c5f2/docs/adr/0031-via-is-not-supported.md)): QMK's Raw HID interface,
+[`0031`](https://github.com/NoahCLR/charybdis-4x6/blob/3ee9a425a6a92d09ec9503372bfd7310771bad25/docs/adr/0031-via-is-not-supported.md)): QMK's Raw HID interface,
 usage page `0xFF60`, 32-byte reports both ways. Every report goes to the
 Profile Wire handlers and is sent back exactly once, in place, as the reply,
 with the same length.
@@ -118,7 +118,7 @@ Page 2, the wider ceilings; every byte count is 32 bits:
 | 2–5 | profile slot size in bytes | 131,072 |
 | 6–9 | maximum profile payload | 130,048 |
 | 10–13 | slot payload capacity | 130,048 |
-| 14–17 | macro domain capacity in bytes | 34,903 |
+| 14–17 | macro domain capacity in bytes | 40,960 |
 | 18–19 | maximum lighting group rows in all four stage tables (D-F63) | 640 |
 | 20–24 | zero | |
 
@@ -145,7 +145,7 @@ Held by: `tests/host/run_profile_wire_v1_tests.sh` (`profile_wire_v1_test.c`, th
 
 Capability page 0 bytes 9–12. It holds only what a build varies by; no
 firmware behaviour depends on a bit, the word only describes the build (D-F28,
-[`0028`](https://github.com/NoahCLR/charybdis-4x6/blob/15e470cbb58d52009239d8864750333a6478c5f2/docs/adr/0028-new-base-32-bit-profile-lengths.md)).
+[`0028`](https://github.com/NoahCLR/charybdis-4x6/blob/3ee9a425a6a92d09ec9503372bfd7310771bad25/docs/adr/0028-new-base-32-bit-profile-lengths.md)).
 
 | Bit | Meaning |
 | ---: | --- |
@@ -298,7 +298,7 @@ Held by: `tests/host/run_qmk_portable_profile_tests.sh` (`qmk_portable_profile_t
 ## Flash pauses — GET `0x0D`
 
 Each half measures how long its profile-slot flash work stops the keyboard
-(D-F29, [`0029`](https://github.com/NoahCLR/charybdis-4x6/blob/15e470cbb58d52009239d8864750333a6478c5f2/docs/adr/0029-profile-slots-in-their-own-flash-region.md)).
+(D-F29, [`0029`](https://github.com/NoahCLR/charybdis-4x6/blob/3ee9a425a6a92d09ec9503372bfd7310771bad25/docs/adr/0029-profile-slots-in-their-own-flash-region.md)).
 Byte page `0` is the master half's figures; page `1` the slave half's, as the
 master half last pulled them over the split link; page 2 and above answer
 status `2`. Page 1 answers status `3` until a pull has succeeded.

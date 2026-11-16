@@ -418,7 +418,7 @@ test("live macro validation replies inline without staging, history, toasts or d
     await loop.handleMessage(message);
     assert.deepEqual(last(shell), {...message, type: "macroValidation", validation: require("../../core/model/macro-editor").macroInputStatus(draft.current, message, draft.capabilities)});
     assert.equal(last(shell).validation.error, "");
-    await loop.handleMessage({...message, payload: "a".repeat(35000)});
+    await loop.handleMessage({...message, payload: "a".repeat(require("../../core/schema/macro-domain-v1").MACRO_DOMAIN_V1.MAX_SIZE + 1)});
     assert.equal(last(shell).validation.code, "MACRO_BANK_FULL");
     await loop.handleMessage({...message, payload: "{+KC_A}"});
     assert.match(last(shell).validation.error, /Release/);

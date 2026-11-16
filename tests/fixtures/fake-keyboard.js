@@ -74,7 +74,7 @@ function fakeKeyboard({document, compiled, settingsVersion = 13, compiledOnly = 
         // Populated steps, slot size, profile payload, slot payload, macro
         // bank, accents in all (firmware D-F63).
         p.writeUInt16LE(640, 0); p.writeUInt32LE(131072, 2); p.writeUInt32LE(130048, 6);
-        p.writeUInt32LE(130048, 10); p.writeUInt32LE(34903, 14); p.writeUInt16LE(640, 18);
+        p.writeUInt32LE(130048, 10); p.writeUInt32LE(40960, 14); p.writeUInt16LE(640, 18);
     }), page(25, (p) => {
         // The autocorrect list's ceilings (firmware D-F68): corrections,
         // typos, text bytes, the domain, bytes in one typo and in one text

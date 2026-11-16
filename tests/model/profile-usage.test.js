@@ -79,7 +79,7 @@ test("macro slots in use are the ones with steps; the highest empty ones are una
     const value = pdDocument();
     assert.deepEqual(count(profileUsage(snapshot(value), schema2), "macros"), {id: "macros", used: 0, limit: 128, fixed: true}, "nothing unavailable, nothing said");
     // Three long text macros leave room for fewer empty slots than there are.
-    const capacity = 34903, text = Buffer.alloc(11000, "a");
+    const capacity = 40960, text = Buffer.alloc(13000, "a");
     const macros = profileMacros(value).map((slot, index) => index < 3 ? text.toString("base64") : slot);
     const stored = 3 * (text.length + 1) + 125;
     const open = Math.floor((capacity - stored) / 30);

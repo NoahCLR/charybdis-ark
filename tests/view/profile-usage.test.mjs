@@ -30,7 +30,7 @@ test("the card names its source and counts each thing in its screen's words", ()
 
 test("unavailable macro slots fill the bar's free end and say so", () => {
     const view = profileUsageView(usage(2000, {counts: [{id: "macros", used: 18, limit: 128, unavailable: 97, fixed: true}, {id: "macros", used: 18, limit: 128, fixed: true}]}),
-        {stored: 34503, capacity: 34903, reserveTaps: 10});
+        {stored: 40560, capacity: 40960, reserveTaps: 10});
     const [short, open] = view.counts;
     assert.deepEqual([short.share, short.unavailableShare, short.note, short.full], [18 / 128, 97 / 128, "97 unavailable", false]);
     assert.equal(short.tip, "Macro slots with steps. Every empty slot keeps room in macro memory for 10 key taps; "

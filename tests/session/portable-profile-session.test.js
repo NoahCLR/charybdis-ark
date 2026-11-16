@@ -325,7 +325,7 @@ test("missing or corrupted exact source bytes fall back to full transfer without
 const {settings: currentSettings} = require("../fixtures/portable-profile");
 const {encodeComboDomain} = require("../../core/schema/combo-domain-v1");
 const {decodeSettings} = require("../../core/schema/settings-domain-v1");
-const snapshotCapabilities = {...CAPABILITIES_32, candidateChunkMax: 20, macroBytes: 34903};
+const snapshotCapabilities = {...CAPABILITIES_32, candidateChunkMax: 20, macroBytes: 40960};
 function wired(keyboard) {
     let id = 0;
     return {connection: {request: async (report) => keyboard.answer(report)[0]}, ids: {next: () => (id = id % 255 + 1)}};
