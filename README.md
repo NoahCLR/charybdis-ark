@@ -70,15 +70,16 @@ them stacked the way the keyboard resolves them:
 ### Keycode picker
 
 The picker opens on a keyboard drawn in your computer's layout, with the
-Shift and Option (AltGr) characters on each key. Search covers every key the
-firmware supports, including macros by name. QMK names such as
+Shift and Option (AltGr) characters on each key, and lists the other keys in
+sections by task beside it. Search covers every key the firmware supports,
+including macros by name. QMK names such as
 `LCTL_T(KC_A)` or `MO(2)` can also be typed into the key's field.
 
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/keycode-picker-dark.png">
-    <img src="docs/images/readme/keycode-picker-light.png" width="640"
-         alt="The keycode picker showing a Dutch Mac keyboard, with Shift characters above each key and Option characters on the right">
+    <img src="docs/images/readme/keycode-picker-light.png" width="880"
+         alt="The keycode picker showing a Dutch Mac keyboard, with Shift characters above each key and Option characters on the right, beside the navigation keys and number pad">
   </picture>
   <br>
   <sub>The picker on a Dutch Mac layout.</sub>
@@ -86,16 +87,16 @@ firmware supports, including macros by name. QMK names such as
 
 ### Behaviours
 
-Each keycode has one grid, with a row per tap count, columns for tap, hold
-and long hold, and the timing on top. Empty cells are dashed and show what
-the key does there anyway. Behaviours can be switched off for the whole
-keyboard, one layer, one behaviour, or one key on one layer, without losing
-their settings.
+Each keycode has one grid, with a row per tap count and columns for tap,
+hold and long hold. Its timings open from **Timings** above the grid. Empty
+cells are dashed and show what the key does there anyway. Behaviours can be
+switched off for the whole keyboard, one layer, one behaviour, or one key on
+one layer, without losing their settings.
 
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/behaviour-grid-dark.png">
-    <img src="docs/images/readme/behaviour-grid-light.png" width="614"
+    <img src="docs/images/readme/behaviour-grid-light.png" width="640"
          alt="The behaviour grid for the right thumb key: a tap locks Navigation and a hold holds it; a double tap is play/pause, double tap and hold is Esc, double tap and long hold locks Number; a triple tap is next track, a quadruple tap is previous track">
   </picture>
   <br>
@@ -199,7 +200,7 @@ combo, behaviour feedback case or replacement case shows.
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/lighting-dark.png">
     <img src="docs/images/readme/lighting-light.png" width="640"
-         alt="The Lighting screen previewing the Navigation layer in indigo, with the six stages below it and the behaviour feedback colours for tap, hold, long hold and double tap">
+         alt="The Lighting screen previewing the Navigation layer in indigo, with the seven stages below it and the behaviour feedback colours for tap, hold, long hold and double tap">
   </picture>
   <br>
   <sub>Navigation previewed, with the stages and the behaviour feedback colours.</sub>
@@ -210,8 +211,9 @@ combo, behaviour feedback case or replacement case shows.
 The **Host** screen tells Ark and the keyboard which system the computer runs
 (Auto, macOS, Windows or Linux) and which keyboard layout it uses. Keys are
 then labelled as the computer types them, and macros type the right
-characters. It also has modifier swaps, such as Ctrl with Caps Lock or Ctrl
-with Command.
+characters. It also has the switch for text replacement, and key swaps for
+every layer, such as Ctrl with Caps Lock, Ctrl with Command or Escape with
+backtick.
 
 The **Keyboard** screen sets the name the computer shows for the keyboard,
 and shows how full the profile is. An edit that wouldn't fit is refused
