@@ -4,7 +4,7 @@ Domain `0x10`, version 7, holds the profile's lighting above the background
 effect: which stages run, reusable LED groups, a colour per layer, the
 auto-mouse fade, a colour per pointing slot, combo feedback, behaviour
 feedback and replacement feedback, each feedback case with its own colour and
-locality (D-F73, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/1fc4a5b385a21daa2c4564812ecc0e20d6f4353a/docs/adr/0073-each-feedback-case-has-its-own-locality.md)).
+locality (D-F73, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/15e470cbb58d52009239d8864750333a6478c5f2/docs/adr/0073-each-feedback-case-has-its-own-locality.md)).
 The domain id, envelope and byte order are
 [blob and digests](profile-wire-v1/blob-and-digests.md)'s; the background
 effect, its colour and the lighting idle timeout are
@@ -18,7 +18,7 @@ lighting ceilings a build reports are on
 All integers are unsigned; multibyte integers are little-endian. A colour is
 three bytes, hue, saturation, value. Hue and saturation take `0..255`; value
 is at most the build's `RGB_MATRIX_MAXIMUM_BRIGHTNESS`, which GET `0x08`
-page 1 reports (D-F38, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/1fc4a5b385a21daa2c4564812ecc0e20d6f4353a/docs/adr/0038-keyboard-reports-its-brightness-limit.md);
+page 1 reports (D-F38, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/15e470cbb58d52009239d8864750333a6478c5f2/docs/adr/0038-keyboard-reports-its-brightness-limit.md);
 [editor metadata](profile-wire-v1/settings-domain.md#editor-metadata--get-0x08)).
 A colour a layer, a pointing slot, the combo feedback or a feedback case owns
 is **passthrough** when its saturation and value are `0`, at any hue: it
@@ -27,7 +27,7 @@ with saturation above `0` is black, which turns the LEDs off: they go dark,
 covering what is beneath; a person reads it as **off**. In a group row black
 (`0, 0, 0`) is the owner's colour ([below](#group-rows)), and the auto-mouse
 end colour is literal, so `0, 0, 0` is black there (D-F74,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/1fc4a5b385a21daa2c4564812ecc0e20d6f4353a/docs/adr/0074-a-colour-of-saturation-and-value-zero-is-passthrough.md)).
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/15e470cbb58d52009239d8864750333a6478c5f2/docs/adr/0074-a-colour-of-saturation-and-value-zero-is-passthrough.md)).
 
 Held by: `tests/host/run_profile_rgb_v1_tests.sh` (`profile_rgb_v1_test.c`, `test_fields_features_and_surfaces`), `tests/fixtures/rgb_domain_v1.fixture`, `tests/host/run_rgb_layer_render_tests.sh` (`rgb_pd_active_profile_test.c`, `test_a_passthrough_slot_paints_nothing`; `rgb_combo_active_profile_test.c`, `test_a_passthrough_combo_colour_paints_nothing`; `rgb_key_active_profile_test.c`, `test_a_passthrough_case_paints_nothing`; `rgb_autocorrect_active_profile_test.c`, `test_a_colour_that_is_off_paints_nothing`).
 
@@ -52,7 +52,7 @@ Held by: `tests/host/run_profile_rgb_v1_tests.sh` (`profile_rgb_v1_test.c`, `tes
 | 15 | 1 | reserved, zero |
 
 `LG + PG + CG + KG + RG` is at most 640 (D-F63,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/1fc4a5b385a21daa2c4564812ecc0e20d6f4353a/docs/adr/0063-more-led-sets-and-accents.md)). The tap-branch colour
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/15e470cbb58d52009239d8864750333a6478c5f2/docs/adr/0063-more-led-sets-and-accents.md)). The tap-branch colour
 count's ceiling is the shared tap depth less one.
 
 | Stage bit | Stage |
@@ -111,8 +111,8 @@ locality per tier (D-F73):
 | 12 | 1 | long hold locality |
 
 Replacement feedback (D-F70,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/1fc4a5b385a21daa2c4564812ecc0e20d6f4353a/docs/adr/0070-replacement-feedback-is-a-lighting-stage.md); leading D-F72,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/1fc4a5b385a21daa2c4564812ecc0e20d6f4353a/docs/adr/0072-leading-is-a-case-of-replacement-feedback.md)), a colour
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/15e470cbb58d52009239d8864750333a6478c5f2/docs/adr/0070-replacement-feedback-is-a-lighting-stage.md); leading D-F72,
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/15e470cbb58d52009239d8864750333a6478c5f2/docs/adr/0072-leading-is-a-case-of-replacement-feedback.md)), a colour
 per semantic in semantic order, then a locality per semantic in the same
 order (D-F73):
 
@@ -423,7 +423,7 @@ Held by: `tests/host/run_active_profile_rgb_runtime_tests.sh` (`active_profile_r
 ## Compatibility
 
 The firmware reads only version 7 (D-F10,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/1fc4a5b385a21daa2c4564812ecc0e20d6f4353a/docs/adr/0010-firmware-accepts-only-current-formats.md)); version 6 and
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/15e470cbb58d52009239d8864750333a6478c5f2/docs/adr/0010-firmware-accepts-only-current-formats.md)); version 6 and
 earlier are `INVALID_VERSION` and are not translated. Version 5 added
 replacement feedback: stage bit 5, the row count in header byte 14 and the
 two sections at the end (D-F70); how long its flash lasts is settings scalar
@@ -436,7 +436,7 @@ committed's), the replacement feedback record a locality per semantic after
 the colours, and behaviour-feedback semantics `4` to `6` for the tap branches
 past the first (D-F73) and `7` for any tap branch (D-F75), profile schema 4.8. D-F63 raised the group and row
 ceilings within version 4, and versions 5 to 7 keep them. The 32
-pointing-colour rows are D-F09's ([ADR](https://github.com/NoahCLR/charybdis-4x6/blob/1fc4a5b385a21daa2c4564812ecc0e20d6f4353a/docs/adr/0009-thirty-two-pointing-slots-stored-sparsely.md));
-the sixteen layer colours D-F14's ([ADR](https://github.com/NoahCLR/charybdis-4x6/blob/1fc4a5b385a21daa2c4564812ecc0e20d6f4353a/docs/adr/0014-bigger-profiles.md)).
+pointing-colour rows are D-F09's ([ADR](https://github.com/NoahCLR/charybdis-4x6/blob/15e470cbb58d52009239d8864750333a6478c5f2/docs/adr/0009-thirty-two-pointing-slots-stored-sparsely.md));
+the sixteen layer colours D-F14's ([ADR](https://github.com/NoahCLR/charybdis-4x6/blob/15e470cbb58d52009239d8864750333a6478c5f2/docs/adr/0014-bigger-profiles.md)).
 
 Held by: `tests/host/run_profile_rgb_v7_tests.sh` (`profile_rgb_v7_test.c`), `tests/fixtures/rgb_domain_v7.json` (`groups-128`, `groups-129`, `rows-255-in-one-table`, `rows-640-in-all`, `rows-641-in-all`, `rows-640-with-replacement`, `rows-641-with-replacement`, `replacement-rows-255`, `replacement-leading-value-over-limit`, `replacement-row-semantic-4`, `key-row-semantic-8`, `tap-branch-*-locality-5`, `key-*-locality-5`, `replacement-*-locality-5`, `version-6`, `version-5`, `version-4`, `version-3`, `version-2`).
