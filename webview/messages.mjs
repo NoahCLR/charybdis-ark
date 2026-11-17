@@ -91,6 +91,9 @@ export function createPanelMessages({root, refreshCommitBar, render, receiveMacr
             state.error = failed ? message.notice : "";
             state.notice = failed ? "" : message.notice;
         }
+        // An empty notice takes back what the rail says: core's "no keyboard
+        // found", once a keyboard is being read (panel-controls.js).
+        else if (message.notice === "") state.notice = "";
         if (message.resetDraftForms) resetDraftForms();
         // A combo builder waiting on Keep or Delete closes when the core accepts
         // the edit, and stays open with its fields when the core refuses it. A

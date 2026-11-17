@@ -14,7 +14,7 @@ baseline.
 
 | Directory | Purpose | Owner |
 | --- | --- | --- |
-| `firmware/tests/fixtures/` | Golden wire bytes and current-format profiles that the firmware's own tests check | Firmware project |
+| `firmware/tests/fixtures/` | Golden wire bytes, current-format profiles and the lighting drawing cases that the firmware's own tests check | Firmware project |
 | `firmware/docs/spec/` | Firmware's specs, all of them: Profile Wire (`profile-wire-v1/`), domains, split, transaction, storage and resource policy | Firmware project |
 | `firmware/GLOSSARY.md` | Firmware's words for the keyboard, its halves and the wire | Firmware project |
 | `qmk/data/constants/keycodes/` | Numeric keycode definitions and US aliases used by the catalog generator | QMK fork |

@@ -30,6 +30,16 @@ test("on Pointing modes the board runs the picked mode from its trigger key, and
     assert.equal(shows(view, {stage: "pd", pointingSlot: empty.id}).pdActive, null);
 });
 
+test("on Pointing modes the running mode carries its link, less the layers the keyboard ignores in one, for the board to paint it beneath a linked layer", () => {
+    const linked = structuredClone(model);
+    const slot = linked.pdModes.find((row) => row.kind);
+    Object.assign(slot, {linkedLayers: (1 << 2) | 1, linkTurnsOn: (1 << 4) | (1 << 6)});
+    const board = shows(layerView(linked, 2, []), {stage: "pd", pointingSlot: slot.id});
+    assert.equal(board.pdActive?.link, (1 << 2) | (1 << 6), "Base is a default layer and Pointing the pointer layer: the keyboard ignores both in a link");
+    assert.match(said(board.caption), new RegExp(`· ${slotCalled(linked, slot.id)} held, painting `));
+    assert.equal(shows(layerView(model, 2, []), {stage: "pd", pointingSlot: slot.id}).pdActive?.link, 0);
+});
+
 test("on Combo feedback the board holds a combo of this view, turning on the layers it holds", () => {
     const view = layerView(model, 0, []);
     const c13 = shows(view, {stage: "combo", comboPreview: {id: 13, keys: []}});
@@ -52,6 +62,18 @@ test("a combo running a pointing mode runs it from the combo's keys, its feedbac
     assert.deepEqual(board.pdActive?.triggerIndex, board.held?.held, "the mode starts from the keys holding the combo");
     assert.equal(board.comboActive?.beneath, true);
     assert.match(said(board.caption), new RegExp(`C0 held, painting .+ beneath ${slotCalled(published, 1)}, which it runs`));
+});
+
+test("a combo running a mode that paints beneath a linked layer paints over the mode, as the keyboard draws it, and says so", () => {
+    const doc = profileDocument({keys: {0: {0: "KC_A", 1: "KC_B"}, 2: {0: "KC_A", 1: "KC_B"}}, combos: [{inputs: ["KC_A", "KC_B"], output: "PD_MODE_1"}]});
+    const published = publishedModel(doc);
+    published.pdModes.find((slot) => slot.id === 1).linkedLayers = 1 << 2;
+    const board = lightingBoard(layerView(published, 2, []), {stage: "combo", pointingSlot: 0, comboPreview: null});
+    assert.equal(board.pdActive?.link, 1 << 2);
+    assert.match(said(board.caption), new RegExp(`C0 held, painting .+ over ${slotCalled(published, 1)}, which it runs$`));
+    // Off the linked layer the mode paints over every layer, and over the combo.
+    const off = lightingBoard(layerView(published, 0, []), {stage: "combo", pointingSlot: 0, comboPreview: null});
+    assert.match(said(off.caption), new RegExp(`C0 held, painting .+ beneath ${slotCalled(published, 1)}, which it runs`));
 });
 
 test("a view where no combo fires says so", () => {

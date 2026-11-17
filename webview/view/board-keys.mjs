@@ -115,7 +115,7 @@ export function boardTrackball(view, {pdActive = null, comboActive = null, behav
 // Lighting names the layers held by id, as a mask's bit does; the view holds
 // them by place, which is the same number (layer-view.mjs).
 /** @param {LayerView} view */
-const heldIds = ({held, stack}) => held.map((at) => stack[at]?.index).filter((id) => id !== undefined);
+export const heldIds = ({held, stack}) => held.map((at) => stack[at]?.index).filter((id) => id !== undefined);
 
 // The icons a key wears: its own keycode's, then each branch's of the
 // behaviour that runs there, tap, hold and long hold in tap order.

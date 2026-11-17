@@ -68,6 +68,23 @@ test("modifiers alone or with a modifier key fold into the simplest keycode; any
     assert.equal(storedPick(model, unfolded), unfolded, "the pick itself when nothing folds");
 });
 
+// A picker opened on an unassigned key has Transparent picked; KC_NO is no
+// key either. Lit modifiers over either are the modifier key, as with
+// nothing picked (D-L83), never C(KC_TRANSPARENT).
+test("modifiers lit over Transparent or KC_NO give the modifier key, as with nothing picked", () => {
+    for (const seed of ["KC_TRANSPARENT", "KC_NO"]) {
+        const opened = picker(openingPick(model, {mode: "single"}, [seed]));
+        assert.deepEqual(opened, picker({keys: [seed]}), `${seed} opens picked`);
+        const ctrl = {...opened, ...pickModifier(opened, "C")};
+        assert.equal(pickedExpression(model, ctrl), "KC_LEFT_CTRL", seed);
+        assert.equal(pickProblem(model, ctrl), "", seed);
+        assert.equal(pickedExpression(model, {...ctrl, mods: ["C", "S"]}), pickedExpression(model, picker({mods: ["C", "S"]})), `${seed}: several modifiers fold as with no key`);
+        assert.equal(pickedExpression(model, opened), seed, `${seed} alone stays ${seed}`);
+    }
+    const a = picker(openingPick(model, {mode: "single"}, ["KC_A"]));
+    assert.equal(pickedExpression(model, {...a, ...pickModifier(a, "C")}), "C(KC_A)", "a real key still takes the modifier");
+});
+
 test("a pick that cannot be used says why in the draft's words; a shortcut shows as the chord of its QMK names", () => {
     const both = picker({mods: ["C", "S", "RCTL", "RSFT"]});
     assert.ok("shortcut" in /** @type {object} */ (foldedPick(model, both)), "two modifiers on each side are a custom key's shortcut");

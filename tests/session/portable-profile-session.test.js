@@ -112,6 +112,14 @@ test("stale review and failed recovery save perform no device mutations", async 
     f.options.expectedFingerprint = fingerprint(f.source); f.options.saveRecovery = async () => {throw Error("disk full");};
     await assert.rejects(f.restore(), /disk full/); assert.deepEqual(f.keyboard.mutations, []);
 });
+test("a recovery copy the browser's storage refuses stops at its step, said as the storage's cause, without mutations", async () => {
+    const {RECOVERY_STORAGE_WORDS, recoveryStorageFailure} = require("../../core/session/recovery-copy");
+    const f = fixture(); f.options.expectedFingerprint = fingerprint(f.source);
+    f.options.saveRecovery = async () => {throw recoveryStorageFailure(new DOMException("The quota has been exceeded.", "QuotaExceededError"));};
+    await assert.rejects(f.restore(), error => error.code === "RECOVERY_STORAGE_FULL" && error.step === "backup" && error.saved === "none"
+        && error.reason === RECOVERY_STORAGE_WORDS.full);
+    assert.deepEqual(f.keyboard.mutations, []);
+});
 test("no recovery writer or an empty recovery path refuses without mutations", async () => {
     for (const saveRecovery of [undefined, async () => null]) {
         const f = fixture(); f.options.saveRecovery = saveRecovery;

@@ -153,6 +153,8 @@ export interface DemoSession {
     notice?: string;
     /** The notice is a failure's, said with or without "Failed:" (panel-loop.js). */
     noticeFailed?: boolean;
+    /** The notice the rail was last told, '' once taken back (panel-session-state.js takeOutbox). */
+    noticeSaid?: string;
     portableReview?: unknown;
     portableLayers?: unknown;
     /** The read the open draft last followed (draft-follow.js). */

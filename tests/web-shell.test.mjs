@@ -6,7 +6,7 @@ import test from "node:test";
 import {connectPanel} from "../web/panel-channel.mjs";
 import {workerSleep} from "../web/sleep.mjs";
 import {BLOCKED, COMPILED_DEFAULTS_KEY, LIST_FILE, LOAD_FAILED, compiledDefaultsStore, initialTheme, readProfileFile, showLoadFailure, startWebShell} from "../web/web-shell.mjs";
-import {listed} from "../web/recoveries.mjs";
+import {listed, openRecoveries} from "../web/recoveries.mjs";
 import {CHARYBDIS_PRODUCT_ID, CHARYBDIS_VENDOR_ID, QMK_RAW_HID_USAGE, QMK_RAW_HID_USAGE_PAGE} from "../core/transport/device-adapter.js";
 import {FILE_MAX_BYTES} from "../core/model/portable-profile.js";
 import {IMPORT_MAX_BYTES} from "../core/model/autocorrect-import.js";
@@ -132,7 +132,7 @@ test("a panel that did not load leaves a plain message, as text, never a blank p
 
 // The page over stand-ins: WebHID with one allowed Charybdis, no locks, no
 // storage, no worker. The models the panel is sent arrive on `window`.
-function page({getDevices} = {}) {
+function page({getDevices, locks, BroadcastChannel} = {}) {
     const device = Object.assign(new EventTarget(), {vendorId: CHARYBDIS_VENDOR_ID, productId: CHARYBDIS_PRODUCT_ID, productName: "Charybdis 4x6",
         collections: [{usagePage: QMK_RAW_HID_USAGE_PAGE, usage: QMK_RAW_HID_USAGE}], opened: false, async open() {}, async close() {}, async sendReport() {}});
     const listeners = new Map();
@@ -145,10 +145,10 @@ function page({getDevices} = {}) {
     const window = Object.assign(new EventTarget(), {URL, Blob, setTimeout});
     const models = [];
     window.addEventListener("message", (event) => {if (event.data?.type === "model") models.push(event.data);});
-    const document = {documentElement: {dataset: {}}, visibilityState: "visible", addEventListener() {}};
-    const shell = startWebShell({hid, document, window, build: {version: "test", commit: "test"}});
+    const document = Object.assign(new EventTarget(), {documentElement: {dataset: {}}, visibilityState: "visible"});
+    const shell = startWebShell({hid, locks, BroadcastChannel, document, window, build: {version: "test", commit: "test"}});
     const fire = (type) => (listeners.get(type) || []).forEach((listener) => listener(new Event(type)));
-    return {...shell, models, fire, close: async () => {shell.panel.close(); await shell.loop.close();}};
+    return {...shell, models, fire, window, document, close: async () => {shell.panel.close(); await shell.loop.close();}};
 }
 
 // Quiet the console for a shell fault a test causes on purpose.
@@ -165,6 +165,44 @@ test("choosing a keyboard whose list cannot be read says so, and the panel hears
         await delivered(shell.models);
         assert.equal(shell.models.at(-1).notice, "Failed: Ark could not list the keyboards this page may open.");
         assert.equal(shell.models.at(-1).failed, true);
+    } finally {await shell.close();}
+});
+
+// A fault nothing caught, in the shell or the panel, is said as a handled one
+// is, once until the panel next posts: a fault that a notice's own drawing
+// raises again is not said again for ever.
+test("an uncaught error or unhandled rejection in the page becomes a notice, never silence", async () => {
+    const {FAILURE_WORDS} = await import("../core/model/vocabulary.js");
+    const shell = page();
+    const failures = () => shell.models.filter((message) => message.failed);
+    try {
+        shell.window.dispatchEvent(Object.assign(new Event("error"), {error: new TypeError("x is undefined"), message: "Uncaught TypeError: x is undefined"}));
+        await delivered(shell.models);
+        assert.equal(shell.models.at(-1).notice, `Failed: ${FAILURE_WORDS.unexpected}`);
+        assert.equal(shell.models.at(-1).failed, true);
+        shell.window.dispatchEvent(Object.assign(new Event("unhandledrejection"), {reason: new TypeError("again")}));
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        assert.equal(failures().length, 1, "not said again before the panel posts anything");
+        shell.api.postMessage({type: "setTheme", theme: "light"});
+        await delivered(shell.models, 2);
+        shell.window.dispatchEvent(Object.assign(new Event("unhandledrejection"), {reason: new TypeError("later")}));
+        await delivered(shell.models, 3);
+        assert.equal(failures().length, 2, "said again after the person did something");
+    } finally {await shell.close();}
+});
+
+// Chrome refuses Web Locks where site data is blocked ("Don't allow sites to
+// save data on your device"): the request rejects with a SecurityError. The
+// page then goes on as a browser without locks does, so it never waits for
+// ever on a lock it cannot have.
+test("a browser that refuses the lock still reads the keyboard", async () => {
+    const refused = {request: async () => {throw new DOMException("The request was denied.", "SecurityError");}};
+    const shell = page({locks: refused});
+    try {
+        shell.api.postMessage({type: "ready"});
+        await delivered(shell.models);
+        assert.equal(shell.models.length > 0, true, "the panel gets its model");
+        assert.equal(shell.models.at(-1).model.shell?.blocked ?? null, null, "and is not told another tab holds the keyboard");
     } finally {await shell.close();}
 });
 
@@ -237,6 +275,93 @@ test("a stored recovery copy lists with what made it and its keyboard, an older 
         {id: 2, name: "recovery-x-before-save-home.charybdis.json", savedAt, cause: "save", keyboard: "Home"});
     assert.deepEqual(listed({id: 1, name: "recovery-2026-10-06T09-14-03-512Z.charybdis.json", savedAt, text: "{}"}),
         {id: 1, name: "recovery-2026-10-06T09-14-03-512Z.charybdis.json", savedAt});
+});
+
+// BroadcastChannel between the tabs of one test: a message reaches every
+// other channel of the same name, later, as in a browser.
+function tabs() {
+    const open = new Set();
+    return class {
+        constructor(name) {this.name = name; this.onmessage = null; open.add(this);}
+        postMessage(data) {
+            for (const other of open) if (other !== this && other.name === this.name) setTimeout(() => other.onmessage?.({data}));
+        }
+        close() {open.delete(this);}
+    };
+}
+const refusedLocks = () => ({request: async () => {throw new DOMException("The request was denied.", "SecurityError");}});
+const blockedIn = (shell) => shell.models.at(-1).model.shell?.blocked ?? null;
+
+// Without the lock the tabs still keep to one: they ask each other over a
+// BroadcastChannel, which blocking site data leaves alone (web/tab-turn.mjs).
+test("where the browser refuses the lock, a second tab waits and takes over when the first closes", async () => {
+    const BroadcastChannel = tabs();
+    const first = page({locks: refusedLocks(), BroadcastChannel});
+    /** @type {ReturnType<typeof page> | undefined} */
+    let opened;
+    try {
+        first.api.postMessage({type: "ready"});
+        await delivered(first.models);
+        assert.equal(blockedIn(first), null, "the first tab holds the keyboard");
+        const second = opened = page({locks: refusedLocks(), BroadcastChannel});
+        second.api.postMessage({type: "ready"});
+        await delivered(second.models);
+        assert.deepEqual(blockedIn(second), BLOCKED.otherTab, "the second is told Ark is open in another tab");
+        const before = second.models.length;
+        first.window.dispatchEvent(new Event("pagehide"));
+        await delivered(second.models, before + 1);
+        assert.equal(blockedIn(second), null, "and takes the keyboard over when the first closes");
+        // A page the browser kept and brings back asks again, and gives way
+        // to the tab that took the keyboard meanwhile.
+        const shown = first.models.length;
+        first.document.dispatchEvent(new Event("visibilitychange"));
+        await delivered(first.models, shown + 1);
+        assert.deepEqual(blockedIn(first), BLOCKED.otherTab, "the first, brought back, finds the second holds it");
+        assert.equal(blockedIn(second), null);
+    } finally {await first.close(); await opened?.close();}
+});
+
+test("two tabs opened at once without the lock leave the keyboard to one of them", async () => {
+    const BroadcastChannel = tabs();
+    const pages = [page({locks: refusedLocks(), BroadcastChannel}), page({locks: refusedLocks(), BroadcastChannel})];
+    try {
+        for (const shell of pages) shell.api.postMessage({type: "ready"});
+        await Promise.all(pages.map((shell) => delivered(shell.models)));
+        assert.deepEqual(pages.map(blockedIn).filter((blocked) => blocked === null).length, 1, "exactly one holds it");
+        assert.deepEqual(pages.map(blockedIn).filter(Boolean), [BLOCKED.otherTab]);
+    } finally {for (const shell of pages) await shell.close();}
+});
+
+// IndexedDB as far as a write that fails: the failed request's error event
+// reaches the transaction while the transaction's own `error` is still null,
+// as in a browser, and the transaction aborts with it after.
+function failingDatabase(error) {
+    const transaction = (_store, _mode) => {
+        const tx = {error: null, oncomplete: null, onerror: null, onabort: null};
+        const failing = () => {
+            const request = {error};
+            setTimeout(() => {
+                tx.onerror?.({target: request});
+                tx.error = error;
+                tx.onabort?.({target: tx});
+            });
+            return request;
+        };
+        tx.objectStore = () => ({add: failing, delete: failing});
+        return tx;
+    };
+    return {open: () => {
+        const open = {result: {transaction}};
+        setTimeout(() => open.onsuccess?.());
+        return open;
+    }};
+}
+
+test("a recovery copy or a delete the browser's storage refuses rejects with the browser's error, never with nothing", async () => {
+    const quota = new DOMException("The quota has been exceeded.", "QuotaExceededError");
+    const recoveries = openRecoveries(/** @type {any} */ (failingDatabase(quota)));
+    await assert.rejects(recoveries.save({format: "charybdis-profile"}, {cause: "save", keyboard: "Home"}), (error) => error === quota);
+    await assert.rejects(recoveries.delete(1), (error) => error === quota);
 });
 
 // The panel loop posts the catalog before a panel's first model and after

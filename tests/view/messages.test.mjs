@@ -119,3 +119,18 @@ test("a notice the core marks as a failure is shown as one, whatever its first w
     receive({type: "model", model, notice: "Failed: The keyboard did not answer."});
     assert.equal(state.error, "Failed: The keyboard did not answer.");
 });
+
+// Core takes a notice back with an empty one (its "no keyboard found", once
+// a keyboard is being read); a reply with no notice leaves the rail as it is.
+test("an empty notice takes back what the rail says; none leaves it", (t) => {
+    const previousDocument = globalThis.document;
+    globalThis.document = {documentElement: {dataset: {}}};
+    t.after(() => { globalThis.document = previousDocument; state.error = ""; state.notice = ""; });
+    const {receive} = surface();
+    const model = {...reading(), load: {state: "loading"}};
+    receive({type: "model", model, notice: "Chrome has no Charybdis this page may open yet. Use Choose keyboard… and pick yours."});
+    receive({type: "model", model});
+    assert.match(state.notice, /Chrome has no Charybdis/);
+    receive({type: "model", model, notice: ""});
+    assert.equal(state.notice, "");
+});

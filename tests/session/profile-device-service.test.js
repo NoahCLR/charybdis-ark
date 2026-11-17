@@ -515,6 +515,16 @@ test("a retired capability layout gets the update notice without any profile rea
     assert.ok(adapter.lastConnection().writes.every(report => report[0] === 8 && report[2] === 1));
 });
 
+test("a keyboard on the released firmware, which has three capability pages, is told to update it", async t => {
+    const {failureSentence} = require("../../core/model/vocabulary");
+    const {service, adapter} = editorRead({capabilityPageCount: 3}); t.after(() => service.close());
+    const scanned = await service.enumerate();
+    const error = await service.connect(scanned.devices[0].id).then(() => assert.fail("connected"), failure => failure);
+    assert.equal(error.code, "FIRMWARE_UPDATE_REQUIRED");
+    assert.match(failureSentence(error), /Ark supports only current firmware\. Update both halves/);
+    assert.deepEqual(adapter.lastConnection().writes.map(report => [report[2], report[4]]), [[1, 0], [1, 1], [1, 2], [1, 3]], "capabilities only, the fourth page refused");
+});
+
 // The editor's read (readForEditor): what it resolves with, and what the
 // service published on the way, over the fake keyboard.
 /** @param {Partial<import("../fixtures/types.js").FakeKeyboardOptions>} [keyboard] */

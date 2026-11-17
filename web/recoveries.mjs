@@ -16,6 +16,12 @@ const request = (operation) => new Promise((resolve, reject) => {
     operation.onerror = () => reject(operation.error);
 });
 
+// Why a transaction's request failed. Its error event comes before the
+// transaction aborts, and the transaction's own `error` is set only at the
+// abort, so the error is the request's.
+/** @param {Event} event @param {IDBTransaction} transaction */
+const failedRequest = (event, transaction) => /** @type {IDBRequest | null} */ (event.target)?.error || transaction.error;
+
 // A stored copy as the panel lists it, without its text; an older copy lists
 // without the cause and keyboard it never recorded.
 /** @param {import("./types.js").StoredRecovery} copy @returns {import("../contracts/model.js").RecoveryCopy} */
@@ -48,7 +54,7 @@ export function openRecoveries(indexedDB) {
             /** @type {Promise<void>} */
             const committed = new Promise((resolve, reject) => {
                 transaction.oncomplete = () => resolve();
-                transaction.onerror = () => reject(transaction.error);
+                transaction.onerror = (event) => reject(failedRequest(event, transaction));
                 transaction.onabort = () => reject(transaction.error || new Error("The recovery copy was not stored."));
             });
             transaction.objectStore(STORE).add({name, savedAt: now.toISOString(), cause, keyboard, text});
@@ -66,7 +72,7 @@ export function openRecoveries(indexedDB) {
             /** @type {Promise<void>} */
             const done = new Promise((resolve, reject) => {
                 transaction.oncomplete = () => resolve();
-                transaction.onerror = () => reject(transaction.error);
+                transaction.onerror = (event) => reject(failedRequest(event, transaction));
                 transaction.onabort = () => reject(transaction.error || new Error("The copy was not deleted."));
             });
             transaction.objectStore(STORE).delete(id);

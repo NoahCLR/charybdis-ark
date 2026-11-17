@@ -46,7 +46,15 @@
 // `fromPress` says so.
 //
 // A bare modifier key (KC_LEFT_CTRL to KC_RIGHT_GUI) is a plain key: it taps
-// itself, a lone tap included, and holds itself as a fallback.
+// itself, a lone tap included, and holds itself as a fallback. So is a QMK
+// function key (DPI_MOD, SNIPING, the RGB keys, QK_BOOT, Caps Word, Magic …;
+// action_kind_registry_list.h, QMK_FUNCTION).
+//
+// TT() and OSL() hold their layer from the press, as MO() does (firmware
+// D-F46), and are the momentary layer keys a Tap-toggle or One-shot custom
+// key stands for: OSL()'s tap arms its one-shot, let go after Tap / hold too,
+// and TT()'s taps do nothing until its TAPPING_TOGGLE-th, which locks. TG(),
+// TO() and a layer lock act at the press and have no tap or hold of their own.
 //
 // A pointing mode's lock key (PD_MODE_n_LOCK) and a switch key (CM_ON …
 // AM_TOGG, firmware D-F66) tap themselves too, so an empty Tap locks the mode
@@ -67,6 +75,12 @@ const {SHORTCUT_LAYER_KINDS, shortcutPresent} = require("../schema/settings-doma
 /** @param {number} code */
 const plainKey = (code) => inBlock(code, BASIC_KEYS) || inBlock(code, QK.MODS);
 
+// A QMK or keyboard function past the layer keycodes and below the user
+// range (DPI_MOD, SNIPING, RGB, Magic, QK_BOOT, Caps Word …), macros aside:
+// the firmware's QMK_FUNCTION kind, which taps and holds like a plain key.
+/** @param {number} code */
+const qmkFunction = (code) => code > QK.PERSISTENT_DEF_LAYER.last && code < QK.USER.first && !inBlock(code, QK.MACRO);
+
 /** @typedef {{customKeyShortcuts?: readonly import("../schema/types.js").CustomKeyShortcut[]}} BuiltInFeatures */
 // The pointing slot an action holds or locks: a pointing-mode action's, or
 // that of the pointing-mode key a keycode is.
@@ -76,7 +90,7 @@ const pointingSlotNamed = (action) => {
     if (action?.kind === ACTION.QMK_KEYCODE) return pdModeKeyOfCode(action.operand)?.slot ?? null;
     return null;
 };
-/** @typedef {{tap?: import("../schema/types.js").SemanticAction, hold?: import("../schema/types.js").SemanticAction, fallback?: boolean, releaseTaps?: boolean, fromPress?: boolean, armsOnRelease?: boolean, transparentTap?: boolean, tapToggle?: boolean}} BuiltIns */
+/** @typedef {{tap?: import("../schema/types.js").SemanticAction, hold?: import("../schema/types.js").SemanticAction, fallback?: boolean, releaseTaps?: boolean, fromPress?: boolean, laterHoldWaits?: boolean, armsOnRelease?: boolean, transparentTap?: boolean, tapToggle?: boolean}} BuiltIns */
 // Whether a branch's action is Transparent: the key below answers.
 /** @param {import("../schema/types.js").SemanticAction | undefined} action */
 const transparent = (action) => action?.kind === ACTION.QMK_KEYCODE && action.operand === TRANSPARENT;
@@ -89,7 +103,10 @@ function builtInActions(target, features = {}, steps = []) {
 }
 
 // A pointing-mode key whose row holds another mode on a later tap count waits
-// for Tap / hold, so the two modes never overlap.
+// for Tap / hold, so the two modes never overlap. One that runs its mode from
+// the press still waits for Tap / hold on a later tap count its row leaves
+// empty, so the taps before it go out first (`laterHoldWaits`, firmware D-F64
+// rules 5 and 7).
 /** @param {BuiltIns} actions @param {readonly Pick<import("../schema/types.js").BehaviorStep, "tapIndex" | "hold" | "longHold">[]} steps @returns {BuiltIns} */
 function pointingTiming(actions, steps) {
     const own = actions.fromPress ? pointingSlotNamed(actions.hold) : null;
@@ -98,7 +115,7 @@ function pointingTiming(actions, steps) {
         const slot = pointingSlotNamed(branch?.action);
         return slot !== null && slot !== own;
     }));
-    if (!foreign) return actions;
+    if (!foreign) return {...actions, laterHoldWaits: true};
     const {fromPress, ...rest} = actions;
     return rest;
 }
@@ -137,6 +154,9 @@ function keyActions(target, {customKeyShortcuts = []} = {}) {
     if (inBlock(code, QK.ONE_SHOT_MOD)) {
         return {tap: keycodeAction(code), hold: keycodeAction((code & MOD_MASK) << 8)};
     }
+    if (inBlock(code, QK.LAYER_TAP_TOGGLE)) return {hold: keycodeAction(code), fromPress: true, tapToggle: true};
+    if (inBlock(code, QK.ONE_SHOT_LAYER)) return {tap: keycodeAction(code), hold: keycodeAction(code), fromPress: true, armsOnRelease: true};
+    if (qmkFunction(code)) return {tap: keycodeAction(code), hold: keycodeAction(code), fallback: true, releaseTaps: true};
     return {};
 }
 

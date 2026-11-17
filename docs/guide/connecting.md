@@ -13,6 +13,23 @@ WebHID, which only Chrome and Edge have, and only over HTTPS. In another
 browser the page says Ark needs Chrome or Edge and offers only the demo. On a
 phone it shows a short notice instead: a phone can't reach the keyboard.
 
+## On Linux
+
+Most Linux systems let Chrome only read a keyboard's hidraw device, so Chrome
+lists the Charybdis but Ark can't open it: Ark says **Ark could not open the
+keyboard** and points here. A udev rule gives it write access too. As
+[Chrome's WebHID article](https://developer.chrome.com/docs/capabilities/hid)
+gives it, for the Charybdis's vendor and product ids, put this line in
+`/etc/udev/rules.d/50-charybdis.rules`:
+
+```
+KERNEL=="hidraw*", ATTRS{idVendor}=="a8f8", ATTRS{idProduct}=="1833", MODE="0664", GROUP="plugdev"
+```
+
+Your user must be in the `plugdev` group. Reload the rules with
+`sudo udevadm control --reload-rules && sudo udevadm trigger`, then unplug the
+keyboard and plug it back in.
+
 ## Reading the keyboard
 
 With no keyboard, Ark shows **Connect your keyboard**. Choose **Choose
@@ -28,7 +45,14 @@ your keys and macros.
 If something goes wrong, the message beside the rail starts with **Failed:**
 and says what happened and what to do. A problem in Ark itself says only
 that, and to reload the page if it keeps happening. If the page shows **Ark
-did not finish loading**, reload it.
+did not finish loading**, reload it. If Ark itself fails to start, which
+happens with JavaScript off, a file that didn't load, or a browser too old for
+it, the page says what Ark needs instead of staying blank.
+
+If a screen hits a problem in Ark while it is drawn, it says **Ark could not
+draw this screen** in its place. The menu still works, and your draft is
+kept while the page stays open, so choose another screen to carry on;
+reloading the page loses a draft you haven't saved.
 
 Ark then reads the whole profile the keyboard runs: keys, layers, behaviours,
 combos, macros, pointing modes, lighting and settings. The screen says what it
@@ -102,12 +126,15 @@ button is its dot. Messages then float over the screen's lower left corner.
 With more than one Charybdis connected, pick which one to edit under
 **Keyboard** in the keyboard menu. A draft with edits stays with its own
 keyboard; the other stays read-only until you switch back or discard the
-draft.
+draft. With no keyboard connected, the bar says **Draft waiting for its
+keyboard** and keeps your changes in Ark; connect the keyboard again with
+**Choose keyboard…** to carry on.
 
 ## One tab, one keyboard
 
 Only one Ark tab holds the keyboard. A second tab says Ark is open
-in another tab, and takes over when that one closes. If closing or reloading
+in another tab, and takes over when that one closes. This holds too where
+Chrome is set not to let Ark save data on your device. If closing or reloading
 the tab would lose something (edits not saved, or a save still
 running), the browser asks first.
 

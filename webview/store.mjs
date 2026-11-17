@@ -180,6 +180,37 @@ export function closeComboBuilder() {
     state.combo = closedComboBuilder();
 }
 
+// Two slots of a bank traded places (D-L81): core moves every reference the
+// draft holds, but a form or pick not yet posted holds its own, and survives
+// a change of screen. The combo builder closes, as a draft change closes it:
+// Keep posts its inputs and output whole, checked against no draft. A key
+// waiting to be placed, a new replacement's macro, and a custom key's pending
+// cell choice or refused timings follow their thing, as the swapped screen's
+// own editor does (each screen's swap handler, which calls this).
+/** @param {"macros" | "customKeys" | "pointing"} bank @param {string} from @param {string} to */
+export function followSlotSwap(bank, from, to) {
+    closeComboBuilder();
+    /** @type {Map<string, string>} */
+    const names = new Map();
+    const trade = (/** @type {string} */ a, /** @type {string} */ b) => { if (a && b) names.set(a, b).set(b, a); };
+    if (bank === "pointing") {
+        const keysOf = (/** @type {string} */ slot) => model?.pdModes?.find((mode) => mode.id === Number(slot))?.keys;
+        const [a, b] = [keysOf(from), keysOf(to)];
+        trade(a?.hold || "", b?.hold || ""); trade(a?.lock || "", b?.lock || "");
+    } else trade(from, to);
+    /** @param {string} keycode */
+    const follows = (keycode) => names.get(keycode) ?? keycode;
+    if (state.placement) state.placement = {keycode: follows(state.placement.keycode)};
+    if (state.cellHow) state.cellHow = {...state.cellHow, keycode: follows(state.cellHow.keycode)};
+    if (state.timingRefusal) state.timingRefusal = {...state.timingRefusal, keycode: follows(state.timingRefusal.keycode)};
+    const fresh = state.autocorrectNew, macros = model?.macros || [];
+    if (bank === "macros" && fresh?.macro != null && names.has(macros[fresh.macro]?.keycode)) {
+        const macro = macros.findIndex((slot) => slot.keycode === follows(macros[/** @type {number} */ (fresh.macro)].keycode));
+        state.autocorrectNew = {...fresh, macro, joins: null, label: undefined};
+        state.autocorrectCheck = null;
+    }
+}
+
 // One macro slot's editor state, and a change to part of it.
 export const macroForm = (/** @type {string} */ keycode) => state.macroForms[keycode] || {};
 /** @param {string} keycode @param {import("./state.js").MacroForm} fields */

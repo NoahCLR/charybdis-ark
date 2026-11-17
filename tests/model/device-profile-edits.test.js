@@ -191,3 +191,71 @@ test("auto-mouse save encodes all three policies exactly and keeps the chosen en
         assert.deepEqual(rgb(edited).pdModeColors, rgb(base).pdModeColors);
     }
 });
+
+// A backup can hold a colour brighter than the keyboard's limit: Review
+// blocks it until it is lowered, and Lighting is where it is lowered. An edit
+// holds to the limit the colour it sets, never one it leaves as it stood.
+const {editProfileDomains, validateSnapshot} = require("../../core/model/portable-profile");
+const {profileFindings} = require("../../core/model/profile-checks");
+const limited = {limits: {brightnessMax: 200}};
+const tooBright = editProfileDomains(base, {}, open => {open("rgb").layerColors[1].color.v = 255;});
+const brightBlockers = document => profileFindings(validateSnapshot(document), {brightnessMax: 200}).filter(row => row.kind === "colourBrightnessBlocker");
+const layerColour = (layer, v, mode = "KEYS_MAPPED_ON_THIS_LAYER_ONLY") => ({type: "updateLayerColor", layer: `Layer ${layer}`, h: 85, s: 255, v, mode});
+
+test("a colour past the keyboard's brightness limit lowered to it is taken, and its blocker goes", () => {
+    assert.equal(brightBlockers(tooBright).length, 1, "the backup's colour is a blocker");
+    const lowered = edit(tooBright, layerColour(1, 200), limited);
+    assert.equal(rgb(lowered).layerColors[1].color.v, 200);
+    assert.deepEqual(brightBlockers(lowered), [], "nothing past the limit remains");
+});
+
+test("another colour edited beside one past the limit is taken, and the blocker still names the first", () => {
+    const edited = edit(tooBright, layerColour(2, 120), limited);
+    assert.equal(rgb(edited).layerColors[2].color.v, 120);
+    assert.equal(rgb(edited).layerColors[1].color.v, 255, "the untouched colour is kept as it stood");
+    const [blocker, ...rest] = brightBlockers(edited);
+    assert.deepEqual(rest, []);
+    assert.equal(blocker.count, 1);
+    assert.match(blocker.identity, /^layers:.*=255$/);
+});
+
+test("a colour set past the limit is still refused in place, with the limit named", () => {
+    assert.throws(() => edit(tooBright, layerColour(2, 201), limited), {code: "INVALID_PROFILE_EDIT", message: "Brightness must be between 0 and 200."});
+    assert.throws(() => edit(tooBright, layerColour(1, 254), limited), /Brightness must be between 0 and 200/, "lowered, but not far enough");
+    assert.throws(() => edit(tooBright, {type: "addRgbLedGroup", group: {target: "layer", owner: "Layer 2", ledIndices: [0], h: 0, s: 255, v: 255}}, limited), /Brightness must be between 0 and 200/);
+});
+
+test("edits that set no colour are taken while one past the limit remains", () => {
+    const record = rgb(tooBright);
+    assert.equal(rgb(edit(tooBright, {...layerColour(1, 255), h: record.layerColors[1].color.h, mode: "ALL_KEYS"}, limited)).layerColors[1].mode, 0, "a policy changed beside its colour");
+    assert.equal(rgb(edit(tooBright, {type: "updateRgbStages", stageEnableMask: 0}, limited)).stageEnableMask, 0, "a stage switched off");
+    // A record posted back whole keeps its untouched colour; the one it changes is held to the limit.
+    const feedback = editProfileDomains(base, {}, open => {open("rgb").keyFeedback.tapBranches[0].color.v = 255;});
+    const {RGB_LOCALITIES, RGB_TAP_COMMIT_MODES} = require("../../core/schema/rgb-domain-v1");
+    const named = (names, value) => Object.keys(names).find(name => names[name] === value);
+    const stored = rgb(feedback).keyFeedback;
+    const posted = {tapBranches: stored.tapBranches.map(branch => ({color: branch.color, locality: named(RGB_LOCALITIES, branch.locality)})),
+        tapCommittedColor: stored.tapCommittedColor, tapCommittedLocality: named(RGB_LOCALITIES, stored.tapCommittedLocality),
+        holdActiveColor: {h: 1, s: 2, v: 3}, holdActiveLocality: named(RGB_LOCALITIES, stored.holdActiveLocality),
+        longHoldActiveColor: stored.longHoldActiveColor, longHoldActiveLocality: named(RGB_LOCALITIES, stored.longHoldActiveLocality),
+        tapCommitMode: named(RGB_TAP_COMMIT_MODES, stored.tapCommitMode)};
+    const kept = edit(feedback, {type: "updateKeyBehaviorFeedback", config: posted}, limited);
+    assert.deepEqual([rgb(kept).keyFeedback.holdActiveColor, rgb(kept).keyFeedback.tapBranches[0].color.v], [{h: 1, s: 2, v: 3}, 255]);
+    const raised = {...posted, tapBranches: posted.tapBranches.map((branch, index) => index ? branch : {...branch, color: {...branch.color, v: 250}})};
+    assert.throws(() => edit(feedback, {type: "updateKeyBehaviorFeedback", config: raised}, limited), /Brightness must be between 0 and 200/);
+    // An accent's LEDs moved, its colour as it stood.
+    const accent = editProfileDomains(base, {}, open => {open("rgb").pdModeGroupRows[0].color.v = 255;});
+    const row = rgb(accent).pdModeGroupRows[0];
+    const {RGB_POINTING_MODE_IDS, RGB_EVERY_OWNER} = require("../../core/schema/rgb-domain-v1");
+    const owner = row.selector === 255 ? RGB_EVERY_OWNER.pdMode : named(RGB_POINTING_MODE_IDS, row.selector);
+    const moved = edit(accent, {type: "updateRgbLedGroup", target: "pdMode", index: 0, group: {owner, ledIndices: [7, 8], ...row.color}}, limited);
+    assert.deepEqual(rgb(moved).groups.find(group => group.id === rgb(moved).pdModeGroupRows[0].groupId).leds, [7, 8]);
+    assert.equal(rgb(moved).pdModeGroupRows[0].color.v, 255);
+});
+
+test("an edit within the limit writes the same bytes whatever limit the keyboard reports", () => {
+    for (const message of [layerColour(1, 200), {type: "updateRgbStages", stageEnableMask: 0},
+        {type: "addRgbLedGroup", group: {target: "layer", owner: "Layer 2", ledIndices: [0, 1], h: 5, s: 6, v: 7}}]) {
+        assert.equal(edit(base, message, limited).profile, edit(base, message).profile, message.type);
+    }
+});

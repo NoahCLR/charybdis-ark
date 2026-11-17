@@ -10,6 +10,9 @@ import {initialTheme, showLoadFailure, startWebShell} from "./web-shell.mjs";
 
 /* global __ARK_VERSION__, __ARK_COMMIT__, __ARK_SLEEP_WORKER__, __ARK_PANEL__ */
 const build = {version: __ARK_VERSION__, commit: __ARK_COMMIT__};
+// The shell has started: the page's words for one that never does
+// (web/index.html) go.
+document.getElementById("root")?.replaceChildren();
 const matchMedia = globalThis.matchMedia?.bind(globalThis);
 
 if (isPhone({matchMedia, screen: globalThis.screen})) {
@@ -35,6 +38,7 @@ if (isPhone({matchMedia, screen: globalThis.screen})) {
     const {api} = startWebShell({
         hid,
         locks: navigator.locks,
+        BroadcastChannel: globalThis.BroadcastChannel,
         storage: navigator.storage,
         indexedDB: globalThis.indexedDB,
         localStorage: (() => {try {return globalThis.localStorage;} catch {return undefined;}})(),

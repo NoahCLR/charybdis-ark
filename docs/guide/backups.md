@@ -91,6 +91,15 @@ on, so those layers stay listed instead of folding away as empty layers.
 Pointing modes, the rest of lighting and settings, and the text replacement
 list stay as your draft has them.
 
+Whatever you keep that plays a macro (a replacement, a pointing mode's
+direction, a behaviour or a combo) plays it by its slot, so after the import
+it plays the file's macro in that slot, or nothing where the file leaves the
+slot empty. The sheet names each one with what it will play, such as "the
+replacement for “sig” plays this file's Macro 3". After **Use as draft**,
+Review says the same as a notice, "What the VIA import kept plays the macros
+it brought", for each one whose slot now holds other steps than the
+keyboard's, until you save, undo the import or discard those macros.
+
 A key Ark doesn't know or can't place, a custom key from older Ark firmware
 (which does nothing on current firmware), or a macro it can't type, is left
 empty, and the sheet lists each with why ("Left empty: 1 key and 1 macro Ark
@@ -105,7 +114,11 @@ profile read first. **Undo** takes the whole import back.
 
 Before every save and before leaving Live edit, Ark saves a recovery copy of
 what the keyboard held, and it doesn't save anything if it can't save one. A
-restart with unsaved edits keeps a copy of those edits the same way.
+restart with unsaved edits keeps a copy of those edits the same way. When the
+browser won't keep the copy, Ark says why: its storage for the page is full
+(delete copies you no longer need here, or free some of the browser's
+storage), the browser is set not to let the page save data (allow it in the
+browser's settings), or its storage can't be opened.
 
 Each copy is named by what made it, the keyboard it came from and when, for
 example "Before saving live edits · Noah's Charybdis · 23 Oct 2026, 14:02". A

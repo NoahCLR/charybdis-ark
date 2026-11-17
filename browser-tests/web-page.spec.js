@@ -328,6 +328,69 @@ test("the page refuses markup that skips its Trusted Types policy, and draws wit
     expect(errors.filter((text) => !/This document requires 'TrustedHTML' assignment|Creating a TrustedTypePolicy named '(?:x|default|ark-html)' violates/.test(text))).toEqual([]);
 });
 
+// The page's own words (web/index.html) stand in for a shell that never
+// starts, after a moment; an ordinary load replaces them unseen.
+test("a shell that never starts leaves the page's own words, never a blank page", async ({browser, baseURL}) => {
+    const fallback = (page) => page.locator("#root > .page-starting");
+    const context = await browser.newContext({baseURL});
+    try {
+        const page = await context.newPage();
+        await page.route(/\/shell-[A-Z0-9]+\.js$/, (route) => route.fulfill({status: 404, contentType: "text/html", body: "<h1>not found</h1>"}));
+        await page.goto(PAGE);
+        await expect(fallback(page)).toBeHidden();
+        await expect(fallback(page)).toBeVisible({timeout: 5000});
+        await expect(fallback(page)).toContainText("Chrome or Edge on a computer, with JavaScript on");
+        await expect(fallback(page).locator("noscript")).toHaveCount(1);
+    } finally {await context.close();}
+    const off = await browser.newContext({baseURL, javaScriptEnabled: false});
+    try {
+        const page = await off.newPage();
+        await page.goto(PAGE);
+        // Playwright turns scripts off below the parser, which still reads
+        // <noscript> as if they ran: the page's words are what this shows.
+        await expect(fallback(page)).toContainText("with JavaScript on", {timeout: 5000});
+        await expect(fallback(page)).toBeVisible();
+    } finally {await off.close();}
+    const ordinary = await browser.newContext({baseURL});
+    try {
+        await withKeyboard(ordinary, baseURL);
+        const page = await ordinary.newPage();
+        const errors = await open(page);
+        await expect(page.locator(".read-placeholder h2")).toHaveText("Connect your keyboard");
+        await expect(fallback(page)).toHaveCount(0);
+        expect(errors).toEqual([]);
+    } finally {await ordinary.close();}
+});
+
+// A screen whose drawing throws (a stand-in for a renderer's bug: every
+// lookup inside a screen throws while armed) leaves the rail and a
+// statement, never an empty page; a fault nothing caught is a notice.
+test("a fault while a screen is drawn says so and keeps the rail; an uncaught one is a notice", async ({page, context, baseURL}) => {
+    await withKeyboard(context, baseURL);
+    const errors = await open(page);
+    await page.locator('.read-placeholder [data-act="explore-demo"]').click();
+    await ready(page);
+    await page.evaluate(() => {
+        const real = Element.prototype.querySelector;
+        Object.assign(window, {__armed: true});
+        Element.prototype.querySelector = function (...selectors) {
+            if (/** @type {any} */ (window).__armed && this.classList?.contains("main")) throw new TypeError("simulated renderer fault");
+            return real.apply(this, selectors);
+        };
+    });
+    await page.locator('[data-screen="lighting"]').click();
+    const fault = page.locator('.read-placeholder[role="alert"]');
+    await expect(fault.locator("h2")).toHaveText("Ark could not draw this screen");
+    await expect(fault).toContainText("choose another screen from the menu");
+    expect(errors.some((text) => /simulated renderer fault/.test(text))).toBe(true);
+    await page.evaluate(() => Object.assign(window, {__armed: false}));
+    await page.locator('[data-screen="profile"]').click();
+    await expect(page.locator('[data-act="export"]')).toBeVisible();
+
+    await page.evaluate(() => {setTimeout(() => {throw new TypeError("simulated uncaught fault");});});
+    await expect(page.locator(".rail-message")).toContainText("Failed: Ark ran into a problem of its own.");
+});
+
 test("explore the demo: edit on several screens, review with no Apply, export, open a profile file and leave", async ({page, context, baseURL}) => {
     test.setTimeout(90000);
     const {keyboard, ownFilesOnly} = await withKeyboard(context, baseURL);

@@ -18,7 +18,7 @@ import {el, esc} from "../lib/dom.mjs";
 import {placementsOf} from "../view/reach.mjs";
 import {NAME_MAX_BYTES} from "../view/names.mjs";
 import {titleName, attachTitleName} from "./title-name.mjs";
-import {getModel, layers, post, render, state} from "../store.mjs";
+import {followSlotSwap, getModel, layers, post, render, state} from "../store.mjs";
 import {editGate} from "../view/edit-gate.mjs";
 import * as edits from "../view/edits.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
@@ -42,6 +42,7 @@ import {SWAP_TIP, allSlotsShown, slotBankControls, swappable} from "./slot-bank.
 /** @param {string} from @param {string} to */
 function swapCustomKeys(from, to) {
     post(edits.swapCustomKeys(from, to));
+    followSlotSwap("customKeys", from, to);
     if (state.cellRow === from || state.cellRow === to) state.cellRow = state.cellRow === from ? to : from;
     state.customKey = to;
     render();

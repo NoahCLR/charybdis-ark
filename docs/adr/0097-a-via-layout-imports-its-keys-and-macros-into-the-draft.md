@@ -62,6 +62,21 @@ number of layers, with the layers above the file's emptied.
   empties becomes its last. A pointing mode's link lets go of the emptied
   layers, and one no layer starts any more has nothing to end it. The sheet
   says when the pointer layer moved or Auto-mouse turned off.
+- **What is kept and plays a macro is named.** A replacement, a pointing
+  mode's direction, and a behaviour or combo the blank slate keeps play a
+  macro by its slot, and the import fills or empties every slot, so each
+  now plays the file's macro in that slot, or nothing. The import leaves
+  them as they are, and the sheet's callout names each after what stays,
+  with what it now plays: "Kept, these still play a macro by its slot,
+  which now holds this file's macro or nothing: the replacement for “sig”
+  plays this file's Macro 3 and Combo 0 plays nothing (Macro 100 is
+  emptied)", the first eight in full. It is read from the document Use as
+  draft takes, so it follows the switches, and says nothing when nothing
+  kept plays a macro. A pre-release review found (2026-11-16) that neither
+  the sheet nor Review said so. Review says it as a notice among its checks,
+  in the sheet's names with "the imported" for "this file's", while the
+  import is a step of the draft, for each whose slot holds other steps than
+  the keyboard's; never a blocker, and Save asks nothing of it.
 - **What VIA wrote is read as VIA wrote it.** A key is QMK's name as VIA's
   key dictionaries spell it (protocols 12 and 13; `MACRO(n)`, `CUSTOM(n)`,
   VIA 10's `MACRO00` and `USER00`), its modifier sets (`MOD_LCTL | MOD_RCTL`

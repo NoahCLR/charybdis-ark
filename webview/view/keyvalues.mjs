@@ -2,7 +2,7 @@
 /** @typedef {Partial<import("../../contracts/panel.js").PublishedModel> | null | undefined} Model */
 import {macroNamed, vocabulary} from "./vocabulary.mjs";
 import {catalogEntry, keyIdentity, keycodeName, macroIndex} from "./key-identity.mjs";
-import {MODIFIER_KEYS, MODIFIER_KEY_SIDES, MOD_BITS, MOD_RIGHT, QK, inBlock, keyOf, macroName, modsOf} from "../../rules/qmk-keycodes.mjs";
+import {MODIFIER_KEYS, MODIFIER_KEY_SIDES, MOD_BITS, MOD_RIGHT, NOTHING, QK, TRANSPARENT, inBlock, keyOf, macroName, modsOf} from "../../rules/qmk-keycodes.mjs";
 
 // Keycodes as values: a stored shortcut named for a person, the modifiers a
 // keycode carries, and a picker selection folded into one keycode. Pointing
@@ -56,7 +56,9 @@ export const modifierNames = (/** @type {Model} */ model, /** @type {number} */ 
 // all on one side (Ctrl+Shift is S(KC_LEFT_CTRL), Command+Right Command is
 // RGUI(KC_LEFT_GUI)), a lone modifier as its own key. A set no
 // keycode can hold (two or more modifiers on each side) comes back as the
-// shortcut a custom key would take instead (D-L63).
+// shortcut a custom key would take instead (D-L63). Transparent and KC_NO
+// press no key, so modifiers over them fold as over nothing: a picker opened
+// on an unassigned key, Ctrl lit, is the Ctrl key, not C(KC_TRANSPARENT).
 // Null when the selection has a key that is not a modifier, or nothing.
 /** @param {Model} model @param {{keys?: string[], mods?: string[]}} picker @returns {{keys: string[], mods: string[]} | {shortcut: import("../../contracts/panel.js").CustomKeyShortcut} | null} */
 export function modifierPick(model, {keys = [], mods = []}) {
@@ -64,7 +66,7 @@ export function modifierPick(model, {keys = [], mods = []}) {
     const wrapped = mods.reduce((bits, wrapper) => bits | (controls.find((entry) => entry.value === wrapper)?.bit ?? 0), 0);
     const code = keys[0] ? keyIdentity(model, keys[0]).entry?.keycode : undefined;
     const keyBit = code !== undefined && inBlock(code, MODIFIER_KEYS) ? 1 << (code - MODIFIER_KEYS.first) : 0;
-    if (keys.length && !keyBit) return null;
+    if (keys.length && !keyBit && code !== TRANSPARENT && code !== NOTHING) return null;
     const mask = wrapped | keyBit;
     if (!mask) return null;
     const {LEFT, RIGHT} = MODIFIER_KEY_SIDES;

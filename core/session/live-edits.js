@@ -30,6 +30,7 @@
  * @typedef {import("./profile-draft-session.js").LiveTarget} Target
  */
 const {fingerprint} = require("../model/portable-profile");
+const {profileFindings} = require("../model/profile-checks");
 const {EDIT_MODE, isEditMode} = require("../protocol/profile-edit-v1");
 const {EDIT_MODE_WORDS, INTERRUPTION_REASONS, PHASE, SAVE_WORDS, arkCode, failureSentence, quietWords} = require("../model/vocabulary");
 const {IDENTITY} = require("../model/draft-order");
@@ -42,6 +43,10 @@ const {forget, keptFor, keptForAny, remember} = require("./kept");
 /** @param {string} message @param {string} [code] */
 const refusal = (message, code = "LIVE_EDIT_REFUSED") => Object.assign(new Error(message), {code});
 
+// How a profile holding a colour past the keyboard's brightness limit gets
+// lowered: a live draft is what the keyboard runs, so it never holds one,
+// and Review and save keeps the draft in Ark, where Lighting lowers it (D-L98).
+const TOO_BRIGHT_WAY_OUT = `Choose ${EDIT_MODE_WORDS[EDIT_MODE.APPLY].label} under Edits in the keyboard menu, use the profile as the draft there, and lower the brightness in Lighting.`;
 // What a read says when the working copy moved under the same session.
 const CHANGED_ELSEWHERE = "The keyboard's unsaved edits are not what Ark last saw (another app, a lost answer, or an edit that did not land as sent): the draft shows what it runs now, and its history starts again here.";
 // Cancel edit ended an edit the keyboard held for released keys.
@@ -69,14 +74,19 @@ function liveDraft(session) {
 // Sends `target` to the keyboard, unless it adds a trap or warning the person
 // has not confirmed: then it waits as the panel's proposal. On any failure
 // the keyboard is read again, so the draft shows what it actually runs.
+// A lighting colour past the keyboard's brightness limit is never sent, even
+// one the draft held before: Lighting edits beside it (portable-profile.js).
+// The refusal says where it can be lowered.
 /** @param {Session} session @param {Target} target @param {{confirmed?: boolean, accepted?: Session["acceptedEdit"], replaceWhenLarge?: boolean}} [options] */
 async function proposeLive(session, target, {confirmed = false, accepted, replaceWhenLarge = false} = {}) {
     const draft = liveDraft(session);
     session.liveProposal = undefined;
     const added = draft.checksAdded(target.document, target.order ?? draft.order);
-    if (added.some(check => check.level === "blocker")) {
+    const blocker = added.find(check => check.level === "blocker")
+        ?? profileFindings(draft.decode(target.document).decoded, {brightnessMax: draft.current.limits?.brightnessMax}).find(finding => finding.kind === "colourBrightnessBlocker");
+    if (blocker) {
         session.resetDraftForms = true;
-        throw refusal(`Not sent: ${added.find(check => check.level === "blocker")?.title || "the keyboard would refuse it"}.`, "LIVE_EDIT_BLOCKED");
+        throw refusal(`Not sent: ${blocker.title || "the keyboard would refuse it"}.${blocker.kind === "colourBrightnessBlocker" ? ` ${TOO_BRIGHT_WAY_OUT}` : ""}`, "LIVE_EDIT_BLOCKED");
     }
     if (added.length && !confirmed) {
         session.liveProposal = {id: draft.revision, draftId: draft.id, revision: draft.revision, target, checks: added, accepted, replaceWhenLarge};

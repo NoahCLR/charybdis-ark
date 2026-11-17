@@ -50,14 +50,15 @@ the key would do something on its own, the cell is dashed and shows it,
 marked **standard key**:
 
 - An empty Single tap sends the key's own keycode, and an empty Hold holds
-  it. A layer-tap key holds its layer; a mod-tap key holds its modifiers. A
-  macro plays. A pointing mode's lock key locks the mode, and a switch key
+  it. A layer-tap key holds its layer; a mod-tap key holds its modifiers.
+  `TT()` holds its layer and does nothing on a tap; `OSL()` holds its layer
+  and a tap arms it. A macro plays. A pointing mode's lock key locks the mode, and a switch key
   turns combos, behaviours or auto-mouse on or off (below). A custom key sends its shortcut; a Tap-toggle one does
   nothing on a tap, a One-shot one arms its layers, and one with no shortcut
   does nothing.
 - A hold that starts as the key goes down, such as a layer key's or a
-  pointing mode's, says **held from the press**. A One-shot custom key's
-  hold also says **arms on release**: let go after the tap / hold threshold
+  pointing mode's, says **held from the press**. An `OSL()` key's or a
+  One-shot custom key's hold also says **arms on release**: let go after the tap / hold threshold
   and its layers stay armed for the next key.
 - An empty Tap on a Double tap or later sends the key's own tap once per
   press, so an empty Double tap sends it twice. It's never the Single tap
@@ -66,8 +67,8 @@ marked **standard key**:
 - A Single tap set to Transparent is the exception: the key below is then
   the key's tap wherever a Tap is empty, marked **key below**. A pointing
   key on a layer types the key under it however many times you tap.
-- A Tap-toggle custom key with no behaviour counts taps by itself: its
-  Quintuple tap says **locks its layers**.
+- A `TT()` key or a Tap-toggle custom key with no behaviour counts taps by
+  itself: its Quintuple tap says **locks its layers**.
 - An empty Long hold beside a Hold shows the Hold carrying on.
 - An empty Hold beside a Long hold shows the tap a release sends before the
   long hold threshold, unless the key's own hold fills it: on the Single
@@ -83,7 +84,10 @@ marked **standard key**:
 - A pointing-mode key holds its mode from the press, unless its row holds
   another mode on a later tap: then it waits for the Tap / hold threshold,
   so the two modes never overlap. That holds however the key is stored, by
-  its name or as its keycode.
+  its name or as its keycode. On a Double tap or later with nothing set,
+  inside the row's deepest tap count, its mode also starts at the Tap / hold
+  threshold, after the taps before it, so that cell doesn't say held from
+  the press.
 
 Setting an action in a dashed cell replaces what it shows. A modifier key on
 its own, such as Left Command, is a key like any other: a quick Single tap

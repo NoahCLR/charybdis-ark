@@ -66,11 +66,12 @@ function builtInForView(target, features, names, steps) {
 
 /** @param {import("../schema/types.js").SemanticAction} target @param {Parameters<typeof builtInActions>[1]} features @param {import("../../contracts/model.js").ProfileKeyNames} [names] @param {Parameters<typeof builtInActions>[2]} [steps] @returns {import("../../contracts/panel.js").BuiltIn} */
 function builtInBranches(target, features, names, steps) {
-    const {tap, hold, fallback, releaseTaps, fromPress, armsOnRelease, transparentTap, tapToggle} = builtInActions(target, features, steps);
+    const {tap, hold, fallback, releaseTaps, fromPress, laterHoldWaits, armsOnRelease, transparentTap, tapToggle} = builtInActions(target, features, steps);
     return {
         ...(releaseTaps ? {releaseTaps: true} : {}),
         ...(transparentTap ? {transparentTap: true} : {}),
         ...(tapToggle ? {tapToggle: true} : {}),
+        ...(laterHoldWaits ? {laterHoldWaits: true} : {}),
         ...(tap ? {tap: {style: "TAP_SENDS", action: actionName(tap), ...builtInDisplay(tap, names, features)}} : {}),
         ...(hold ? {hold: {style: "PRESS_AND_HOLD_UNTIL_RELEASE", action: actionName(hold), repeatHz: "0", ...builtInDisplay(hold, names, features),
             ...(fallback ? {fallback: true} : {}), ...(fromPress ? {fromPress: true} : {}), ...(armsOnRelease ? {armsOnRelease: true} : {})}} : {}),

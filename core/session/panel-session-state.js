@@ -159,11 +159,14 @@ async function whileApplying(session, work) {
     }
 }
 
-// What the next model carries once, then forgets.
-/** @param {Pick<Session, "notice" | "noticeFailed" | "acceptedEdit" | "resetDraftForms">} session */
+// What the next model carries once, then forgets; the notice it carries is
+// what the rail says from then on (`noticeSaid`). An empty notice takes back
+// what the rail said.
+/** @param {Pick<Session, "notice" | "noticeFailed" | "noticeSaid" | "acceptedEdit" | "resetDraftForms">} session */
 function takeOutbox(session) {
     const outbox = {notice: session.notice, acceptedEdit: session.acceptedEdit, resetDraftForms: session.resetDraftForms,
         ...(session.noticeFailed && session.notice ? {failed: true} : {})};
+    if (session.notice !== undefined) session.noticeSaid = session.notice;
     session.notice = undefined;
     session.noticeFailed = undefined;
     session.acceptedEdit = undefined;

@@ -9,6 +9,9 @@ const {layerName: layerCalled} = require("../model/vocabulary");
 const {revertUnits} = require("../model/profile-revert");
 const {LEVELS: CHECK_LEVELS} = require("../model/layer-reach");
 const {draftProfileChecks} = require("../model/profile-checks");
+const {compareFindings} = require("../model/compare-findings");
+const {VIA_IMPORT_LABEL, keptMacroFinding} = require("../model/via-layout");
+const {hostSettings} = require("../schema/host-settings");
 const {applyDraftEdit} = require("../model/draft-editor");
 const {draftEditLabel, draftEditStep} = require("../model/draft-edits");
 const {actionName, knownActionAbi} = require("../schema/actions");
@@ -129,7 +132,7 @@ class ProfileDraftSession {
     slotReferenceCache;
     /** @type {WeakMap<Document, {previous: Document, before: Order, after: Order, rows: Review[]}> | undefined} */
     reviewCache;
-    /** @type {WeakMap<Decoded, {keyboard: Decoded | null | undefined, order: Order, checks: import("../../contracts/model.js").Check[]}> | undefined} */
+    /** @type {WeakMap<Decoded, {keyboard: Decoded | null | undefined, order: Order, imported: boolean, checks: import("../../contracts/model.js").Check[]}> | undefined} */
     checksCache;
     /** @type {boolean | undefined} */
     needsRead;
@@ -676,17 +679,22 @@ class ProfileDraftSession {
     // What the layer walk finds in this revision beside the keyboard as it is,
     // matched layer with layer through this revision's order and slot with
     // slot through its slots (keyboardInSlots; model/layer-reach.js), kept
-    // with the entry and the keyboard it was compared with.
+    // with the entry and the keyboard it was compared with. While a VIA
+    // layout used as the draft is a step of it, what the import kept that
+    // plays a macro it changed is said too, as its sheet said it (D-L97).
     checks() {
         const draft = this.current.decoded, order = this.order;
         const keyboard = this.base.incomplete ? undefined : this.keyboardInSlots(order);
+        const imported = this.history.slice(1, this.cursor + 1).some(entry => entry.label === VIA_IMPORT_LABEL);
         this.checksCache ??= new WeakMap();
         const known = this.checksCache.get(draft);
-        if (known && known.keyboard === keyboard && known.order === order) return known.checks;
+        if (known && known.keyboard === keyboard && known.order === order && known.imported === imported) return known.checks;
         const checks = draftProfileChecks(keyboard ?? null, draft, order.layers, {brightnessMax: this.current.limits?.brightnessMax,
             detectedHostOs: this.current.hostOs?.detected,
             effects: this.current.options?.effects});
-        this.checksCache.set(draft, {keyboard, order, checks});
+        const kept = imported && keyboard ? keptMacroFinding(keyboard, draft, hostSettings(draft.settings.values, this.current.hostOs?.detected)) : null;
+        if (kept) checks.push(...compareFindings([], [kept], order.layers));
+        this.checksCache.set(draft, {keyboard, order, imported, checks});
         return checks;
     }
     // Whether Apply has to be confirmed: active traps and warnings matter

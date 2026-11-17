@@ -33,14 +33,25 @@ const CLEARABLE = [["behaviors", "behaviour", "behaviours"], ["combos", "combo",
 // removes. Layers are named as the sheet's table names them (the file's
 // summary names).
 /** @param {import("../../contracts/model.js").ViaImportView} via @param {readonly string[]} names */
-export function viaCallout({layers, clear, clearable, pointer}, names) {
+export function viaCallout({layers, clear, clearable, pointer, kept}, names) {
     const replaced = layers === 1 ? names[0] : `${names[0]} to ${names[layers - 1]}`;
     // Only what the draft has is removed; a kind it has none of stays, empty.
     const goes = (/** @type {keyof import("../../contracts/model.js").ViaClears} */ kind) => clear[kind] && clearable[kind] > 0;
     const removed = CLEARABLE.filter(([kind]) => goes(kind)).map(([, , many]) => many);
-    const kept = [...CLEARABLE.filter(([kind]) => !goes(kind)).map(([, , many]) => many), "pointing modes", "the rest of lighting and settings"];
-    const stays = listed(kept);
-    return `A VIA layout holds keys and macros only. Its ${counted(layers, "layer")} replace${layers === 1 ? "s" : ""} ${replaced}, and every layer above is emptied; its macros fill the first macro slots, and the rest are emptied. Layer and macro names are cleared, and so are each layer's own settings and the emptied layers' lighting and pointing links.${pointerLine(pointer)}${removed.length ? ` Your draft's ${listed(removed)} are removed.` : ""} ${stays[0].toUpperCase()}${stays.slice(1)} stay as they are.`;
+    const stays = listed([...CLEARABLE.filter(([kind]) => !goes(kind)).map(([, , many]) => many), "pointing modes", "the rest of lighting and settings"]);
+    return `A VIA layout holds keys and macros only. Its ${counted(layers, "layer")} replace${layers === 1 ? "s" : ""} ${replaced}, and every layer above is emptied; its macros fill the first macro slots, and the rest are emptied. Layer and macro names are cleared, and so are each layer's own settings and the emptied layers' lighting and pointing links.${pointerLine(pointer)}${removed.length ? ` Your draft's ${listed(removed)} are removed.` : ""} ${stays[0].toUpperCase()}${stays.slice(1)} stay as they are.${keptLine(kept)}`;
+}
+
+// What the import keeps that plays a macro by its slot, which the file filled
+// or emptied, so it plays the file's macro now or nothing: each as core calls
+// it, the first VIA_LEFT_SHOWN of them, then a count of the rest. Nothing, when
+// nothing kept plays a macro.
+/** @param {import("../../contracts/model.js").ViaImportView["kept"]} kept */
+function keptLine(kept) {
+    if (!kept.length) return "";
+    const plays = kept.map((item) => `${item.called} plays ${item.emptied ? `nothing (${item.macro} is emptied)` : `this file's ${item.macro}`}`);
+    const rest = plays.length - VIA_LEFT_SHOWN;
+    return ` Kept, these still play a macro by its slot, which now holds this file's macro or nothing: ${rest > 0 ? `${plays.slice(0, VIA_LEFT_SHOWN).join(", ")} and ${rest} more` : listed(plays)}.`;
 }
 
 // What became of Auto-mouse's pointer layer, which the file decides: moved

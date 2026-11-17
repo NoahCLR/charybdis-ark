@@ -15,7 +15,8 @@ const {document: pdDocument} = require("../fixtures/pd-profile");
 const MACRO = slot => QK.MACRO.first + slot;
 // The test profile with every kind of reference to a slot: a macro with a
 // name, a key for each bank on layer 1, a custom key's name and shortcut, a
-// pointing tap that runs the macro, and an accent on a pointing mode. Its
+// pointing tap that runs the macro, text replacements that play macros 2
+// and 5, and an accent on a pointing mode. Its
 // behaviours already reach macros (the key 0x806 sends MACRO_10), custom
 // keys (rows on CUSTOM_KEY_0–3) and pointing modes (rows on PD_MODE_1).
 function referenced() {
@@ -28,12 +29,14 @@ function referenced() {
         const layer = open("keymap")[1];
         layer[0] = MACRO(2); layer[1] = customKeyCode(3); layer[2] = PD_MODE_KEYS[1].holdCode; layer[3] = PD_MODE_KEYS[1].lockCode;
         open("pdModes")[1].directions.up.keycode = MACRO(2);
+        open("autocorrect").entries.push({correction: "", macro: 2, typos: [{typo: "hi", match: 0}]}, {correction: "", macro: 5, trigger: 1, typos: [{typo: "sig", match: 0}]});
         const rgb = open("rgb");
         rgb.pdModeGroupRows.push({selector: 1, color: {h: 1, s: 2, v: 3}, groupId: rgb.pdModeGroupRows[0].groupId});
     });
 }
 const macroDomain = document => decodeProfileBlob(validateSnapshot(document).profile).domains.find(domain => domain.id === PROFILE_DOMAIN_IDS.MACROS).payload;
 const behaviourOn = (decoded, target) => decoded.behaviors.rows.find(row => row.target.kind === target.kind && row.target.operand === target.operand);
+const playing = decoded => decoded.autocorrect.entries.filter(entry => entry.macro !== undefined).map(entry => [entry.typos[0].typo, entry.macro]);
 const sent = row => row.steps.flatMap(step => [step.tap, step.hold?.action, step.longHold?.action]).filter(Boolean).map(action => `${action.kind}/${action.operand}`);
 
 test("the banks are the keyboard's fixed sets, and a swap step trades exactly two slots", () => {
@@ -59,6 +62,8 @@ test("two macros trade places with their steps and names, and every key, behavio
     assert.equal(now.layers[1][0], MACRO(10), "the key that typed Greeting still does");
     assert.deepEqual(sent(behaviourOn(now, {kind: 1, operand: 0x806})), sent(behaviourOn(was, {kind: 1, operand: 0x806})).map(a => (a === "6/10" ? "6/2" : a)), "the behaviour that sent macro 10 now names slot 2, where it is");
     assert.equal(now.pdModes[1].directions.up.keycode, MACRO(10), "the pointing tap runs the same macro");
+    assert.deepEqual(playing(now), [["sig", 5], ["hi", 10]], "the replacement that played Greeting still does, in the list's stored order");
+    assert.deepEqual(now.autocorrect.entries.filter(entry => entry.macro === undefined), was.autocorrect.entries.filter(entry => entry.macro === undefined), "text replacements are left as they were");
     assert.deepEqual([now.settings.customKeyNames[3], now.layers[1][1], now.pdModes[1].name, now.rgb.pdModeGroupRows.length], ["Thumb", customKeyCode(3), "Volume", 2], "nothing else moved");
     assert.equal(fingerprint(reorderSlots(moved, {macros: swapStep("macros", 2, 10)})), fingerprint(source), "swapping back is the keyboard's profile again");
 });
@@ -72,6 +77,7 @@ test("two custom keys trade names, shortcuts and behaviour rows, and the keys an
     assert.equal(behaviourOn(now, {kind: 7, operand: 3}), undefined, "the row on custom key 3 went with it");
     assert.deepEqual(sent(behaviourOn(now, {kind: 7, operand: 20})), sent(behaviourOn(was, {kind: 7, operand: 3})), "and listens to the key where it is now");
     assert.equal(now.layers[1][1], customKeyCode(20), "the layout key sends the same custom key");
+    assert.deepEqual(playing(now), playing(was), "a replacement plays the same macro");
     assert.deepEqual(macroDomain(moved), macroDomain(source), "the macro domain's bytes are left as they were");
     assert.equal(fingerprint(reorderSlots(moved, {customKeys: swapStep("customKeys", 20, 3)})), fingerprint(source));
 });

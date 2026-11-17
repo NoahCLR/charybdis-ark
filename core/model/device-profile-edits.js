@@ -239,31 +239,38 @@ function editPointing(open, message) {
 
 /** @param {Rgb} rgb @param {Extract<ProfileEdit, {type: import("./draft-edits.js").InDomain<"lighting">}>} message @param {number} maximumBrightness */
 function editLighting(rgb, message, maximumBrightness) {
-    /** @param {ColourInput} value */
-    const editColor = (value) => color(value, maximumBrightness);
+    // A colour the edit sets is held to the keyboard's brightness limit; one
+    // it posts back as it stood (a record sent whole, a policy, an accent's
+    // LEDs) is kept, even past the limit, for Review's blocker to name until
+    // it is lowered (profile-checks.js).
+    /** @param {ColourInput} value @param {import("../schema/types.js").Hsv} [stood] */
+    const editColor = (value, stood) => {
+        const set = color(value);
+        return stood && set.h === stood.h && set.s === stood.s && set.v === stood.v ? set : color(value, maximumBrightness);
+    };
     /** @param {string | undefined} value */
     const locality = (value) => enumValue(value, RGB_LOCALITIES, "locality");
     switch (message.type) {
         case "updateLayerColor": {
             const row = existing(rgb.layerColors, row => row.layerId === namedId(message.layer, "Layer"), "Layer");
-            row.color = editColor(message); row.mode = enumValue(message.mode, RGB_LAYER_MODES, "layer policy"); break;
+            row.color = editColor(message, row.color); row.mode = enumValue(message.mode, RGB_LAYER_MODES, "layer policy"); break;
         }
         case "updatePdModeColor": {
             const id = enumValue(message.pointingMode, RGB_POINTING_MODE_IDS, "pointing mode");
             const row = existing(rgb.pdModeColors, row => row.pdModeId === id, "Pointing mode");
-            row.color = editColor(message); row.locality = locality(message.locality); break;
+            row.color = editColor(message, row.color); row.locality = locality(message.locality); break;
         }
-        case "updateAutomouseFade": rgb.automouseFade = {mode: enumValue(message.mode, RGB_AUTOMOUSE_MODES, "fade policy"), endColor: editColor(message)}; break;
-        case "updateComboFeedback": rgb.comboFeedback = {color: editColor(message), locality: locality(message.locality)}; break;
+        case "updateAutomouseFade": rgb.automouseFade = {mode: enumValue(message.mode, RGB_AUTOMOUSE_MODES, "fade policy"), endColor: editColor(message, rgb.automouseFade.endColor)}; break;
+        case "updateComboFeedback": rgb.comboFeedback = {color: editColor(message, rgb.comboFeedback.color), locality: locality(message.locality)}; break;
         // Each case of behaviour feedback, a colour and where it paints, and
         // the stage's tap-commit policy, stored as one record (firmware D-F73).
         case "updateKeyBehaviorFeedback": {
-            const feedback = message.config;
+            const feedback = message.config, stood = rgb.keyFeedback;
             rgb.keyFeedback = {
-                tapBranches: feedback.tapBranches.map((branch) => ({color: editColor(branch.color), locality: locality(branch.locality)})),
-                tapCommittedColor: editColor(feedback.tapCommittedColor), tapCommittedLocality: locality(feedback.tapCommittedLocality),
-                holdActiveColor: editColor(feedback.holdActiveColor), holdActiveLocality: locality(feedback.holdActiveLocality),
-                longHoldActiveColor: editColor(feedback.longHoldActiveColor), longHoldActiveLocality: locality(feedback.longHoldActiveLocality),
+                tapBranches: feedback.tapBranches.map((branch, index) => ({color: editColor(branch.color, stood.tapBranches[index]?.color), locality: locality(branch.locality)})),
+                tapCommittedColor: editColor(feedback.tapCommittedColor, stood.tapCommittedColor), tapCommittedLocality: locality(feedback.tapCommittedLocality),
+                holdActiveColor: editColor(feedback.holdActiveColor, stood.holdActiveColor), holdActiveLocality: locality(feedback.holdActiveLocality),
+                longHoldActiveColor: editColor(feedback.longHoldActiveColor, stood.longHoldActiveColor), longHoldActiveLocality: locality(feedback.longHoldActiveLocality),
                 tapCommitMode: enumValue(feedback.tapCommitMode, RGB_TAP_COMMIT_MODES, "tap policy")}; break;
         }
         // The four cases of replacement feedback, each a colour and where it
@@ -271,12 +278,12 @@ function editLighting(rgb, message, maximumBrightness) {
         // HSV(0, 0, 0) is passthrough: the case paints nothing (firmware D-F70,
         // D-F72, D-F73, D-F74).
         case "updateAutocorrectFeedback": {
-            const feedback = message.config;
+            const feedback = message.config, stood = rgb.autocorrectFeedback;
             rgb.autocorrectFeedback = {
-                textColor: editColor(feedback.textColor), textLocality: locality(feedback.textLocality),
-                macroColor: editColor(feedback.macroColor), macroLocality: locality(feedback.macroLocality),
-                undoColor: editColor(feedback.undoColor), undoLocality: locality(feedback.undoLocality),
-                leadingColor: editColor(feedback.leadingColor), leadingLocality: locality(feedback.leadingLocality)}; break;
+                textColor: editColor(feedback.textColor, stood.textColor), textLocality: locality(feedback.textLocality),
+                macroColor: editColor(feedback.macroColor, stood.macroColor), macroLocality: locality(feedback.macroLocality),
+                undoColor: editColor(feedback.undoColor, stood.undoColor), undoLocality: locality(feedback.undoLocality),
+                leadingColor: editColor(feedback.leadingColor, stood.leadingColor), leadingLocality: locality(feedback.leadingLocality)}; break;
         }
         case "updateRgbStages": rgb.stageEnableMask = integer(message.stageEnableMask, RGB_STAGE_MASK_ALL, "RGB stage mask"); break;
         // An accent is added at its table's end, changed where it stands
@@ -294,9 +301,9 @@ function editLighting(rgb, message, maximumBrightness) {
             const index = integer(message.index, rows.length - 1, "Accent");
             // Its old LEDs give their group back first, so changing the LEDs
             // of the only accent lighting them fits on a full keyboard.
-            rows.splice(index, 1);
+            const [stood] = rows.splice(index, 1);
             pruneGroups(rgb);
-            placeAccent(rgb, {...message.group, target: message.target}, editColor(message.group), index);
+            placeAccent(rgb, {...message.group, target: message.target}, editColor(message.group, stood.color), index);
             break;
         }
         case "deleteRgbLedGroup": {

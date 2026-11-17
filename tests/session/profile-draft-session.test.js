@@ -724,6 +724,22 @@ test("a macro swap is one item, and the macro's keys and behaviours follow it", 
     assert.equal(draft.view({}).undoLabel, "Put the macro order back");
     assert.deepEqual(sends(draft.current.decoded), [10]);
 });
+test("a text replacement that plays a macro follows its swap, and a swap alone is still the order", () => {
+    const {draft} = slotFixture();
+    stage(draft, {type: "updateMacro", keycode: "MACRO_2", payload: "hello", name: "Greeting"});
+    stage(draft, {type: "addAutocorrectTypos", macro: 2, typos: [{typo: "hi"}]});
+    const before = units(draft);
+    stage(draft, {type: "swapMacros", keycodes: ["MACRO_2", "MACRO_10"]});
+    const plays = () => draft.current.decoded.autocorrect.entries.find(entry => entry.typos.some(typo => typo.typo === "hi")).macro;
+    assert.equal(plays(), 10, "typing hi plays Greeting where it is now");
+    assert.deepEqual(draft.steps().at(-1).changes.map(row => row.unit), ["macroOrder"], "the step is the swap alone");
+    assert.equal(units(draft).length, before.length + 1, "the replacement is no change of its own");
+    // The mirror: a replacement added after the swap, then the order put back.
+    stage(draft, {type: "addAutocorrectTypos", macro: 10, typos: [{typo: "hey"}]});
+    draft.discard(draft.revision, groupOf(draft, "macroOrder"));
+    const playsFor = typo => draft.current.decoded.autocorrect.entries.find(entry => entry.typos.some(row => row.typo === typo)).macro;
+    assert.deepEqual([playsFor("hi"), playsFor("hey")], [2, 2], "both still play Greeting, back in slot 2");
+});
 test("swaps compose: three swaps are one order that says where each macro sits now, and discarding it puts every macro back", () => {
     const {draft, snapshot} = slotFixture();
     for (const [slot, name] of [[1, "One"], [2, "Two"], [3, "Three"]]) stage(draft, {type: "updateMacro", keycode: `MACRO_${slot}`, name, expectedFingerprint: draft.current.fingerprint});
@@ -762,6 +778,27 @@ test("a pointing mode swap takes its colour, its accents and the keys and behavi
     assert.deepEqual(units(draft), ["pdOrder", "rgb:pd:6"], "a colour edited after the swap is its own change, on the mode where it is");
     draft.discard(draft.revision, groupOf(draft, "pdOrder"));
     assert.deepEqual(units(draft), ["rgb:pd:1"], "the colour stays with Volume as it goes home");
+});
+// An imported colour brighter than the keyboard's limit: the draft is
+// repaired in Lighting, and nothing past the limit leaves Ark meanwhile.
+test("a draft holding a colour past the brightness limit still swaps pointing slots, and stays blocked until the colour is lowered", () => {
+    const {checkRestorable} = require("../../core/session/restore-checks");
+    const {draft, snapshot, caps} = slotFixture();
+    const imported = editProfileDomains(draft.current.document, {}, open => {open("rgb").pdModeColors.find(row => row.pdModeId === 1).color.v = 255;});
+    draft.replace(imported, draft.revision, "edit", "Imported a backup");
+    const bright = () => draft.checks().filter(check => check.kind === "colourBrightnessBlocker" && check.status !== "fixed");
+    assert.equal(bright().length, 1, "the import is a blocker");
+    assert.equal(bright()[0].fix, "Lower its brightness to 200 or less in Lighting.");
+    stage(draft, {type: "swapPdModes", slots: [1, 6]});
+    assert.equal(draft.current.decoded.rgb.pdModeColors.find(row => row.pdModeId === 6).color.v, 255, "the colour went with its mode");
+    assert.equal(bright().length, 1, "and is still past the limit");
+    assert.ok(draft.hasBlockers(), "Save is blocked");
+    const facts = {limits: snapshot.limits, options: {effects: [{id: require("../../core/model/settings-editor").baseLighting(draft.current.decoded.settings.values).effect}]}};
+    assert.throws(() => checkRestorable(draft.current.document, facts, caps), {code: "SETTINGS_LIMIT_EXCEEDED", message: /brightness 255; the keyboard accepts at most 200/});
+    stage(draft, {type: "updatePdModeColor", pointingMode: "POINTING_MODE_6", h: 1, s: 2, v: 200, locality: "RGB_RIGHT_HALF"});
+    assert.deepEqual(bright(), [], "lowered, the blocker is gone");
+    assert.ok(!draft.hasBlockers());
+    assert.equal(checkRestorable(draft.current.document, facts, caps), undefined);
 });
 test("a custom key swap takes its name, shortcut and behaviour, and a live proposal's checks are matched through what moved", () => {
     const {draft} = slotFixture();

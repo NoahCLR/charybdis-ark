@@ -31,7 +31,9 @@
 // - `afterTaps`: a later tap count with nothing set, inside the deepest tap
 //   count or past it, is the standard key pressed that many times with the
 //   last held: the presses before it each send the standard tap, then the
-//   standard hold.
+//   standard hold. Inside the deepest tap count, a hold that runs from the
+//   press starts at Tap / hold there (`waits`), after those taps; past it
+//   the taps go out at the press and the hold runs from the press as ever.
 // - A key that counts no taps, a row no deeper than its Single tap, treats
 //   each press as a Single tap of its own, sent at its release: its later
 //   rows tap the Single tap, set or standard, `times` over (`separate`), and
@@ -127,8 +129,10 @@ function emptyCells(builtIn, steps = []) {
         if (step.tap || step.hold || step.longHold) return laterTapImplied(step, kind);
         const tap = inherited(step, "tap");
         if (builtIn.hold) {
-            if (kind === "long") return {meaning: "continues", hold: {own: "hold"}};
-            return {meaning: "afterTaps", ...(tap && !tap.locks ? {tap: {...tap, times: step.tapIndex}} : {}), hold: {own: "hold"}};
+            /** @type {CellRef} */
+            const hold = {own: "hold", ...(builtIn.laterHoldWaits && step.tapIndex < tapDepth(steps) ? {waits: true} : {})};
+            if (kind === "long") return {meaning: "continues", hold};
+            return {meaning: "afterTaps", ...(tap && !tap.locks ? {tap: {...tap, times: step.tapIndex}} : {}), hold};
         }
         return tap && builtIn.releaseTaps ? {meaning: "tapsOnRelease", tap} : null;
     };

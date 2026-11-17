@@ -47,6 +47,8 @@ export interface ViaImportView {
     pointer: {layer: number; layerName: string; change: 'moved' | 'off'} | null;
     /** Each left empty, named as core names it: a key by its layer, a macro by its slot. */
     left: {keys: {layer: number; layerName: string; position: number; spelling: string; reason: string}[]; macros: {slot: number; name: string; reason: string}[]};
+    /** Each thing the import keeps that plays a macro by its slot, which now holds the file's macro, or nothing (`emptied`): a replacement by its first input, a pointing mode's direction, a behaviour by its key, a combo by its number; `called` is what the sheet and Review call it (core/model/via-layout.js keptMacros). */
+    kept: {kind: 'replacement' | 'pointing' | 'behaviour' | 'combo'; name: string; direction?: string; called: string; slot: number; macro: string; emptied: boolean}[];
 }
 export interface DemoView {
     active: boolean;

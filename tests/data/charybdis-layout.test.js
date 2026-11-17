@@ -42,3 +42,19 @@ test("every key carries an LED of its own, and the trackball the next one", () =
     assert.ok(TRACKBALL_LED < RGB_DOMAIN_V1.PHYSICAL_LED_COUNT, "a lighting group may name every one");
     assert.deepEqual([KEY_LEDS[0], KEY_LEDS[6], KEY_LEDS[48], KEY_LEDS[51]], [0, 49, 26, 53], "the left half's columns, its thumbs, then the right half's");
 });
+
+// Ark's tables are the keyboard's own (QMK keyboard.json, imported under
+// upstream/): the layout's keys in its order, and each key's LED the one the
+// keyboard's LED layout files under that key's matrix position. The
+// keyboard's table once filed the lower right thumb key's LED under a
+// position no key uses; this is the check that catches that from Ark's side.
+test("the layout and each key's LED are the keyboard's own", () => {
+    const keyboard = require("../../upstream/qmk/keyboards/bastardkb/charybdis/4x6/keyboard.json");
+    const layout = Object.values(keyboard.layouts)[0].layout.map(key => key.matrix);
+    assert.deepEqual(layout, CHARYBDIS_4X6_LAYOUT_MATRIX.map(position => [...position]));
+    const leds = keyboard.rgb_matrix.layout;
+    const ledAt = ([row, column]) => leds.flatMap((led, index) => led.matrix && led.matrix[0] === row && led.matrix[1] === column ? [index] : []);
+    assert.deepEqual(CHARYBDIS_4X6_LAYOUT_MATRIX.map(position => ledAt(position)), KEY_LEDS.map(led => [led]), "every key carries exactly the LED Ark gives it");
+    const keyless = leds.flatMap((led, index) => led.matrix ? [] : [index]);
+    assert.deepEqual(keyless, [TRACKBALL_LED, 57], "the trackball's LED, and one the board does not populate");
+});

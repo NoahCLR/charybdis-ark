@@ -13,7 +13,7 @@ import {LIVE, liveSaveState, restartOffer} from "./edit-mode.mjs";
  *     | {kind: "failed", apply: import("../../contracts/model.js").ApplyView}
  *     | {kind: "held", wait: NonNullable<Model["liveWait"]>}
  *     | {kind: "busy", title: string, busy: ReturnType<typeof busyText>}
- *     | {kind: "otherKeyboard"}
+ *     | {kind: "otherKeyboard", title: string, detail: string, discard: boolean}
  *     | {kind: "reread"}
  *     | {kind: "stale"}
  *     | {kind: "restart", offer: NonNullable<ReturnType<typeof restartOffer>>}
@@ -44,7 +44,7 @@ export function commitBarState(model, {applyDismissed = null} = {}) {
     if (!draft.busy && apply?.state === "failed" && applyDismissed !== apply.id) return {kind: "failed", apply};
     if (draft.busy && model.liveWait) return {kind: "held", wait: model.liveWait};
     if (draft.busy) return {kind: "busy", title: "Working with the keyboard", busy: busyText(model.device?.health?.phase, model)};
-    if (!draft.matching) return {kind: "otherKeyboard"};
+    if (!draft.matching) return otherKeyboard(draft.changes.length, Boolean(model.device?.connected));
     if (draft.stale) return {kind: draft.live ? "reread" : "stale"};
     const offer = restartOffer(model);
     if (offer) return {kind: "restart", offer};
@@ -58,6 +58,18 @@ export function commitBarState(model, {applyDismissed = null} = {}) {
         return draft.live.mode === LIVE && !draft.live.slaveRefused ? {kind: "liveEdit", saving} : {kind: "livePreview"};
     }
     return draft.dirty ? {kind: "review"} : null;
+}
+
+// A draft held for its own keyboard, its changes kept in Ark. With another
+// keyboard connected the bar says the draft is that keyboard's, and offers to
+// discard it so this one can be edited; with none connected there is no other
+// keyboard, so it waits for its own, which Choose keyboard… brings back.
+/** @param {number} count @param {boolean} connected @returns {Extract<CommitBar, {kind: "otherKeyboard"}>} */
+function otherKeyboard(count, connected) {
+    const kept = `${count} change${count === 1 ? "" : "s"} kept in Ark.`;
+    return connected
+        ? {kind: "otherKeyboard", title: "Draft belongs to another keyboard", detail: `${kept} Select that keyboard to continue, or discard the draft here.`, discard: true}
+        : {kind: "otherKeyboard", title: "Draft waiting for its keyboard", detail: `${kept} Connect the keyboard to continue.`, discard: false};
 }
 
 // Whether `text`, a failure's notice or the keyboard's own error, is what a

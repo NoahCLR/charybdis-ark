@@ -28,6 +28,8 @@ export interface FakeKeyboardOptions {
     generation?: number;
     firmwareVersion?: number;
     brightnessMax?: number;
+    /** How many capability pages it has; 3 answers as the released firmware, a fourth refused as an unknown page. */
+    capabilityPageCount?: number;
     options?: ReturnType<typeof import('./keyboard-options.js').wire>;
     /** The version its settings readback reports; any but 8 is firmware Ark does not read. */
     settingsVersion?: number;

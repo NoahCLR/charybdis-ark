@@ -161,6 +161,17 @@ test("apply writes a recovery copy through the shell, then reads the keyboard ag
     assert.equal(session.resetDraftForms, true);
 });
 
+test("a recovery copy the browser's storage refuses stops the Apply, said as the storage's cause", async () => {
+    const session = sessionWithDraft(), draft = session.draft;
+    const h = {...shell(), saveRecovery: async () => {throw new DOMException("The quota has been exceeded.", "QuotaExceededError");}};
+    stage(session, {type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "KC_A"}]});
+    draft.review(draft.revision);
+    session.service.calls.length = 0;
+    await assert.rejects(draftControl(session, {type: "applyProfileDraft", draftRevision: draft.revision}, h),
+        (error) => error.code === "RECOVERY_STORAGE_FULL" && /Backups/.test(error.message) && error.storageError?.name === "QuotaExceededError");
+    assert.deepEqual(session.service.calls, ["restorePortableProfile"], "nothing is read back: the keyboard was not changed");
+});
+
 test("after Apply, Put back makes what the keyboard held before it the draft, one undoable step", async () => {
     const session = sessionWithDraft(), draft = session.draft, h = shell();
     stage(session, {type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "KC_A"}]});

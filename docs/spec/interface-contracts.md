@@ -318,7 +318,12 @@ The same kind of control looks and sits the same on every screen.
   (a macro's unkept form text and take, a pointing mode's chosen movement and
   taps, a custom key's open behaviour cell) (`swappable`,
   `webview/ui/slot-bank.mjs`; `tests/view/edits.test.mjs`,
-  `browser-tests/slot-swap.spec.js`).
+  `browser-tests/slot-swap.spec.js`). What another screen holds of that
+  bank and has not posted survives the change of screen, so it follows too
+  or closes: the combo builder closes, as a draft change closes it; a key
+  waiting to be placed, a new replacement's macro, and a custom key's pending
+  cell choice and refused timings follow their thing (`followSlotSwap`,
+  `webview/store.mjs`; `tests/view/slot-swap-forms.test.mjs`).
   Lighting's list of pointing modes folds its empty slots by the same rule,
   under its table's last band, "Empty slots" with their count, as its layer
   list folds the empty layers (`toggleAllSlots`); the picked slot and one the
@@ -755,7 +760,7 @@ here: its home and tests are in
 | The Text replacement screen (D-L88): a bank of replacements beside the editor of the one picked, as Macros is. The interface holds which entry is open, the replacement being made and the field open in the editor (`autocorrectEntry`, `autocorrectNew`, `autocorrectEdit`), a replacement whose last input was removed waiting as one being made (`autocorrectNew.emptied`) until an input puts it back or Undo brings it back; which entries a search shows and which is open are `autocorrectRows` and `openEntry` (one is always open while the list has any). A replacement's macro is picked in the keycode picker on the macros alone (`allowedKeys`). No control that removes is a bare ×. Where the Leader key is placed comes from `keycodePlacements` and `reachLine`, as Pointer's sniping keys do, and Place on a key → sets `placement` as a macro's does. How each section works is behind the info mark, the one component the board's shortcuts mark is too, which keeps its list inside the screen's area (`infoMark`, `attachInfoMarks`); the words for Text and Macro and for the file formats are the vocabulary's (`replacementKinds`, `listFileFormats`), and the Export menu's keys the rail menu's (`menuKey`) | `webview/ui/autocorrect.mjs`, `webview/view/autocorrect.mjs`, `webview/ui/info-mark.mjs`, `webview/lib/menu-keys.mjs` | `tests/view/autocorrect.test.mjs`, `browser-tests/autocorrect.spec.js` |
 | A text replacement list file (D-L85, D-L91): how QMK's text, a spreadsheet's CSV and Ark's JSON read and are written, how a replacement fires among them (`fires`), which lines a file is refused, and what a file would do to the list added to it or replacing it. The interface reads a dropped file's text and posts it; core reads it and answers with the preview (`previewAutocorrectImport`, `chooseAutocorrectFile`), and the import is one draft edit of the preview's entries | `core/model/autocorrect-import.js`; the preview's sentences, `importLines` in `webview/view/autocorrect.mjs` | `tests/model/autocorrect-import.test.js`, `tests/model/autocorrect-editor.test.js`, `tests/session/panel-loop.test.js`, `tests/view/autocorrect.test.mjs`, `browser-tests/autocorrect.spec.js` |
 | Macro text: how text, `{key}`, `{key,key}`, `{+key}`, `{-key}` and `{milliseconds}` read as steps, the limits on them, and why one does not read, as a reason code (D-L73). Core reads it by keycode, sending only the key names the step editor offers, and refuses a macro that leaves a key held, which the step editor names key by key; the step editor reads it by key name, as a person types. Both word each reason from `vocabulary.macroProblems` (core through `wordedMacroError`, wherever it reads a macro), and both skip an empty name between commas | `rules/macro-payload.mjs`, read by `core/schema/macro-payload.js` (`parsePayload`) and `webview/view/macro.mjs` (`parseMacro`); its `overfillsReport`, what fills the report's six key slots (firmware D-F65), also by `webview/view/macro-sequence.mjs` (`sequenceIssues`) and, as `chordOverfills`, `webview/view/picker.mjs` (`pickKey`) | `tests/rules/macro-payload.test.mjs`, `tests/schema/macro-payload.test.js`, `tests/view/macro.test.mjs`, `tests/view/macro-cache.test.mjs`, `tests/view/macro-sequence.test.mjs`, `tests/view/picker.test.mjs` |
-| The lighting colour compositor: the order the stages paint in and the two "no colour" rules, a firmware rule (D-L73) ([more](#lighting-preview)) | `rules/led-light.mjs`, read by `webview/view/lighting.mjs` | `tests/rules/led-light.test.mjs`, `tests/view/lighting.test.mjs` |
+| The lighting colour compositor: the order the stages paint in and the two "no colour" rules, a firmware rule (D-L73) ([more](#lighting-preview)) | `rules/led-light.mjs`, read by `webview/view/lighting.mjs` | `tests/rules/led-light.test.mjs`, `tests/view/lighting.test.mjs`, `tests/view/drawing-cases.test.mjs` |
 | Idle lighting timeout: staged in milliseconds, edited in seconds or minutes; changing the unit stages nothing; zero means always on | `webview/view/duration.mjs` | `tests/view/duration.test.mjs`, `browser-tests/preview.spec.js` |
 | Shortcut words: ⌘ and ⇧⌘ on a Mac, Ctrl and Ctrl+Shift elsewhere, in text, tips and `aria-keyshortcuts`; no screen writes ⌘ itself | `webview/view/shortcuts.mjs` | `tests/view/shortcuts.test.mjs`, `browser-tests/shortcut-glyphs.spec.js` |
 | Panel sequencing; the page's shell supplies the file chooser, downloads, recovery storage and progress; a failure's notice is its sentence, never its code, and the reply marks it `failed` | `core/session/panel-controls.js`, `core/session/panel-loop.js` | `tests/session/panel-controls.test.js`, `tests/session/panel-loop.test.js`, `tests/view/messages.test.mjs` |
@@ -769,7 +774,7 @@ here: its home and tests are in
 | Pointing links (firmware D-F62): which layers may start a slot's mode or be turned on by its key ([more](#pointing-links)) | `core/model/pointing-links.js`, `core/model/layer-effects.js` (`keycodeLayersOn`), `rules/pointing-link-starts.mjs` (whether a published start holds under the layers on), `webview/view/pointing-link.mjs`, `webview/view/pointing-reach.mjs` | `tests/model/pointing-links.test.js`, `tests/rules/pointing-link-starts.test.mjs`, `tests/model/layer-reach.test.js`, `tests/model/layer-effects.test.js`, `tests/session/pd-mode-editing.test.js`, `tests/view/pointing-link.test.mjs`, `tests/view/pointing-reach.test.mjs`, `browser-tests/pointing-controls.spec.js`, `browser-tests/keys-workbench.spec.js` |
 | Shortcut layers (firmware D-F26): which layers a custom key's shortcut may turn on ([more](#shortcut-layers)) | `core/model/shortcut-layers.js`, `webview/view/custom-key.mjs` (`shortcutLayerRows`) | `tests/model/shortcut-layers.test.js`, `tests/model/custom-key-editor.test.js`, `browser-tests/custom-key-shortcut.spec.js` |
 | The rail's keyboard button and its menu ([more](#the-rails-keyboard-menu)) | `webview/view/keyboard-menu.mjs`, `webview/ui/keyboard-menu.mjs` | `tests/view/keyboard-menu.test.mjs`, `browser-tests/preview.spec.js`, `browser-tests/live-edits.spec.js` |
-| The commit bar: which bar the frame shows over the draft (an Apply running, its read back, a failed one until dismissed, a held live edit, other work, a draft from another keyboard or one the keyboard changed under, a restart, the live modes', the review), drawn by `webview/ui/frame.mjs` | `webview/view/commit-bar.mjs` (`commitBarState`) | `tests/view/commit-bar.test.mjs`, `browser-tests/live-edits.spec.js`, `browser-tests/apply-progress.spec.js` |
+| The commit bar: which bar the frame shows over the draft (an Apply running, its read back, a failed one until dismissed, a held live edit, other work, a draft from another keyboard, or waiting for its own with none connected, or one the keyboard changed under, a restart, the live modes', the review), drawn by `webview/ui/frame.mjs` | `webview/view/commit-bar.mjs` (`commitBarState`) | `tests/view/commit-bar.test.mjs`, `browser-tests/live-edits.spec.js`, `browser-tests/apply-progress.spec.js` |
 | Whether an area takes an edit now: the draft core binds (`draft.editable`) and the area's own capability, Export only the keyboard; and what a screen says when it does not, or nothing while the draft is busy, which the commit bar says | `webview/view/edit-gate.mjs` (`editGate`) | `tests/view/edit-gate.test.mjs`, `tests/scripts/conventions.test.js` |
 | Which key a spelling is, and whether two spellings are one key: the name the profile knows it by, one canonical spelling per key, what core publishes of it in a table keyed by keycode name (its label and short label, kind, layer, layer form, a layer-mod's modifiers, a layer-tap's tap, the layers it turns on, the host layout's legends), read under every name it goes by with each fact's own rule for an empty entry, the macro, custom key or pointing slot (held or locked) it is, and two ways of finding a behaviour row kept apart, the row keyed exactly by the spelling (what a key means, what a combo sends) and the row listening to the key however either is spelled (a picked or typed key); worked out once per model and spelling | `webview/view/key-identity.mjs` (`keyIdentity`, `sameKey`, `keycodeName`, `macroIndex`) | `tests/view/key-identity.test.mjs`, `tests/scripts/conventions.test.js` |
 | The keycode picker: which keys and sections a field takes, what is lit and picked, what the pick stores and why it cannot be used yet, what each section lists and in which groups, and what a search finds, drawn by `webview/ui/picker.mjs` | `webview/view/picker.mjs`, `webview/view/picker-sections.mjs`, `webview/view/picker-tiles.mjs` | `tests/view/picker.test.mjs`, `tests/view/picker-sections.test.mjs`, `tests/view/picker-tiles.test.mjs`, `browser-tests/picker-groups.spec.js` |
@@ -834,9 +839,13 @@ document changed; draft history entries are frozen and decoded once each.
 A document's domains change one way: `editProfileDomains`
 (`core/model/portable-profile.js`). Its change opens each domain it edits,
 decoded once with the document's codec options (the keyboard's tap depth,
-or the one the document's RGB palette counts; its brightness limit; its
-action slots); only opened domains are encoded again, every other keeps its
-bytes, and with none opened the document itself is the result. Beside
+or the one the document's RGB palette counts; its LED sets and accents; its
+action slots). The keyboard's brightness limit is not among them: an edit
+holds to it the colour it sets, so a colour past it from a backup stays
+beside every other edit, and Review's blocker, the restore check and the live
+send keep it from the keyboard until it is lowered. Only opened domains are
+encoded again, every other keeps its bytes, and with none opened the
+document itself is the result. Beside
 `open`, the change gets `read`: the document as it stands, validated against
 the keyboard once (the caller's decoded form when it is of that very
 document) and never written back; `open.isOpen` says which domains it
@@ -860,7 +869,12 @@ transparency again.
 What the page offers is `model.shell` (D-L71): its words, Choose keyboard
 unless the tab is blocked, a light or dark theme, the Backups list, its build
 and progress. Without a shell (the preview, tests) it offers the page's
-defaults.
+defaults. Its `noneFound` words are the notice of a read that found no
+keyboard the page may open, and hold only while that is so: the read of a
+keyboard it lists takes them back with an empty notice, which the rail
+takes as saying nothing (`readKeyboard`, `core/session/panel-controls.js`;
+`tests/session/panel-loop-keyboards.test.js`,
+`tests/view/messages.test.mjs`).
 
 ### An Apply or Save cut short
 
@@ -879,7 +893,15 @@ A recovery copy is named in any sentence as Backups lists it, by what made
 it, the keyboard and when (`copyTitle`), never by its file name: that is what
 the web shell's `saveRecovery` resolves to, and the sentence says it is on
 Backups (`tests/view/shell-panel.test.mjs`,
-`tests/session/apply-progress.test.js`).
+`tests/session/apply-progress.test.js`). A copy the browser's storage will
+not keep, because it is full, refuses this page or cannot be opened, stops
+what asked for it before anything reaches the keyboard and says that cause
+and what helps (`RECOVERY_STORAGE_WORDS`, with a code of its own,
+`RECOVERY_STORAGE_FULL`, `_REFUSED` or `_UNAVAILABLE`), never Ark's own
+problem: the panel's recovery writer (`recoveryFor`,
+`core/session/panel-controls.js`) words the shell's refusal with
+`recoveryStorageFailure` (`core/session/recovery-copy.js`;
+`tests/session/recovery-copy.test.js`, `tests/session/panel-controls.test.js`).
 
 The same holds for every failure's notice (D-L75), which starts with "Failed:"
 unless it starts with a verdict. It says the failure's own sentence only when
@@ -908,8 +930,18 @@ the keyboard's answer; only an answer the coordinator saw itself is the
 keyboard's unexpected one. Where the keyboard rejected a profile is named by
 its Review area (`PROFILE_AREAS`), and a reason Ark has no words for is said
 as one, never by its name. A shell's own failures, and whatever its handling
-of a message throws, become a notice through the loop's `fail`; a panel whose
-file did not load leaves a plain message in the page, never a blank one.
+of a message throws, become a notice through the loop's `fail`; so does an
+error or rejection nothing caught in the page (`web/web-shell.mjs`), said once
+until the panel next posts, so a fault its notice's drawing raises again is
+not said for ever (`tests/web-shell.test.mjs`). A panel whose file did not
+load leaves a plain message in the page, never a blank one. A screen whose
+drawing throws leaves the rail and a plain statement in its place
+(`webview/app.mjs` `drawApp`), its fault in the console, and is drawn again
+only when something asks for it. Until the shell starts, the page holds its
+own words, what Ark is and what it needs, with a `<noscript>` line, kept
+unseen for a moment by the stylesheet (`.page-starting`) and replaced as the
+shell starts (`web/page.mjs`), so a shell that never runs leaves no blank
+page (`tests/scripts/web-build.test.js`, `browser-tests/web-page.spec.js`).
 
 ### Pointing links
 
@@ -1438,7 +1470,18 @@ for what the draft has (`viaClearChoices`), each kind on its own switch, all
 on (`BLANK_SLATE`), and its callout names only the kinds the draft has; a
 switch posts `setViaImportClears` and core reads the file again, so the
 counts follow (`tests/model/via-layout.test.js`,
-`browser-tests/web-page.spec.js`).
+`browser-tests/web-page.spec.js`). What the import keeps that plays a macro
+by its slot (a replacement, a pointing mode's direction, a kept behaviour or
+combo) is read from the imported document (`kept`), and the callout names
+each with the file's macro it now plays, or nothing where the slot is
+emptied, the first `VIA_LEFT_SHOWN` in full, and says nothing when there is
+none, each as core calls it (`called`; `tests/model/via-layout.test.js`,
+`tests/view/backups.test.mjs`). While "Imported a VIA layout" is a step of
+the draft up to where it stands, Review's checks carry a notice
+(`keptMacros`, `keptMacroFinding`) naming, in the same words with "the
+imported" for "this file's", each such thing whose slot holds other steps
+than the keyboard's in the draft's slots, and none when nothing does
+(`tests/session/via-import-review.test.js`).
 
 ## Demo
 
@@ -1468,15 +1511,19 @@ inheritance rules. The order the stages paint in, and the
 combo feedback or a feedback case owns, D-L94; an accent that takes its
 owner's colour), are the shared compositor
 (`rules/led-light.mjs`, D-L73); `webview/view/lighting.mjs` gathers what each stage paints from the
-model (`tests/rules/led-light.test.mjs`, `tests/view/lighting.test.mjs`). The caption
+model (`tests/rules/led-light.test.mjs`, `tests/view/lighting.test.mjs`).
+What the preview paints is held to the firmware's drawing cases
+(`upstream/firmware/tests/fixtures/rgb_render_v1.json`, D-L99): every case,
+its profile published by core and its state given as the preview's inputs,
+LED by LED (`tests/view/drawing-cases.test.mjs`). The caption
 on the board names those layers as the Keymap's layer preview does, top
 first down to the base ("Function on top of Pointing and Base, over the
 background effect"; `layersOnTop` in `webview/view/vocabulary.mjs`,
 `tests/view/vocabulary.test.mjs`), each screen adding only its own words:
 the Keymap where edits go, Lighting what the stage holds.
 
-On Pointing modes the board always shows the picked mode running, as it
-paints with no layer it is linked to on, and on Combo feedback one combo held,
+On Pointing modes the board always shows the picked mode running, and on
+Combo feedback one combo held,
 of those the Keymap's Combos tab lists On this view, so they follow the layer
 picked and the layers previewed under it, never a match of keycodes of its
 own: `tabReach(view, "combos")` and its `keysFor` ring (`combosHere`,
@@ -1491,7 +1538,15 @@ its feedback is judged against those keys; a combo whose output holds layers
 lights nothing of its own and the board turns them on over the view, as the
 layer strip would, since the firmware shows the layers instead
 (`viewWhileHeld`); one whose output runs a pointing mode runs it from those
-keys and paints beneath it (the compositor's combo stage `beneath`). On
+keys and paints beneath it (the compositor's combo stage `beneath`). A
+running mode carries its link, the layers that start it and those its key
+turns on less the default and pointer layers (`pdActive.link`,
+`webview/view/lighting-board.mjs`), and where one of them is on in the view it
+paints beneath the lowest such layer, so that layer and those above show over
+it, and is drawn with the layers, so a combo running it paints over it and
+the line says so (`linkedBeneath`, `rules/led-light.mjs`, firmware D-F62;
+`tests/rules/led-light.test.mjs`, `tests/view/lighting.test.mjs`,
+`tests/view/lighting-board.test.mjs`). On
 Behaviour feedback (D-L93) the board shows the case picked in its list, in
 its colour where its own locality reaches, then its accents, those for every
 state, then for every tap branch when it is one, then for the case (the
@@ -1573,7 +1628,10 @@ passthrough, dark and struck through for off, and unlit while its stage
 paints nothing, hatched in a list and hollow in a tab or chip, the one choice
 of class every swatch makes (`swatchFor`, a colour's by `swatchOf`); LED-row
 inheritance is all three channels zero, distinct from an explicit black
-(`tests/view/lighting.test.mjs`, `tests/view/colour.test.mjs`); the auto-mouse
+(`tests/view/lighting.test.mjs`, `tests/view/colour.test.mjs`), so an
+accent's own colour that lands on exactly HSV(0, 0, 0) is kept, in its editor
+and when posted, as HSV(1, 0, 0), as dark and still its own
+(`ownAccentColour`, `rules/led-light.mjs`, `tests/rules/led-light.test.mjs`); the auto-mouse
 end colour is literal. Zero brightness never hides the stored hue and
 saturation (`browser-tests/review-regressions.spec.js`).
 Each Behaviour feedback and Replacement feedback case has its own Locality

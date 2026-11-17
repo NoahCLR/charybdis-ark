@@ -247,6 +247,25 @@ test("a refused edit is said, and the draft is read again from the keyboard", as
     assert.equal(session.draft.current.fingerprint, shown, "the refused edit is not shown as made");
 });
 
+// Lighting takes an edit beside a colour past the keyboard's brightness
+// limit, so a live draft that holds one is refused before anything is sent,
+// in the blocker's words (profile-checks.js), whatever the edit.
+test("a live draft holding a colour past the brightness limit sends nothing until it is lowered", async t => {
+    const {editProfileDomains} = require("../../core/model/portable-profile");
+    const bright = editProfileDomains(document(), {}, open => {open("rgb").layerColors[1].color.v = 255;});
+    const {keyboard, shell, send, key} = await openLoop(t, {keyboard: liveKeyboard({document: bright, brightnessMax: 200})});
+    const published = () => keyboard.events.filter(event => event === "published").length;
+    await send({type: "updateLayerColor", layer: "Layer 2", h: 85, s: 255, v: 120, mode: "KEYS_MAPPED_ON_THIS_LAYER_ONLY"});
+    // A live draft is what the keyboard runs, so it cannot hold the colour to
+    // lower it: the refusal names the mode whose draft can.
+    assert.match(lastMessage(shell).notice, /Not sent: Layer colours: 1 colour is brighter than this keyboard's limit of 200\. Choose Review and save under Edits in the keyboard menu, use the profile as the draft there, and lower the brightness in Lighting\.$/);
+    await key(0, 4, "KC_Q");
+    assert.match(lastMessage(shell).notice, /Not sent: Layer colours: 1 colour is brighter/, "nor any other edit while it remains");
+    assert.equal(published(), 0);
+    await send({type: "updateLayerColor", layer: "Layer 1", h: 85, s: 255, v: 200, mode: "KEYS_MAPPED_ON_THIS_LAYER_ONLY"});
+    assert.equal(published(), 1, "lowered, it is sent");
+});
+
 test("an edit that finds the keyboard restarted over unsaved edits says so with the read it made, and Read keyboard does not again", async t => {
     const {keyboard, shell, loop, key} = await open(t);
     await key(0, 3, "KC_Z");
