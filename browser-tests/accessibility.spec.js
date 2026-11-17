@@ -216,13 +216,11 @@ test("a board key says it is selected, and a key the draft changed says so", asy
     await expect(page.locator('.board [data-led="0"]')).toHaveAttribute("aria-pressed", "true");
 });
 
-test("Diagnostics' Read keyboard is no part of its summary", async ({page}) => {
-    await openControls(page, "device");
+test("no fold's summary holds a button: the Keyboard screen's Read keyboard is in This keyboard's heading", async ({page}) => {
+    await openControls(page, "device", {}, "dark", "diagnostics");
     await expect(page.locator("summary button")).toHaveCount(0);
-    const read = page.locator('.diagnostics [data-act="read"]');
-    const summary = await page.locator('[data-section="diagnostics"] > summary').boundingBox();
-    const box = await read.boundingBox();
-    expect(box && summary && box.y >= summary.y && box.y + box.height <= summary.y + summary.height).toBe(true);
+    const read = page.locator('.device-pad [data-act="read"]');
+    await expect(read).toHaveCount(1);
     await clearPosts(page);
     await read.focus();
     await page.keyboard.press("Enter");

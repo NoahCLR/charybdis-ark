@@ -95,7 +95,7 @@ export const SCREENS = Object.freeze({
         secondaryLabel: "Keyboard",
         icon: '<svg viewBox="0 0 16 16"><rect x="2.5" y="2.5" width="11" height="11" rx="2.5"/><path d="M6 6.5h4v3H6z"/></svg>',
         available: model => Boolean(model.device?.connected || model.demo?.active), render: renderers => renderers.screenDevice(),
-        unavailable: {title: "Keyboard status unavailable", detail: "Read the keyboard to see its connection and diagnostics."},
+        unavailable: {title: "Keyboard status unavailable", detail: "Read the keyboard to see its firmware, its halves and how full it is."},
     }),
 });
 // Each kind of thing a key reaches (key-identity.mjs reachKind) by its
@@ -131,7 +131,7 @@ export function screenGroups() {
 }
 
 // Unavailable Configure and Settings screens offer the first available
-// keyboard surface; profile backups precede diagnostics, in the same order as
+// keyboard surface; Backups precedes the Keyboard screen, in the same order as
 // the rail.
 /** @param {StatusModel | null | undefined} model @param {unknown} current */
 export function secondaryScreen(model, current) {

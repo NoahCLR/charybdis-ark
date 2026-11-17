@@ -971,7 +971,7 @@ const PROFILE_AREAS = Object.freeze({lighting: REVIEW_AREAS.lighting, behaviours
 // publicError): "Error" for Ark's plain sentence, "TypeError" for a fault.
 const FAILURE_WORDS = Object.freeze({
     unexpected: "Ark ran into a problem of its own. Try again, and reload the page if it keeps happening.",
-    unreadable: "The keyboard answered with something Ark could not read. Read the keyboard again; if it keeps happening, the Keyboard screen's Diagnostics say what it sent.",
+    unreadable: "The keyboard answered with something Ark could not read. Read the keyboard again.",
     incompatible: "The keyboard's firmware answers in a form this Ark does not read. Update both halves to current firmware.",
 });
 // The codes of an answer in a form this Ark does not support.

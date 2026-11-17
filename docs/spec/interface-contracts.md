@@ -559,7 +559,8 @@ hold what they name.
   tab's keycode, no test; a behaviour's timings,
   `browser-tests/behaviour-timings.spec.js`). Review's group Discard lights what it takes back on
   focus as on hover (no test). No button sits inside a `<summary>`:
-  Diagnostics' Read keyboard is drawn over its title, outside it (tested).
+  the Keyboard screen's Read keyboard is in This keyboard's heading, outside
+  Diagnostics' fold (tested).
 - Every control shows the one focus ring (2px of `--focus`) when the
   keyboard reaches it, in either theme; a strip that scrolls sideways draws
   it inside its tabs, a macro step and the name in an editor's title show it
@@ -1300,6 +1301,13 @@ standalone export reads its own snapshot and leaves the editor's alone
   for it, and a whole model, as the preview posts it, is taken as it is
   (`tests/session/panel-loop.test.js`, `tests/view/store-catalog.test.mjs`,
   `tests/web-shell.test.mjs`).
+- The Keyboard screen shows its Diagnostics only on a page whose address
+  has `?diagnostics` (`diagnosticsShown`, D-L100); without it the fold is
+  not drawn and the flash pauses are never read. Read keyboard is in This
+  keyboard's heading either way
+  (`tests/view/keyboard-view.test.mjs`,
+  `browser-tests/settings-screens.spec.js`). No user-facing sentence sends a
+  person to them.
 - The Keyboard screen's Diagnostics list, `model.diagnostics`, is what was
   read, then the device service's log, newest last and bounded by the service
   (`addDiagnostic`): the code and own text of a failure no notice says, with
@@ -1861,7 +1869,8 @@ input's key under the layers in view (`tests/model/participation.test.js`,
 
 ## Flash pauses
 
-The Keyboard screen's Diagnostics shows each half's flash pauses, GET `0x0D`
+The Keyboard screen's Diagnostics (shown with `?diagnostics`, D-L100) shows
+each half's flash pauses, GET `0x0D`
 (firmware D-F29; `upstream/firmware/docs/spec/profile-wire-v1/hid-channel.md`,
 "Flash pauses"), decoded by `core/protocol/flash-pauses-v1.js`
 (`tests/protocol/flash-pauses-v1.test.js`).
@@ -1874,8 +1883,9 @@ The Keyboard screen's Diagnostics shows each half's flash pauses, GET `0x0D`
   (`webview/view/flash-pauses.mjs`, `tests/view/flash-pauses.test.mjs`).
 - They are read only when the fold opens (`readFlashPauses`), once for each
   connection while it stays open and nothing holds the keyboard
-  (`state.flashPausesAsked` against `load.connectionToken`), and by its Read
-  keyboard (`refresh` with `flashPauses`, after the keyboard is read). Each
+  (`state.flashPausesAsked` against `load.connectionToken`), and by the
+  Keyboard screen's Read keyboard while it is open (`refresh` with
+  `flashPauses`, after the keyboard is read). Each
   reads both pages, waits longer than the master half's one-second pull
   interval and reads both again, as the firmware's spec says to get fresh
   figures (`core/session/flash-pauses.js`;
