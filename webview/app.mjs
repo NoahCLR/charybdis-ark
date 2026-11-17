@@ -156,11 +156,14 @@ function readPlaceholder(read, model) {
     // Titled as the rail item it sits under, which the rail highlights.
     const screenTitle = screenDefinition(state.screen)?.label || "Ark";
     const secondary = secondaryScreen(model, state.screen);
-    // Until a keyboard is reached, a new user may not have the firmware yet:
-    // a card under the placeholder, outside what its status announces.
-    const firmware = !loading && read.state !== "blocked" && !model?.device?.connected ? `<section class="firmware-first" aria-labelledby="firmware-first-title">
+    // Until a keyboard is reached and read, a new user may not have the
+    // firmware yet: a card under the placeholder, outside what its status
+    // announces. A connected keyboard shows it only when its read failed or
+    // its firmware is not one this Ark edits (`read.firmware`).
+    const connected = Boolean(model?.device?.connected);
+    const firmware = !loading && read.state !== "blocked" && (!connected || read.firmware) ? `<section class="firmware-first" aria-labelledby="firmware-first-title">
             <div class="firmware-first-copy"><span class="eyebrow">${esc(FIRMWARE_NEEDED.eyebrow)}</span>
-                <h3 id="firmware-first-title">${esc(FIRMWARE_NEEDED.title)}</h3><p>${esc(FIRMWARE_NEEDED.words)}</p></div>
+                <h3 id="firmware-first-title">${esc(FIRMWARE_NEEDED.title)}</h3><p>${esc(connected ? FIRMWARE_NEEDED.wordsConnected : FIRMWARE_NEEDED.words)}</p></div>
             <a class="btn firmware-install" href="${esc(FIRMWARE_NEEDED.href)}" target="_blank" rel="noopener">${githubMark("firmware-install-mark")}<span>${esc(FIRMWARE_NEEDED.label)}</span><span aria-hidden="true">↗</span></a>
             <p class="firmware-first-via"><strong>${esc(FIRMWARE_NEEDED.viaLead)}</strong> ${esc(FIRMWARE_NEEDED.via)}</p>
         </section>` : "";

@@ -10,12 +10,14 @@ import {vocabulary} from "./vocabulary.mjs";
 // Where to get the firmware: its releases, newest first.
 export const FIRMWARE_RELEASES = "https://github.com/NoahCLR/charybdis-4x6/releases";
 
-// What a page with no keyboard tells a new user: Ark edits only its own
-// firmware, flashed to both halves from one release.
+// What a page with no keyboard, or one it could not read, tells a new user:
+// Ark edits only its own firmware, flashed to both halves from one release.
 export const FIRMWARE_NEEDED = Object.freeze({
     eyebrow: "New to Ark?",
     title: "Flash the firmware first",
     words: "Ark edits a Charybdis running the charybdis-4x6 firmware. Flash both halves from the same release, then choose your keyboard here.",
+    // A keyboard already chosen is read again, not chosen.
+    wordsConnected: "Ark edits a Charybdis running the charybdis-4x6 firmware. Flash both halves from the same release, then read the keyboard again.",
     label: "Firmware releases",
     href: FIRMWARE_RELEASES,
     // Flashing replaces a VIA keymap, and Backups imports VIA's saved layout.
