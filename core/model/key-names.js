@@ -23,7 +23,7 @@ const {actionName, knownActionAbi} = require("../schema/actions");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {resolveNativeQmkExpression} = require("../schema/compiled-profile-v1");
 const {MACOS} = require("../schema/host-settings");
-const {LAYER_KEY_VERBS: LAYER_VERBS, layerName, macroDefaultName, slotName} = require("./vocabulary");
+const {LAYER_KEY_VERBS: LAYER_VERBS, layerName, customKeyDefaultName, macroDefaultName, slotName} = require("./vocabulary");
 const {hostLayout, US_HOST_LAYOUT} = require("../data/host-layouts");
 const {LAYERS} = require("../data/charybdis-layout");
 const {shortcutPresent, shortcutSends} = require("../schema/settings-domain-v1");
@@ -34,12 +34,12 @@ const {SHORTCUT_JOIN, shortcutLayerWords, shortcutSendWords, shortcutWords} = re
 const SWITCH_KEY_FAMILIES = /** @type {const} */ ([[BEHAVIOR_SWITCH_KEYS, behaviorSwitchKeyCode], [AUTO_MOUSE_SWITCH_KEYS, autoMouseSwitchKeyCode]]);
 
 
-// A pointing key by its slot: "Dragscroll · hold", "Slot 6 · lock (empty)",
-// or "Slot 0 · hold" where the keyboard reported no slots.
+// A pointing key by its slot: "Dragscroll · hold", "Pointing mode 6 · lock (empty)",
+// or "Pointing mode 0 · hold" where the keyboard reported no slots.
 /** @param {{id: number, kind: number, name: string} | undefined} slot @param {number} id @param {boolean} locked */
 const pointingKeyLabel = (slot, id, locked) => `${slotName(slot, id)} · ${locked ? "lock" : "hold"}${slot && !slot.kind ? " (empty)" : ""}`;
 
-// LOCK_LAYER(2) → "Lock layer 2", PD_MODE_0 → "Slot 0 · hold".
+// LOCK_LAYER(2) → "Lock layer 2", PD_MODE_0 → "Pointing mode 0 · hold".
 /** @param {string} semantic */
 function semanticLabel(semantic) {
     const pointing = pdModeKeyOfName(semantic);
@@ -163,7 +163,7 @@ function profileKeyNames({hostOs = 0, hostLayout: layoutId = US_HOST_LAYOUT, mac
     // reads by its number.
     for (let slot = 0; slot < CUSTOM_KEY_SLOTS; slot++) {
         const name = customKeyName(slot), code = customKeyCode(slot);
-        const label = customKeys.find(key => key.slot === slot)?.name || `Custom key ${slot}`;
+        const label = customKeys.find(key => key.slot === slot)?.name || customKeyDefaultName(slot);
         const native = keycodes.resolve(code).name;
         aliases[native] = name;
         labels[native] = labels[name] = label;

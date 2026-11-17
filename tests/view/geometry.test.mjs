@@ -131,7 +131,7 @@ test("a name of two or more words takes two lines, so whether a key wraps never 
         assert.deepEqual(texts(setLegend(name, {room: ROOM, twoLines: true})), lines, name);
     }
     assert.deepEqual(texts(setLegend("Backspace", {room: ROOM, twoLines: true})), ["Backspace"], "one word stays one line");
-    assert.deepEqual(legendBreak("Slot 6 · hold (empty)"), ["Slot 6", "hold (empty)"], "a name joined by a · breaks there");
+    assert.deepEqual(legendBreak("Pointing mode 6 · hold (empty)"), ["Pointing mode 6", "hold (empty)"], "a name joined by a · breaks there");
     assert.deepEqual(legendBreak("Custom key 0"), ["Custom", "key 0"], "a number stays with its word");
     assert.equal(legendBreak("Macro 0"), null, "a word and its number do not break");
     assert.deepEqual(legendBreak("Layer 1 Toggle"), ["Layer 1", "Toggle"], "a number is never the start of a line");
@@ -160,7 +160,7 @@ test("a line too wide is condensed at its size before the legend steps down, and
 
 test("every legend stays on its cap, between the rows above it and the icons, line or hold below it", () => {
     const y = 100;
-    const names = ["A", "Esc", "Left Command", "Slot 20 · lock (empty)", "VS Code Preview MD", "Supercalifragilisticexpialidocious"];
+    const names = ["A", "Esc", "Left Command", "Pointing mode 20 · lock (empty)", "VS Code Preview MD", "Supercalifragilisticexpialidocious"];
     const sizes = new Set();
     for (const tiers of [false, true]) for (const combos of [false, true]) for (const icons of [false, true]) for (const sub of ["", "Navigation"]) for (const main of names) {
         const rows = keyFaceRows(y, {tiers, combos, sub: Boolean(sub), icons});

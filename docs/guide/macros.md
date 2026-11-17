@@ -34,7 +34,8 @@ A slot can carry a mark:
 ## Writing a macro
 
 Pick a slot. Its name is the editor's title: click it to rename, Enter to
-finish, Escape to put it back.
+finish, Escape to put it back. The tag beside it names the slot, such as
+**Macro 3**, which is also what the macro is called until you name it.
 
 Add steps with the buttons above the sequence:
 

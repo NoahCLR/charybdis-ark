@@ -67,7 +67,7 @@ test("a key reads by the profile's name for it, under every name it is known by"
     });
     assert.equal(keyLabel(names, PD_MODE_0), "Dragscroll · hold", "not the catalogue's bare user slot");
     assert.equal(names.labels.PD_MODE_0, "Dragscroll · hold");
-    assert.equal(keyLabel(names, PD_MODE_KEYS[1].holdCode), "Slot 1 · hold (empty)", "an empty slot says so");
+    assert.equal(keyLabel(names, PD_MODE_KEYS[1].holdCode), "Pointing mode 1 · hold (empty)", "an empty slot says so");
     assert.equal(keyLabel(names, PD_MODE_KEYS[0].lockCode), "Dragscroll · lock");
     assert.equal(names.labels.MACRO_0, "Copy line");
     assert.equal(names.labels.MACRO_1, "Macro 1", "an unnamed macro reads by its number");

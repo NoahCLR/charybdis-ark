@@ -324,6 +324,9 @@ test("a custom key is named by its title, as a macro is: Enter commits, Escape c
     await expect(page.locator(".main [data-name]"), "the title is the only name field").toHaveCount(1);
     await expect(page.locator(".name-titlebar [data-name]")).toHaveCount(1);
     await expect(title).toHaveAttribute("placeholder", "Custom key 3");
+    // The tag beside it is the slot as the name field calls it, as a macro's is, and nothing else.
+    await expect(page.locator(".name-titlebar .tag")).toHaveText("Custom key 3");
+    await expect(page.locator(".name-titlebar code")).toHaveCount(0);
     await clearPosts(page);
     await title.fill("Copy line");
     await title.press("Enter");

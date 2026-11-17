@@ -141,7 +141,9 @@ The list opens on the keys in use, each by its name or what it sends.
 and **Show all 128 slots** lists the rest. Pick one from the list (**Search
 by name** finds it by name or number, through every key). The heading counts
 the keys in use, such as "5 of 128 used". Its name is the editor's title:
-click it to rename, Enter to keep, Escape to put it back.
+click it to rename, Enter to keep, Escape to put it back. The tag beside it
+names the slot, such as **Custom key 5**, which is also what the key is
+called until you name it.
 
 Drag a key onto another to swap the two. Each moves with its name, its
 shortcut and its taps and holds, and every layer key, behaviour and combo that

@@ -17,7 +17,7 @@ const rgbEnums = require("../schema/rgb-domain-v1");
 const {KEY_BEHAVIOR_HOLD_STYLES, KEY_BEHAVIOR_TIER_FIELDS} = require("../schema/key-behavior-domain-v1");
 const {PD_AXIS, PD_KIND} = require("../schema/pd-mode-domain-v1");
 const {effectiveTimings} = require("./gesture-timing");
-const {REVIEW_AREAS: AREA, VOCABULARY, word, layerName: layerCalled, macroDefaultName, slotName, ledsCalled, modifierNames, protectionWords, settingsPath} = require("./vocabulary");
+const {REVIEW_AREAS: AREA, VOCABULARY, word, layerName: layerCalled, macroDefaultName, customKeyDefaultName, pointingDefaultName, slotName, ledsCalled, modifierNames, protectionWords, settingsPath} = require("./vocabulary");
 const {macroName} = require("../../rules/qmk-keycodes.mjs");
 const {SHORTCUT_JOIN} = require("../../rules/shortcut-notation.mjs");
 const {colourPaints} = require("../../rules/led-light.mjs");
@@ -558,7 +558,7 @@ function profileReview(before, after, capabilities) {
         const fields = (name, shortcut, names) => new Map([["Name", name || "no name"], ["Shortcut", shortcutField(shortcut, names)]]);
         /** @param {string} name @param {import("../schema/types.js").CustomKeyShortcut} shortcut */
         const exists = (name, shortcut) => Boolean(name || shortcutPresent(shortcut));
-        item(AREA.customKeys, UNIT.customKey(i), `Custom key ${i}${(next || old) ? ` · ${next || old}` : ""}`, fields(old, shortcutA, namesA), fields(next, shortcutB, namesB), {kind: "customKey", index: i, keycode: customKeyName(i)},
+        item(AREA.customKeys, UNIT.customKey(i), `${customKeyDefaultName(i)}${(next || old) ? ` · ${next || old}` : ""}`, fields(old, shortcutA, namesA), fields(next, shortcutB, namesB), {kind: "customKey", index: i, keycode: customKeyName(i)},
             [exists(old, shortcutA), exists(next, shortcutB)]);
     });
     // The keyboard's own name, edited on Settings' Keyboard card. Empty is the
@@ -642,7 +642,7 @@ function profileReview(before, after, capabilities) {
         new Map([["Stored bits", `0x${(b.settings.values[SETTING.KEYMAP_OPTIONS] & ~masks).toString(16)}`]]), {kind: "settings"}, [true, true]);
     for (let id = 0; id < Math.max(a.pdModes?.length || 0, b.pdModes?.length || 0); id++) {
         const old = a.pdModes?.[id], next = b.pdModes?.[id];
-        item(AREA.pointing, UNIT.pd(id), `Slot ${id}${(next?.name || old?.name) ? ` · ${next?.kind ? next.name : old?.name}` : ""}`,
+        item(AREA.pointing, UNIT.pd(id), `${pointingDefaultName(id)}${(next?.name || old?.name) ? ` · ${next?.kind ? next.name : old?.name}` : ""}`,
             pointingFields(old, namesA), pointingFields(next, namesB), {kind: "pointing", slot: id}, [Boolean(old?.kind || old?.name), Boolean(next?.kind || next?.name)], {kind: "pointing", slot: id});
     }
     const lightA = lightingRecords(a), lightB = lightingRecords(b);
@@ -695,7 +695,7 @@ function slotOrderReview(after, bank, order) {
     const moved = order.map((held, slot) => slot).filter(slot => order[slot] !== slot);
     /** @param {number} slot */
     const called = slot => bank === "macros" ? settings.macroNames[slot] || macroDefaultName(slot)
-        : bank === "customKeys" ? settings.customKeyNames[slot] || `Custom key ${slot}` : slotName(pdModes[slot], slot);
+        : bank === "customKeys" ? settings.customKeyNames[slot] || customKeyDefaultName(slot) : slotName(pdModes[slot], slot);
     /** @param {number} slot @returns {import("../../contracts/model.js").ReviewMark} */
     const mark = slot => bank === "pdModes" ? {kind: "pointing", slot} : {kind: bank === "macros" ? "macro" : "customKey"};
     const fields = moved.map(/** @returns {import("../../contracts/model.js").ReviewField} */ slot =>

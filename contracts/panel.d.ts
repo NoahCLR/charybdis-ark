@@ -85,7 +85,7 @@ export interface PdLinkStart {layer: number; ends: number}
 export interface PdLinkTarget {layer: number; refusal: string; inert: 'default' | 'pointer' | ''; linkedBy: number | null; linkedByName: string}
 /** `shortcutLabel` names the shortcut in the host's words ("Ctrl+Right Alt+K", the left modifiers unmarked, D-L83), empty for none. */
 export interface CustomKey {
-    slot: number; keycode: string; code: number; name: string; hasBehavior: boolean; shortcut: CustomKeyShortcut;
+    slot: number; keycode: string; code: number; name: string; /** What it is called while it has no name of its own ("Custom key 3"). */ defaultName: string; hasBehavior: boolean; shortcut: CustomKeyShortcut;
     /** The whole shortcut in words: modifiers, keys, then layers, joined by "+", the layers led by their kind's verb unless held ("Lock Navigation"). */
     shortcutLabel: string;
     /** What it sends, one part each: modifiers in the host's words, then each key in press order; empty for layers alone. */
@@ -169,7 +169,7 @@ export interface PublishedModel {
     layers: Layer[];
     hostLayoutLegends: Record<string, string[]> | null;
     /** `pointerCovers`: the layers the slot's key turns on that the pointer layer covers while the mode keeps it, bit n layer n (core/model/pointing-links.js). */
-    pdModes: (PointingSlot & {displayName: string; keys: {slot: number; hold: string; lock: string; holdCode: number; lockCode: number}; pointerCovers: number; linkStarts: PdLinkStart[]})[];
+    pdModes: (PointingSlot & {displayName: string; /** What it is called while it has no name of its own ("Pointing mode 3"). */ defaultName: string; keys: {slot: number; hold: string; lock: string; holdCode: number; lockCode: number}; pointerCovers: number; linkStarts: PdLinkStart[]})[];
     pdModeEditing: {writable: boolean; dpiChoices: {value: number; label: string}[]; tapKeys: {plain: string[]; modified: string[]};
         /** Every layer as a link target (core/model/pointing-links.js): why the keyboard would ignore it in a link ("" when it would not), and the slot whose link names it. */
         linkTargets: PdLinkTarget[];

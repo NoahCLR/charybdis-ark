@@ -33,7 +33,7 @@ export function keyFace(/** @type {import("../../contracts/panel.js").Position |
     // (OSL(), TT()) what it does to the layer the cap names, in the
     // vocabulary's words. Any other key reads on one line by core's name for
     // it: a single-role layer key ("Hold Navigation"), and a pointing key for
-    // a slot that holds nothing ("Slot 6 · hold (empty)"). Otherwise
+    // a slot that holds nothing ("Pointing mode 6 · hold (empty)"). Otherwise
     // MT(Shift, A) and a plain A would be indistinguishable on the board.
     return {
         main: position.display || keycode,

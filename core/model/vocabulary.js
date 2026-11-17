@@ -896,15 +896,21 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     comboFields: {inputs: "Inputs", sends: "Sends", window: "Window", conditions: "Conditions"},
 }));
 
-// The names a person reads for a layer and a pointing slot that have none of
-// their own. Layer 0 is the base layer.
+// The names a person reads for a layer and a slot that have none of their
+// own. Layer 0 is the base layer. A slot goes by its kind and its number,
+// "Macro 3", "Custom key 3", "Pointing mode 3": what its name field holds
+// while empty, and the tag its editor's title bar wears always.
 /** @param {readonly string[] | null | undefined} names @param {number} index */
 const layerName = (names, index) => names?.[index] || (index ? `Layer ${index}` : "Base");
-// A macro slot's name when it has none of its own.
 /** @param {number} index */
 const macroDefaultName = (index) => `Macro ${index}`;
+/** @param {number} index */
+const customKeyDefaultName = (index) => `Custom key ${index}`;
+/** @param {number} index */
+const pointingDefaultName = (index) => `Pointing mode ${index}`;
+// A pointing slot's name: its own while it holds a mode, else its default.
 /** @param {{id: number, kind: number, name: string} | null | undefined} slot @param {number} [id] */
-const slotName = (slot, id = slot?.id) => (slot?.kind && slot.name) || `Slot ${id}`;
+const slotName = (slot, id = slot?.id) => (slot?.kind && slot.name) || pointingDefaultName(Number(id));
 /** @param {number} count */
 const branchName = (count) => VOCABULARY.branches[count - 1] || `${count} taps`;
 // The LEDs an accent lights, by the indices the board numbers them with, a
@@ -1005,4 +1011,4 @@ function failureSentence(error) {
     return INCOMPATIBLE_ANSWERS.has(String(code)) ? FAILURE_WORDS.incompatible : FAILURE_WORDS.unreadable;
 }
 
-module.exports = {TEXT_REPLACEMENT_KEYS, PHASE, listed, PHASE_WORDS, HALVES_WORDS, LIVE_RESULT_WORDS, SAVE_STEP_WORDS, SAVE_FAILURE_WORDS, APPLY_VERDICTS, SAVE_WORDS, INTERRUPTION_REASONS, PROFILE_FULL_WORDS, heldWords, EDIT_MODE_WORDS, editModeWords, quietWords, VOCABULARY, word, layerName, macroDefaultName, slotName, branchName, ledsCalled, LAYER_KEY_VERBS, wordedMacroError, protectionWords, settingsPath, modifierNames, PROFILE_AREAS, REVIEW_AREAS, FAILURE_WORDS, sayable, arkCode, failureSentence};
+module.exports = {TEXT_REPLACEMENT_KEYS, PHASE, listed, PHASE_WORDS, HALVES_WORDS, LIVE_RESULT_WORDS, SAVE_STEP_WORDS, SAVE_FAILURE_WORDS, APPLY_VERDICTS, SAVE_WORDS, INTERRUPTION_REASONS, PROFILE_FULL_WORDS, heldWords, EDIT_MODE_WORDS, editModeWords, quietWords, VOCABULARY, word, layerName, macroDefaultName, customKeyDefaultName, pointingDefaultName, slotName, branchName, ledsCalled, LAYER_KEY_VERBS, wordedMacroError, protectionWords, settingsPath, modifierNames, PROFILE_AREAS, REVIEW_AREAS, FAILURE_WORDS, sayable, arkCode, failureSentence};

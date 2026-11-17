@@ -607,12 +607,11 @@ function entryEditor(model, list, entry, canEdit) {
     const stored = entry.macro === undefined ? "text" : "macro";
     const kind = editing?.kind ?? stored;
     // Text or Macro picked and not yet kept shows that kind's field empty,
-    // and says what keeps it: the header and the list still have the other.
+    // and says what keeps it: the list still has the other.
     const value = {kind, text: kind === stored ? entry.correction : "", macro: kind === stored ? entry.macro ?? null : null};
     const pending = kind === stored ? "" : kind === "macro" ? `Still ${word(kinds, stored)} until you pick a macro.` : `Still ${word(kinds, stored)} until you type its text and press Enter.`;
     const card = el(`<div class="card ac-editor" data-ac-editor="${esc(entry.id)}">
         <div class="card-h name-titlebar">${ICON}${titleText(entry.label)}
-            <span class="tag" data-ac-kind>${esc(word(kinds, stored))}</span>
             <span class="right row actions">
                 ${editMacroLink(kind === "macro" && value.macro !== null)}
                 <button class="btn tiny ghost destructive" data-act="ac-delete" ${off} data-tip="Delete this replacement and its inputs. Undo takes it back.">Delete replacement</button></span></div>
@@ -794,7 +793,6 @@ function newEditor(model, list, fresh, canEdit) {
     const empty = fresh.kind === "macro" && fresh.macro !== null && model?.macros?.[fresh.macro]?.empty;
     const card = el(`<div class="card ac-editor" data-ac-editor data-ac-new>
         <div class="card-h name-titlebar">${ICON}${titleText("New replacement")}
-            <span class="tag">Not on your list yet</span>
             <span class="right row actions">
                 ${editMacroLink(fresh.kind === "macro" && fresh.macro !== null)}
                 <button class="btn tiny ghost destructive" data-act="ac-discard" data-tip="${fresh.emptied ? "Let this replacement go: it left your list with its last input. Undo takes it back." : "Let this new replacement go. Nothing was added to your list."}">Discard</button></span></div>

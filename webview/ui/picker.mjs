@@ -256,7 +256,7 @@ export function pickerOverlay() {
     const {existing, withBehaviour, spare} = offer ? customKeyChoice(model, offer, {runsBehaviour: picker.customKeyRuns !== "shortcut"})
         : {existing: undefined, withBehaviour: false, spare: undefined};
     /** @param {import("../../contracts/panel.js").CustomKey} key */
-    const keyWords = (key) => `Custom key ${key.slot}${key.name ? ` · ${key.name}` : ""}`;
+    const keyWords = (key) => `${key.defaultName}${key.name ? ` · ${key.name}` : ""}`;
     // The footer names every part picked, in the order it is held (modifiers,
     // keys, layers), beside the pick in QMK's names (D-L83).
     const node = el(`<div class="scrim"><div class="sheet picker" role="dialog" aria-modal="true" aria-label="Pick a keycode">

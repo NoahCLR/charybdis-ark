@@ -97,7 +97,7 @@ export function screenCustomKeys() {
     /** @param {import("../../contracts/panel.js").CustomKey} row */
     const tile = (row) => {
         const does = [hasShortcut(row) ? shortcutAct(row) : "", row.hasBehavior ? "has a behaviour" : ""].filter(Boolean).join(" · ");
-        const tip = `Custom key ${row.slot}${row.name ? ` · ${row.name}` : ""} · ${does || "no shortcut or behaviour: does nothing yet"}`;
+        const tip = `${row.defaultName}${row.name ? ` · ${row.name}` : ""} · ${does || "no shortcut or behaviour: does nothing yet"}`;
         const cell = el(`<button class="mslot ${customKeyInUse(row) ? "filled" : ""}" data-custom-key="${esc(row.keycode)}"
             aria-current="${row.keycode === key?.keycode}" data-tip="${esc(canEdit ? `${tip} · ${SWAP_TIP}` : tip)}">
             <span class="n">K${esc(row.slot)}</span>${changed.has(row.keycode) ? draftDot(model?.draft, "corner") : ""}
@@ -137,9 +137,9 @@ export function screenCustomKeys() {
 /** @param {Model} model @param {import("../../contracts/panel.js").CustomKey} key @param {boolean} canEdit */
 function editor(model, key, canEdit) {
     const card = el(`<div class="card">
-        <div class="card-h name-titlebar"><span class="mark-lg">${mark(model, {kind: "customKey"})}</span>${titleName({f: `custom-key:${key.slot}:name`, value: key.name, placeholder: `Custom key ${key.slot}`,
+        <div class="card-h name-titlebar"><span class="mark-lg">${mark(model, {kind: "customKey"})}</span>${titleName({f: `custom-key:${key.slot}:name`, value: key.name, placeholder: key.defaultName,
             label: "Custom key name", perName: (model?.customKeyNameSpace || {perName: NAME_MAX_BYTES}).perName, canEdit})}
-            <span class="tag">Key ${esc(key.slot)}</span><code class="dim">${esc(key.keycode)}</code>
+            <span class="tag">${esc(key.defaultName)}</span>
             <span class="right row actions">
                 <button class="btn tiny link" data-act="place" ${editGate(model, "keys").editable ? "" : "disabled"}>Place on a key →</button>
                 <button class="btn tiny ghost destructive" data-act="clear" ${canEdit && customKeyInUse(key) ? "" : "disabled"}
@@ -224,7 +224,7 @@ function shortcutField(model, key, canEdit) {
     const save = (shortcut) => post(edits.customKeyShortcutMessage(key.keycode, shortcut, getModel()?.customKeyEditing?.identity));
     /** @type {HTMLElement} */ (node.querySelector('[data-act="clear-shortcut"]')).addEventListener("click", () => save({mods: 0, keys: [], layers: 0, layerKind: 0}));
     /** @type {HTMLElement} */ (node.querySelector('[data-act="pick-shortcut"]')).addEventListener("click", () => openPicker({
-        title: "Shortcut", context: key.name || `Custom key ${key.slot}`,
+        title: "Shortcut", context: key.name || key.defaultName,
         seed: names, allowedKeys: model?.customKeyShortcutKeys || [], shortcut: {mods: key.shortcut.mods, layers: key.shortcut.layers, layerKind: key.shortcut.layerKind},
         onShortcut: (shortcut) => {
             const now = getModel()?.customKeys?.find((row) => row.keycode === key.keycode) || key;

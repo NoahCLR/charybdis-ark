@@ -24,7 +24,7 @@ test("every layer and pointing slot core publishes is named by core, and the int
     }
     assert.deepEqual(model.layers.slice(0, 3).map(layerCalled), ["Base", "Layer 1", "Navigation"], "a layer with no name by core's words for it");
     for (const slot of model.pdModes) assert.equal(slotCalled(model, slot.id), slot.displayName || assert.fail(`slot ${slot.id} has no name`));
-    assert.equal(slotCalled(model, 6), "Slot 6", "an empty slot by core's words for it");
+    assert.equal(slotCalled(model, 6), "Pointing mode 6", "an empty slot by core's words for it");
     assert.equal(layerCalled(undefined), "");
     // A model built by hand may leave out core's name; the layer or slot then
     // reads by the name it stores, never as nothing.
