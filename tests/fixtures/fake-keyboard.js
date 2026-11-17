@@ -53,7 +53,7 @@ const CURRENT_DOMAINS = "16:7,32:2,48:3,64:13,80:4,96:1,112:1,128:2";
 // released firmware does, its page 0 counting three and a fourth refused as
 // an unknown page.
 /** @param {import("./types.js").FakeKeyboardOptions} options @returns {import("./types.js").FakeKeyboard} */
-function fakeKeyboard({document, compiled, settingsVersion = 13, compiledOnly = false, slaveKnown = true, generation = 42, firmwareVersion = 0x00010000, brightnessMax = 255, capabilityPageCount = PROFILE_WIRE_V1.CAPABILITY_PAGE_COUNT, options = keyboardOptions.wire()}) {
+function fakeKeyboard({document, compiled, settingsVersion = 13, compiledOnly = false, slaveKnown = true, generation = 42, firmwareVersion = 0x07EA0A1B, brightnessMax = 255, capabilityPageCount = PROFILE_WIRE_V1.CAPABILITY_PAGE_COUNT, options = keyboardOptions.wire()}) {
     const held = validateSnapshot(document);
     if (document.version !== 5 || held.layers.length !== 16) throw new Error("The fake keyboard runs current firmware: a schema-4, sixteen-layer document.");
     /** @param {Buffer} blob */

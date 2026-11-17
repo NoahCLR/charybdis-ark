@@ -176,8 +176,11 @@ drops off USB for a moment and comes back, and Ark follows it. In Live edit the
 keyboard is often saving the new name just then; Ark waits for the save and
 reads it again rather than asking you to.
 
-**This keyboard** shows the product, the firmware and whether it works with
-this Ark, Ark's own version, and the two halves. The product is the
+**This keyboard** shows the product, the firmware release the keyboard runs
+(such as **charybdis-4x6 firmware v2026.10.27**) and whether it works with
+this Ark, Ark's own version, and the two halves. A build made between
+releases shows the last release it includes; firmware from before releases
+were numbered says so instead of a release. The product is the
 firmware's built-in name; a renamed keyboard reports only its new name, so
 Ark leaves the product out rather than repeat the title. The halves are the
 **Master half**, the right one with the USB cable and the trackball, and the

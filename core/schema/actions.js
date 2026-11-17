@@ -38,10 +38,12 @@ const {resolveNativeQmkExpression} = require("./compiled-profile-v1");
 // key is QMK's own QK_LEADER, so no keycode moved. Schema 4.7, leading's
 // (firmware D-F72), moved it from 4.6's 0x951f1b61 with no keycode changed,
 // and schema 4.8, a locality for each feedback case's (firmware D-F73), from
-// 4.7's 0x8208b36c the same way.
+// 4.7's 0x8208b36c the same way. The firmware version left the digest (firmware
+// D-F77), so a release on its own no longer moves it; that moved it once, from
+// 0xf22f93d3, with no keycode changed.
 // A keyboard advertising another vocabulary numbers its keys differently, so
 // Ark reads it but neither names its keys nor edits it.
-const ACTION_ABI = 0xf22f93d3;
+const ACTION_ABI = 0xa144ecce;
 const KNOWN_ACTION_ABIS = Object.freeze([ACTION_ABI]);
 /** @param {number} value */
 const knownActionAbi = value => KNOWN_ACTION_ABIS.includes(value);
