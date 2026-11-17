@@ -42,5 +42,5 @@ test("a swap is recorded by the two names as they were before it", () => {
     const value = named();
     assert.equal(swapLabel({type: "swapMacros", keycodes: ["MACRO_2", "MACRO_10"]}, value), "Swapped Greeting and Macro 10");
     assert.equal(swapLabel({type: "swapCustomKeys", keycodes: ["CUSTOM_KEY_20", "CUSTOM_KEY_3"]}, value), "Swapped Custom key 20 and Thumb");
-    assert.equal(swapLabel({type: "swapPdModes", slots: [1, 6]}, value), "Swapped Volume and Slot 6");
+    assert.equal(swapLabel({type: "swapPdModes", slots: [1, 6]}, value), "Swapped Volume and Pointing mode 6");
 });

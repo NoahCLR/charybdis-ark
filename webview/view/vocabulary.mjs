@@ -46,7 +46,7 @@ export const stageOrder = (model) => vocabulary(model).stages;
 export const stageCalled = (model, id) => id === "accents" ? vocabulary(model).allAccents : stageOrder(model).find((stage) => stage.id === id)?.label || "";
 
 // A pointing slot's name as the core gives it: its own, or core's words for
-// one that holds nothing ("Slot 6"), which core publishes on every slot as
+// one that holds nothing ("Pointing mode 6"), which core publishes on every slot as
 // its displayName. A slot published without one reads by the name it
 // stores, the one place a name is made up for it here.
 /** @param {{displayName?: string, name?: string} | null | undefined} slot */

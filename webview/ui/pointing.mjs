@@ -84,7 +84,7 @@ export function screenPointing() {
         const reaching = !row.kind ? whatReachesSlot(model, row) : null;
         const inert = reaching ? reaching.keys.length + reaching.behaviours.length + reaching.combos.length : 0;
         const kind = row.kind ? word(words(model).kinds, row.kind) : "";
-        const tip = row.kind ? `Slot ${row.id} · ${row.name} · ${kind}` : `Slot ${row.id} · empty${inert ? ` · ${inert} action${inert === 1 ? "" : "s"} still reach it` : ""}`;
+        const tip = row.kind ? `${row.defaultName} · ${row.name} · ${kind}` : `${row.defaultName} · empty${inert ? ` · ${inert} action${inert === 1 ? "" : "s"} still reach it` : ""}`;
         const cell = el(`<button class="mslot pd-tile ${row.kind ? "filled" : ""} ${inert ? "warn" : ""}" data-slot="${esc(row.id)}" role="listitem"
             aria-current="${row.id === slot.id}" aria-label="${esc(tip)}" data-tip="${esc(gate.editable ? `${tip} · ${SWAP_TIP}` : tip)}">
             ${changed.has(row.id) ? draftDot(model?.draft, "corner") : ""}

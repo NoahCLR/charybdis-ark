@@ -217,7 +217,7 @@ const squeezeInto = (width, room) => width > room ? room : 0;
 
 /**
  * Where a name breaks onto two lines: at a " · ", which parts its halves
- * ("Slot 6" over "hold (empty)"), the dot dropped since the break says it;
+ * ("Pointing mode 6" over "hold (empty)"), the dot dropped since the break says it;
  * else between words where the longer line comes out shortest. A number is
  * never left on a line of its own ("Custom" over "key 0", "Macro 0" whole).
  * Null for a name that does not break: one word, or a word and its number.

@@ -19,8 +19,8 @@ test("all 128 custom keys are listed, and a name changes nothing else", () => {
     const before = snapshot(pdDocument());
     const view = customKeyEditorView(before, capabilities);
     assert.equal(view.keys.length, 128);
-    assert.deepEqual(view.keys[2], {slot: 2, keycode: "CUSTOM_KEY_2", code: 0x7f02, name: "", hasBehavior: true, shortcut: {mods: 0, keys: [], layers: 0, layerKind: 0}}, "the compiled profile gives Click Spam a behaviour");
-    assert.deepEqual(view.keys[127], {slot: 127, keycode: "CUSTOM_KEY_127", code: 0x7f7f, name: "", hasBehavior: false, shortcut: {mods: 0, keys: [], layers: 0, layerKind: 0}});
+    assert.deepEqual(view.keys[2], {slot: 2, keycode: "CUSTOM_KEY_2", code: 0x7f02, name: "", defaultName: "Custom key 2", hasBehavior: true, shortcut: {mods: 0, keys: [], layers: 0, layerKind: 0}}, "the compiled profile gives Click Spam a behaviour");
+    assert.deepEqual(view.keys[127], {slot: 127, keycode: "CUSTOM_KEY_127", code: 0x7f7f, name: "", defaultName: "Custom key 127", hasBehavior: false, shortcut: {mods: 0, keys: [], layers: 0, layerKind: 0}});
     assert.deepEqual(view.names, {perName: 32}, "a name is counted in bytes of UTF-8");
     assert.ok(["KC_A", "KC_EXSEL", "QK_MOUSE_BUTTON_1", "MS_BTN1", "QK_MOUSE_BUTTON_8", "KC_SYSTEM_POWER", "KC_AUDIO_MUTE", "KC_MEDIA_PLAY_PAUSE", "KC_LAUNCHPAD", "QK_MOUSE_CURSOR_UP", "QK_MOUSE_WHEEL_RIGHT"]
         .every(name => view.shortcutKeys.includes(name)), "keyboard, system and media keys, mouse buttons, the wheel and cursor movement");
@@ -195,7 +195,7 @@ test("clearing a custom key empties its name, shortcut and behaviour in one step
     const cleared = draftEdit(before, {type: "clearCustomKey", keycode: "CUSTOM_KEY_2", expectedFingerprint: before.fingerprint}, capabilities);
     const after = validateSnapshot(cleared, capabilities);
     assert.deepEqual(customKeyEditorView(snapshot(cleared), capabilities).keys[2],
-        {slot: 2, keycode: "CUSTOM_KEY_2", code: 0x7f02, name: "", hasBehavior: false, shortcut: {mods: 0, keys: [], layers: 0, layerKind: 0}});
+        {slot: 2, keycode: "CUSTOM_KEY_2", code: 0x7f02, name: "", defaultName: "Custom key 2", hasBehavior: false, shortcut: {mods: 0, keys: [], layers: 0, layerKind: 0}});
     assert.equal(after.settings.customKeyNames[3], "Neighbour", "another key keeps its name");
     assert.equal(after.behaviors.rows.length, was.behaviors.rows.length - 1, "only its own behaviour row goes");
     assert.deepEqual(profileLayers(cleared), profileLayers(before.document), "keys that send it stay on the board");

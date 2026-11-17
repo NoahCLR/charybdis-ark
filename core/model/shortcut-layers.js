@@ -8,7 +8,7 @@
 // staging a shortcut, a settings change and a layer reorder.
 
 const {SETTINGS, alwaysOnLayers} = require("../schema/settings-domain-v1");
-const {layerName} = require("./vocabulary");
+const {customKeyDefaultName, layerName} = require("./vocabulary");
 const {layersOfMask: layerList} = require("../data/charybdis-layout");
 
 /** @typedef {Pick<import("../schema/types.js").SettingsDomain, "values" | "names">} ShortcutSettings */
@@ -42,7 +42,7 @@ function shortcutRefusal(settings, shortcut) {
 }
 
 /** @param {ShortcutKeys} settings @param {number} slot */
-const keyWords = (settings, slot) => `Custom key ${slot}${settings.customKeyNames[slot] ? ` (${settings.customKeyNames[slot]})` : ""}`;
+const keyWords = (settings, slot) => `${customKeyDefaultName(slot)}${settings.customKeyNames[slot] ? ` (${settings.customKeyNames[slot]})` : ""}`;
 
 // The first custom key whose shortcut names a layer that is always on in
 // `settings`, with that layer; undefined when none does.

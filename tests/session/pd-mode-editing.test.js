@@ -43,7 +43,7 @@ test("create, bind, edit RGB and macros, reorder, review and undo share a PD dra
     const view = draft.view({connected: true, selectedDeviceId: "board"});
     const slot = view.changes.find(change => change.area === "Pointing modes" && change.unit === "pd:7");
     const field = label => slot.fields.find(entry => entry.label === label)?.after;
-    assert.equal(slot.status, "added"); assert.equal(slot.title, "Slot 7 · History");
+    assert.equal(slot.status, "added"); assert.equal(slot.title, "Pointing mode 7 · History");
     assert.equal(field("Pointing mode name"), "History");
     assert.equal(field("Horizontal movement per tap"), 30);
     assert.match(field("Left"), /Inherit modifiers/);
@@ -52,7 +52,7 @@ test("create, bind, edit RGB and macros, reorder, review and undo share a PD dra
     assert(model.qmkKeycodes.some(key => key.value === "PD_MODE_7" && key.keycode === 0x7e87 && key.label === "History · hold"));
     assert(model.qmkKeycodes.some(key => key.value === "PD_MODE_7_LOCK" && key.keycode === 0x7ea7 && key.label === "History · lock"));
     assert(!model.qmkKeycodes.some(key => key.value === "SLOT_7_MODE"));
-    assert(model.qmkKeycodes.some(key => key.value === "PD_MODE_6" && key.keycode === 0x7e86 && key.label === "Slot 6 · hold (empty)"),
+    assert(model.qmkKeycodes.some(key => key.value === "PD_MODE_6" && key.keycode === 0x7e86 && key.label === "Pointing mode 6 · hold (empty)"),
         "an unconfigured slot still offers its keycodes, so a button can be placed before the mode exists");
     assert(!settingsEditorView(draft.current).sections.some(section => section.fields.some(field => field.id >= 10 && field.id <= 14)));
     draft.undo(draft.revision); draft.undo(draft.revision); draft.undo(draft.revision);
@@ -108,7 +108,7 @@ test("a cleared slot keeps its bindings, because the keyboard keeps its keycodes
     assert.equal(cleared.pdModes[7].kind, 0, "the slot is empty");
     assert.equal(cleared.danglingPointingKeys[7], 1, "and the key that still reaches it is counted, not refused");
     assert.equal(profileLayers(cleared.document)[0][0] !== 0, true, "the button stays on the board");
-    assert.equal(modelNow().qmkKeycodes.find(key => key.value === "PD_MODE_7").label, "Slot 7 · hold (empty)",
+    assert.equal(modelNow().qmkKeycodes.find(key => key.value === "PD_MODE_7").label, "Pointing mode 7 · hold (empty)",
         "and the keycode stays in the catalogue, described as empty rather than by a name that is gone");
 
     stage({type: "savePdMode", slot: 7, config: {kind: 1, name: "History", axis: 1, thresholdX: 30,

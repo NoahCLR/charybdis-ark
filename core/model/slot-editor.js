@@ -11,7 +11,7 @@
 
 const {decodedOf} = require("./portable-profile");
 const {reorderSlots, swapStep} = require("./slot-order");
-const {macroDefaultName, slotName} = require("./vocabulary");
+const {customKeyDefaultName, macroDefaultName, slotName} = require("./vocabulary");
 const {macroOfName} = require("../../rules/qmk-keycodes.mjs");
 const {customKeyOfName} = require("../data/user-keycodes");
 
@@ -60,7 +60,7 @@ function swapLabel(message, document) {
     const {settings, pdModes} = decodedOf({document});
     /** @param {number} slot */
     const called = slot => bank === "macros" ? settings.macroNames[slot] || macroDefaultName(slot)
-        : bank === "customKeys" ? settings.customKeyNames[slot] || `Custom key ${slot}`
+        : bank === "customKeys" ? settings.customKeyNames[slot] || customKeyDefaultName(slot)
         : slotName(pdModes[slot], slot);
     return `Swapped ${called(slots[0])} and ${called(slots[1])}`;
 }

@@ -69,8 +69,8 @@ locks it on until pressed again. The picker shows them as **Hold** and
 locks from an empty Tap.
 
 The mode's name is the editor's title: click it to rename, up to 32 bytes
-(an accented letter takes two); its slot number follows it, such as
-**Mode 0**. **Place on a key →** beside it puts the
+(an accented letter takes two). The tag beside it names the slot, such as
+**Pointing mode 0**, which is also what the mode is called until you name it. **Place on a key →** beside it puts the
 mode's hold key on a key you pick on the board. **Duplicate** copies the mode
 into the first empty slot, and **Clear mode** empties the slot.
 
@@ -91,7 +91,7 @@ with the rest of the steps below. Or pick a mode
 you already have under **Or copy a mode** and choose **Copy into this slot**.
 
 A key can point at an empty slot. It just does nothing until the slot holds a
-mode, and its key on the board reads by the slot's number, such as **Slot 6 ·
+mode, and its key on the board reads by the slot's number, such as **Pointing mode 6 ·
 hold (empty)**. So you can lay out the keys first and fill in the modes later,
 and clearing a slot doesn't break the keys that use it.
 

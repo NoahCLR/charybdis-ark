@@ -193,7 +193,7 @@ test("a new pointing mode is one added item, however many fields it sets", () =>
     const items=profileReview(before,after);
     assert.equal(items.length,1);
     assert.equal(items[0].status,"added");
-    assert.equal(items[0].title,"Slot 6 · Mode 6");
+    assert.equal(items[0].title,"Pointing mode 6 · Mode 6");
     assert.ok(items[0].fields.length>5,"it lists what it sets");
     assert.deepEqual(items[0].place,{kind:"pointing",slot:6});
 });

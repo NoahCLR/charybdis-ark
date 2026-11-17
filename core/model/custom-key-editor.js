@@ -11,7 +11,7 @@
 // another key that sends a custom key sends only its shortcut.
 
 const {decodedOf, editProfileDomains} = require("./portable-profile");
-const {PROFILE_FULL_WORDS} = require("./vocabulary");
+const {PROFILE_FULL_WORDS, customKeyDefaultName} = require("./vocabulary");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {SETTINGS, SHORTCUT_KEY_LIMITS, validShortcutKey, shortcutStoreRefusal, shortcutIdentity} = require("../schema/settings-domain-v1");
 const {validName} = require("../schema/profile-name");
@@ -35,7 +35,7 @@ function customKeyEditorView(snapshot, capabilities) {
     const names = settings.customKeyNames;
     const behaved = new Set(behaviors.rows.filter(row => row.target.kind === ACTION.CUSTOM_KEY).map(row => row.target.operand));
     return {identity: snapshot.fingerprint,
-        keys: names.map((name, slot) => ({slot, keycode: customKeyName(slot), code: customKeyCode(slot), name, hasBehavior: behaved.has(slot),
+        keys: names.map((name, slot) => ({slot, keycode: customKeyName(slot), code: customKeyCode(slot), name, defaultName: customKeyDefaultName(slot), hasBehavior: behaved.has(slot),
             shortcut: {...settings.customKeyShortcuts[slot], keys: [...settings.customKeyShortcuts[slot].keys]}})),
         // Each name may be 32 bytes of text; the profile as a whole has a ceiling.
         names: {perName: SETTINGS.NAME_MAX_BYTES},

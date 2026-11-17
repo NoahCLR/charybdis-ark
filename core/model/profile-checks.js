@@ -130,7 +130,7 @@ function profileFindings(decoded, destination = {}) {
     for (const [slot, count] of Object.entries(decoded.danglingPointingKeys || {})) {
         if (!count) continue;
         findings.push({kind: "inertPointing", level: "warning", layers: [], identity: `${slot}:${count}`, count,
-            title: `${count} action${count === 1 ? " reaches" : "s reach"} ${slotName(undefined, Number(slot))}, an empty pointing slot`,
+            title: `${count} action${count === 1 ? " reaches" : "s reach"} ${slotName(undefined, Number(slot))}, an empty slot`,
             detail: "Keys, behaviours or combo outputs still name this empty slot. The keyboard accepts them but does nothing when they run.",
             fix: "Configure the slot or replace the actions that reach it.", place: {kind: "pointing", slot: Number(slot)}});
     }

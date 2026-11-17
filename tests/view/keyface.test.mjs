@@ -98,7 +98,7 @@ test("the behaviour editor keeps every supported tap column visible", () => {
 test("a key for an empty pointing slot says so on one line, as core names it", () => {
     // The line across a cap is a dual-role key's; this key holds or locks a
     // slot that holds nothing, which its name already says.
-    assert.deepEqual(keyFace(cap("PD_MODE_6"), words), {main: "Slot 6 · hold (empty)", sub: "", kind: "key"});
+    assert.deepEqual(keyFace(cap("PD_MODE_6"), words), {main: "Pointing mode 6 · hold (empty)", sub: "", kind: "key"});
     assert.equal(keyFace(cap("PD_MODE_0"), words).sub, "");
 });
 

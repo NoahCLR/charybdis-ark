@@ -129,7 +129,7 @@ or name it in Rename & reorder. Folding only draws less: Ark stores and sends
 every layer as before.
 
 A key's name that doesn't fit its cap on one line takes two, such as
-**Slot 6** over **hold (empty)**, rather than shrinking out of reading.
+**Pointing mode 6** over **hold (empty)**, rather than shrinking out of reading.
 
 Wherever Ark names a layer in its words (a key's name, a combo, the review,
 what reaches a key, a note, a heading, why a behaviour or combo is not used,

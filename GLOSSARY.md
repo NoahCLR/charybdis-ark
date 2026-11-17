@@ -104,6 +104,12 @@ bank's things back where the keyboard holds them, and their edits stay with
 them.
 _Avoid_: slot move, renumbering, reorder (for a swap)
 
+**Default name**:
+What a macro, custom key or pointing mode is called while it has no name of
+its own: its kind and slot number, **Macro 3**, **Custom key 3**, **Pointing
+mode 3** (D-L101). Its editor's tag shows it always.
+_Avoid_: Slot 3, Mode 3, Key 3 (for a slot's name)
+
 **Check**:
 A finding Review makes about what the draft lets the keyboard do; each says
 whether the draft made it, the keyboard already had it, or the draft fixes it.

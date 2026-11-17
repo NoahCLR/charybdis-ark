@@ -86,7 +86,8 @@ test("the screen is a bank of replacements beside the editor of the one picked, 
     await expect(bank(page).locator('[aria-current="true"]')).toHaveAttribute("data-ac-entry", "+31 6 1234 5678");
     await expect(editor(page).locator(".name-titlebar .title-name-text")).toHaveText("+31 6 1234 5678");
     await expect(editor(page).locator(".name-titlebar .mark-lg svg")).toBeVisible();
-    await expect(editor(page).locator("[data-ac-kind]")).toHaveText("Text");
+    // A replacement has no slot, so its title bar wears no tag (D-L88).
+    await expect(editor(page).locator(".name-titlebar .tag")).toHaveCount(0);
     await expect(editor(page).locator('.name-titlebar [data-act="ac-delete"]')).toHaveText("Delete replacement");
     await expect(editor(page).locator('[data-act="place"]')).toHaveCount(0);
     await expect(editor(page).locator(".macro-sequence-heading h4, .editor-section .card-h h3")).toHaveText(["Replacement", "Fires", "Inputs", "Try it"]);
@@ -152,7 +153,7 @@ test("New replacement opens an editor with its text focused, and it joins the li
     await bank(page).locator('[data-act="ac-add"]').click();
     const fresh = page.locator("[data-ac-new]");
     await expect(fresh.locator(".title-name-text")).toHaveText("New replacement");
-    await expect(fresh.locator(".name-titlebar .tag")).toHaveText("Not on your list yet");
+    await expect(fresh.locator(".name-titlebar .tag")).toHaveCount(0);
     await expect(fresh.locator('[data-act="ac-discard"]')).toHaveText("Discard");
     // It heads the bank, and is the item open.
     await expect(bank(page).locator(".ac-bank > :first-child")).toHaveAttribute("data-ac-new-item", "");
@@ -338,8 +339,8 @@ test("a replacement is changed in its editor, to other text or to a macro, and d
     await item(page, "iPhone").click();
     await editor(page).locator(".seg label", {hasText: "Macro"}).click();
     await expect(editor(page).locator("input[data-ac-macro]")).toHaveValue("");
-    // The choice is not kept yet, and says so: the header and the list still have the text.
-    await expect(editor(page).locator("[data-ac-kind]")).toHaveText("Text");
+    // The choice is not kept yet, and says so: the list still has the text.
+    await expect(item(page, "iPhone").locator('.v .kind-icon[data-kind="macro"]')).toHaveCount(0);
     await expect(editor(page).locator("[data-ac-pending]")).toHaveText("Still Text until you pick a macro.");
     expect(await edits(page)).toEqual([]);
     await editor(page).locator('[data-act="ac-pick"]').click();
@@ -469,7 +470,6 @@ test("a replacement that plays a macro is named by its macro, told apart, and ed
     await expect(bank(page).locator('[data-ac-entry="because"] .v .kind-icon')).toHaveCount(0);
     await played.click();
     await expect(editor(page).locator(".title-name-text")).toHaveText("Sign-off");
-    await expect(editor(page).locator("[data-ac-kind]")).toHaveText("Macro");
     await expect(editor(page).locator('[data-f$=":kind:macro"]')).toBeChecked();
     await expect(editor(page).locator("input[data-ac-macro]")).toHaveValue("Sign-off");
     await expect(editor(page).locator('.card-h [data-act="ac-edit-macro"]')).toBeVisible();
@@ -1109,7 +1109,7 @@ test("in the demo a replacement is made to play a macro, Try it says which, and 
     const played = bank(page).locator("[data-ac-entry]").filter({has: page.locator('[data-ac-input="spot"]')});
     await expect(played.locator(".v")).toHaveText(name);
     await expect(played).toHaveAttribute("aria-current", "true");
-    await expect(editor(page).locator("[data-ac-kind]")).toHaveText("Macro");
+    await expect(played.locator('.v .kind-icon[data-kind="macro"]')).toHaveCount(1);
     // Try it: the box keeps what was typed; in the preview the input goes, and the line says what plays.
     const box = page.locator('[data-f="autocorrect:try:text"]'), preview = page.locator("[data-ac-try-preview]");
     await editor(page).locator("[data-ac-more]").press("Escape");

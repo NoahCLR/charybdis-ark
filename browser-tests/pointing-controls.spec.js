@@ -33,7 +33,7 @@ test("the slot list opens on the modes in use; New opens the first free slot, an
     await list.locator('[data-act="new-slot"]').click();
     const free = await page.evaluate(async () => (await import("/webview/store.mjs")).getModel().pdModes.find(slot => !slot.kind).id);
     await expect(editor(page).locator(".card-h h3")).toHaveText("New pointing mode");
-    await expect(editor(page).locator(".card-h .tag")).toHaveText(`Mode ${free}`);
+    await expect(editor(page).locator(".card-h .tag")).toHaveText(`Pointing mode ${free}`);
     expect(await posted(page)).toEqual([]);
     await list.locator('[data-all-slots="pointing"]').click();
     await expect(list.locator(".pd-tile")).toHaveCount(32);
@@ -273,7 +273,7 @@ test("making a mode leaves its card's header and step 1 where they were", async 
             store.render();
         }, slot);
         const head = editor(page).locator(".name-titlebar");
-        await expect(head.locator(".tag")).toHaveText(`Mode ${slot}`);
+        await expect(head.locator(".tag")).toHaveText(`Pointing mode ${slot}`);
         const box = async locator => {
             const {x, y, height} = /** @type {{x: number, y: number, height: number}} */ (await locator.boundingBox());
             return {x, y, height};

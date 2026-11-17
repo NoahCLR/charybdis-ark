@@ -763,11 +763,11 @@ test("swaps compose: three swaps are one order that says where each macro sits n
 test("a pointing mode swap takes its colour, its accents and the keys and behaviours that start it, and adds no check", () => {
     const {draft} = slotFixture();
     stage(draft, {type: "swapPdModes", slots: [1, 6]});
-    assert.equal(draft.view({}).undoLabel, "Swapped Volume and Slot 6");
+    assert.equal(draft.view({}).undoLabel, "Swapped Volume and Pointing mode 6");
     assert.deepEqual(units(draft), ["pdOrder"], "Lighting followed: no colour changed");
     const order = draft.changes()[0];
     assert.deepEqual([order.title, order.area], ["Pointing mode order", "Pointing modes"]);
-    assert.deepEqual(fieldsOf(order), [["Slot 1", "slot 6", "slot 1"], ["Volume", "slot 1", "slot 6"]]);
+    assert.deepEqual(fieldsOf(order), [["Pointing mode 1", "slot 6", "slot 1"], ["Volume", "slot 1", "slot 6"]]);
     assert.deepEqual(order.fields.map(field => field.labelMark), [{kind: "pointing", slot: 1}, {kind: "pointing", slot: 6}]);
     assert.deepEqual(order.place, {kind: "slots", bank: "pdModes", slots: [1, 6]});
     const {rgb, pdModes, behaviors} = draft.current.decoded, was = draft.completeBase.decoded;

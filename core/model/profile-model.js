@@ -13,7 +13,7 @@
 // be a lie about what the keyboard is running.
 
 const {PD_MODE_KEYS, formerNames, pdModeKeyOfCode} = require("../data/pd-mode-keys");
-const {TEXT_REPLACEMENT_KEYS, VOCABULARY, layerName, slotName} = require("./vocabulary");
+const {TEXT_REPLACEMENT_KEYS, VOCABULARY, layerName, pointingDefaultName, slotName} = require("./vocabulary");
 const {comboOutputBehaviorLayers, participation} = require("./participation");
 const {comboReferenceLayers, publishedComboReach} = require("./combo-reach");
 const keycodeCatalog = require("../data/keycode-catalog");
@@ -211,7 +211,7 @@ function profileModel(content, capabilities, editing) {
         // key turns on that the pointer layer covers (model/pointing-links.js),
         // and the layers that start its mode, each with the layers that end a
         // start from it (model/pointing-links.js linkStarts).
-        pdModes: (content.domains?.pdModes || []).map((slot) => ({...slot, displayName: slotName(slot), keys: PD_MODE_KEYS[slot.id],
+        pdModes: (content.domains?.pdModes || []).map((slot) => ({...slot, displayName: slotName(slot), defaultName: pointingDefaultName(slot.id), keys: PD_MODE_KEYS[slot.id],
             pointerCovers: linkSettings ? pointerCoveredLayers(linkSettings, slot) : 0, linkStarts: linkSettings ? linkStarts(linkSettings, slot) : []})),
         pdModeEditing: {writable: editing.pointing,
             dpiChoices: dpiChoices({normalSpeed: true}),
