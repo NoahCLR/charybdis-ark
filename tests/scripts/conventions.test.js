@@ -512,10 +512,8 @@ const LAYER_LITERAL_ALLOWED = [
     // The interface's copies, pinned by tests/view/enum-drift.test.mjs.
     {file: "webview/view/layout.mjs", line: "export const LAYERS = 16, ALL_LAYERS = 2 ** LAYERS - 1;"},
     {file: "webview/view/keycode-expression.mjs", line: "export const LAYER_LOCK_BASE = 0x7ec0, LAYER_LOCK_SLOTS = 16;"},
-    // 16-bit fields that hold no layers: a transaction's sequence number and
-    // the firmware version's major part.
+    // A 16-bit field that holds no layers: a transaction's sequence number.
     {file: "core/session/candidate-upload-coordinator.js", line: "const sequence = (baseline.operationSequence + admitted) & 0xffff;"},
-    {file: "core/session/firmware-support.js", line: "version: known ? `${(/** @type {number} */ (version) >>> 16) & 0xffff}.${(/** @type {number} */ (version) >>> 8) & 0xff}.${/** @type {number} */ (version) & 0xff}` : null,"},
 ];
 
 test("the layer check catches a layer count or mask written as a number", () => {

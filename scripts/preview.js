@@ -75,6 +75,8 @@ const capabilities = {
     compiledLayerCount: 16,
     supportedDomainMask: 255,
     actionAbiDigest: ACTION_ABI,
+    // The release it was built as (firmware D-F77): v2026.10.27.
+    firmwareVersion: 0x07EA0A1B,
     // Current firmware: everything the flashable pair reports.
     featureFlags: PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES,
     responseVersion: 3,

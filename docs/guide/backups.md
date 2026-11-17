@@ -137,10 +137,11 @@ you want to keep.
 
 ## Firmware updates
 
-A backup imports onto the same firmware release. Ark works with the current
-firmware only and converts nothing: when a firmware update changes how the
-profile is stored, the keyboard starts from its compiled defaults and older
-backups no longer import. Check the firmware's release notes before updating,
+A backup imports onto any firmware release that stores the profile the same
+way. Ark works with the current firmware only and converts nothing: when a
+firmware update changes how the profile is stored, or the actions a key can
+hold, the keyboard starts from its compiled defaults and older backups no
+longer import. A release that changes neither keeps both. Check the firmware's release notes before updating,
 and export a fresh backup afterwards.
 
 To go back to the profile you had before your changes, import a backup made
