@@ -69,7 +69,7 @@ import {keycodePlacements, reachLine} from "../view/placements.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
 import {macroNamed, vocabulary, word} from "../view/vocabulary.mjs";
 import {LIST_FILE_MAX_BYTES, LIST_FILE_TOO_LARGE, addedReplacement, autocorrectRows, bytesWords, countWords, freeWords, importLines,
-    leaderTriedWords, openEntry, replacementOf, textCount, triedAfter, triedWords, usageWords} from "../view/autocorrect.mjs";
+    openEntry, replacementOf, textCount, triedAfter, triedWords, usageWords} from "../view/autocorrect.mjs";
 import * as edits from "../view/edits.mjs";
 import * as controls from "../view/controls.mjs";
 
@@ -564,8 +564,7 @@ function showMacro(model, slot) {
     render();
 }
 
-// The Leader key's cap, drawn before Try it's field for what is typed after
-// it, and before where the key is placed under Fires.
+// The Leader key's cap, drawn before where the key is placed under Fires.
 /** @param {Model} model */
 const leaderCap = (model) => `<span class="kbd ac-leader-key" aria-hidden="true">${esc(vocabulary(model).leaderKey)}</span>`;
 // How a replacement fires (D-L91): as you type, after the Leader key, or
@@ -929,10 +928,6 @@ function emptyEditor(canEdit) {
 // ── try it ──────────────────────────────────────────────────────────────
 
 let nextTry = 0;
-// The computer's own Caps Lock as the last key in the box reported it. The
-// preview's switch follows it only when it changes, so a switch set by hand
-// stays as it was set while the real key does.
-let realCapsLock = false;
 /** @param {Model} model */
 const draftOf = (model) => `${model?.draft?.id ?? ""}:${model?.draft?.revision ?? ""}`;
 
@@ -940,7 +935,7 @@ const draftOf = (model) => `${model?.draft?.id ?? ""}:${model?.draft?.revision ?
 // holds: the text that was there, then what was typed after it.
 function askTry() {
     const tried = state.autocorrectTry;
-    if (!tried.before && !tried.typed && !tried.leader) { state.autocorrectTry = {...tried, shown: "", fired: [], marks: [], undone: false, error: "", requestId: 0, leaderResult: null}; paintTry(); return; }
+    if (!tried.before && !tried.typed) { state.autocorrectTry = {...tried, shown: "", fired: [], marks: [], undone: false, error: "", requestId: 0}; paintTry(); return; }
     const requestId = ++nextTry;
     state.autocorrectTry = {...tried, requestId};
     post(controls.tryAutocorrect(tried, requestId));
@@ -951,7 +946,7 @@ export function receiveAutocorrectTry(message) {
     const tried = state.autocorrectTry, model = getModel();
     if (tried.requestId !== message.requestId || message.draftId !== model?.draft?.id || message.draftRevision !== model?.draft?.revision) return;
     state.autocorrectTry = {...tried, draft: draftOf(model), error: message.error || "",
-        ...(message.result ? {shown: message.result.text, fired: message.result.fired, marks: message.result.marks, undone: message.result.undone, leaderResult: message.result.leader ?? null} : {})};
+        ...(message.result ? {shown: message.result.text, fired: message.result.fired, marks: message.result.marks, undone: message.result.undone} : {})};
     paintTry();
 }
 
@@ -984,8 +979,6 @@ function paintTry() {
     for (const row of /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll("[data-ac-bank] [data-ac-entry]"))) row.classList.toggle("fired", Boolean(last) && row.dataset.acEntry === last?.entry);
     const open = /** @type {HTMLElement | null} */ (document.querySelector("[data-ac-editor]"))?.dataset.acEditor;
     for (const chip of /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll("[data-ac-editor] [data-ac-chip]"))) chip.classList.toggle("fired", Boolean(last) && open === last?.entry && chip.dataset.acChip === last?.typo);
-    const leaderSaid = /** @type {HTMLElement | null} */ (document.querySelector("[data-ac-try-leader-said]"));
-    if (leaderSaid) leaderSaid.textContent = leaderTriedWords(tried.leader, tried.leaderResult);
     const show = /** @type {HTMLButtonElement} */ (document.querySelector('[data-act="ac-try-show"]'));
     show.hidden = !last || tried.undone || open === last.entry || !getModel()?.autocorrect?.entries.some((entry) => entry.id === last.entry);
     show.dataset.entry = last?.entry || "";
@@ -994,21 +987,18 @@ function paintTry() {
 // Try it closes the editor, as Record closes a macro's: it tries the whole
 // draft's list, whichever replacement is open. The box is typed in as
 // anywhere, and stays as it was typed, whatever a connected keyboard does to
-// it; under it the preview is that text as this draft's list would leave it
-// (D-L86). Caps Lock and the undo are the preview's alone.
+// it; under it the preview is that text as this draft's list would leave it,
+// under the computer's own Caps Lock (D-L86). The undo is the preview's
+// alone. A Leader key cannot be typed into the box, and Try it does not try
+// what follows one (D-L91).
 /** @param {Model} model @param {List} list */
 function trySection(model, list) {
     const tried = state.autocorrectTry;
-    // A Leader key cannot be typed into the box, and nothing writes one there:
-    // what follows it is tried in a field of its own (D-L91), shown while the
-    // list has a leader input.
-    const leading = list.usage.leaders > 0;
     const card = el(`<div class="card editor-section" data-ac-try>
         <div class="card-h"><h3>Try it</h3>${infoMark({id: "ac-info-try", label: "About the preview", heading: "About the preview", rows: [
                 {term: "Preview", says: `What your keyboard would type with this draft's list, through ${list.layoutName}.`},
                 {term: "Not shown", says: "Clicks, shortcuts, arrow keys and held keys. On the keyboard they start a new word or pause replacing until the next one. A word ended through a dead key is left alone by the keyboard, and replaced here."},
-                {term: "Caps Lock", says: "The switch follows your own Caps Lock when it changes as you type here, or set it yourself for the preview."},
-                ...(leading ? [{term: "After Leader", says: "What you type after the Leader key, tried on its own: whether the keyboard sends a replacement, waits for more, or drops it. The box above never holds the Leader key."}] : [])]})}
+                {term: "Caps Lock", says: "The preview follows your own Caps Lock as you type here."}]})}
             <button class="btn tiny ghost destructive right" data-act="ac-try-clear" ${tried.text ? "" : "disabled"} data-tip="Empty the box and its preview.">Clear</button></div>
         <div class="card-b stack">
             <textarea class="input ac-try-box" data-f="autocorrect:try:text" rows="2" aria-label="Type here to try your list" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Type here: teh, then a space.">${esc(tried.text)}</textarea>
@@ -1016,21 +1006,11 @@ function trySection(model, list) {
             <div class="field"><span id="ac-try-label">Your keyboard would type</span>
                 <div class="ac-try-preview" data-ac-try-preview role="group" aria-labelledby="ac-try-label"></div></div>
             <div class="row ac-try-tools">
-                <label class="sw" data-tip="Whether the preview takes Caps Lock to be on at the computer."><input type="checkbox" data-f="autocorrect:try:caps" ${tried.capsLock ? "checked" : ""}><span class="track"></span><span class="txt">Preview with Caps Lock on</span></label>
                 <span class="note" data-ac-try-said aria-live="polite"></span>
                 <button class="btn tiny link" data-act="ac-try-show" hidden>Show it →</button>
             </div>
-            ${leading ? `<label class="field ac-try-leader"><span>${esc(word(vocabulary(model).inputModes, "leader"))}</span>
-                <span class="input-row">${leaderCap(model)}<input class="input mono" data-f="autocorrect:try:leader" data-ac-try-leader autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"
-                    placeholder="What you type after the Leader key: pn" value="${esc(tried.leader)}"></span></label>
-            <p class="note" data-ac-try-leader-said aria-live="polite"></p>` : ""}
         </div></div>`);
     const box = /** @type {HTMLTextAreaElement} */ (card.querySelector("textarea"));
-    /** @type {HTMLInputElement | null} */ (card.querySelector("[data-ac-try-leader]"))?.addEventListener("input", (event) => {
-        state.autocorrectTry = {...state.autocorrectTry, leader: /** @type {HTMLInputElement} */ (event.target).value};
-        askTry();
-    });
-    const caps = /** @type {HTMLInputElement} */ (card.querySelector('[data-f="autocorrect:try:caps"]'));
     const clear = /** @type {HTMLButtonElement} */ (card.querySelector('[data-act="ac-try-clear"]'));
     box.addEventListener("input", () => {
         state.autocorrectTry = {...state.autocorrectTry, ...triedAfter(state.autocorrectTry, box.value), text: box.value};
@@ -1038,16 +1018,10 @@ function trySection(model, list) {
         askTry();
     });
     // The computer's own Caps Lock, as the key press reports it: read, and
-    // nothing of the key changed. The switch takes it when it changes.
+    // nothing of the key changed. The input that follows asks with it.
     box.addEventListener("keydown", (event) => {
-        const on = event.getModifierState("CapsLock");
-        if (on === realCapsLock) return;
-        realCapsLock = on;
-        if (on === state.autocorrectTry.capsLock) return;
-        caps.checked = on;
-        state.autocorrectTry = {...state.autocorrectTry, capsLock: on};
+        state.autocorrectTry = {...state.autocorrectTry, capsLock: event.getModifierState("CapsLock")};
     });
-    caps.addEventListener("change", () => { state.autocorrectTry = {...state.autocorrectTry, capsLock: caps.checked}; askTry(); });
     // Clear is the one thing here that empties the box, with its preview.
     clear.addEventListener("click", (event) => {
         event.stopPropagation();
@@ -1062,7 +1036,7 @@ function trySection(model, list) {
         openInEditor(/** @type {HTMLElement} */ (event.currentTarget).dataset.entry || "");
     });
     // The list or the host layout changed under what was tried: try it again.
-    if ((tried.before || tried.typed || tried.leader) && tried.draft !== draftOf(model)) queueMicrotask(askTry);
+    if ((tried.before || tried.typed) && tried.draft !== draftOf(model)) queueMicrotask(askTry);
     return card;
 }
 

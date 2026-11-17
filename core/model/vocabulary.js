@@ -418,8 +418,8 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     inputModesMean: [["word", "Replaced as you finish the word."],
         ["leader", "Press the Leader key, then type one of its inputs: the keyboard sends the replacement the moment it is typed, and the computer never sees what you typed."],
         ["both", "Either way."]],
-    // The Leader key as its cap names it: before Try it's After Leader field
-    // and where a replacement's editor says the key is placed.
+    // The Leader key as its cap names it, where a replacement's editor says
+    // the key is placed.
     leaderKey: "Leader",
     // The formats a text replacement list is saved in (autocorrect-import.js
     // AUTOCORRECT_FILE_FORMATS), as Export's menu names each.

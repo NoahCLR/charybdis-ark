@@ -568,7 +568,7 @@ test("every control of the screen has a name, and the keyboard reaches them in r
         if (order.at(-1) !== at) order.push(at);
     }
     expect(order.map((name) => name.replace(/^autocorrect:entry:because:/, ""))).toEqual(["item", "ac-add", "ac-import", "ac-export-menu", "ac-delete", "ⓘ How a replacement works", "kind:text", "replacement",
-        "ⓘ How a replacement fires", "fires:word", "ⓘ How inputs are written, and the * wildcard", "ac-chip", "input:becasue", "ac-remove-input", "ac-chip", "ac-more", "ⓘ About the preview", "autocorrect:try:text", "autocorrect:try:caps"]);
+        "ⓘ How a replacement fires", "fires:word", "ⓘ How inputs are written, and the * wildcard", "ac-chip", "input:becasue", "ac-remove-input", "ac-chip", "ac-more", "ⓘ About the preview", "autocorrect:try:text"]);
     // Clear is off with nothing to clear, as Clear take is, and a replaced part of the preview is no tab stop.
     await expect(editor(page).locator('[data-act="ac-try-clear"]')).toBeDisabled();
 });
@@ -645,7 +645,8 @@ test("Try it closes the editor: its box is never changed, and the preview under 
     expect(await page.locator(".pad.autocorrect").evaluate((node) => node.textContent)).not.toMatch(/\bApply\b/);
     // Clear is off with nothing to clear, as Clear take is.
     await expect(section.locator('[data-act="ac-try-clear"]')).toBeDisabled();
-    await expect(section.locator(".sw .txt")).toHaveText("Preview with Caps Lock on");
+    // Caps Lock has no switch here: the preview takes the computer's own.
+    await expect(section.locator(".sw")).toHaveCount(0);
     await expect(preview).toHaveText("Nothing typed yet.");
     // No keyboard is replacing here, so nothing says one is.
     await expect(page.locator("[data-ac-try-running]")).toHaveCount(0);
@@ -685,24 +686,19 @@ test("Try it closes the editor: its box is never changed, and the preview under 
     // An edit in the middle is what a click is to the keyboard: the text stands, and typing starts afresh.
     await box.fill("tex");
     await expect.poll(last).toEqual(expect.objectContaining({type: "tryAutocorrect", before: "tex", typed: ""}));
-    // Caps Lock is the preview's, posted with what is typed.
-    await page.locator('[data-f="autocorrect:try:caps"]').check({force: true});
-    await expect.poll(last).toEqual(expect.objectContaining({type: "tryAutocorrect", before: "tex", typed: "", capsLock: true}));
-    await expect(box).toHaveValue("tex");
-    // Set by hand, the switch stays as it was set while the computer's own Caps Lock does not change; when that changes, the switch follows it.
-    const caps = page.locator('[data-f="autocorrect:try:caps"]');
-    const key = (capsLock) => box.evaluate((node, modifierCapsLock) => node.dispatchEvent(new KeyboardEvent("keydown", {key: "a", bubbles: true, modifierCapsLock})), capsLock);
-    await key(false);
-    await expect(caps).toBeChecked();
-    await key(true);
-    await expect(caps).toBeChecked();
-    await key(false);
-    await expect(caps).not.toBeChecked();
-    await caps.check({force: true});
-    await key(false);
-    await expect(caps).toBeChecked();
+    // The computer's own Caps Lock, as the key press reports it, is posted with what that key typed.
+    const type = (character, capsLock) => box.evaluate((node, [character, modifierCapsLock]) => {
+        node.dispatchEvent(new KeyboardEvent("keydown", {key: character, bubbles: true, modifierCapsLock}));
+        node.value += character;
+        node.dispatchEvent(new Event("input", {bubbles: true}));
+    }, [character, capsLock]);
+    await type("T", true);
+    await expect.poll(last).toEqual(expect.objectContaining({type: "tryAutocorrect", before: "tex", typed: "T", capsLock: true}));
+    await type("t", false);
+    await expect.poll(last).toEqual(expect.objectContaining({type: "tryAutocorrect", before: "tex", typed: "Tt", capsLock: false}));
+    await expect(box).toHaveValue("texTt");
     // Clear empties the box and the preview, and asks nothing; with nothing left to clear it is off again.
-    await answer(page, {text: "tex", fired: [], marks: [], undone: false});
+    await answer(page, {text: "texTt", fired: [], marks: [], undone: false});
     await clearPosts(page);
     await expect(page.locator('[data-act="ac-try-clear"]')).toBeEnabled();
     await page.locator('[data-act="ac-try-clear"]').click();
@@ -1369,25 +1365,7 @@ test("while a replacement fires after Leader its editor says where the Leader ke
     expect(await edits(page)).toEqual([]);
 });
 
-test("Try it's After Leader field asks the core what the leader would do with what follows the key, and says it", async ({page}) => {
-    await openControls(page, "autocorrect");
-    await expect(page.locator("[data-ac-try-leader]")).toHaveCount(0);
-    await publish(page, (model) => { model.autocorrect.entries[0].fires = "leader"; model.autocorrect.usage.leaders += model.autocorrect.entries[0].typos.length; });
-    const field = page.locator("[data-ac-try-leader]"), said = page.locator("[data-ac-try-leader-said]");
-    await expect(field).toBeVisible();
-    await field.fill("pn");
-    await expect.poll(async () => (await posted(page)).filter((message) => message.type === "tryAutocorrect").at(-1)).toEqual(expect.objectContaining({type: "tryAutocorrect", before: "", typed: "", leader: "pn"}));
-    await answer(page, {text: "", fired: [], marks: [], undone: false, leader: {state: "sends", input: "pn", entry: "+31", label: "+31 6 1234 5678", finishing: false, passedOver: false}});
-    await expect(said).toHaveText("“pn” sends “+31 6 1234 5678”, and that is all the computer sees.");
-    await answer(page, {text: "", fired: [], marks: [], undone: false, leader: {state: "waits", sends: "alpha", longer: ["abcd"]}});
-    await expect(said).toHaveText("Waiting: Enter, or a pause, sends “alpha”; “abcd” could still follow.");
-    await answer(page, {text: "", fired: [], marks: [], undone: false, leader: {state: "drops", held: "ax"}});
-    await expect(said).toHaveText("No leader input begins with “ax”: the keyboard drops what you typed, and nothing reaches the computer.");
-    // The box itself was never written into.
-    await expect(page.locator('[data-f="autocorrect:try:text"]')).toHaveValue("");
-});
-
-test("in the demo a replacement made to fire after Leader is marked in the bank, tried after Leader by the core, and reviewed", async ({page}) => {
+test("in the demo a replacement made to fire after Leader is marked in the bank and reviewed, and Try it does not try the leader", async ({page}) => {
     await openDemo(page);
     await bank(page).locator('[data-act="ac-add"]').click();
     await editor(page).locator("[data-ac-text]").fill("Kind regards, Sam");
@@ -1399,13 +1377,10 @@ test("in the demo a replacement made to fire after Leader is marked in the bank,
     await first.press("Enter");
     await expect(item(page, "Kind regards, Sam").locator(".n")).toHaveText("kr");
     await expect(item(page, "Kind regards, Sam").locator("[data-ac-fires]")).toHaveText("After Leader");
-    const field = page.locator("[data-ac-try-leader]"), said = page.locator("[data-ac-try-leader-said]");
-    await field.fill("k");
-    await expect(said).toHaveText("Waiting for more: it could become “kr”.");
-    await field.fill("kr");
-    await expect(said).toHaveText("“kr” sends “Kind regards, Sam”, and that is all the computer sees.");
-    await field.fill("k r");
-    await expect(said).toHaveText("No leader input begins with “k ”: the keyboard drops what you typed, and nothing reaches the computer.");
+    // Try it holds its one box, and nothing of the leader (D-L91).
+    await expect(page.locator("[data-ac-try]")).toBeVisible();
+    await expect(page.locator("[data-ac-try] input, [data-ac-try] textarea")).toHaveCount(1);
+    await expect(page.locator("[data-ac-try]")).not.toContainText("Leader");
     // Review says how it fires.
     await page.locator('.commit [data-act="review"]').click();
     await expect(page.locator('.sheet[aria-label="Review changes"]')).toContainText("After Leader");

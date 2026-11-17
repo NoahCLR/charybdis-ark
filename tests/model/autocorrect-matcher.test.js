@@ -173,25 +173,6 @@ test("of part-of-word typos equally long, the first in the domain's order fires:
     }
 });
 
-// What the leader does with text typed after it (firmware D-F71): Try it's
-// After Leader field reads it (D-L91).
-test("the leader sends an input no longer one begins with at once, waits on one a longer one begins with, and drops the start of none", () => {
-    const value = firing(list(["the", "teh"], ["+31 6 1234 5678", "pn"], ["alpha", "abc"], ["delta", "abcd"], ["receive", ["recieve", MATCH.START]]), TRIGGER.AFTER_LEADER, "+31 6 1234 5678", "alpha", "delta");
-    firing(value, TRIGGER.BOTH, "receive");
-    const {leaderOutcome} = require("../../core/model/autocorrect-matcher");
-    const said = typed => { const outcome = leaderOutcome(value, typed); return outcome.state === "sends" ? ["sends", outcome.entry.correction, outcome.at, outcome.finishing] : outcome.state === "drops" ? ["drops", outcome.at] : ["waits", outcome.exact?.entry.correction ?? null, outcome.longer.map(listed => listed.typo.typo)]; };
-    assert.deepEqual(said("PN"), ["sends", "+31 6 1234 5678", 1, false], "folded, sent on its last character");
-    assert.deepEqual(said("pnx"), ["sends", "+31 6 1234 5678", 1, false], "what follows a send is not the leader's");
-    assert.deepEqual(said("ab"), ["waits", null, ["abc", "abcd"]]);
-    assert.deepEqual(said("abc"), ["waits", "alpha", ["abcd"]], "Enter or the timeout sends alpha");
-    assert.deepEqual(said("abc\n"), ["sends", "alpha", 3, true]);
-    assert.deepEqual(said("abd"), ["drops", 2]);
-    assert.deepEqual(said("teh"), ["drops", 0], "an input of a replacement that fires as you type is no leader input");
-    assert.deepEqual(said("recieve"), ["sends", "receive", 6, false], "a part-of-word input is typed whole after the Leader key");
-    assert.deepEqual(said("p n"), ["drops", 1], "a space is in no input");
-    assert.deepEqual(said(""), ["waits", null, []]);
-});
-
 test("what the leader sends is marked as a replacement the leader sent, typed as written under Caps Lock, and passed over when the host cannot type it", () => {
     const value = firing(list(["Kind regards", "kr"], ["über", "ub"]), TRIGGER.AFTER_LEADER, "Kind regards", "über");
     const tried = typedText(value, US, true, "Hi \u0010kr.");

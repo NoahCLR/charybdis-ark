@@ -30,7 +30,6 @@ const {hostLayout} = require("../data/host-layouts");
  * @typedef {(slot: number) => {text: string | null} | null} Macros what a macro slot plays: its text when it types only text, `text: null` when it does more, and null for a slot that is empty or cannot play
  * @typedef {Replaced & {start: number, end: number}} Mark where a standing replacement's text is in the text tried, by its offsets
  * @typedef {{entry: string, correction: string, typo: string, macro?: number, leader?: true}} Replaced a replacement that fired: its entry's key, its text ("" for a macro), the input, the macro slot it played, and `leader` when the leader sent it
- * @typedef {{state: "sends", entry: Entry, typo: Typo, at: number, finishing: boolean} | {state: "waits", exact: Listed | null, longer: Listed[]} | {state: "drops", at: number}} Leading what the leader does with characters typed after it: send an entry's replacement on the character at `at` (on Enter or the timeout when `finishing`), wait with what Enter would send and the inputs it could still become, or drop what is held on the character at `at`
  */
 
 // The keyboard follows this many characters of a word, and types no
@@ -173,27 +172,6 @@ function leadStep(index, held, character) {
     const next = [...held, folded(character)];
     const {exact, longer} = leaderMatch(index, next);
     return longer.length ? {held: next, sends: null} : {held: null, sends: exact};
-}
-
-// What the leader does with these characters typed after it: each taken by
-// leadStep, as the fixture-held typedText takes them, until one sends an
-// input or drops what is held; at the end of the text it waits, Enter or the
-// timeout to send an input a longer one begins with. It does not ask whether
-// the host can type what is sent.
-/** @param {AutocorrectList} list @param {string} typed @returns {Leading} */
-function leaderOutcome(list, typed) {
-    const index = indexed(list);
-    /** @type {string[]} */
-    let held = [];
-    let at = 0;
-    for (const character of typed) {
-        const step = leadStep(index, held, character);
-        if (step.sends) return {state: "sends", entry: step.sends.entry, typo: step.sends.typo, at, finishing: character === "\n"};
-        if (!step.held) return {state: "drops", at};
-        held = step.held;
-        at += character.length;
-    }
-    return {state: "waits", ...leaderMatch(index, held)};
 }
 
 // How many key strokes show this character on this host under its Caps Lock;
@@ -421,4 +399,4 @@ function typedText(list, host, capsLock, screen, before = "", macros = () => nul
     return {text: out.join(""), fired, marks, undone};
 }
 
-module.exports = {LEADER, firingTypo, leaderOutcome, typedText, typoFinder, wordsOf};
+module.exports = {firingTypo, typedText, typoFinder, wordsOf};
