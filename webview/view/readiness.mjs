@@ -50,8 +50,12 @@ export function readScreen(model, screen = "keys") {
     const halvesDetail = halves === "alone" || halves === "apart" ? model.vocabulary?.halves?.[halves]?.detail : "";
     if (halvesDetail || device.health?.error) return {state: "unavailable", title: "Keyboard not ready for edits", detail: halvesDetail || /** @type {string} */ (device.health?.error)};
     // A read that worked, held by its draft: why, and what the bar offers;
-    // otherwise the read failed (draftBlockWords words both).
+    // otherwise the read failed (draftBlockWords words both). A failed read,
+    // or firmware this Ark cannot edit, may be firmware the keyboard lacks or
+    // runs an old release of, so the page offers it (`firmware`).
     const live = Boolean(model.draft?.live);
-    const words = draftBlockWords(model, model.load?.held, live) || draftBlockWords(model, "no-draft", live);
-    return {state: "unavailable", title: words?.title || "", detail: words?.detail || ""};
+    const held = model.load?.held;
+    const words = draftBlockWords(model, held, live) || draftBlockWords(model, "no-draft", live);
+    const firmware = !held || held === "unsupported";
+    return {state: "unavailable", title: words?.title || "", detail: words?.detail || "", ...(firmware ? {firmware} : {})};
 }

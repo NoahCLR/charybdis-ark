@@ -72,7 +72,9 @@ keyboard changes. The Keyboard screen links to the firmware's releases.
 
 If Ark can show the keyboard but can't read its complete profile, the editing
 screens say **Keyboard not ready for edits** and offer **Read keyboard** to
-try again. The usual cause is a missing half: check the cable between the
+try again. **Flash the firmware first** shows under it too, as it does under
+firmware that isn't current, since a keyboard without the firmware, or with an
+old release of it, can't be read either. The usual cause is a missing half: check the cable between the
 halves.
 
 ## The rail

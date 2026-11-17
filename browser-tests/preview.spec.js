@@ -340,6 +340,27 @@ test("with no keyboard the web shell offers its picker first, and without WebHID
     await placeholder.locator('[data-act="choose-keyboard"]').click();
     await expect.poll(() => page.evaluate(() => window.__posted)).toEqual([expect.objectContaining({type: "chooseKeyboard"})]);
 
+    // A keyboard Ark reached but could not read: its firmware may be missing or
+    // old, so the card stays, and its last step reads the keyboard again.
+    await page.goto("/preview/index.html");
+    const failedRead = async (held) => page.evaluate(async (held) => {
+        const store = await import("/webview/store.mjs");
+        const model = structuredClone(store.getModel());
+        model.load = {...model.load, state: "unavailable", ...(held ? {held} : {})};
+        model.device.health = {...model.device.health, halves: "agree"};  // the preview's slave half is away: that is the cable
+        store.setModel(model);
+        store.render();
+    }, held);
+    await failedRead("");
+    await expect(page.locator(".read-placeholder h2")).toHaveText("Keyboard not ready for edits");
+    await expect(page.locator(".pad > .firmware-first h3")).toHaveText("Flash the firmware first");
+    await expect(page.locator(".pad > .firmware-first")).toContainText("then read the keyboard again");
+    await expect(page.locator(".read-placeholder [data-act='retry']")).toHaveCount(1);
+    await failedRead("unsupported");
+    await expect(page.locator(".pad > .firmware-first")).toHaveCount(1);
+    await failedRead("stale");
+    await expect(page.locator(".firmware-first"), "a draft held by a changed keyboard is no firmware problem").toHaveCount(0);
+
     await page.goto("/preview/index.html?shell=unsupported");
     await expect(page.locator(".read-placeholder h2")).toHaveText("Ark needs Chrome or Edge");
     await expect(page.locator('[data-act="choose-keyboard"]')).toHaveCount(0);
