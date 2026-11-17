@@ -422,20 +422,3 @@ test("how a replacement fires is switched alone, its inputs kept, and a new one 
     says(() => edit(current, {type: "addAutocorrectTypos", correction: "Kind regards", inputs: "k.r", trigger: "leader"}), /one word/);
     says(() => edit(current, {type: "updateAutocorrectTrigger", correction: "the", trigger: "never"}), /fires as you type, after the Leader key, or both/);
 });
-
-// Try it's After Leader field (D-L91): the box is never written into, so what
-// the leader does is asked of text typed after the key on its own.
-test("a try says what the leader would do with text typed after it: send, wait, drop, pass over or nothing", () => {
-    const leads = {fires: TRIGGER.AFTER_LEADER};
-    const current = fixture([["+31 6 1234 5678", "pn", leads], ["alpha", "abc", leads], ["delta", "abcd", leads], ["über", "ub", leads], [5, "sig", leads]], 0, {5: "Kind regards"});
-    const leader = typed => tryText(current, {before: "", typed: "", capsLock: false, leader: typed}).leader;
-    assert.deepEqual(leader("PN"), {state: "sends", input: "pn", entry: "+31 6 1234 5678", label: "+31 6 1234 5678", finishing: false, passedOver: false});
-    assert.deepEqual(leader("abc"), {state: "waits", sends: "alpha", longer: ["abcd"]});
-    assert.deepEqual(leader("abc\n"), {state: "sends", input: "abc", entry: "alpha", label: "alpha", finishing: true, passedOver: false});
-    assert.deepEqual(leader("ax"), {state: "drops", held: "ax"});
-    assert.deepEqual(leader("ub"), {state: "sends", input: "ub", entry: "über", label: "über", finishing: false, passedOver: true}, "US cannot type it");
-    assert.deepEqual(leader("sig"), {state: "sends", input: "sig", entry: entryKey({macro: 5}), label: "Macro 5 named", macro: 5, finishing: false, passedOver: false});
-    assert.deepEqual(tryText(fixture([["the", "teh"]]), {before: "", typed: "", capsLock: false, leader: "pn"}).leader, {state: "none"});
-    assert.equal(tryText(current, {before: "", typed: "teh", capsLock: false}).leader, undefined, "asked only when given");
-    says(() => tryText(current, {before: "", typed: "", capsLock: false, leader: 5}), /takes text/);
-});

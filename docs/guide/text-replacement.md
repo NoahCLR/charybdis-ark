@@ -317,10 +317,8 @@ says what it replaced. The line beside it says what was replaced last, and
 that replacement is marked in the list; **Show it →** opens it.
 
 Backspace straight after a replacement puts the word back in the preview, as
-it would on the keyboard. **Preview with Caps Lock on** says whether the
-preview takes Caps Lock to be on; set it by hand, and it follows your own
-Caps Lock when you turn that on or off while you type there. **Clear**
-empties the box and the preview.
+it would on the keyboard, and the preview follows your own Caps Lock as you
+type there. **Clear** empties the box and the preview.
 
 With a keyboard connected and text replacement on, the keyboard replaces as
 you type in the box too, by the list that is already applied, and the box
@@ -343,14 +341,8 @@ Space), and the preview shows it replaced. An edit in the middle of the box coun
 would: the text stays and the next key starts a new word. Try it works
 whether text replacement is on or off.
 
-The box can't hold the Leader key, and Ark never writes one into it. With a
-replacement on your list that fires after Leader, **After Leader** under it
-tries what you type
-after the key, on its own: the line under it says whether the keyboard sends
-a replacement, and which, waits for more (and what Enter or the wait would
-send), or drops what you typed. A replacement your layout can't type, or a
-macro that can't play, is sent as nothing, and it says so. The wait itself
-and Escape need the keyboard.
+The box can't hold the Leader key, so Try it doesn't try what you type
+after Leader: press Leader on the keyboard to try that.
 
 ## Importing a list
 

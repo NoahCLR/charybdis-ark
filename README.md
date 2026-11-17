@@ -159,7 +159,7 @@ autocorrect format, a spreadsheet's CSV or JSON. **Try it** previews what the ke
 for a sentence before anything is saved, and a key on the keyboard switches it off
 for a password or a terminal. A replacement can fire after the **Leader** key
 instead, or both ways: Leader then `pn` sends your phone number, and nothing you typed
-reaches the computer; **Try it** tries those too.
+reaches the computer.
 
 ### Pointing modes
 

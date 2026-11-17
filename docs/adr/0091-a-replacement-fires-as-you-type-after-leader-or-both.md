@@ -62,16 +62,15 @@ Leader key with nothing on the list that fires after it
 
 ## Try it
 
-Try it's box is never written into (D-L86), and no key types a Leader there.
-While a replacement fires after Leader, a field of its own, **After Leader**,
-tries what is typed after the key: core answers, with the box's own request,
-whether the leader would send a replacement and which, wait for more (and
-what Enter or the wait would send), or drop what was typed (`leaderOutcome`,
-`AutocorrectLeaderTry`). The matcher runs the leader in a screen too, U+0010
-standing for the key as the firmware's behaviour fixture writes it
-(`leadStep`, which Try it's field and a screen share), and is held to the
-fixture's leader cases that have one; the wait, Escape and a switch key are
-the keyboard's, and those cases are skipped with their reasons.
+Try it's box is never written into (D-L86), and no key types a Leader there,
+so Try it does not try the leader. It first had a field of its own for that,
+**After Leader**, which said whether the leader would send, wait or drop what
+was typed after the key; Noah took it out (2026-11-17), as more than the
+screen needs. The matcher still runs the leader in a screen, U+0010 standing
+for the key as the firmware's behaviour fixture writes it (`leadStep`), and is
+held to the fixture's leader cases that have one; the wait, Escape and a
+switch key are the keyboard's, and those cases are skipped with their
+reasons.
 
 ## Files
 

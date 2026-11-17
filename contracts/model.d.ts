@@ -143,7 +143,7 @@ export interface Vocabulary {
     inputModes: WordList<'word' | 'leader' | 'both'>;
     /** What each way a replacement fires means, by the same value. */
     inputModesMean: WordList<'word' | 'leader' | 'both'>;
-    /** The Leader key's name, on its cap before Try it's After Leader field and where the editor says the key is placed. */
+    /** The Leader key's name, on its cap where the editor says the key is placed. */
     leaderKey: string;
     /** The formats a text replacement list is saved in, by extension, in the order Export offers them. */
     listFileFormats: WordList<import('./messages.js').AutocorrectFileFormat>;
