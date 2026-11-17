@@ -60,8 +60,8 @@ Held by: `tests/host/run_qmk_profile_split_transport_tests.sh` (`qmk_profile_spl
   an n-byte chunk, never under 32 (a shorter chunk is zero-padded). A payload
   reuse is 44 bytes. The largest frame is 128 bytes, so a chunk carries at
   most 106 bytes, pushed as a request or pulled as a reply (D-F28,
-  [0028](https://github.com/NoahCLR/charybdis-4x6/blob/3ee9a425a6a92d09ec9503372bfd7310771bad25/docs/adr/0028-new-base-32-bit-profile-lengths.md); D-F19,
-  [0019](https://github.com/NoahCLR/charybdis-4x6/blob/3ee9a425a6a92d09ec9503372bfd7310771bad25/docs/adr/0019-the-copy-reuses-what-the-other-half-has.md)).
+  [0028](https://github.com/NoahCLR/charybdis-4x6/blob/83ae3451bbdfa7c366081d200be79b8bced081c4/docs/adr/0028-new-base-32-bit-profile-lengths.md); D-F19,
+  [0019](https://github.com/NoahCLR/charybdis-4x6/blob/83ae3451bbdfa7c366081d200be79b8bced081c4/docs/adr/0019-the-copy-reuses-what-the-other-half-has.md)).
 - The last byte is a CRC8, polynomial `0x07`, initial value 0, over every
   byte before it. Multi-byte values are little-endian. Every offset and length
   is 32 bits. Every reserved or unused byte is zero, and a frame with a
@@ -87,7 +87,7 @@ Held by: `tests/host/run_profile_split_foundation_tests.sh` (`profile_split_foun
 | `ACK` | `6` | transfer | accepted progress (`OK`) or `BUSY` |
 | `ERROR` | `7` | transfer | a terminal or retryable error |
 | `PAYLOAD_REQUEST` | `8` | transfer, no chunk | pull bytes of the other half's saved profile |
-| retired | `9` | none | refused like an unknown kind (D-F31, [0031](https://github.com/NoahCLR/charybdis-4x6/blob/3ee9a425a6a92d09ec9503372bfd7310771bad25/docs/adr/0031-via-is-not-supported.md)) |
+| retired | `9` | none | refused like an unknown kind (D-F31, [0031](https://github.com/NoahCLR/charybdis-4x6/blob/83ae3451bbdfa7c366081d200be79b8bced081c4/docs/adr/0031-via-is-not-supported.md)) |
 | `PREPARE_DURABLE` | `10` | descriptor | validate the received copy and make only its prepared marker durable |
 | retired | `11` | none | refused like an unknown kind (D-F31) |
 | `PAYLOAD_REUSE` | `12` | reuse | fill a range of the copy from the receiver's own active profile |
@@ -236,7 +236,7 @@ run: its save waits for a quiet keyboard before the next erase, or the scan's
 flash time is spent ([device-resident-profile.md](device-resident-profile.md)).
 That is not a stall: the receiver's own timers stand still meanwhile, and the
 sender counts each storage-paused reply as progress toward the save's
-deadlines (D-F32, [0032](https://github.com/NoahCLR/charybdis-4x6/blob/3ee9a425a6a92d09ec9503372bfd7310771bad25/docs/adr/0032-live-edits-working-copy-and-save.md)).
+deadlines (D-F32, [0032](https://github.com/NoahCLR/charybdis-4x6/blob/83ae3451bbdfa7c366081d200be79b8bced081c4/docs/adr/0032-live-edits-working-copy-and-save.md)).
 Profile Wire candidate status page 1 reports reasons 8 and 9 as 5
 ([candidate-transfer.md](profile-wire-v1/candidate-transfer.md)).
 
@@ -365,6 +365,12 @@ Each half compares its own descriptor with the other half's:
 - Unreadable, invalid and incompatible fail closed. Incompatible, concurrent
   commit and corrupt same tuple stop the reconciler with `INCOMPATIBLE`,
   `CONFLICT` and `CORRUPT`; neither half's record is overwritten.
+- A half on another schema never reaches this table: a frame's descriptor
+  names its schema, and one naming another schema does not decode, so it is
+  answered `INVALID_FRAME` before any store call. The sender counts that as a
+  lost exchange and polls again. A half beside one on another release (one
+  half flashed, the other not yet) therefore stays unresolved, on its
+  compiled defaults, with neither record written, until both run one schema.
 - A newer local profile is pushed; a newer profile on the other half is
   pulled with `PAYLOAD_REQUEST`. The transport role never decides which
   profile wins.
@@ -383,7 +389,7 @@ Each half compares its own descriptor with the other half's:
   authority. How two provisional candidates are arbitrated is
   [`logical-profile-transaction-v1.md`](logical-profile-transaction-v1.md)'s.
 
-Held by: `tests/host/run_profile_split_foundation_tests.sh` (`test_authority_decision_table`, `test_authority_publication_and_activation_observer`), `tests/host/run_profile_split_reconciler_tests.sh` (`test_concurrent_commit_stops_without_overwrite`, `test_same_tuple_corruption_stops_without_overwrite`, `test_incompatible_firmware_stops_without_write`, `test_refresh_publishes_new_local_authority_during_backoff`, `test_descriptor_changes_are_validated_before_backoff`, `test_descriptor_is_read_only_when_its_revision_moves`).
+Held by: `tests/host/run_profile_split_foundation_tests.sh` (`test_released_descriptor_frames_do_not_decode`, `test_authority_decision_table`, `test_authority_publication_and_activation_observer`), `tests/host/run_profile_split_reconciler_tests.sh` (`test_a_released_halfs_descriptors_are_refused_before_any_store_call`, `test_beside_a_released_half_this_half_polls_and_never_copies`, `test_concurrent_commit_stops_without_overwrite`, `test_same_tuple_corruption_stops_without_overwrite`, `test_incompatible_firmware_stops_without_write`, `test_refresh_publishes_new_local_authority_during_backoff`, `test_descriptor_changes_are_validated_before_backoff`, `test_descriptor_is_read_only_when_its_revision_moves`), `tests/host/run_profile_owner_tests.sh` (`test_a_saved_half_beside_a_released_half_waits_on_its_compiled_defaults`), `tests/host/include/released_half_fixture.h`.
 
 ## Receiving a copy
 
@@ -417,7 +423,7 @@ uses, holding its storage admission as `PEER`.
 - The receive lease: a copy still being received is aborted, and its
   admission released, 3 s (`NOAH_PROFILE_SPLIT_PREPARE_LEASE_MS`) after the
   last request for that copy, whatever else crosses the link (D-F44,
-  [0044](https://github.com/NoahCLR/charybdis-4x6/blob/3ee9a425a6a92d09ec9503372bfd7310771bad25/docs/adr/0044-stale-copy-cannot-hold-off-later-copies.md)). The
+  [0044](https://github.com/NoahCLR/charybdis-4x6/blob/83ae3451bbdfa7c366081d200be79b8bced081c4/docs/adr/0044-stale-copy-cannot-hold-off-later-copies.md)). The
   lease never ends a copy being validated, prepared, committed or of unknown
   durability.
 - `ABORT` ends a copy still receiving, validating or prepared and answers
@@ -508,7 +514,7 @@ Recovery:
   a second in idle slots, reported as *peer cleanup pending*
   ([hid-channel.md](profile-wire-v1/hid-channel.md)), and no new prepared
   push or transfer starts until it is acknowledged (D-F41,
-  [0041](https://github.com/NoahCLR/charybdis-4x6/blob/3ee9a425a6a92d09ec9503372bfd7310771bad25/docs/adr/0041-cancelled-save-ends-in-bounded-time.md)). A push whose
+  [0041](https://github.com/NoahCLR/charybdis-4x6/blob/83ae3451bbdfa7c366081d200be79b8bced081c4/docs/adr/0041-cancelled-save-ends-in-bounded-time.md)). A push whose
   commit is authorized cannot be cancelled.
 
 Held by: `tests/host/run_profile_split_reconciler_tests.sh` (`test_prepared_push_*`, `test_authorized_commit_survives_one_replayed_reply`, `test_store_completion_polling_requires_the_matching_full_copy`, `test_maximum_candidate_resolves_within_owner_no_progress_window`, `test_prepared_abort_is_bounded_when_other_half_goes_silent`, `test_prepared_abort_is_bounded_when_other_half_stays_busy`, `test_receiver_durable_prepare_survives_sender_pause`), `tests/host/run_profile_owner_tests.sh` (`test_other_half_store_write_failure_retries_then_fails_fast`, `test_host_abort_ends_when_other_half_never_acknowledges`).
@@ -517,7 +523,7 @@ Held by: `tests/host/run_profile_split_reconciler_tests.sh` (`test_prepared_push
 
 A prepared copy is ended only by its push: `PREPARE_COMMIT` commits it and
 `ABORT` releases it; the receive lease never times it (D-F34,
-[0034](https://github.com/NoahCLR/charybdis-4x6/blob/3ee9a425a6a92d09ec9503372bfd7310771bad25/docs/adr/0034-stopped-keyboard-says-so-and-restarts.md)). A push lives
+[0034](https://github.com/NoahCLR/charybdis-4x6/blob/83ae3451bbdfa7c366081d200be79b8bced081c4/docs/adr/0034-stopped-keyboard-says-so-and-restarts.md)). A push lives
 in its sender's RAM, so a sender that restarts forgets it without ending it.
 Flag bit 5 of a `METADATA` request closes that gap.
 

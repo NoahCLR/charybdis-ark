@@ -68,8 +68,29 @@ test("a bare modifier is a plain key: it taps itself and holds itself as a fallb
 });
 
 test("other key families and non-keycode targets inherit nothing", () => {
-    const others = [key(0x00), key(0x01), key(0x03), key(0x5310), key(0x7e00), key(0x7ec0), key(0x7ee3), key(0x7ef3), undefined];
-    for (const target of others) assert.deepEqual(builtInActions(target), {});
+    // TG(1), TO(1) and LOCK_LAYER(2) act at the press and have no default tap
+    // (the firmware's LAYER_LOCK and LAYER_GOTO kinds).
+    const others = [key(0x00), key(0x01), key(0x03), key(0x5261), key(0x5201), {kind: ACTION.LAYER_LOCK, operand: 2}, key(0x7ec0), key(0x7ee3), key(0x7ef3), undefined];
+    for (const target of others) assert.deepEqual(builtInActions(target), {}, JSON.stringify(target));
+});
+
+// QMK's own functions past the layer keycodes and below the user range (the
+// firmware's QMK_FUNCTION kind): tap themselves and hold themselves as a
+// fallback, as a plain key does.
+test("a QMK function key taps itself and holds itself down as a fallback", () => {
+    const keycodes = require("../../core/schema/keycodes");
+    for (const name of ["DPI_MOD", "SNIPING", "QK_BOOT", "RM_TOGG", "QK_CAPS_WORD_TOGGLE", "NK_TOGG", "SH_TOGG", "QK_REPEAT_KEY", "QK_LAYER_LOCK"]) {
+        const code = keycodes.encode(name);
+        assert.deepEqual(builtInActions(key(code)), {tap: key(code), hold: key(code), fallback: true, releaseTaps: true}, name);
+    }
+});
+
+// TT(n) and OSL(n) hold their layer from the press (firmware D-F46). OSL's
+// tap arms its one-shot, let go after Tap / hold too; TT's taps do nothing
+// until its TAPPING_TOGGLE-th, which locks.
+test("TT() and OSL() hold their layer from the press; OSL() taps its one-shot", () => {
+    assert.deepEqual(builtInActions(key(0x52c1)), {hold: key(0x52c1), fromPress: true, tapToggle: true});
+    assert.deepEqual(builtInActions(key(0x5281)), {tap: key(0x5281), hold: key(0x5281), fromPress: true, armsOnRelease: true});
 });
 
 // The firmware taps them itself (firmware D-F66, D-F71): an empty Tap locks
@@ -92,10 +113,12 @@ test("layer holds and pointing-mode keys hold from the press, with no tap of the
     assert.deepEqual(builtInActions(key(0x522f)), {hold: {kind: ACTION.LAYER_MOMENTARY, operand: 15}, fromPress: true});
     // LM(2, MOD_LSFT): its layer and its modifiers, from the press.
     assert.deepEqual(builtInActions(key(0x5042)), {hold: key(0x5042), fromPress: true});
-    // PD_MODE_0 and PD_MODE_31 run their mode while held.
-    assert.deepEqual(builtInActions(key(0x7e80)), {hold: key(0x7e80), fromPress: true});
-    assert.deepEqual(builtInActions(key(0x7e9f)), {hold: key(0x7e9f), fromPress: true});
-    assert.deepEqual(builtInActions({kind: ACTION.POINTING_MODE_MOMENTARY, operand: 0}), {hold: {kind: ACTION.POINTING_MODE_MOMENTARY, operand: 0}, fromPress: true});
+    // PD_MODE_0 and PD_MODE_31 run their mode while held; on a later tap
+    // count the row leaves empty the mode waits for Tap / hold (firmware
+    // D-F64 rules 5 and 7).
+    assert.deepEqual(builtInActions(key(0x7e80)), {hold: key(0x7e80), fromPress: true, laterHoldWaits: true});
+    assert.deepEqual(builtInActions(key(0x7e9f)), {hold: key(0x7e9f), fromPress: true, laterHoldWaits: true});
+    assert.deepEqual(builtInActions({kind: ACTION.POINTING_MODE_MOMENTARY, operand: 0}), {hold: {kind: ACTION.POINTING_MODE_MOMENTARY, operand: 0}, fromPress: true, laterHoldWaits: true});
 });
 
 test("a pointing-mode key holds its mode from the press, unless its row holds another mode on a later tap count", () => {

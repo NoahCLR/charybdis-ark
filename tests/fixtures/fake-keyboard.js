@@ -49,8 +49,11 @@ const CURRENT_DOMAINS = "16:7,32:2,48:3,64:13,80:4,96:1,112:1,128:2";
 // defaults, with nothing committed; the live combo and settings readbacks
 // still answer from the document. `settingsVersion` is the version its
 // settings readback reports: any but 13 is firmware Ark does not read.
+// `capabilityPageCount` is how many capability pages it has: 3 answers as the
+// released firmware does, its page 0 counting three and a fourth refused as
+// an unknown page.
 /** @param {import("./types.js").FakeKeyboardOptions} options @returns {import("./types.js").FakeKeyboard} */
-function fakeKeyboard({document, compiled, settingsVersion = 13, compiledOnly = false, slaveKnown = true, generation = 42, firmwareVersion = 0x00010000, brightnessMax = 255, options = keyboardOptions.wire()}) {
+function fakeKeyboard({document, compiled, settingsVersion = 13, compiledOnly = false, slaveKnown = true, generation = 42, firmwareVersion = 0x00010000, brightnessMax = 255, capabilityPageCount = PROFILE_WIRE_V1.CAPABILITY_PAGE_COUNT, options = keyboardOptions.wire()}) {
     const held = validateSnapshot(document);
     if (document.version !== 5 || held.layers.length !== 16) throw new Error("The fake keyboard runs current firmware: a schema-4, sixteen-layer document.");
     /** @param {Buffer} blob */
@@ -62,7 +65,7 @@ function fakeKeyboard({document, compiled, settingsVersion = 13, compiledOnly = 
     const settings = settingsDomain.payload;
 
     const capabilities = [page(25, (p) => {
-        p.set([PROFILE_WIRE_V1.CAPABILITY_LAYOUT, PROFILE_WIRE_V1.CAPABILITY_PAGE_COUNT, PROFILE_WIRE_V1.PROTOCOL_MAJOR, PROFILE_WIRE_V1.PROTOCOL_MINOR, PROFILE_BLOB_V1.SCHEMA_MAJOR, PROFILE_BLOB_V1.SCHEMA_MINOR, RAW_HID_REPORT_SIZE, PROFILE_CANDIDATE_V1.CHUNK_MAX, PROFILE_WIRE_V1.STATUS_PAGE_COUNT]);
+        p.set([PROFILE_WIRE_V1.CAPABILITY_LAYOUT, capabilityPageCount, PROFILE_WIRE_V1.PROTOCOL_MAJOR, PROFILE_WIRE_V1.PROTOCOL_MINOR, PROFILE_BLOB_V1.SCHEMA_MAJOR, PROFILE_BLOB_V1.SCHEMA_MINOR, RAW_HID_REPORT_SIZE, PROFILE_CANDIDATE_V1.CHUNK_MAX, PROFILE_WIRE_V1.STATUS_PAGE_COUNT]);
         p.writeUInt32LE(FEATURES, 9); p.writeUInt32LE(document.actionAbiDigest, 13);
         p.writeUInt32LE(firmwareVersion, 17); p.writeUInt32LE(fnv1a32(defaults), 21);
     }), page(25, (p) => {
@@ -80,7 +83,7 @@ function fakeKeyboard({document, compiled, settingsVersion = 13, compiledOnly = 
         // typos, text bytes, the domain, bytes in one typo and in one text
         // correction.
         p.writeUInt16LE(1024, 0); p.writeUInt16LE(1024, 2); p.writeUInt16LE(20480, 4); p.writeUInt32LE(36874, 6); p[10] = 32; p[11] = 128;
-    })];
+    })].slice(0, capabilityPageCount);
     // Committed (or running its defaults), converged with the slave half,
     // nothing pending.
     const status = [page(25, (p) => {
@@ -136,8 +139,10 @@ function fakeKeyboard({document, compiled, settingsVersion = 13, compiledOnly = 
                 {
                     const pages = values[request[2]], at = request[4] | (request[5] << 8);
                     // A payload readback page past the end answers status 2
-                    // (Profile Wire, "Payload readback").
-                    if (pages && !pages[at] && (request[2] === VALUE.COMMITTED || request[2] === VALUE.COMPILED)) return pastTheEnd(reply);
+                    // (Profile Wire, "Payload readback"), and so does a
+                    // capability page past the ones this keyboard has, as
+                    // firmware answers it.
+                    if (pages && !pages[at] && (request[2] === VALUE.COMMITTED || request[2] === VALUE.COMPILED || request[2] === VALUE.CAPABILITIES)) return pastTheEnd(reply);
                     return profileValue(pages?.[at], reply);
                 }
             default: return undefined;

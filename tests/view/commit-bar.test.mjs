@@ -82,6 +82,20 @@ test("a draft from another keyboard, or one the keyboard changed under, is settl
     assert.equal(kind(model({draft: {stale: true, ...liveDraft()}})), "reread", "a live draft is what the keyboard runs, so it is read again");
 });
 
+// A draft whose keyboard is not connected waits for it: no other keyboard is
+// there to select, and none to discard the draft for.
+test("a draft from another keyboard says so only while another keyboard is connected", () => {
+    const other = commitBarState(model({draft: {matching: false}}));
+    assert.deepEqual(other, {kind: "otherKeyboard", title: "Draft belongs to another keyboard",
+        detail: "1 change kept in Ark. Select that keyboard to continue, or discard the draft here.", discard: true});
+    const none = commitBarState(model({draft: {matching: false, connected: false}, device: {connected: false}}));
+    assert.deepEqual(none, {kind: "otherKeyboard", title: "Draft waiting for its keyboard",
+        detail: "1 change kept in Ark. Connect the keyboard to continue.", discard: false});
+    assert.doesNotMatch(JSON.stringify(none), /another keyboard|Select/);
+    const two = model({draft: {matching: false, changes: [...published.draft.changes, ...published.draft.changes]}, device: {connected: false}});
+    assert.equal(commitBarState(two)?.detail, "2 changes kept in Ark. Connect the keyboard to continue.");
+});
+
 test("a keyboard that stopped saving or needs a restart takes the bar in every edit mode", () => {
     assert.deepEqual(commitBarState(model({health: {restartNeeded: true}})), {kind: "restart", offer: {kind: "restartNeeded", title: RESTART_NEEDED.label, detail: RESTART_NEEDED.detail}});
     const stopped = commitBarState(model({draft: liveDraft({keyboard: {...keyboard, stopped: true}})}));

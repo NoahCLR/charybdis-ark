@@ -69,8 +69,21 @@ _Avoid_: conflict (alone), outdated draft, drifted draft
 
 **Send live**:
 Turning a draft made in Review and save into unsaved edits on the keyboard
-when switching to a live edit mode.
+when switching to a live edit mode: the whole draft at once, the answer
+**Send live** to "Send your draft live?". Not **Send … to keyboard**, one
+form's button in a live mode.
 _Avoid_: push, upload, apply live
+
+**Keep … in draft** / **Send … to keyboard**:
+The button of a form that keeps its own state until it is pressed (a combo,
+an accent, the layers' order and names), putting what it holds into the
+draft as one edit: **Keep combo in draft** in Review and save, where it
+waits for a save, and **Send combo to keyboard** in the live modes, where it
+takes effect on the keyboard at once, unsaved in Live preview + save and
+saved by the keyboard a moment later in Live edit
+(`webview/view/edit-mode.mjs`).
+Not **Send live**, which sends a whole draft when the mode switches.
+_Avoid_: Apply, Save (for this), commit, push
 
 ## Review
 
@@ -78,6 +91,17 @@ _Avoid_: push, upload, apply live
 The list of every change in the draft against the keyboard, with the checks,
 that every save goes through.
 _Avoid_: diff view, summary, changes dialog
+
+**Slot order**:
+Which macro, custom key or pointing mode each slot of its bank holds, set by
+swapping two slots on its screen (D-L81). Each thing moves with what is its
+own, and every key, behaviour, combo, pointing mode and replacement that
+names it follows, so a swap changes nothing a key does. Review lists a bank's
+swaps as one change, **Macro order**, **Custom key order** or **Pointing mode
+order**, as it lists the layers' as **Layer priority**; its Discard puts that
+bank's things back where the keyboard holds them, and their edits stay with
+them.
+_Avoid_: slot move, renumbering, reorder (for a swap)
 
 **Check**:
 A finding Review makes about what the draft lets the keyboard do; each says
@@ -242,8 +266,9 @@ matches the keyboard stores; no control, label or message names a match. It
 may be called **the wildcard** ("Add *, the wildcard, where other letters
 may go"), and an input written with one "catches" the words it matches.
 _Avoid_: whole word, start of word, end of word, anywhere (as a choice or a
-label), match type, boundary; fires (in anything a person reads: an input
-catches a word, and the keyboard replaces it)
+label), match type, boundary; fires (for a word an input matches: an input
+catches a word, and the keyboard replaces it; **Fires** is when a
+replacement fires, as you type or after Leader)
 
 **Try it**:
 The last section of a replacement's editor on the Text replacement screen: a
@@ -373,10 +398,12 @@ committed**, **Hold active**, **Long hold active**) and each tap branch
 pending (**Double tap**, **Triple tap**, **Quadruple tap**, **Quintuple tap**,
 the last for every deeper count too), each with its own colour, locality and
 accents (D-L93, firmware D-F73); an accent lights for one case, for **Every
-tap branch** (firmware D-F75), or for **Every behaviour state**. Its
-tap-commit policy, **Flash on a double tap or more**, is Tap committed's
-alone, on that case's pane; its **Blink time**, how long the key stays on,
-then off, in each blink, is one setting for every case, on its stage bar. The
+tap branch** (firmware D-F75), or for **Every behaviour state**. The
+firmware's glossary calls a behaviour state a **case**, as Ark calls
+replacement feedback's, and avoids "state" for it
+(`upstream/firmware/GLOSSARY.md`): the same thing. Its tap-commit policy,
+**Flash on a double tap or more**, is Tap committed's alone, on that case's
+pane; its **Blink time**, how long the key stays on, then off, in each blink, is one setting for every case, on its stage bar. The
 firmware's code and Ark's keep the stage's old name: the stage id `key`, the
 record `keyFeedback`, the accent table `keyBehavior`, the edit
 `updateKeyBehaviorFeedback`.

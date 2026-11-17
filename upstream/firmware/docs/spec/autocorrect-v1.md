@@ -3,7 +3,7 @@
 The keyboard replaces what is on the profile's
 [autocorrect list](profile-wire-v1/autocorrect-domain.md) as it is typed, on
 any computer, with nothing installed there (D-F69,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/3ee9a425a6a92d09ec9503372bfd7310771bad25/docs/adr/0069-autocorrect-is-the-firmwares-own-and-corrects-at-the-word-end.md)):
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/83ae3451bbdfa7c366081d200be79b8bced081c4/docs/adr/0069-autocorrect-is-the-firmwares-own-and-corrects-at-the-word-end.md)):
 a typo with the right word, an abbreviation with a phone number or a
 sign-off, a typed form with a macro, and after its own
 [Leader key](#the-leader) what is typed with what it stands for. People know the feature as **text
@@ -18,7 +18,7 @@ replaces, the undo, when it forgets the word, how a replacement is typed or
 played and what happens to keys pressed meanwhile. The list's bytes are the
 [autocorrect domain](profile-wire-v1/autocorrect-domain.md)'s; the layouts
 are [host layouts](host-layouts-v1.md)'s; how it sits in the report path is
-[macro playback](https://github.com/NoahCLR/charybdis-4x6/blob/3ee9a425a6a92d09ec9503372bfd7310771bad25/docs/architecture/macro-playback.md#corrections)'s.
+[macro playback](https://github.com/NoahCLR/charybdis-4x6/blob/83ae3451bbdfa7c366081d200be79b8bced081c4/docs/architecture/macro-playback.md#corrections)'s.
 
 `tests/fixtures/autocorrect_v1.json` holds a case for every rule here: a
 list, a host layout, the computer's Caps Lock, the keys typed and the text the
@@ -327,7 +327,9 @@ alone. A replacement already being typed finishes. With the stored switch
 off or no replacement that fires as a word ends, keyboard reports are not
 read at all, except from a Leader press until leading is over. A word end
 passes over a replacement that fires only after the Leader key, its typed
-forms left as typed.
+forms left as typed. Whether a published list has a replacement that fires
+as a word ends is read at the scan after its publication, never while a
+report is sent; until then reports are read, or not, as for the list before.
 
 When reports start being read with keys held (the switch or a list has just
 been applied), the computer sees nothing change: those keys stay down for
@@ -337,12 +339,12 @@ key that ends a word still ends the [suspension](#forgetting-the-word).
 The keyboard cannot see a password field or a terminal: `AC_OFF` or
 `AC_TOGG` is how to keep it out of one.
 
-Held by: `tests/host/run_autocorrect_tests.sh` (`switched-off`; `test_the_stage_is_idle_without_a_list`, `test_the_override_and_the_stored_switch_both_allow`, `test_the_stage_starts_with_a_key_held`), `tests/host/run_key_runtime_layer_lock_integration_tests.sh` (`test_plain_autocorrect_keys_switch_the_override`).
+Held by: `tests/host/run_autocorrect_tests.sh` (`switched-off`; `test_the_stage_is_idle_without_a_list`, `test_the_report_filter_never_reads_the_list`, `test_the_override_and_the_stored_switch_both_allow`, `test_the_stage_starts_with_a_key_held`), `tests/host/run_key_runtime_layer_lock_integration_tests.sh` (`test_plain_autocorrect_keys_switch_the_override`).
 
 ## The leader
 
 The **Leader key**, QMK's `QK_LEADER`, is the firmware's own (D-F71,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/3ee9a425a6a92d09ec9503372bfd7310771bad25/docs/adr/0071-the-leader-is-part-of-the-typing-stage.md)): an action kind
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/83ae3451bbdfa7c366081d200be79b8bced081c4/docs/adr/0071-the-leader-is-part-of-the-typing-stage.md)): an action kind
 of its own, which goes wherever a switch key goes, a key, a behaviour's tap
 or hold, a combo's output, acts at its tap or press and puts nothing in a
 report. When the list holds a replacement that fires after the leader

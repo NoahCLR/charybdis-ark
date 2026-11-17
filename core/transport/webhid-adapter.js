@@ -129,9 +129,13 @@ class WebHidDeviceAdapter {
             }
             this.opened = device;
         } catch (cause) {
+            // Another program or page holding it is the cause everywhere; on
+            // Linux, also a hidraw device the person may not write until a
+            // udev rule allows it (docs/guide/connecting.md).
             throw liveLinkError(
                 LIVE_LINK_ERROR_CODES.CONNECT_FAILED,
-                "Ark could not open the keyboard. Close any other program or Ark page using it, then try again.",
+                "Ark could not open the keyboard. Close any other program or Ark page using it, then try again. "
+                    + "On Linux, Chrome may also need a udev rule to open it; Connecting in Ark's guide has one.",
                 {cause, deviceId: id}
             );
         }

@@ -424,13 +424,16 @@ test("a change reads the document as it stands, checked once and never written b
     assert.equal(editProfileDomains(source, {decoded}, () => {}), source);
 });
 
-test("a document's domains are read and written with its keyboard's depth and brightness, and a behaviour edit with its action slots", () => {
+test("a document's domains are read and written with its keyboard's depth, not its brightness limit, and a behaviour edit with its action slots", () => {
     const {editProfileDomains} = require("../../core/model/portable-profile");
     const {CURRENT_CAPABILITIES} = require("../fixtures/portable-profile");
     const source = document();
     const brighten = value => open => {open("rgb").layerColors[0].color.v = value;};
-    assert.equal(validateSnapshot(editProfileDomains(source, {limits: {brightnessMax: 200}}, brighten(200))).rgb.layerColors[0].color.v, 200);
-    assert.throws(() => editProfileDomains(source, {limits: {brightnessMax: 200}}, brighten(201)), {code: "BRIGHTNESS_EXCEEDED"});
+    // The limit holds the colour an edit sets (device-profile-edits.js) and
+    // blocks Save (profile-checks.js); the domain beside it stays editable.
+    const bright = editProfileDomains(source, {limits: {brightnessMax: 200}}, brighten(255));
+    assert.equal(validateSnapshot(bright).rgb.layerColors[0].color.v, 255);
+    assert.equal(validateSnapshot(editProfileDomains(bright, {limits: {brightnessMax: 200}}, open => {open("rgb").layerColors[1].color.v = 10;})).rgb.layerColors[0].color.v, 255);
     // A behaviour edit checks that every row sends only a macro slot the keyboard has.
     const macroTap = open => {open("behaviors").rows[0].steps = [{tapIndex: 0, tap: {kind: 6, flags: 0, operand: 40}}];};
     const capabilities = {...CURRENT_CAPABILITIES, actionAbiDigest: source.actionAbiDigest};

@@ -15,7 +15,7 @@ test("a file larger than the keyboard's memory says it does not fit, as a warnin
 
 const NAMES = ["Base", "Layer 1", "Layer 2", "Layer 3", "Layer 4"];
 const KEEP = {behaviors: false, combos: false, customKeys: false};
-const via = (keys = [], macros = 0, layers = 4, clear = KEEP, clearable = {behaviors: 0, combos: 0, customKeys: 0}, pointer = null) => ({layers, macros: 2, clear, clearable, pointer,
+const via = (keys = [], macros = 0, layers = 4, clear = KEEP, clearable = {behaviors: 0, combos: 0, customKeys: 0}, pointer = null, kept = []) => ({layers, macros: 2, clear, clearable, pointer, kept,
     left: {keys: keys.map(([layer, spelling], position) => ({layer, layerName: NAMES[layer], position, spelling, reason: `${spelling} reason.`})),
         macros: Array.from({length: macros}, (_, slot) => ({slot, name: `Macro ${slot}`, reason: "It is not text."}))}});
 
@@ -60,4 +60,18 @@ test("the callout says where the file put the pointer layer, or that Auto-mouse 
     assert.match(viaCallout(via([], 0, 4, KEEP, undefined, {layer: 3, layerName: "Layer 3", change: "moved"}), NAMES), /The pointer layer is now Layer 3, the file's layer with mouse buttons\./);
     assert.match(viaCallout(via([], 0, 4, KEEP, undefined, {layer: 3, layerName: "Layer 3", change: "off"}), NAMES), /Auto-mouse is turned off: no layer of this file above Base has mouse buttons\./);
     assert.doesNotMatch(viaCallout(via(), NAMES), /pointer|Auto-mouse/);
+});
+
+test("the callout names what is kept that plays a macro, and what it plays now", () => {
+    const kept = [{kind: "replacement", name: "sig", called: "the replacement for “sig”", slot: 3, macro: "Macro 3", emptied: false},
+        {kind: "pointing", name: "Volume", direction: "Up", called: "Volume's Up direction", slot: 0, macro: "Macro 0", emptied: false},
+        {kind: "behaviour", name: "GUI+C", called: "the behaviour on GUI+C", slot: 10, macro: "Macro 10", emptied: true},
+        {kind: "combo", name: "Combo 0", called: "Combo 0", slot: 100, macro: "Macro 100", emptied: true}];
+    assert.match(viaCallout(via([], 0, 4, KEEP, undefined, null, kept), NAMES),
+        /stay as they are\. Kept, these still play a macro by its slot, which now holds this file's macro or nothing: the replacement for “sig” plays this file's Macro 3, Volume's Up direction plays this file's Macro 0, the behaviour on GUI\+C plays nothing \(Macro 10 is emptied\) and Combo 0 plays nothing \(Macro 100 is emptied\)\.$/);
+    // Past the first few, the rest are counted.
+    const many = Array.from({length: VIA_LEFT_SHOWN + 2}, (_, index) => ({kind: "combo", name: `Combo ${index}`, called: `Combo ${index}`, slot: index, macro: `Macro ${index}`, emptied: false}));
+    assert.match(viaCallout(via([], 0, 4, KEEP, undefined, null, many), NAMES), new RegExp(`Combo ${VIA_LEFT_SHOWN - 1} plays this file's Macro ${VIA_LEFT_SHOWN - 1} and 2 more\\.$`));
+    // Nothing kept plays a macro: the callout reads as it did.
+    assert.match(viaCallout(via(), NAMES), /settings stay as they are\.$/);
 });

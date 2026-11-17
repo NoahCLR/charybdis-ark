@@ -11,6 +11,7 @@
 // (D-L89), or Leader waiting held, from the key that stands in for the Leader
 // key (D-L92). Each case paints by its own locality (D-L93).
 
+import {heldIds} from "./board-keys.mjs";
 import {comboHeld, viewWhileHeld} from "./combo-held.mjs";
 import {feedbackCase, feedbackOwner, replacementOwner, replacementRowOf} from "./accents.mjs";
 import {localityOf, tapBranchOf} from "./edits.mjs";
@@ -18,7 +19,7 @@ import {followsTrigger} from "./geometry.mjs";
 import {keyIdentity} from "./key-identity.mjs";
 import {keyMeaning} from "./keyface.mjs";
 import {behaviourRuns} from "./participation.mjs";
-import {pdColourRow, pdTrigger, colourPaints, replacementTrigger, stageEnabled} from "./lighting.mjs";
+import {pdBeneath, pdColourRow, pdTrigger, colourPaints, replacementTrigger, stageEnabled} from "./lighting.mjs";
 import {layerAt, layersOnTop, localityInText, phrasesJoined, phrasesListed, slotCalled, vocabulary, word} from "./vocabulary.mjs";
 
 /** @typedef {import("./keyface-types.js").LayerView} LayerView */
@@ -28,10 +29,18 @@ import {layerAt, layersOnTop, localityInText, phrasesJoined, phrasesListed, slot
 /** @param {LayerView["model"]} model @param {number} slot */
 const runs = (model, slot) => Boolean((model?.pdModes || []).find((row) => row.id === slot)?.kind) && stageEnabled(model, "pd");
 
+// A running mode, with its link: the layers that start it and those its key
+// turns on, less the default and pointer layers, which the keyboard ignores
+// in a link (core's linkTargets), for the board to paint it beneath the
+// lowest of them that is on (firmware D-F62).
 /** @param {LayerView["model"]} model @param {number} slot @param {number | readonly number[] | undefined} trigger @returns {LightOptions["pdActive"]} */
 function modeRunning(model, slot, trigger) {
     const row = runs(model, slot) ? pdColourRow(model, slot) : null;
-    return row ? {mode: row.pointingMode, color: row.color, locality: row.locality, triggerIndex: trigger} : null;
+    if (!row) return null;
+    const record = (model?.pdModes || []).find((entry) => entry.id === slot);
+    const ignored = (model?.pdModeEditing?.linkTargets || []).reduce((mask, target) => target.inert ? mask | 2 ** target.layer : mask, 0);
+    const link = (((record?.linkedLayers ?? 0) | (record?.linkTurnsOn ?? 0)) & ~ignored) >>> 0;
+    return {mode: row.pointingMode, color: row.color, locality: row.locality, triggerIndex: trigger, link};
 }
 
 /**
@@ -157,7 +166,9 @@ export function lightingBoard(view, {stage, pointingSlot, comboPreview, feedback
         const badge = held.combo.badge || "C";
         const mode = held.pointing !== null ? slotCalled(model, held.pointing) : "";
         parts.push(held.holds.length ? [`${badge} held, holding `, ...phrasesListed(held.holds.map((at) => [{layer: layerAt(model, at)}])), ", whose own light shows the hold"]
-            : comboActive && pdActive ? [`${badge} held, ${painting(comboActive)} beneath ${mode}, which it runs`]
+            // A mode that paints beneath a linked layer is drawn with the
+            // layers, so the combo paints over it (firmware D-F62).
+            : comboActive && pdActive ? [`${badge} held, ${painting(comboActive)} ${pdBeneath(model, pdActive, shown.layer, heldIds(shown)) === null ? "beneath" : "over"} ${mode}, which it runs`]
             : comboActive ? [`${badge} held, ${painting(comboActive)}`]
             : [`${badge} held`]);
         if (held.choice) parts.push(["click a ringed key to hold it from that key"]);

@@ -294,7 +294,8 @@ imports the same way, bringing its keys and macros.
 
 One browser tab at a time can connect to the keyboard. On Linux, Chrome and
 Edge need read and write access to the keyboard's hidraw device, which
-usually takes a udev rule. Ark edits only firmware whose profile format it
+usually takes a udev rule; [Connecting](docs/guide/connecting.md#on-linux)
+has one. Ark edits only firmware whose profile format it
 knows; after a release that changes the format, update both halves first.
 Export a backup before every firmware update, since an update can start the
 keyboard from the new defaults.

@@ -134,7 +134,7 @@ export interface AutocorrectImportPreview {
     entries: import('./edits.js').AutocorrectEntryEdit[];
     add: AutocorrectImportOutcome; replace: AutocorrectImportOutcome;
 }
-/** What the shell posts to the panel. The catalog comes before the first model, and again after each `ready`; a model leaves out what it holds. */
+/** What the shell posts to the panel. The catalog comes before the first model, and again after each `ready`; a model leaves out what it holds. A model's `notice` is what the rail says from then on, `''` taking back what it said. */
 export type PanelResponse<M = import('./panel.js').PostedModel> =
     | {type: 'catalog'; catalog: import('./panel.js').PanelCatalog}
     | {type: 'model'; model: M; notice?: string; failed?: boolean; resetDraftForms?: boolean; acceptedEdit?: {message: {type: string}; previousFingerprint: string; fingerprint: string}}

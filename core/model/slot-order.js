@@ -13,15 +13,17 @@
 // What follows: the native keycodes on the keymap (MACRO_n, CUSTOM_KEY_n,
 // PD_MODE_n and PD_MODE_n_LOCK), the actions in a behaviour's target and
 // branches and in a combo's inputs and output, as kinds of their own or as
-// those keycodes, and the macro a pointing mode's direction taps run. Nothing
-// else names a slot: a macro's steps send only basic keys and modifiers, a
-// shortcut holds no userspace key, and no setting names a slot.
+// those keycodes, the macro a pointing mode's direction taps run, and the
+// macro a text replacement plays. Nothing else names a slot: a macro's steps
+// send only basic keys and modifiers, a shortcut holds no userspace key, no
+// setting names a slot, and no lighting row names a macro or custom key.
 
 const {editProfileDomains, validateSnapshot, walkActions} = require("./portable-profile");
 const {PROFILE_FULL_WORDS} = require("./vocabulary");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {MACRO_DOMAIN_V1} = require("../schema/macro-domain-v1");
 const {RGB_DOMAIN_V1} = require("../schema/rgb-domain-v1");
+const {playsMacro} = require("../schema/autocorrect-domain-v1");
 const {DIRECTIONS, DIAGONALS, isPdMacro} = require("../schema/pd-mode-domain-v1");
 const {CUSTOM_KEY_SLOTS, customKeyCode, customKeyOfCode} = require("../data/user-keycodes");
 const {PD_MODE_KEYS, POINTING_SLOT_COUNT, pdModeKeyOfCode} = require("../data/pd-mode-keys");
@@ -145,6 +147,10 @@ function reorderSlots(document, step) {
         if (moved.macros) {
             const macros = open("macros");
             macros.splice(0, macros.length, ...orders.macros.map(old => macros[old]));
+            // A replacement that plays a macro plays the same macro; the
+            // encoder writes the list in its stored order, by slot.
+            const next = inverse(orders.macros);
+            for (const entry of open("autocorrect").entries) if (playsMacro(entry)) entry.macro = next[/** @type {number} */ (entry.macro)];
         }
         if (moved.macros || moved.pdModes) {
             const slots = open("pdModes");

@@ -277,16 +277,20 @@ function autocorrectRefusal(list, capabilities) {
 }
 // The codec options a document's domains are read and written with: the tap
 // depth the keyboard reports, or the one the document's RGB palette counts;
-// the brightness the keyboard allows; and the LED sets and accents it holds. A behaviour edit also checks every
+// and the LED sets and accents it holds. Not the brightness the keyboard
+// allows: a colour past it (from a backup) stays editable beside, and is
+// lowered in Lighting; an edit holds to it the colour it sets
+// (device-profile-edits.js), and Review's blocker, the restore check and the
+// live send keep any past it from the keyboard. A behaviour edit also checks every
 // row's actions against the keyboard's action slots (`checkActions`), since
 // the keyboard refuses a profile whose actions sit where it cannot run them;
 // any other edit keeps the rows it does not touch as they are.
 /** @param {Uint8Array} rgbPayload @param {DomainsContext & {checkActions?: boolean}} context @returns {DomainOptions} */
-function domainOptions(rgbPayload, {capabilities, limits, checkActions}) {
+function domainOptions(rgbPayload, {capabilities, checkActions}) {
     const depth = profileDepthOptions(capabilities, rgbPayload);
     const actionLimits = {maxPdModes: POINTING_SLOT_COUNT, maxLogicalLayers: capabilities?.compiledLayerCount,
         maxMacroSlots: capabilities?.macroSlots, maxCustomKeys: capabilities?.customKeySlots};
-    return {rgb: {maximumBrightness: brightnessCeiling(limits), ...lightingCeilings(capabilities), ...depth.rgb},
+    return {rgb: {...lightingCeilings(capabilities), ...depth.rgb},
         behaviors: {...depth.behaviors, ...(checkActions ? {actionLimits} : {})},
         autocorrect: autocorrectCeilings(capabilities)};
 }

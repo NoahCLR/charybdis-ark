@@ -19,7 +19,7 @@ import {meterFill} from "./meter.mjs";
 import {macroMatches, macroPeekSteps} from "../view/macro.mjs";
 import {readMacro} from "../view/macro-cache.mjs";
 import {keyIdentity} from "../view/key-identity.mjs";
-import {getModel, post, render, state} from "../store.mjs";
+import {followSlotSwap, getModel, post, render, state} from "../store.mjs";
 import {editGate} from "../view/edit-gate.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
 import {vocabulary} from "../view/vocabulary.mjs";
@@ -109,6 +109,7 @@ export function screenMacros() {
 /** @param {string} from @param {string} to */
 function swapMacros(from, to) {
     post(edits.swapMacros(from, to));
+    followSlotSwap("macros", from, to);
     /** @param {string} keycode */
     const follows = (keycode) => (keycode === from ? to : keycode === to ? from : keycode);
     const forms = {...state.macroForms};

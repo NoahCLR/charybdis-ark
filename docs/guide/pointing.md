@@ -58,7 +58,8 @@ every slot. An empty slot in amber still has keys pointing at it.
 Drag a slot onto another to swap the two. A mode moves with everything that
 is its own: its settings, its link, its colour and accents on Lighting, and
 every key, behaviour and combo that started it still starts it, under its new
-number. From the keyboard, focus a slot and press Shift+Space to hold it, then
+number, as does a key you chose to place and have not yet placed; a combo you
+were building closes. From the keyboard, focus a slot and press Shift+Space to hold it, then
 Shift+Space on the other; Escape lets go. Review lists the swaps as one
 **Pointing mode order** change.
 

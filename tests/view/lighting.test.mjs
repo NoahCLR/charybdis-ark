@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {createRequire} from "node:module";
-import {baseColour, colourPaints, feedbackColours, inheritsStageColour, isPassthrough, keyLed, keyLight, mappedKeyCount, offWording, ownLight, pdColourRow, replacementTrigger, stageEnabled, stageHeldOffBy, stageIdle, stageInEffect, stageOffDetail, trackballLed, trackballLight, swatchFor, swatchOf} from "../../webview/view/lighting.mjs";
+import {baseColour, colourPaints, feedbackColours, inheritsStageColour, isPassthrough, keyLed, keyLight, mappedKeyCount, pdBeneath, offWording, ownLight, pdColourRow, replacementTrigger, stageEnabled, stageHeldOffBy, stageIdle, stageInEffect, stageOffDetail, trackballLed, trackballLight, swatchFor, swatchOf} from "../../webview/view/lighting.mjs";
 
 const colour = (h, s, v) => ({h: String(h), s: String(s), v: String(v)});
 const position = (layoutIndex, keycode) => ({layoutIndex, keycode});
@@ -237,6 +237,34 @@ test("a pointing mode is an overlay on its locality, never on the key that binds
 
     const stageOff = model({rgb: {...model().rgb, stages: [{id: "pd", label: "Pointing modes", enabled: false}]}});
     assert.equal(keyLight(stageOff, {index: 3}, position(7, "KC_NO"), {pdActive: preview}).source, "base");
+});
+
+test("a running pointing mode linked to a layer that is on paints beneath it, so that layer's keys show over the mode (firmware D-F62)", () => {
+    const m = model();
+    const row = pdColourRow(m, 0);
+    const preview = {color: row.color, locality: row.locality, triggerIndex: 0, mode: row.pointingMode};
+    const mapped = position(7, "KC_A");
+    assert.deepEqual(keyLight(m, {index: 3}, mapped, {pdActive: {...preview, link: 1 << 3}}), {colour: colour(180, 255, 200), source: "layer", layer: 3}, "the linked layer shows over the mode");
+    assert.equal(keyLight(m, {index: 3}, position(7, "KC_TRANSPARENT"), {pdActive: {...preview, link: 1 << 3}}).source, "pointing", "where it paints nothing the mode shows");
+    assert.equal(keyLight(m, {index: 3}, mapped, {pdActive: {...preview, link: 1 << 5}}).source, "pointing", "linked to a layer that is not on, it paints over every layer");
+    assert.equal(keyLight(m, {index: 3}, mapped, {pdActive: preview}).source, "pointing", "with no link, it paints over every layer");
+    assert.deepEqual(keyLight(m, {index: 0}, mapped, {pdActive: {...preview, link: 1 << 4}, held: [4]}).colour, colour(0, 0, 158), "a layer held on counts as on");
+});
+
+// The keyboard splits the layer stack for a linked mode only while the mode
+// has something to paint (rgb_runtime_pointing_mode_stage_has_paint): a
+// passthrough slot with no coloured accent leaves the stack whole.
+test("a passthrough pointing mode with no coloured accent leaves the layer stack whole", () => {
+    const m = model();
+    const through = {mode: "POINTING_MODE_DRAGSCROLL", color: colour(0, 0, 0), locality: "RGB_RIGHT_HALF", link: 1 << 3};
+    assert.equal(pdBeneath(m, through, {index: 3}), null, "nothing to paint: no split");
+    assert.equal(pdBeneath(m, {...through, color: colour(21, 255, 200)}, {index: 3}), 3, "a coloured mode paints beneath its linked layer");
+    const every = {...m, vocabulary: {...m.vocabulary, accents: {...m.vocabulary?.accents, pdMode: {...m.vocabulary?.accents?.pdMode, everyOwner: "EVERY"}}}};
+    const accented = (owner, color) => ({...every, rgb: {...every.rgb, pdModeAccents: [{owner, color, ledIndices: [0]}]}});
+    assert.equal(pdBeneath(accented("POINTING_MODE_DRAGSCROLL", colour(5, 255, 100)), through, {index: 3}), 3, "its own coloured accent paints");
+    assert.equal(pdBeneath(accented("EVERY", colour(5, 255, 100)), through, {index: 3}), 3, "so does one for every slot");
+    assert.equal(pdBeneath(accented("POINTING_MODE_DRAGSCROLL", colour(0, 0, 0)), through, {index: 3}), null, "an accent in the slot's colour paints nothing");
+    assert.equal(pdBeneath(accented("POINTING_MODE_VOLUME", colour(5, 255, 100)), through, {index: 3}), null, "nor does another slot's accent");
 });
 
 test("feedback colours come back per semantic, missing ones as black", () => {

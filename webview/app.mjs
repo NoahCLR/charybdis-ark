@@ -69,8 +69,35 @@ function render({keepScreen = false} = {}) {
     announce(announcements(getModel(), state));
 }
 
+// A fault while the page is drawn never leaves it empty: the rail and a
+// statement take the screen's place, so every other screen, Backups among
+// them, is still a click away, and the fault goes to the console. Nothing is
+// drawn again until something asks for it.
 /** @param {Element | null} keptScreen @param {ReturnType<typeof captureContentScroll>} scroll @param {ReturnType<typeof captureBenchHeight>} benchHeight */
 function drawApp(keptScreen, scroll, benchHeight) {
+    try {drawFrame(keptScreen, scroll, benchHeight);}
+    catch (fault) {
+        console.error(fault);
+        drawFault();
+    }
+}
+
+const SCREEN_FAULT = Object.freeze({title: "Ark could not draw this screen",
+    detail: "Ark ran into a problem of its own drawing it; the browser's console says what. Your draft is kept while this page stays open: choose another screen from the menu to carry on."});
+
+function drawFault() {
+    renderedScreen = null;
+    const app = el(`<div class="app"></div>`);
+    try {app.appendChild(rail());} catch (fault) {console.error(fault);}
+    app.appendChild(el(`<div class="main">${topbar(screenDefinition(state.screen)?.label || "Ark", "")}
+        <div class="content"><div class="pad"><div class="read-placeholder" role="alert">
+            <i class="dot err" aria-hidden="true"></i><h2>${esc(SCREEN_FAULT.title)}</h2><p>${esc(SCREEN_FAULT.detail)}</p>
+        </div></div></div></div>`));
+    root.replaceChildren(app);
+}
+
+/** @param {Element | null} keptScreen @param {ReturnType<typeof captureContentScroll>} scroll @param {ReturnType<typeof captureBenchHeight>} benchHeight */
+function drawFrame(keptScreen, scroll, benchHeight) {
     hideHover();
     const model = getModel();
     root.replaceChildren();

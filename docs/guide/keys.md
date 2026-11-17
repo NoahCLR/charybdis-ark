@@ -145,8 +145,9 @@ click it to rename, Enter to keep, Escape to put it back.
 
 Drag a key onto another to swap the two. Each moves with its name, its
 shortcut and its taps and holds, and every layer key, behaviour and combo that
-sent it still sends it, under its new number. From the keyboard, focus a key
-and press Shift+Space to hold it, then Shift+Space on the other; Escape lets
+sent it still sends it, under its new number, as does a key you chose to place
+and have not yet placed; a combo you were building closes. From the keyboard,
+focus a key and press Shift+Space to hold it, then Shift+Space on the other; Escape lets
 go. Review lists the swaps as one **Custom key order** change.
 
 **Shortcut** is what the key sends: up to six keys held together, any

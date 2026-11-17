@@ -153,11 +153,14 @@ const emptyCell = (behaviour, step, kind) => {
 // The branch a cell names, with what the cell says of it.
 /** @param {BehaviorView | null | undefined} behaviour @param {import("../../contracts/panel.js").CellRef} ref @returns {import("./keyface-types.js").InheritedBranch | null} */
 function resolved(behaviour, ref) {
-    const {times, separate, below, locks} = ref;
+    const {times, separate, below, locks, waits} = ref;
     const said = {...(times ? {times} : {}), ...(separate ? {separate} : {}), ...(below ? {below} : {}), ...(locks ? {locks} : {})};
     if ("own" in ref) {
         const branch = behaviour?.builtIn?.[ref.own];
-        return branch ? {...branch, ...said} : null;
+        if (!branch) return null;
+        // Where the hold waits for Tap / hold it is not held from the press.
+        const {fromPress, ...atThreshold} = branch;
+        return {...(waits ? atThreshold : branch), ...said};
     }
     const branch = (behaviour?.steps || []).find((entry) => entry.tapCount === ref.step)?.[TIER_FIELDS[ref.tier]];
     return branch ? {...branch, ...said} : null;

@@ -14,7 +14,7 @@ import {editWords} from "../../view/edit-mode.mjs";
 import * as edits from "../../view/edits.mjs";
 import {vocabulary} from "../../view/vocabulary.mjs";
 import {accentBudget, accentOwner, accentsFor, allAccents, everyOwner, groupOwner, ownerCalled, ownerMark, ownerPlace, stageShade} from "../../view/accents.mjs";
-import {inheritsStageColour, swatchFor} from "../../view/lighting.mjs";
+import {inheritsStageColour, ownAccentColour, swatchFor} from "../../view/lighting.mjs";
 import {colourEditor} from "../colour-editor.mjs";
 import {pickButton} from "../groups.mjs";
 import {choiceField, choiceValue} from "../segmented.mjs";
@@ -258,10 +258,11 @@ function accentRow(model, stage, target, row, {editable = false, scope, go}) {
 }
 
 // Keeping the accent being edited posts it, its owner as the editor has
-// it; cancelling drops it. Nothing posts before.
+// it; cancelling drops it. Nothing posts before. Its own colour is never the
+// code for its stage's (ownAccentColour).
 /** @param {Model} model @param {Editing} editing */
 function keepAccent(model, editing) {
-    const accent = {target: editing.target, owner: editingOwner(model, editing), leds: editing.leds, colour: editing.stageColour ? {h: 0, s: 0, v: 0} : editing.colour};
+    const accent = {target: editing.target, owner: editingOwner(model, editing), leds: editing.leds, colour: editing.stageColour ? {h: 0, s: 0, v: 0} : ownAccentColour(editing.colour)};
     post(editing.index === null ? edits.addAccent(accent) : edits.updateAccent(editing.index, accent));
     state.accent = null;
     render();
@@ -314,7 +315,9 @@ function accentEditor(model, editing, mine) {
     const colourCol = /** @type {HTMLElement} */ (node.querySelector(".accent-colour-col"));
     if (editing.stageColour) colourCol.append(el(`<p class="note">These LEDs take the colour their stage paints.</p>`));
     else colourCol.append(colourEditor({identity: "lighting:accent:colour", colour: editing.colour, title: "Accent colour", maximumBrightness: model.rgb.maximumBrightness,
-        onChange: (next) => { editing.colour = {h: Number(next.h), s: Number(next.s), v: Number(next.v)}; render(); }}));
+        // A dark own colour at hue 0 is kept at hue 1, so the editor shows what
+        // is stored: exactly 0, 0, 0 would be the stage's colour.
+        onChange: (next) => { const own = ownAccentColour(next); editing.colour = {h: Number(own.h), s: Number(own.s), v: Number(own.v)}; render(); }}));
     const actions = el(`<div class="row gap-8"><button class="btn primary" data-act="keep" ${count ? "" : "disabled"}>${esc(editWords(model.draft).keep("accent"))}</button>
         <button class="btn ghost" data-act="cancel">Cancel</button></div>`);
     node.append(actions);

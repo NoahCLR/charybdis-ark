@@ -59,7 +59,15 @@ what that section's choices mean.
 
 Every stage uses the same colour editor: drag in the square and along the
 **Hue** strip, or type **Hue**, **Saturation** and **Brightness**. Brightness stops at the limit
-the keyboard reports.
+the keyboard reports. A colour brighter than that, such as one in a backup
+from another keyboard, is a blocker in Review naming its stage and colour.
+Lower it in Lighting, where the blocker opens its stage; the rest of the
+profile stays editable meanwhile, and Ark sends nothing to the keyboard until
+every such colour is within the limit. That needs a draft that waits in Ark.
+In **Live edit** and **Live preview + save** every edit goes to the keyboard
+at once, so Ark does not take such a backup as the draft there: it says **Not
+sent**, and to choose **Review and save** under **Edits** first
+([edit modes](review-and-save.md#edit-modes)).
 
 A colour a layer, a pointing mode, combo feedback or a feedback case has is
 one of three, chosen beside its value:
@@ -148,7 +156,8 @@ slots** band to show them.
 
 A mode with no known trigger key paints every key under the last two.
 While this tab is open, the board shows the picked mode running, with its
-accents, as it paints with no linked layer on. When two pointing slots are
+accents, and when a layer it is linked to is on there, beneath the lowest
+such layer, as the keyboard paints it. When two pointing slots are
 swapped on the Pointing modes screen, each mode's colour and accents go with
 it (see [Pointing modes](pointing.md#pointing-modes)).
 
@@ -173,7 +182,8 @@ the half it lights follows the keys you press. A combo whose output holds a
 layer shows no combo light: the board turns that layer on instead, since the
 layer's own light shows the hold. A combo whose output runs a pointing mode
 paints beneath it: the board runs the mode from the combo's keys, and the mode
-covers the combo's colour wherever both paint. Where no combo fires on the
+covers the combo's colour wherever both paint, unless the mode paints beneath
+a linked layer that is on, when the combo paints over both. Where no combo fires on the
 layer shown, the line under the board says so.
 
 With **Enabled** off on Combo settings no combo fires, so this stage paints
@@ -387,8 +397,8 @@ it and who it lights for; click a line to keep its LEDs glowing on the board,
 and **Open** goes to it on its stage's tab, its LEDs glowing there.
 
 The keyboard holds at most 640 accents, 255 on any one stage, and 128
-different LED sets across every stage (older firmware holds 32 accents and 16
-sets; Ark uses whatever the connected keyboard reports): accents that light the same LEDs share one set, and a set no accent
+different LED sets across every stage (Ark uses whatever the connected
+keyboard reports): accents that light the same LEDs share one set, and a set no accent
 lights any more is freed. Each list shows how many the keyboard uses, **On
 the keyboard** (also **Accents** and **LED sets** under **Memory** on the
 Keyboard screen). Adding one more is

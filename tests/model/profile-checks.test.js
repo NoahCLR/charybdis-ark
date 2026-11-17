@@ -17,7 +17,32 @@ test("whole-profile checks report inert actions and destination blockers", () =>
     assert.equal(unplayable?.place.index, 0);
     assert.equal(unplayable?.title, "Macro 0 cannot play with the settings in Your computer");
     assert.equal(unplayable?.fix, "Fix the macro or change Host settings → Your computer before playing it.");
-    assert.deepEqual(checks.filter(row => row.level === "blocker").map(row => row.kind), ["brightnessBlocker", "effectBlocker"]);
+    // The fixture's lighting colours are brighter than 100 too.
+    assert.deepEqual([...new Set(checks.filter(row => row.level === "blocker").map(row => row.kind))], ["brightnessBlocker", "colourBrightnessBlocker", "effectBlocker"]);
+});
+
+test("a lighting colour brighter than the keyboard's limit is a blocker on its stage, naming where it is", () => {
+    const decoded = validateSnapshot(document());
+    const {rgb} = decoded;
+    rgb.layerColors[1].color.v = 255; rgb.layerColors[3].color.v = 230;
+    rgb.layerGroupRows.push({selector: 2, color: {h: 0, s: 255, v: 201}, groupId: 0});
+    rgb.pdModeColors[1].color.v = 255;
+    rgb.keyFeedback.tapBranches[0].color.v = 210;
+    rgb.autocorrectFeedback.macroColor = {h: 10, s: 255, v: 250};
+    const blockers = profileFindings(decoded, {brightnessMax: 200}).filter(row => row.kind === "colourBrightnessBlocker");
+    assert.deepEqual(blockers.map(row => [row.level, row.place.stage, row.count]), [["blocker", "layers", 3], ["blocker", "pd", 1], ["blocker", "key", 1], ["blocker", "autocorrect", 1]]);
+    const [layers, pointing] = blockers;
+    assert.equal(layers.title, "Layer colours: 3 colours are brighter than this keyboard's limit of 200");
+    assert.equal(layers.detail, "Numbers colour, Navigation colour and Accent · Symbols store brightness up to 255; the keyboard accepts at most 200, so it refuses the profile.");
+    assert.equal(layers.fix, "Lower their brightness to 200 or less in Lighting.");
+    assert.deepEqual(layers.place, {kind: "settings", area: "Lighting", stage: "layers"});
+    assert.equal(pointing.title, "Pointing modes: 1 colour is brighter than this keyboard's limit of 200");
+    assert.equal(pointing.detail, "Volume colour stores brightness 255; the keyboard accepts at most 200, so it refuses the profile.");
+    assert.equal(pointing.fix, "Lower its brightness to 200 or less in Lighting.");
+    assert.match(blockers[2].detail, /^Double tap colour /);
+    assert.match(blockers[3].detail, /^Replaced by a macro colour /);
+    assert.deepEqual(profileFindings(decoded, {brightnessMax: 255}).filter(row => row.kind === "colourBrightnessBlocker"), [], "at the limit is accepted");
+    assert.deepEqual(profileFindings(decoded, {}).filter(row => row.kind === "colourBrightnessBlocker"), [], "a limit the keyboard did not report checks nothing");
 });
 
 test("whole-profile findings retain new and fixed status beside the keyboard", () => {

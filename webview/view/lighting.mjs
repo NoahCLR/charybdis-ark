@@ -10,7 +10,7 @@ import {keyIdentity, sameKey} from "./key-identity.mjs";
 import {keyMeaning} from "./keyface.mjs";
 import {masterOff} from "./participation.mjs";
 import {vocabulary} from "./vocabulary.mjs";
-import {OFF, colourPaints, inheritsStageColour, ledColour, ledsOff} from "../../rules/led-light.mjs";
+import {OFF, colourPaints, inheritsStageColour, ledColour, ledsOff, linkedBeneath, ownAccentColour} from "../../rules/led-light.mjs";
 
 /**
  * @typedef {Partial<import("../../contracts/panel.js").PublishedModel> | null | undefined} Model
@@ -203,7 +203,7 @@ const isMapped = (model, position) => {
 export const mappedKeyCount = (model, layer) => (layer?.positions || []).filter((position) => isMapped(model, position)).length;
 
 // The firmware's rules for "no colour" (rules/led-light.mjs).
-export {colourPaints, inheritsStageColour};
+export {colourPaints, inheritsStageColour, ownAccentColour};
 // Passthrough, as the keyboard means it for every colour a layer, a pointing
 // slot, combo feedback or a feedback case owns (D-L94, firmware D-F74), and
 // off, value 0 with saturation, its LEDs dark: the shared rule, said as the
@@ -269,7 +269,8 @@ function mappedOn(model, layer, l, position) {
  *   background effect → every active layer's solid colour, ascending (layer 0 first,
  *   so the default layer shows through a mapped-keys-only layer above it) →
  *   the layers' accents → a held combo whose output runs the pointing mode →
- *   a previewed pointing mode by locality → its accents → any other held
+ *   a previewed pointing mode by locality → its accents (beneath the lowest
+ *   layer on that its link names, when one is: firmware D-F62) → any other held
  *   combo by locality → its accents → a previewed behaviour feedback case
  *   by its locality → its accents → a previewed replacement flash by
  *   locality → its accents (rules/led-light.mjs).
@@ -287,6 +288,26 @@ function mappedOn(model, layer, l, position) {
  * does. A pointing-mode colour is an overlay that exists only while its mode
  * runs, so it is painted only when the caller asks for that preview.
  */
+// The layers the preview has on, lowest first: base, the viewed layer and
+// those held on (by id).
+/** @param {Layer} layer @param {readonly number[]} [held] */
+const layersOn = (layer, held = []) => [...new Set([0, layer?.index ?? 0, ...held])].sort((a, b) => a - b);
+
+// The layer a previewed pointing mode paints beneath, its link's lowest that
+// the preview has on, or null when it paints over every layer (firmware
+// D-F62).
+// A mode with nothing to paint, a passthrough slot with no coloured accent of
+// its own or of every slot, leaves the layer stack whole
+// (rgb_runtime_pointing_mode_stage_has_paint).
+/** @param {Model} model @param {LightOptions["pdActive"]} pdActive @param {Layer} layer @param {readonly number[]} [held] */
+export function pdBeneath(model, pdActive, layer, held) {
+    if (!pdActive) return null;
+    const every = vocabulary(model).accents.pdMode?.everyOwner;
+    const paints = colourPaints(pdActive.color)
+        || (model?.rgb?.pdModeAccents || []).some((accent) => (accent.owner === every || accent.owner === pdActive.mode) && !inheritsStageColour(accent.color));
+    return paints ? linkedBeneath(pdActive.link, layersOn(layer, held)) : null;
+}
+
 /** @param {Model} model @param {Layer} layer @param {number | undefined} led @param {Position} position @param {LightOptions} [options] @returns {import("./types.js").LedLight} */
 function ledLight(model, layer, led, position, options = {}) {
     const baseHere = baseReaches(model, position ? position.layoutIndex : undefined);
@@ -295,7 +316,7 @@ function ledLight(model, layer, led, position, options = {}) {
     // The keyboard paints base and the layers that are on (rgb_layer_stage.c,
     // from layer_state), never the other default layers it keeps: those live
     // in QMK's default layer state, which lighting does not read.
-    const active = [...new Set([0, layer?.index ?? 0, ...(options.held || [])])].sort((a, b) => a - b);
+    const active = layersOn(layer, options.held);
     const lit = (/** @type {{ledIndices?: number[]}} */ group) => (group.ledIndices || []).includes(led ?? -1);
     const preview = options.pdActive;
     const held = options.comboActive;
@@ -314,7 +335,8 @@ function ledLight(model, layer, led, position, options = {}) {
             owners: group.owner === vocabulary(model).accents.layer?.everyOwner ? active : active.filter((l) => group.ownerLayer === l)})),
         pointing: preview && stageEnabled(model, "pd") ? {colour: preview.color,
             reaches: position ? inLocality(position.layoutIndex, preview.locality, preview.triggerIndex) : trackballInLocality(preview.locality, preview.triggerIndex),
-            groups: (model?.rgb?.pdModeAccents || []).filter((group) => lit(group) && (group.owner === vocabulary(model).accents.pdMode?.everyOwner || group.owner === preview.mode)).map((group) => group.color)} : null,
+            groups: (model?.rgb?.pdModeAccents || []).filter((group) => lit(group) && (group.owner === vocabulary(model).accents.pdMode?.everyOwner || group.owner === preview.mode)).map((group) => group.color),
+            beneath: pdBeneath(model, preview, layer, options.held)} : null,
         combo: held && stageEnabled(model, "combo") ? {colour: held.color,
             reaches: position ? inLocality(position.layoutIndex, held.locality, held.inputs) : trackballInLocality(held.locality, held.inputs),
             groups: (model?.rgb?.comboAccents || []).filter(lit).map((group) => group.color), beneath: Boolean(held.beneath)} : null,

@@ -247,6 +247,19 @@ test("connect opens only a listed interface and maps open failures", async () =>
     }
 });
 
+// Chrome refuses to open a keyboard another program holds, and on Linux one
+// whose hidraw device the person may not write until a udev rule allows it:
+// the refusal names both, the second for Linux alone.
+test("a refused open names another program first, then Linux's udev rule", async () => {
+    const refused = new FakeHidDevice({failOpen: domError("NotAllowedError")});
+    const adapter = new WebHidDeviceAdapter({hid: new FakeHid([refused])});
+    const [descriptor] = await adapter.listDevices();
+    const error = await adapter.connect(descriptor.id).catch((failure) => failure);
+    assert.equal(error.code, LIVE_LINK_ERROR_CODES.CONNECT_FAILED);
+    assert.equal(error.message, "Ark could not open the keyboard. Close any other program or Ark page using it, then try again. "
+        + "On Linux, Chrome may also need a udev rule to open it; Connecting in Ark's guide has one.");
+});
+
 test("writes send 32 bytes with report id 0 and map send failures", async () => {
     const hid = new FakeHid();
     const {connected} = await connectFirst(hid);

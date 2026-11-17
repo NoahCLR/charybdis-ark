@@ -2425,6 +2425,10 @@ details > summary { list-style: none; }
 .load-failure { display: grid; gap: var(--sp-3); max-width: 34rem; margin: 0 auto; padding: var(--sp-8) var(--sp-6);
   font-size: var(--fs-base); line-height: var(--lh-base); color: var(--text-2); overflow-wrap: anywhere; }
 .load-failure h1 { font-size: var(--fs-xl); line-height: var(--lh-xl); font-weight: var(--fw-strong); color: var(--text); }
+/* The page's own words for a shell that never starts (web/index.html): unseen
+   for a moment, so an ordinary load, which replaces them, never shows them. */
+.page-starting { visibility: hidden; animation: page-starting 0s 2s forwards; }
+@keyframes page-starting { to { visibility: visible; } }
 .flash-pauses-section > .note { margin-bottom: var(--sp-2); }
 .flash-pauses { table-layout: fixed; }
 .flash-pauses th:first-child { width: 40%; }

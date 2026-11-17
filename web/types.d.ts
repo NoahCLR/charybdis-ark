@@ -6,6 +6,8 @@ export type SleepWorker = Pick<Worker, 'onmessage' | 'postMessage'> & Partial<Pi
 export interface WebEnvironment {
     hid?: WebHid;
     locks?: LockManager;
+    /** For the tabs to keep to one where the browser refuses the lock (web/tab-turn.mjs). */
+    BroadcastChannel?: typeof BroadcastChannel;
     storage?: Pick<StorageManager, 'persist'>;
     indexedDB?: IDBFactory;
     localStorage?: Pick<Storage, 'getItem' | 'setItem'>;

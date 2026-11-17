@@ -123,11 +123,13 @@ test("a VIA layout comes into the draft's own profile, says what it left out, an
     assert.ok(review.differences.length, "compared with the keyboard as a backup is");
     assert.deepEqual(review.via.clear, {behaviors: true, combos: true, customKeys: true}, "a fresh start: the blank slate is whole until something is kept");
     assert.ok(review.via.clearable.behaviors > 0 && review.via.clearable.customKeys > 0);
+    assert.deepEqual(review.via.kept, [], "a blank slate keeps nothing that plays a macro");
     // Keeping something reads the file again, and the comparison follows.
     await loop.handleMessage({type: "setViaImportClears", clear: {behaviors: false, combos: true, customKeys: true}});
     const kept = last(shell).model.portable.review;
     assert.deepEqual(kept.via.clear, {behaviors: false, combos: true, customKeys: true});
     assert.deepEqual(kept.via.clearable, review.via.clearable, "counted from the draft, not from the import");
+    assert.ok(kept.via.kept.some(item => item.kind === "behaviour"), "a kept behaviour that plays a macro is listed");
     assert.equal(kept.fileName, "charybdis.layout.json");
     assert.ok(kept.differences.length < review.differences.length);
     assert.ok(validateSnapshot(loop.session.portableReview.document, capabilities).behaviors.rows.length > 0);

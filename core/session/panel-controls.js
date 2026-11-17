@@ -26,7 +26,7 @@
 const {panelControl} = require("./panel-control-registry");
 const {hasCurrentLayers} = require("./firmware-support");
 const {validateSnapshot, FILE_MAX_BYTES, FILE_TOO_LARGE} = require("../model/portable-profile");
-const {BLANK_SLATE, importViaLayout, viaClearable, viaLayoutOf} = require("../model/via-layout");
+const {BLANK_SLATE, VIA_IMPORT_LABEL, importViaLayout, viaClearable, viaLayoutOf} = require("../model/via-layout");
 const {firmwareUpdateRequired} = require("../schema/profile-blob-v1");
 const {failureSentence} = require("../model/vocabulary");
 const {exportedList} = require("../model/autocorrect-editor");
@@ -40,6 +40,7 @@ const {LIVE_ACTIONS, proposeLive, readNews, setEditMode} = require("./live-edits
 const {restartKeyboard, putBackAfterRestart} = require("./keyboard-restart");
 const {startingTimeout} = require("./keyboard-starting");
 const {keyboardLabel, selectedDevice} = require("./device-model");
+const {recoveryStorageFailure} = require("./recovery-copy");
 const {forget, keptFor, remember} = require("./kept");
 
 /** @template T @param {Shell} shell @param {string} title @param {() => Promise<T>} work */
@@ -93,6 +94,10 @@ const READ_TITLES = Object.freeze({
 /** @param {Session} session @param {string | undefined} selectedDeviceId @param {Shell} [shell] */
 async function readKeyboard(session, selectedDeviceId, shell = {}) {
     const service = session.service;
+    // "No keyboard found" holds only while the page has none it may open: a
+    // read of one it lists takes it back, as soon as the read publishes.
+    const noneFound = shell.words?.noneFound || SHELL_WORDS.noneFound;
+    if (session.noticeSaid === noneFound && service.snapshot().devices?.length) session.notice = "";
     const read = await service.readForEditor(selectedDeviceId, {
         progress: (step, work) => run(shell, READ_TITLES[step], work),
         // A follow-back's read the keyboard moved under is the live watch's
@@ -100,7 +105,7 @@ async function readKeyboard(session, selectedDeviceId, shell = {}) {
         failed: (error) => {if (session.reconnect && session.draft?.live) readFailed(session, error);},
     });
     if (read.kind === "none") {
-        session.notice = shell.words?.noneFound || SHELL_WORDS.noneFound;
+        session.notice = noneFound;
         return false;
     }
     if (read.kind === "firmware") {
@@ -395,12 +400,12 @@ function viaReview(before, source, capabilities, origin) {
     const base = /** @type {import("../model/types.js").PortableDocument} */ (before.document);
     const imported = importViaLayout(base, source.via, {capabilities, hostOs: before.hostOs, clear: source.clear});
     return {...origin, document: imported.document, before, viaSource: source,
-        via: {layers: imported.layers, macros: imported.macros, pointer: imported.pointer, left: imported.left, clearable: viaClearable(base, capabilities), clear: source.clear}};
+        via: {layers: imported.layers, macros: imported.macros, pointer: imported.pointer, left: imported.left, kept: imported.kept, clearable: viaClearable(base, capabilities), clear: source.clear}};
 }
 
 // What the draft's history calls an import.
 /** @param {import("./types.js").PortableReview | import("./types.js").LayerEditState} review */
-const importLabel = review => "via" in review && review.via ? "Imported a VIA layout" : "Imported a profile";
+const importLabel = review => "via" in review && review.via ? VIA_IMPORT_LABEL : "Imported a profile";
 
 /** @template T @param {T | null | undefined} value @returns {T} */
 function requireReview(value) {
@@ -409,13 +414,15 @@ function requireReview(value) {
 }
 
 // The shell's recovery copy, saying what made it and the keyboard it comes
-// from, named as the Keyboard screen's title names it at that moment.
+// from, named as the Keyboard screen's title names it at that moment. Storage
+// that would not keep it is said as its cause (recovery-copy.js).
 /** @param {Shell} shell @param {Session} session @param {import("../../contracts/model.js").RecoveryCause} cause @returns {import("./types.js").SaveRecovery} */
-const recoveryFor = (shell, session, cause) => (document) => {
+const recoveryFor = (shell, session, cause) => async (document) => {
     if (typeof shell.saveRecovery !== "function") throw new TypeError("shell.saveRecovery is not a function");
     const state = session.service.snapshot();
     const device = selectedDevice(state);
-    return shell.saveRecovery(document, {cause, keyboard: keyboardLabel({...state, device})});
+    try {return await shell.saveRecovery(document, {cause, keyboard: keyboardLabel({...state, device})});}
+    catch (error) {throw recoveryStorageFailure(error);}
 };
 
 module.exports = {readKeyboard, draftControl, portableControl, DRAFT_ACTIONS, PORTABLE_ACTIONS};

@@ -21,6 +21,8 @@
 // links to layers the file empties (settlePointing). With a blank slate
 // (`clear`), the draft's behaviours on ordinary keys, its combos and its
 // custom keys go too, each on its own; otherwise they stay.
+// What is kept names a macro by its slot, so it plays the file's macro now,
+// or nothing, and is listed (`kept`, keptMacros).
 //
 // A key or macro Ark cannot carry is left empty and listed (`left`): one Ark
 // does not know or cannot place, and a custom key from before firmware D-F14,
@@ -31,12 +33,15 @@
 const keycodes = require("../schema/keycodes");
 const {LAYERS, MATRIX_KEYS} = require("../data/charybdis-layout");
 const {MACRO_DOMAIN_V1} = require("../schema/macro-domain-v1");
-const {QK, NOTHING, TRANSPARENT, MODS, MOD_BITS, MOD_NAMES, MOD_RIGHT} = require("../../rules/qmk-keycodes.mjs");
+const {QK, NOTHING, TRANSPARENT, MODS, MOD_BITS, MOD_NAMES, MOD_RIGHT, macroName} = require("../../rules/qmk-keycodes.mjs");
 const {NAMES: LEGACY_NAMES} = require("../data/keycode-legacy");
 const {lookupValue} = require("../data/keycode-catalog");
-const {layerName, macroDefaultName} = require("./vocabulary");
-const {PD_LINK_ENDS} = require("../schema/pd-mode-domain-v1");
-const {editProfileDomains, validateSnapshot} = require("./portable-profile");
+const {VOCABULARY, layerName, macroDefaultName, slotName, word} = require("./vocabulary");
+const {DIAGONALS, DIRECTIONS, PD_LINK_ENDS, isPdMacro} = require("../schema/pd-mode-domain-v1");
+const {editProfileDomains, validateSnapshot, walkActions} = require("./portable-profile");
+const {nativeCode} = require("../schema/actions");
+const {keyLabel, profileKeyNames} = require("./key-names");
+const {inputForm} = require("./autocorrect-list");
 const {keyPlacementProblem} = require("./profile-placement");
 const {encodeMacroPayload} = require("../schema/macro-payload");
 const {hostSettings} = require("../schema/host-settings");
@@ -109,7 +114,7 @@ function codeOf(spelling) {
 // key's name in any case; Ark doubles a literal brace (rules/macro-payload.mjs).
 /** @param {string} expression @returns {string} */
 function viaMacroText(expression) {
-    return expression.split(/(?<!\\)(\{.*?\})/).map((part, index) => {
+    return viaMacroParts(expression).map((part, index) => {
         if (index % 2 === 0) return part.replace(/\\\{/g, "{").replace(/[{}]/g, brace => brace + brace);
         const inner = part.slice(1, -1);
         if (/^\d+$/.test(inner)) return part;
@@ -118,6 +123,36 @@ function viaMacroText(expression) {
             .map(macroKeyName);
         return `{${sign}${keys.join(",")}}`;
     }).join("");
+}
+
+// A VIA macro's text cut as VIA cuts it, `split(/(?<!\\)(\{.*?\})/)`: the
+// text between its keys, then each {…} from a { not after a backslash to the
+// first } after it on the same line. Scanned once, as that expression takes
+// time that grows with the square of a long run of unmatched { (each would
+// look to the end of the text for its }).
+/** @param {string} text @returns {string[]} */
+function viaMacroParts(text) {
+    /** @type {string[]} */
+    const parts = [];
+    const lineBreak = /[\n\r\u2028\u2029]/g;
+    // The first } and the first line break after the { being read, each looked
+    // for again only once the reading has passed it.
+    let from = 0, close = -1, lineEnd = -1;
+    for (let at = text.indexOf("{"); at !== -1; at = text.indexOf("{", at + 1)) {
+        if (text[at - 1] === "\\") continue;
+        if (close <= at) close = text.indexOf("}", at + 1);
+        if (close === -1) break;
+        if (lineEnd <= at) {
+            lineBreak.lastIndex = at + 1;
+            lineEnd = lineBreak.exec(text)?.index ?? text.length;
+        }
+        if (lineEnd < close) {at = lineEnd; continue;}
+        parts.push(text.slice(from, at), text.slice(at, close + 1));
+        from = close + 1;
+        at = close;
+    }
+    parts.push(text.slice(from));
+    return parts;
 }
 
 // The file, if it is a VIA layout: undefined for anything else, which is
@@ -145,8 +180,9 @@ function viaLayoutOf(text) {
  * @typedef {import("../../contracts/model.js").ViaImportView} ViaImportView
  * @typedef {ViaImportView["left"]["keys"][number]} LeftKey
  * @typedef {ViaImportView["left"]["macros"][number]} LeftMacro
+ * @typedef {ViaImportView["kept"][number]} KeptMacro
  * @typedef {import("../../contracts/model.js").ViaClears} ViaClears
- * @typedef {Pick<ViaImportView, "layers" | "macros" | "left" | "pointer"> & {document: import("./types.js").PortableDocument}} ViaImport
+ * @typedef {Pick<ViaImportView, "layers" | "macros" | "left" | "pointer" | "kept"> & {document: import("./types.js").PortableDocument}} ViaImport
  */
 
 // Each layer's own state after a VIA import (D-L97): whatever described a
@@ -219,6 +255,84 @@ function settlePointing(open, keymap, from) {
 // QMK's mouse buttons, as the catalogue names them.
 /** @param {number} code */
 const isMouseButton = code => /^QK_MOUSE_BUTTON_\d$/.test(lookupValue(code)?.name ?? "");
+
+// What the import keeps that plays a macro (D-L97): a replacement, a pointing
+// mode's direction, and a behaviour or combo the blank slate leaves. Each names
+// its macro by slot, and the file fills or empties every slot, so each now
+// plays the file's macro there or nothing (`emptied`). Read from the imported
+// document, so it is what Use as draft keeps; a behaviour is called by its key
+// and a combo by its number, as Review calls them, and each is `called` as the
+// import sheet and Review name it.
+/** @type {Readonly<Record<KeptMacro["kind"], (item: Omit<KeptMacro, "called" | "slot" | "macro" | "emptied">) => string>>} */
+const KEPT_CALLED = {replacement: item => `the replacement for “${item.name}”`, pointing: item => `${item.name}'s ${item.direction} direction`,
+    behaviour: item => `the behaviour on ${item.name}`, combo: item => item.name};
+/** @param {import("./types.js").DecodedProfile} after @param {ReturnType<typeof hostSettings>} host @returns {KeptMacro[]} */
+function keptMacros(after, host) {
+    /** @type {KeptMacro[]} */
+    const kept = [];
+    /** @param {Omit<KeptMacro, "called" | "slot" | "macro" | "emptied">} what @param {number} slot */
+    const plays = (what, slot) => {
+        if (kept.some(item => item.kind === what.kind && item.name === what.name && item.direction === what.direction && item.slot === slot)) return;
+        kept.push({...what, called: KEPT_CALLED[what.kind](what), slot, macro: macroDefaultName(slot), emptied: !after.macroSlots[slot]?.length});
+    };
+    /** @param {unknown} value @returns {number[]} */
+    const slotsIn = value => {
+        /** @type {number[]} */
+        const slots = [];
+        walkActions(value, action => {
+            if (action.kind === PROFILE_ACTION_KINDS.MACRO) slots.push(action.operand);
+            else if (action.kind === PROFILE_ACTION_KINDS.QMK_KEYCODE && action.operand >= QK.MACRO.first && action.operand <= QK.MACRO.last) slots.push(action.operand - QK.MACRO.first);
+        });
+        return slots;
+    };
+    for (const entry of after.autocorrect.entries) if (entry.macro !== undefined && entry.typos.length) plays({kind: "replacement", name: inputForm(entry.typos[0])}, entry.macro);
+    for (const slot of after.pdModes) for (const [taps, words] of /** @type {const} */ ([[slot.directions, VOCABULARY.pointing.directions], [slot.diagonals, VOCABULARY.pointing.diagonals]])) {
+        for (const name of [...DIRECTIONS, ...DIAGONALS]) {
+            const tap = taps?.[name];
+            if (tap && isPdMacro(tap.keycode)) plays({kind: "pointing", name: slotName(slot), direction: word(words, name)}, tap.keycode - QK.MACRO.first);
+        }
+    }
+    const names = profileKeyNames({hostOs: host.effective, hostLayout: host.layout, macosIso: host.macosIso, actionsKnown: true, layers: after.settings.names,
+        behaviors: after.behaviors.rows, pdModes: after.pdModes, customKeys: after.settings.customKeyNames.map((name, slot) => ({slot, name}))});
+    for (const row of after.behaviors.rows) {
+        const code = nativeCode(row.target);
+        for (const slot of slotsIn(row)) plays({kind: "behaviour", name: code === undefined ? `Action ${row.target.operand}` : keyLabel(names, code)}, slot);
+    }
+    after.combos.rows.forEach((row, index) => {for (const slot of slotsIn(row)) plays({kind: "combo", name: `Combo ${index}`}, slot);});
+    return kept;
+}
+
+// The draft history's words for a VIA layout used as the draft (D-L97).
+const VIA_IMPORT_LABEL = "Imported a VIA layout";
+// How many of a list Review names in full before it counts the rest, as the
+// import sheet does (its copy, VIA_LEFT_SHOWN in webview/view/backups.mjs).
+const KEPT_SHOWN = 8;
+
+// What Review says of a VIA import still in the draft: what it kept that
+// plays a macro by its slot, where that slot now holds other steps than the
+// keyboard's, or none, so each plays the imported macro or nothing once
+// saved. `keyboard` is the keyboard's profile in the draft's slots. A notice,
+// since the import meant it; null when nothing kept plays a macro it changed.
+/** @param {import("./types.js").DecodedProfile} keyboard @param {import("./types.js").DecodedProfile} draft @param {ReturnType<typeof hostSettings>} host @returns {import("../../contracts/model.js").Finding | null} */
+function keptMacroFinding(keyboard, draft, host) {
+    /** @param {number} slot */
+    const changed = slot => {
+        const mine = draft.macroSlots[slot] || [], theirs = keyboard.macroSlots[slot] || [];
+        return mine.length !== theirs.length || mine.some((byte, at) => byte !== theirs[at]);
+    };
+    const kept = keptMacros(draft, host).filter(item => changed(item.slot));
+    if (!kept.length) return null;
+    const plays = kept.map(item => `${item.called} plays ${item.emptied ? `nothing (${item.macro} is emptied)` : `the imported ${item.macro}`}`);
+    const rest = plays.length - KEPT_SHOWN;
+    const named = rest > 0 ? `${plays.slice(0, KEPT_SHOWN).join(", ")} and ${rest} more`
+        : plays.length > 1 ? `${plays.slice(0, -1).join(", ")} and ${plays.at(-1)}` : plays[0];
+    return {kind: "keptMacros", level: "notice", layers: [], count: kept.length,
+        identity: kept.map(item => `${item.called}:${item.slot}:${item.emptied ? 0 : 1}`).join("|"),
+        title: "What the VIA import kept plays the macros it brought",
+        detail: `These play a macro by its slot, which now holds the imported macro or nothing: ${named}.`,
+        fix: "Choose another macro for any of them that should play something else.",
+        place: {kind: "macro", index: kept[0].slot, keycode: macroName(kept[0].slot)}};
+}
 
 // No blank slate: the draft keeps its behaviours, combos and custom keys.
 /** @type {Readonly<ViaClears>} */
@@ -314,7 +428,9 @@ function importViaLayout(document, via, {capabilities, hostOs, clear = KEEP_ALL}
             value.settings.customKeyNames.forEach((_, slot) => {if (customKeyInUse(value, slot)) emptyCustomKey(open, read, slot);});
         }
     });
-    return {document: result, layers: via.layers.length, macros: brought, pointer, left: {keys, macros: macros.sort((a, b) => a.slot - b.slot)}};
+    const after = validateSnapshot(result, capabilities);
+    const kept = keptMacros(after, hostSettings(after.settings.values, hostOs?.detected));
+    return {document: result, layers: via.layers.length, macros: brought, pointer, kept, left: {keys, macros: macros.sort((a, b) => a.slot - b.slot)}};
 }
 
-module.exports = {BLANK_SLATE, KEEP_ALL, LAYER_SWITCHES, viaLayoutOf, importViaLayout, viaClearable, codeOf, viaMacroText};
+module.exports = {BLANK_SLATE, KEEP_ALL, KEPT_SHOWN, LAYER_SWITCHES, VIA_IMPORT_LABEL, viaLayoutOf, importViaLayout, keptMacroFinding, viaClearable, codeOf, viaMacroText, viaMacroParts};

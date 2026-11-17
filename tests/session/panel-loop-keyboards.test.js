@@ -8,6 +8,7 @@ const test = require("node:test");
 const {LIVE_LINK_ERROR_CODES, liveLinkError} = require("../../core/transport/device-adapter");
 const {expectLost} = require("../../core/session/keyboard-reconnect");
 const {FAILURE_WORDS} = require("../../core/model/vocabulary");
+const {SHELL_WORDS} = require("../../core/session/panel-session");
 const {fakeShell, lastMessage, lastModel, notices, openLoop} = require("../fixtures/panel-loop");
 const {document} = require("../fixtures/portable-profile");
 
@@ -39,6 +40,34 @@ test("a picker closed without a choice says so and reads nothing; one that faile
     assert.equal(lastMessage(shell).notice, "Failed: The browser refused to show the keyboard picker.");
     assert.equal(lastMessage(shell).failed, true);
     assert.equal(lastModel(shell).device.connected, false);
+});
+
+// "Chrome has no Charybdis…" holds only while the page has no keyboard it
+// may open: the first model of a chosen keyboard's read takes it back (an
+// empty notice), and a read that still finds none says it again unbroken.
+test("no keyboard found is taken back once a keyboard is chosen and being read", async (t) => {
+    const {adapter, shell, loop} = await openLoop(t, {read: false});
+    const plugged = adapter.devices;
+    adapter.devices = [];
+    await loop.handleMessage({type: "refresh"});
+    assert.equal(lastMessage(shell).notice, SHELL_WORDS.noneFound);
+    let posted = shell.posted.length;
+    await loop.handleMessage({type: "refresh"});
+    assert.deepEqual(shell.posted.slice(posted).filter((message) => message.type === "model").map((message) => message.notice).filter((notice) => notice !== undefined), [SHELL_WORDS.noneFound],
+        "a read that still finds none says so, and takes nothing back");
+    adapter.devices = plugged;
+    posted = shell.posted.length;
+    await loop.chose(Promise.resolve());
+    const replies = shell.posted.slice(posted).filter((message) => message.type === "model");
+    const first = replies.findIndex((message) => message.model.load.state === "loading");
+    assert.ok(first >= 0, "the read publishes while it runs");
+    assert.equal(replies[first].notice, "", "the first model of the read takes the words back");
+    assert.equal(replies.filter((message) => message.notice === "").length, 1, "once");
+    assert.match(replies.at(-1).notice, /^Read the keyboard's/, "the read then says what it read");
+    // Once taken back, a later read takes back nothing more.
+    posted = shell.posted.length;
+    await loop.handleMessage({type: "refresh"});
+    assert.ok(shell.posted.slice(posted).every((message) => message.notice !== ""));
 });
 
 test("a chosen keyboard whose list fails with a fault reads as plain words, its own text kept for the diagnostics", async (t) => {

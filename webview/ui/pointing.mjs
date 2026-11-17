@@ -11,7 +11,7 @@
 // Selector assertions refer to elements created by this module's authored markup.
 import {el, esc} from "../lib/dom.mjs";
 import {whatReachesSlot} from "../view/pointing-reach.mjs";
-import {getModel, post, render, state} from "../store.mjs";
+import {followSlotSwap, getModel, post, render, state} from "../store.mjs";
 import * as edits from "../view/edits.mjs";
 import {editGate} from "../view/edit-gate.mjs";
 import {slotBank} from "../view/slot-bank.mjs";
@@ -31,6 +31,7 @@ import {emptySlot} from "./pointing/empty-slot.mjs";
 function swapPointing(from, to) {
     const a = Number(from), b = Number(to);
     post(edits.swapPdModes(a, b));
+    followSlotSwap("pointing", from, to);
     /** @param {number} slot */
     const follows = (slot) => (slot === a ? b : slot === b ? a : slot);
     if (state.pdKind) state.pdKind = {...state.pdKind, slot: follows(state.pdKind.slot)};

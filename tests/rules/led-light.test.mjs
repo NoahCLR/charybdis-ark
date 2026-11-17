@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {OFF, colourPaints, inheritsStageColour, ledColour} from "../../rules/led-light.mjs";
+import {OFF, colourPaints, inheritsStageColour, ledColour, linkedBeneath, ownAccentColour} from "../../rules/led-light.mjs";
 
 const colour = (h, s, v) => ({h: String(h), s: String(s), v: String(v)});
 const stages = (more = {}) => ({off: false, base: {colour: colour(10, 20, 30), source: "base"}, layers: [], layerGroups: [], pointing: null, ...more});
@@ -112,4 +112,33 @@ test("a behaviour case's accents paint widest first: every state's, then every t
     assert.deepEqual(ledColour(stages({layers, behaviour: branch})).colour, colour(2, 255, 200), "every tap branch's over every state's");
     assert.deepEqual(ledColour(stages({layers, behaviour: {...branch, own: [colour(3, 255, 200)]}})).colour, colour(3, 255, 200), "the branch's own over both");
     assert.deepEqual(ledColour(stages({layers, behaviour: {...branch, group: [colour(0, 0, 0)]}})).colour, branch.colour, "black takes the branch's colour");
+});
+
+test("a running pointing mode whose link names a layer that is on paints beneath the lowest such layer, so it and those above show over the mode (firmware D-F62)", () => {
+    const base = colour(80, 255, 255), linked = colour(169, 255, 255), above = colour(40, 255, 255), mode = colour(21, 255, 255);
+    const layers = [{layer: 0, colour: base, paints: true}, {layer: 2, colour: linked, paints: true}, {layer: 4, colour: above, paints: false}];
+    const pointing = {colour: mode, reaches: true, groups: []};
+    assert.deepEqual(ledColour(stages({layers, pointing: {...pointing, beneath: 2}})), {colour: linked, source: "layer", layer: 2}, "the linked layer shows over the mode");
+    assert.deepEqual(ledColour(stages({layers: [layers[0], {...layers[1], paints: false}], pointing: {...pointing, beneath: 2}})).colour, mode, "where the layer paints nothing the mode shows, over the layers beneath");
+    assert.equal(ledColour(stages({layers, pointing})).source, "pointing", "with no linked layer on the mode paints over every layer");
+    assert.equal(ledColour(stages({layers, pointing: {...pointing, beneath: null}})).source, "pointing");
+    // Accents go with their layer: beneath the mode for a layer below it, over it for the linked layer and above.
+    assert.deepEqual(ledColour(stages({layers: [layers[0]], layerGroups: [{colour: colour(5, 255, 255), owners: [0]}], pointing: {...pointing, beneath: 2}})).colour, mode, "a lower layer's accent paints beneath the mode");
+    assert.deepEqual(ledColour(stages({layers: [layers[0], {...layers[1], paints: false}], layerGroups: [{colour: colour(5, 255, 255), owners: [2]}], pointing: {...pointing, beneath: 2}})).colour, colour(5, 255, 255), "the linked layer's accent paints over it");
+    // A passthrough mode paints nothing beneath the layer either.
+    assert.deepEqual(ledColour(stages({layers: [layers[0], {...layers[1], paints: false}], pointing: {...pointing, colour: colour(21, 0, 0), beneath: 2}})), ledColour(stages({layers: [layers[0], {...layers[1], paints: false}]})));
+    // Painted beneath a layer, the mode is drawn with the layers, before combo feedback, so a combo running it paints over it (rgb_runtime.c).
+    const combo = {colour: colour(190, 255, 200), reaches: true, groups: [], beneath: true};
+    assert.equal(ledColour(stages({layers: [layers[0]], combo, pointing: {...pointing, beneath: 2}})).source, "combo");
+    // The layer it paints beneath: the lowest that is on of those its link names.
+    assert.deepEqual([linkedBeneath((1 << 2) | (1 << 4), [4, 0, 2]), linkedBeneath(1 << 3, [0, 2]), linkedBeneath(undefined, [0, 2]), linkedBeneath(0, [0])], [2, null, null, null]);
+});
+
+test("an accent's own colour never lands on the code for its owner's colour: exact 0, 0, 0 is kept dark at hue 1, which the keyboard paints dark (rgb_helpers.h)", () => {
+    const dark = ownAccentColour(colour(0, 0, 0));
+    assert.equal(inheritsStageColour(dark), false, "it is no longer the owner's colour");
+    assert.deepEqual([Number(dark.h), Number(dark.s), Number(dark.v)], [1, 0, 0]);
+    const layers = [{layer: 1, colour: colour(80, 255, 255), paints: true}];
+    assert.deepEqual(ledColour(stages({layers, layerGroups: [{colour: dark, owners: [1]}]})).colour, dark, "the accent paints its own dark over the layer");
+    for (const kept of [colour(0, 0, 200), colour(5, 0, 0), colour(0, 255, 0), colour(30, 200, 100)]) assert.deepEqual(ownAccentColour(kept), kept, "any other colour is kept as it is");
 });

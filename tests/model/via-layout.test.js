@@ -3,7 +3,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const {document} = require("../fixtures/portable-profile");
 const {validateSnapshot, editProfileDomains} = require("../../core/model/portable-profile");
-const {LAYER_SWITCHES, viaLayoutOf, importViaLayout, codeOf, viaMacroText} = require("../../core/model/via-layout");
+const {BLANK_SLATE, LAYER_SWITCHES, viaLayoutOf, importViaLayout, codeOf, viaMacroText} = require("../../core/model/via-layout");
 const {encodeMacroPayload} = require("../../core/schema/macro-payload");
 const {MATRIX_KEYS, LAYERS} = require("../../core/data/charybdis-layout");
 const {NOTHING, TRANSPARENT} = require("../../rules/qmk-keycodes.mjs");
@@ -119,6 +119,28 @@ test("VIA's macro text is written in Ark's grammar", () => {
         // VIA reads a key in any case and keeps old names.
         ["{kc_lctl, kc_a}", "{KC_LCTL,KC_A}"], ["{KC_SLCK}", "{KC_SCROLL_LOCK}"],
     ]) assert.equal(viaMacroText(via), ark, via);
+});
+
+test("VIA's macro text is cut where VIA cuts it, braces unmatched, escaped or repeated", () => {
+    // The cut as a regular expression, as the reader first made it: the same
+    // parts, on every mix of braces, backslashes, line breaks, signs, commas
+    // and letters up to five long, where its time does not matter.
+    /** @param {string} text */
+    const viaCut = text => text.split(/(?<!\\)(\{.*?\})/);
+    const alphabet = ["{", "}", "\\", "\n", "a", ",", "+", "1"];
+    /** @param {string} prefix @param {number} left @returns {string[]} */
+    const every = (prefix, left) => left ? [prefix, ...alphabet.flatMap(char => every(prefix + char, left - 1))] : [prefix];
+    const {viaMacroParts} = require("../../core/model/via-layout");
+    for (const text of every("", 5)) assert.deepEqual(viaMacroParts(text), viaCut(text), JSON.stringify(text));
+});
+
+test("a long macro of unmatched braces is read at once, not in time that grows with its square", () => {
+    for (const text of ["{".repeat(190000), "{a".repeat(100000), "\\{".repeat(60000) + "{", "{".repeat(100000) + "}"]) {
+        const started = performance.now();
+        viaMacroText(text);
+        const took = performance.now() - started;
+        assert.ok(took < 200, `${text.length} characters read in ${Math.round(took)} ms`);
+    }
 });
 
 test("the rest of the draft stays as it was", () => {
@@ -257,4 +279,32 @@ test("each part of a blank slate goes on its own, and a custom key's behaviours 
     assert.deepEqual([all.behaviors.rows, all.combos.rows], [[], []]);
     assert.deepEqual(all.autocorrect, before.autocorrect);
     assert.deepEqual(withoutLayerState(all), withoutLayerState(before));
+});
+
+test("what the import keeps that plays a macro is listed, each by its name, with whether the file fills that slot", () => {
+    const capabilities = CURRENT_CAPABILITIES;
+    // A replacement that plays macro 3, Volume's Up direction runs macro 0,
+    // and a combo sends macro 100, which the file leaves empty.
+    const playing = editProfileDomains(document(), {capabilities}, open => {
+        open("autocorrect").entries.push({correction: "", macro: 3, typos: [{typo: "sig", match: 0}]});
+        open("pdModes")[1].directions.up.keycode = 0x7700;
+        open("combos").rows[0].output = {kind: PROFILE_ACTION_KINDS.MACRO, flags: 0, operand: 100};
+    });
+    const via = /** @type {NonNullable<ReturnType<typeof viaLayoutOf>>} */ (viaLayoutOf(viaFile({layers: [layer(() => "KC_A")], macros: ["zero", "", "", "three", ...Array(12).fill("")]})));
+    /** @param {Partial<import("../../contracts/model.js").ViaClears>} clear */
+    const kept = (clear, from = playing) => importViaLayout(from, via, {capabilities, clear: {...BLANK_SLATE, ...clear}}).kept;
+    // Always kept: the text replacement list and pointing modes.
+    assert.deepEqual(kept({}), [
+        {kind: "replacement", name: "sig", called: "the replacement for “sig”", slot: 3, macro: "Macro 3", emptied: false},
+        {kind: "pointing", name: "Volume", direction: "Up", called: "Volume's Up direction", slot: 0, macro: "Macro 0", emptied: false},
+    ]);
+    // Kept when their switch is off: the behaviours and combos, each by what Review calls it.
+    assert.deepEqual(kept({behaviors: false, combos: false}).filter(item => item.kind === "behaviour" || item.kind === "combo"), [
+        {kind: "behaviour", name: "GUI+C", called: "the behaviour on GUI+C", slot: 10, macro: "Macro 10", emptied: true},
+        {kind: "behaviour", name: "GUI+V", called: "the behaviour on GUI+V", slot: 7, macro: "Macro 7", emptied: true},
+        {kind: "behaviour", name: "Pinch · hold", called: "the behaviour on Pinch · hold", slot: 6, macro: "Macro 6", emptied: true},
+        {kind: "combo", name: "Combo 0", called: "Combo 0", slot: 100, macro: "Macro 100", emptied: true},
+    ]);
+    // The compiled defaults with a blank slate keep nothing that plays a macro.
+    assert.deepEqual(kept({}, document()), []);
 });

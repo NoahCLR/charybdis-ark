@@ -14,8 +14,11 @@ the slots in use, such as "18 of 128 used". **Search by name** finds a macro
 by its name or its slot, through every slot.
 
 Drag a slot onto another to swap the two. Each macro moves with its steps and
-its name, and every key, behaviour, combo and pointing mode that played it
-still plays it, under its new number. From the keyboard, focus a slot and
+its name, and every key, behaviour, combo, pointing mode and text
+replacement that played it still plays it, under its new number. So does a
+key you chose to place and have not yet placed, and a new replacement not yet
+on the list; a combo you were building closes, as it does when the draft
+changes under it. From the keyboard, focus a slot and
 press Shift+Space to hold it, then Shift+Space on the other slot; Escape lets
 go. Review lists the swaps as one **Macro order** change (see [Review and
 save](review-and-save.md#review)).

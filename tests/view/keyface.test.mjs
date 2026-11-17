@@ -356,3 +356,15 @@ test("a dual-role key names what its tap sends and what its hold does", () => {
     assert.equal(dualRole(words, cap("MO(3)")), null, "a layer key has no tap half");
     assert.equal(dualRole(words, cap("KC_F")), null);
 });
+
+// Where a hold that runs from the press waits for Tap / hold (a pointing-mode
+// key on a later empty tap count), the cell does not say "held from the press".
+test("a hold that waits for Tap / hold is not shown as held from the press", () => {
+    const hold = {style: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "PD_MODE_0", fromPress: true};
+    const behaviour = /** @type {any} */ ({steps: [], builtIn: {hold, laterHoldWaits: true, cells: {
+        "0-hold": {inherited: {own: "hold"}},
+        "1-hold": {implied: {meaning: "afterTaps", hold: {own: "hold", waits: true}}}}}});
+    assert.equal(inheritedBranch(behaviour, {tapCount: 0}, "hold")?.fromPress, true);
+    const later = impliedBranch(behaviour, {tapCount: 1}, "hold");
+    assert.deepEqual(later, {meaning: "afterTaps", hold: {style: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "PD_MODE_0"}});
+});

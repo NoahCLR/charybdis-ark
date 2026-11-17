@@ -224,10 +224,10 @@ export function commitBar() {
     }
     if (bar.kind === "otherKeyboard") {
         const node = el(`<div class="commit draft">
-            <span class="n"><i class="dot draft"></i> <strong>Draft belongs to another keyboard</strong>
-            <span class="muted">${draft.changes.length} change${draft.changes.length === 1 ? "" : "s"} kept in Ark. Select that keyboard to continue${model.device?.connected ? ", or discard the draft here" : ""}.</span></span>
+            <span class="n"><i class="dot draft"></i> <strong>${esc(bar.title)}</strong>
+            <span class="muted">${esc(bar.detail)}</span></span>
             <span class="sep"></span>
-            ${model.device?.connected ? '<button class="btn ghost" data-act="discard">Discard draft</button>' : ""}</div>`);
+            ${bar.discard ? '<button class="btn ghost" data-act="discard">Discard draft</button>' : ""}</div>`);
         /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="discard"]'))?.addEventListener("click", () => post(controls.control("discardProfileDraft")));
         return node;
     }

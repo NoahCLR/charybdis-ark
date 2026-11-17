@@ -196,6 +196,7 @@ function readU32(buffer, offset) {
     ) >>> 0;
 }
 
+const OLDER_CAPABILITIES = "Unsupported Profile Wire capability layout: Ark supports only current firmware. Update both halves.";
 /** @param {Uint8Array[]} pages */
 function decodeCapabilityPages(pages) {
     assertPageSet(pages, PROFILE_WIRE_V1.CAPABILITY_PAGE_COUNT, "capability");
@@ -204,7 +205,7 @@ function decodeCapabilityPages(pages) {
     const wide = pages[2];
     const autocorrect = pages[3];
     if (identity[0] !== PROFILE_WIRE_V1.CAPABILITY_LAYOUT || identity[1] !== PROFILE_WIRE_V1.CAPABILITY_PAGE_COUNT) {
-        throw new ProfileWireProtocolError("INCOMPATIBLE_RESPONSE", "Unsupported Profile Wire capability layout: Ark supports only current firmware. Update both halves.");
+        throw new ProfileWireProtocolError("INCOMPATIBLE_RESPONSE", OLDER_CAPABILITIES);
     }
     assertZeroRange(capacity, 16, 25, "capability page 1");
     assertZeroRange(wide, 20, 25, "capability page 2");
@@ -359,9 +360,18 @@ async function readProfilePages(connection, valueId, pageCount, options = {}) {
     return pages;
 }
 
+// A keyboard without a capability page Ark reads is older firmware, as one
+// whose page 0 counts other pages is: the released firmware has three and
+// refuses the fourth as an unknown page.
 /** @param {import("../transport/types.js").RequestConnection} connection @param {import("./types.js").ReadOptions} [options] */
 async function readProfileCapabilities(connection, options) {
-    return decodeCapabilityPages(await readProfilePages(connection, PROFILE_WIRE_V1.VALUE_CAPABILITIES, PROFILE_WIRE_V1.CAPABILITY_PAGE_COUNT, options));
+    let pages;
+    try {pages = await readProfilePages(connection, PROFILE_WIRE_V1.VALUE_CAPABILITIES, PROFILE_WIRE_V1.CAPABILITY_PAGE_COUNT, options);}
+    catch (error) {
+        if (!isUnknownPage(error)) throw error;
+        throw new ProfileWireProtocolError("INCOMPATIBLE_RESPONSE", OLDER_CAPABILITIES, {cause: error});
+    }
+    return decodeCapabilityPages(pages);
 }
 
 /** @param {import("../transport/types.js").RequestConnection} connection @param {import("./types.js").ReadOptions} [options] */

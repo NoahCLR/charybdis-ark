@@ -107,7 +107,7 @@ edits you haven't saved.
 The keyboard changes mode only with nothing unsaved, so Ark asks when a switch
 would lose something:
 
-- From Live preview + save with unsaved changes, it asks you to **Save on
+- From Live preview + save with unsaved changes, it asks you to **Save to
   keyboard** or **Revert** first.
 - From Review and save to a live mode with a draft, it asks whether to
   **Send live** (your draft starts running on the keyboard, unsaved) or
@@ -164,7 +164,9 @@ the draft fixes it.
 - A **Warning** is something Ark asks about before saving: a layer nothing
   reaches, a layer key onto an empty layer, a combo that can't fire, a macro
   your computer's settings can't play, and so on.
-- A **Notice** only informs, such as a behaviour that changes nothing.
+- A **Notice** only informs, such as a behaviour that changes nothing, or
+  what a [VIA layout](backups.md#import-a-via-layout) you imported kept that
+  plays one of its macros.
 
 What your draft adds stays open. What the keyboard already has folds behind
 **Already on the keyboard** with its count, and what the draft fixes behind

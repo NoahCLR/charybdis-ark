@@ -338,7 +338,8 @@ The shell runs `core/` and the interface through the shared panel loop; what
 it offers reaches the interface as `model.shell`. What it does, and why, is
 in the file comments of `web/`: the click-time `gesture` path Chrome's
 keyboard picker and file chooser need (`web/panel-channel.mjs`), the Web Lock
-that makes a second tab wait, the `beforeunload` warning, the worker clock
+that makes a second tab wait and the tabs' own turn-taking where the browser
+refuses it (`web/tab-turn.mjs`), the `beforeunload` warning, the worker clock
 that background tabs do not throttle, recovery copies in IndexedDB, and the
 phone notice (`web/phone.mjs`). A browser shell needs a secure context
 (HTTPS or localhost) for WebHID and the draft's `crypto.randomUUID()`.
@@ -565,4 +566,5 @@ What can break Ark, and what checks it:
 | Keycode catalog and layout | BK | Ark's pinned BK inputs | agreement (files equal at firmware's BK pin); `npm run keycodes -- --check` |
 | Keymap, macro and autocorrect domains | firmware profile codecs and config | domain versions and capability capacities | golden codecs; candidate, macro-domain and autocorrect-domain runners |
 | Keyboard options (RGB effects and order, LED flags) | BK's RGB matrix and firmware config | reported at runtime | `qmk_portable_editor` runner |
+| Lighting drawing (stage order and painting, LED by LED) | firmware RGB render path | the drawing cases (`rgb_render_v1.json`, pinned) | `tests/view/drawing-cases.test.mjs` (D-L99); agreement (fixtures equal) |
 | Behaviour on the keyboard | firmware | nothing | keyboard checks only |

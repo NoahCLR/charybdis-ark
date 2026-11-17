@@ -79,7 +79,7 @@ export function stageInfo(model, id) {
             row(passthrough, "The mode paints nothing while it runs; its accents in a colour of their own still light.")]);
         case "combo": return mark("How combo feedback paints", "While a combo's inputs are held, its keys wear this colour, where the Locality says. One colour, place and set of accents serves every combo.", [
             row(words.lightingLists.holdLayer.title, "They light no combo feedback: the layer's own light shows the hold."),
-            row("Pointing mode", "A combo that runs a pointing mode paints beneath it; the mode covers it where both paint.")]);
+            row("Pointing mode", "A combo that runs a pointing mode paints beneath it; the mode covers it where both paint, unless the mode paints beneath a linked layer, when the combo paints over both.")]);
         case "key": {
             const tiers = ["KEY_FEEDBACK_GROUP_TAP_COMMITTED", "KEY_FEEDBACK_GROUP_HOLD_ACTIVE", "KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE"].map(flash);
             const [first, deepest] = [flash("KEY_FEEDBACK_GROUP_TAP_COUNT_2"), flash("KEY_FEEDBACK_GROUP_TAP_COUNT_5")];
