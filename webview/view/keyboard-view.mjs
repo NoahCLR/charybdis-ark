@@ -23,6 +23,12 @@ export const FIRMWARE_NEEDED = Object.freeze({
     via: "Before you flash, save your layout there (Save + Load, Save Current Layout). Once Ark reads the keyboard, import that file in Backups to carry over your keys and macros.",
 });
 
+// Diagnostics are for whoever looks into a fault, not for using the
+// keyboard, so the Keyboard screen shows them only on a page opened with
+// `?diagnostics` in its address (D-L100).
+/** @param {string} [search] the page address's query, `location.search` */
+export const diagnosticsShown = (search = globalThis.location?.search || "") => new URLSearchParams(search).has("diagnostics");
+
 // Each half by its role: the master half is always the right one, with the
 // USB cable and the trackball (the firmware builds force it), and the slave
 // half the left. The side follows as detail. Each half's state in words.

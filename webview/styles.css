@@ -331,12 +331,6 @@ a.rail-build:hover { color: var(--text-2); }
 .device-pad .warn-words { color: var(--warning); }
 .device-pad .callout.danger-note { border-left-color: var(--danger); color: var(--text); }
 .device-pad .callout .steps { margin: var(--sp-2) 0 0 var(--sp-4); padding: 0; }
-/* Diagnostics' Read keyboard is drawn over the fold's title, at its right, but
-   is no part of its summary: a button inside a summary is a control inside a
-   control. */
-.diagnostics { display: grid; }
-.diagnostics > details, .diagnostics > .diagnostics-read { grid-area: 1 / 1; }
-.diagnostics > .diagnostics-read { justify-self: end; align-self: start; margin: var(--sp-3) var(--sp-4) 0 0; }
 
 /* ── controls ────────────────────────────────────────────────────────── */
 .btn {
@@ -2110,7 +2104,6 @@ select.input.pd-add { height: var(--h-chip); width: 124px; min-width: 0; padding
 .reference-cell select.input { height: var(--h-compact); background-position: calc(100% - 15px) 12px, calc(100% - 10px) 12px; }
 /* QMK keeps the live value: keys on the keyboard change it too. */
 .kk-mark { margin-left: var(--sp-2); font-size: var(--fs-md); color: var(--text-3); white-space: nowrap; }
-.setrow .fact-value { font-family: var(--mono); font-size: var(--fs-md); color: var(--text-2); }
 .card-h > .kk-mark { margin-left: 0; }
 .import-diff td:first-child { white-space: nowrap; }
 .import-diff td:last-child { white-space: nowrap; text-align: right; }

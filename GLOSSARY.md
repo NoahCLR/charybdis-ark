@@ -33,7 +33,8 @@ _Avoid_: locked, view-only, disabled
 
 **Flash pauses**:
 How long each half stopped to work on its flash since it started, as it
-measures them, shown under Diagnostics on the Keyboard screen.
+measures them, shown under Diagnostics on the Keyboard screen (with
+`?diagnostics` in the address).
 _Avoid_: stalls, latency, flash timing
 
 ## The draft

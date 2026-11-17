@@ -133,7 +133,7 @@ async function readKeyboard(session, selectedDeviceId, shell = {}) {
             ? "compiled defaults"
             : `saved profile, generation ${state.committed.generation}`;
         const failures = state.committed.failures?.length || 0;
-        session.notice = `Read the keyboard's ${description}.` + (failures ? ` ${failures} part${failures === 1 ? "" : "s"} of it could not be read; see Diagnostics on the Keyboard screen.` : "");
+        session.notice = `Read the keyboard's ${description}.` + (failures ? ` ${failures} part${failures === 1 ? "" : "s"} of it could not be read.` : "");
     }
     if (macroFailure) session.notice += macroFailure;
     // A live keyboard that restarted (a replug, a lost connection) since Ark

@@ -12,7 +12,7 @@ export const applyDraft = (confirmChecks) => ({type: 'applyProfileDraft', ...(co
 export const discardChanges = (group) => ({type: 'discardProfileDraftChanges', group});
 /** @param {number} step @returns {import("../../contracts/messages.js").DraftControl} */
 export const jumpDraft = (step) => ({type: 'jumpProfileDraft', step});
-// Read keyboard; from an open Diagnostics, each half's flash pauses after it.
+// Read keyboard; with Diagnostics open, each half's flash pauses after it.
 /** @param {boolean} [flashPauses] @returns {{type: 'refresh', flashPauses?: true}} */
 export const readKeyboard = (flashPauses) => ({type: 'refresh', ...(flashPauses ? {flashPauses: true} : {})});
 // Diagnostics opened: read each half's flash pauses.

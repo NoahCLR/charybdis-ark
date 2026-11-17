@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {RESTART_NEEDED, SAVE_IN_PROGRESS, firmwareLine, halvesRows, productName} from "../../webview/view/keyboard-view.mjs";
+import {RESTART_NEEDED, SAVE_IN_PROGRESS, diagnosticsShown, firmwareLine, halvesRows, productName} from "../../webview/view/keyboard-view.mjs";
 import {keyboardControl} from "../../webview/view/keyboard-menu.mjs";
 import {createRequire} from "node:module";
 
@@ -74,4 +74,11 @@ test("firmware this Ark does not work with says so in the words every edit contr
     assert.equal(firmwareLine(model).works, true);
     const old = {...model, firmware: {...model.firmware, worksWithArk: false}};
     assert.deepEqual(firmwareLine(old), {version: firmwareLine(model).version, works: false, words: model.vocabulary.firmwareUpdate});
+});
+
+test("Diagnostics show only on a page opened with ?diagnostics in its address (D-L100)", () => {
+    assert.equal(diagnosticsShown(""), false);
+    assert.equal(diagnosticsShown("?shell=demo&screen=device"), false);
+    assert.equal(diagnosticsShown("?diagnostics"), true);
+    assert.equal(diagnosticsShown("?screen=device&diagnostics=1"), true);
 });

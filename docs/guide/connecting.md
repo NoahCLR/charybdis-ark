@@ -197,12 +197,14 @@ fit. While your draft has changes, the figures are the draft's. An edit that
 would go past one of these counts, or past the shared space, is refused in the
 draft before the keyboard sees it, saying which is full and what to remove.
 
-**Built into this firmware** lists what only a new firmware build can change:
-how many layers, tap counts, macros, pointing modes and combos there are, the
-repeat ceiling and the DPI steps.
+**Read keyboard**, at the top right of This keyboard, reads the keyboard
+again.
 
-**Diagnostics** holds the details of the last read and **Read keyboard**,
-which reads it again. Under them are the last few things Ark noted while
+Ark hides its **Diagnostics** unless you ask for them: open Ark with
+`?diagnostics` at the end of its address (for example
+`https://ark.ncleroy.dev/?diagnostics`) and they appear at the bottom
+of the Keyboard screen. They are for looking into a fault, not for using the
+keyboard. They hold the details of the last read. Under them are the last few things Ark noted while
 talking to the keyboard: connecting, a disconnect, an answer it set aside, and
 a failure's own error with its code, which the message beside the rail leaves
 out. It also shows each half's **flash pauses**: how long the master half and
@@ -211,7 +213,8 @@ the longest erase of a sector, the longest write of a page, the most flash
 time in one scan, how long the last save took and how much of it was flash,
 and how many saves there have been. Hover over a figure for its exact
 microseconds. Ark reads them when you open Diagnostics, when a keyboard
-connects while it is open, and again with its **Read keyboard**; the slave
+connects while it is open, and again with **Read keyboard** while it is
+open; the slave
 half's arrive through the master half, so they show a moment after the master
 half's. A half with nothing to report yet says **not measured yet**. The demo
 shows sample figures.

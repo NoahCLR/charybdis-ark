@@ -159,7 +159,8 @@ test("read phase changes keep the editor, while content and permissions redraw i
 
 
 test("phase words render from the model while progress and saving use stable IDs", async ({page}) => {
-    await page.goto("/preview/index.html");
+    // The Keyboard screen names the phase under Diagnostics (D-L100).
+    await page.goto("/preview/index.html?diagnostics");
     const result = await page.evaluate(async () => {
         const store = await import("/webview/store.mjs");
         const original = structuredClone(store.getModel());
