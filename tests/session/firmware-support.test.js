@@ -165,14 +165,19 @@ test("the support names have one home: neither the portable session nor the devi
 
 test("firmwareView says what the firmware reports about itself and its ceilings, nothing it does not", () => {
     assert.equal(support.firmwareView(null), null);
-    const view = support.firmwareView({...complete, firmwareVersion: 0x00010203, compiledDefaultDigest: 0xabc});
-    assert.equal(view?.version, "1.2.3");
-    assert.equal(view?.versionWord, "0x00010203");
+    const view = support.firmwareView({...complete, firmwareVersion: 0x07EA0A1B, compiledDefaultDigest: 0xabc});
+    assert.equal(view?.version, "v2026.10.27", "the firmware release the build includes (firmware D-F77)");
+    assert.equal(view?.versionWord, "0x07EA0A1B");
     assert.equal(view?.defaultsDigest, "0x00000ABC");
     assert.equal(view?.worksWithArk, true);
     assert.equal(view?.layers, complete.compiledLayerCount);
     assert.equal(view?.tapCounts, complete.maxTapStepsPerBehavior);
     assert.equal(view?.repeatHz, 100);
+    assert.equal(support.firmwareView({...complete, firmwareVersion: 0x07EA0A3B})?.version, "v2026.10.27.1", "a second release that day");
+    assert.equal(support.firmwareView({...complete, firmwareVersion: 0x07EF0CFF})?.version, "v2031.12.31.7");
+    for (const unnumbered of [0x00010000, 0x00010203, 0x07EA0D01, 0x07EA0A00, 0x07EA001B])
+        assert.equal(support.firmwareView({...complete, firmwareVersion: unnumbered})?.version, "from before release numbers",
+            `0x${unnumbered.toString(16)} names no release, so no date is made up`);
     const old = support.firmwareView({...complete, featureFlags: 0, firmwareVersion: 0, physicalLedCount: undefined});
     assert.equal(old?.worksWithArk, false);
     assert.equal(old?.version, null, "no version is said rather than 0.0.0");

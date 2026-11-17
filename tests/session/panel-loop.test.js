@@ -656,7 +656,7 @@ test("a retained dirty draft adopts the reconnected keyboard's capabilities at r
     adapter.keyboard = fakeKeyboard({document: currentDocument(), firmwareVersion: 0x00020000});
     await loop.handleMessage({type: "refresh"});
     assert.equal(loop.session.draft, draft, "reconnect preserves the authored draft");
-    assert.equal(draft.capabilities.firmwareVersion, 0x00010000, "a retained draft keeps its interpretation until rebase");
+    assert.equal(draft.capabilities.firmwareVersion, 0x07EA0A1B, "a retained draft keeps its interpretation until rebase");
     await loop.handleMessage({type: "rebaseProfileDraft", draftId: draft.id, draftRevision: draft.revision});
     assert.equal(last(shell).model.draft.editable, true);
     assert.equal(draft.capabilities.firmwareVersion, 0x00020000);

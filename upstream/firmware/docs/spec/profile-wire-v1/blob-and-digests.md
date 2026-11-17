@@ -26,13 +26,13 @@ The blob carries no length of its own. The carrier supplies it as a 32-bit
 field: a candidate's BEGIN, a profile slot's record header, payload readback's
 metadata page. A blob is `8..130,048` bytes: the upper bound is one 128 KiB
 profile slot less the first kilobyte its header and commit marker take
-(D-F29, [`0029`](https://github.com/NoahCLR/charybdis-4x6/blob/83ae3451bbdfa7c366081d200be79b8bced081c4/docs/adr/0029-profile-slots-in-their-own-flash-region.md)).
+(D-F29, [`0029`](https://github.com/NoahCLR/charybdis-4x6/blob/ac42a7231376ac108149a378cb6feae98e3708a2/docs/adr/0029-profile-slots-in-their-own-flash-region.md)).
 The empty profile is the eight bytes `4e 4c 50 31 04 05 00 01`.
 
 A header is refused, in this order: shorter than 8 bytes `TRUNCATED`; longer
 than 130,048 `CAPACITY_EXCEEDED`; wrong magic `INVALID_MAGIC`; any other
 schema `INCOMPATIBLE_SCHEMA` (no earlier schema is read, D-F10,
-[`0010`](https://github.com/NoahCLR/charybdis-4x6/blob/83ae3451bbdfa7c366081d200be79b8bced081c4/docs/adr/0010-firmware-accepts-only-current-formats.md)); a
+[`0010`](https://github.com/NoahCLR/charybdis-4x6/blob/ac42a7231376ac108149a378cb6feae98e3708a2/docs/adr/0010-firmware-accepts-only-current-formats.md)); a
 reserved flag bit set `RESERVED_FLAGS`; flag bit 0 clear `NONCANONICAL`; more
 than eight domains `CAPACITY_EXCEEDED`.
 
@@ -80,19 +80,19 @@ requested domains, a record's domain mask, capability page 1 byte 12) is
 | 7 | `0x80` | `0x80` | 2 | Autocorrect list | [autocorrect-domain.md](autocorrect-domain.md) |
 
 Lighting version 5 and settings version 12 were both schema 4.5's (D-F70,
-[`0070`](https://github.com/NoahCLR/charybdis-4x6/blob/83ae3451bbdfa7c366081d200be79b8bced081c4/docs/adr/0070-replacement-feedback-is-a-lighting-stage.md)).
+[`0070`](https://github.com/NoahCLR/charybdis-4x6/blob/ac42a7231376ac108149a378cb6feae98e3708a2/docs/adr/0070-replacement-feedback-is-a-lighting-stage.md)).
 Settings version 13 and autocorrect version 2 are both schema 4.6's, the step
 that brought the leader (D-F71,
-[`0071`](https://github.com/NoahCLR/charybdis-4x6/blob/83ae3451bbdfa7c366081d200be79b8bced081c4/docs/adr/0071-the-leader-is-part-of-the-typing-stage.md)), not
+[`0071`](https://github.com/NoahCLR/charybdis-4x6/blob/ac42a7231376ac108149a378cb6feae98e3708a2/docs/adr/0071-the-leader-is-part-of-the-typing-stage.md)), not
 schema minors of their own. Lighting version 6 is schema 4.7's, the step
 that lights leading (D-F72,
-[`0072`](https://github.com/NoahCLR/charybdis-4x6/blob/83ae3451bbdfa7c366081d200be79b8bced081c4/docs/adr/0072-leading-is-a-case-of-replacement-feedback.md)), and
+[`0072`](https://github.com/NoahCLR/charybdis-4x6/blob/ac42a7231376ac108149a378cb6feae98e3708a2/docs/adr/0072-leading-is-a-case-of-replacement-feedback.md)), and
 lighting version 7 schema 4.8's, the step that gives each feedback case its
 own locality (D-F73,
-[`0073`](https://github.com/NoahCLR/charybdis-4x6/blob/83ae3451bbdfa7c366081d200be79b8bced081c4/docs/adr/0073-each-feedback-case-has-its-own-locality.md)).
+[`0073`](https://github.com/NoahCLR/charybdis-4x6/blob/ac42a7231376ac108149a378cb6feae98e3708a2/docs/adr/0073-each-feedback-case-has-its-own-locality.md)).
 
 The eight rows fill the one-byte mask (D-F68,
-[`0068`](https://github.com/NoahCLR/charybdis-4x6/blob/83ae3451bbdfa7c366081d200be79b8bced081c4/docs/adr/0068-the-autocorrect-list-is-a-readable-profile-domain.md)):
+[`0068`](https://github.com/NoahCLR/charybdis-4x6/blob/ac42a7231376ac108149a378cb6feae98e3708a2/docs/adr/0068-the-autocorrect-list-is-a-readable-profile-domain.md)):
 every bit names a domain, so no mask is refused for a bit alone, and a ninth
 domain needs a wider mask in every place one travels.
 
@@ -112,10 +112,10 @@ A registry row names its domain module. The whole-profile validator and the
 compiled-defaults writer reach each domain only through a switch generated
 from the rows, calling `validate_<module>` and
 `noah_profile_<module>_compiled_v1_write`, so a row added without both does
-not compile (D-F11, [`0011`](https://github.com/NoahCLR/charybdis-4x6/blob/83ae3451bbdfa7c366081d200be79b8bced081c4/docs/adr/0011-one-definition-per-profile-domain.md);
-D-F13, [`0013`](https://github.com/NoahCLR/charybdis-4x6/blob/83ae3451bbdfa7c366081d200be79b8bced081c4/docs/adr/0013-registry-row-names-its-domain-module.md)). A
+not compile (D-F11, [`0011`](https://github.com/NoahCLR/charybdis-4x6/blob/ac42a7231376ac108149a378cb6feae98e3708a2/docs/adr/0011-one-definition-per-profile-domain.md);
+D-F13, [`0013`](https://github.com/NoahCLR/charybdis-4x6/blob/ac42a7231376ac108149a378cb6feae98e3708a2/docs/adr/0013-registry-row-names-its-domain-module.md)). A
 domain whose compiled encoder writes nothing is absent from the build's
-compiled defaults (D-F12, [`0012`](https://github.com/NoahCLR/charybdis-4x6/blob/83ae3451bbdfa7c366081d200be79b8bced081c4/docs/adr/0012-one-complete-compiled-profile.md)).
+compiled defaults (D-F12, [`0012`](https://github.com/NoahCLR/charybdis-4x6/blob/ac42a7231376ac108149a378cb6feae98e3708a2/docs/adr/0012-one-complete-compiled-profile.md)).
 
 One envelope walker checks magic, schema, flags, domain count, versions,
 order, payload extents and completion. It takes one already-read blob or
@@ -157,14 +157,14 @@ operand at or above its kind's count or a nonzero operand on kind 0; any of
 them refuses the whole candidate or edit. The validator also refuses a layer
 at or above the build's layer count and a pointing slot the build does not
 have. The userspace keycode blocks are fixed (D-F51,
-[`0051`](https://github.com/NoahCLR/charybdis-4x6/blob/83ae3451bbdfa7c366081d200be79b8bced081c4/docs/adr/0051-userspace-keycodes-in-fixed-blocks.md)).
+[`0051`](https://github.com/NoahCLR/charybdis-4x6/blob/ac42a7231376ac108149a378cb6feae98e3708a2/docs/adr/0051-userspace-keycodes-in-fixed-blocks.md)).
 
 The firmware writes the semantic kind for every native keycode that has one:
 `KC_NO` as kind 0, a custom key as 7, a macro as 6, a layer lock as 3, `MO()`
 as 2, a pointing hold or lock as 4 or 5, and anything else as kind 1. Kind 1
 decodes for any value; what a QMK keycode may do is decided by the action-ABI
 digest and the placement rules below. A custom key as a behaviour step sends
-its shortcut only (D-F26, [`0026`](https://github.com/NoahCLR/charybdis-4x6/blob/83ae3451bbdfa7c366081d200be79b8bced081c4/docs/adr/0026-custom-key-carries-a-shortcut.md);
+its shortcut only (D-F26, [`0026`](https://github.com/NoahCLR/charybdis-4x6/blob/ac42a7231376ac108149a378cb6feae98e3708a2/docs/adr/0026-custom-key-carries-a-shortcut.md);
 [key-behavior-domain.md](key-behavior-domain.md)).
 
 Held by: `tests/host/run_profile_blob_v1_tests.sh` (`profile_blob_v1_test.c`), `tests/fixtures/profile_blob_v1.fixture`, `tests/host/run_profile_compiled_defaults_v1_tests.sh` (`profile_compiled_defaults_v1_test.c`, native mapping and keycode blocks), `tests/host/run_action_dispatch_tests.sh` (`action_dispatch_test.c`, native round trips).
@@ -238,15 +238,15 @@ The FNV-1a digest of this byte stream, integers little-endian:
 | 5 | 1 | pointing slot count |
 | 6 | 1 | macro slot count |
 | 7 | 1 | custom-key count |
-| 8 | 4 | `NOAH_FIRMWARE_VERSION` |
-| 9 | 2 each | `KC_NO`, `KC_TRNS`, `MO(0)`, `LT(0, KC_NO)`, `OSM(0)`, `MT(0, KC_NO)`, `QK_MACRO_0`, `CUSTOM_KEY_0`, the first layer lock |
-| 10 | 1 + 2 + 2 per layer | layer id, `MO(n)`, `LOCK_LAYER(n)` |
-| 11 | 1 + 4 + 2 + 2 per slot | slot id, its 32-bit mode flag, its hold keycode, its lock keycode |
-| 12 | 2 + 2 | the end of the userspace keycode blocks before custom keys (`0x7f00`), then `0xFFFF` |
+| 8 | 2 each | `KC_NO`, `KC_TRNS`, `MO(0)`, `LT(0, KC_NO)`, `OSM(0)`, `MT(0, KC_NO)`, `QK_MACRO_0`, `CUSTOM_KEY_0`, the first layer lock |
+| 9 | 1 + 2 + 2 per layer | layer id, `MO(n)`, `LOCK_LAYER(n)` |
+| 10 | 1 + 4 + 2 + 2 per slot | slot id, its 32-bit mode flag, its hold keycode, its lock keycode |
+| 11 | 2 + 2 | the end of the userspace keycode blocks before custom keys (`0x7f00`), then `0xFFFF` |
 
 It depends on no authored row, so an empty profile and a populated one share
-it. Because it includes the firmware version and the layer count, a new
-firmware version or layer bank has its own digest, and a profile saved under
-another is refused.
+it. Because it includes the layer count, a new layer bank has its own digest,
+and a profile saved under another is refused. It does not include the
+firmware version, so a new release on its own keeps the digest (D-F77,
+[`0077`](https://github.com/NoahCLR/charybdis-4x6/blob/ac42a7231376ac108149a378cb6feae98e3708a2/docs/adr/0077-the-firmware-version-is-the-release.md)).
 
 Held by: `tests/host/run_profile_compiled_defaults_v1_tests.sh` (`profile_compiled_defaults_v1_test.c`), `tests/fixtures/compiled_profile_pd_v2.fixture` (`profile.action_abi`).
