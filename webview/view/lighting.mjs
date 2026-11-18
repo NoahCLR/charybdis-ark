@@ -53,7 +53,7 @@ function autoMouseOff(model) {
         ?.fields.find((entry) => entry.macro === "autoMouse");
     return Boolean(field && !field.enabled);
 }
-// Text replacement's switch, a section of its own on Host settings (D-L87).
+// Text replacement's switch, a section of its own on Typing settings (D-L87).
 /** @param {Model} model */
 function textReplacementOff(model) {
     const field = (model?.configDefaults || []).find((section) => section.id === "autocorrect")

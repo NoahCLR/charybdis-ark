@@ -136,6 +136,13 @@ keyboard do, and what must be fixed first.
 - **Discard** puts that one change back.
 - Changes made by one edit, such as two keys swapped, are discarded together.
 
+A few things the keyboard stores have no control in Ark, so their change has
+no **Show**: the default layers, and QMK's key options, such as swapping Ctrl
+and Caps Lock, N-key rollover or one-shot keys. Ark keeps whatever the keyboard
+stores for those options and never changes them on its own, so they differ
+only when a backup or another tool sets them; Review then lists them as one
+**Other key options** change, which **Discard** puts back.
+
 Layers are compared by which layer they are, not where they sit, so a
 reorder is one change and a key edited afterwards is another. Macros, custom
 keys and pointing modes are compared the same way when their slots are

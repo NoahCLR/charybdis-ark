@@ -3,7 +3,7 @@
 const {test, expect} = require("@playwright/test");
 const {openPreview} = require("./shell-page");
 for (const theme of ["dark", "light"]) {
-    test(`Host Settings and literal Text steps post exact content (${theme})`, async ({page}) => {
+    test(`Typing settings and literal Text steps post exact content (${theme})`, async ({page}) => {
         await openPreview(page, theme);
         await page.evaluate(async () => {
             const store = await import("/webview/store.mjs");

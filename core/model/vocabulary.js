@@ -320,17 +320,17 @@ const SETTINGS_SECTIONS = Object.freeze({
     keyTiming: "Tap & hold timing", normalPointerSpeed: "Pointer speed", sniping: "Auto-sniping", autoMouse: "Auto-mouse",
     automouseFade: "Auto-mouse fade", lightingPower: "All lighting", rgbAppearance: "Background effect", lightingFeedback: "Behaviour feedback flash", replacementFeedback: "Replacement feedback flash",
     startupLayers: "Default layers", behaviorSettings: "Where behaviours run", comboSettings: "How combos run", comboReferences: "Combo layer matching",
-    keyboardOptions: "Key swaps & typing", host: "Your computer", autocorrect: "Text replacement",
+    host: "Your computer", autocorrect: "Text replacement",
 });
 
 // A Settings screen as anything but the rail names it. The rail lists
 // "Pointer" under Settings; a link, a tip or a fix that sends a person
 // there has no rail around it, so it says "Pointer settings".
-const SETTINGS_SCREENS = Object.freeze({behaviours: "Behaviour settings", combos: "Combo settings", pointer: "Pointer settings", host: "Host settings"});
+const SETTINGS_SCREENS = Object.freeze({behaviours: "Behaviour settings", combos: "Combo settings", pointer: "Pointer settings", host: "Typing settings"});
 
 // Where a person finds a settings section, as a note core writes names it:
 // the Settings screen as it is named outside the rail, then the section's
-// heading ("Host settings → Your computer"), as the interface's sectionPath
+// heading ("Typing settings → Your computer"), as the interface's sectionPath
 // (webview/view/settings-layout.mjs) says it.
 /** @param {keyof typeof SETTINGS_SCREENS} screen @param {keyof typeof SETTINGS_SECTIONS} section */
 const settingsPath = (screen, section) => `${SETTINGS_SCREENS[screen]} → ${SETTINGS_SECTIONS[section]}`;
@@ -729,7 +729,7 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     // and says so.
     fileSections: {
         keyTiming: SETTINGS_SECTIONS.keyTiming, startupLayers: SETTINGS_SECTIONS.startupLayers, behaviorSettings: "Behaviour settings", comboSettings: "Combo settings",
-        comboReferences: SETTINGS_SECTIONS.comboReferences, keyboardOptions: SETTINGS_SECTIONS.keyboardOptions, lightingPower: SETTINGS_SECTIONS.lightingPower, rgbAppearance: SETTINGS_SECTIONS.rgbAppearance,
+        comboReferences: SETTINGS_SECTIONS.comboReferences, lightingPower: SETTINGS_SECTIONS.lightingPower, rgbAppearance: SETTINGS_SECTIONS.rgbAppearance,
         lightingFeedback: "Behaviour feedback", replacementFeedback: "Replacement feedback", normalPointerSpeed: SETTINGS_SECTIONS.normalPointerSpeed, sniping: SETTINGS_SECTIONS.sniping, autoMouse: SETTINGS_SECTIONS.autoMouse,
         autocorrect: "Text replacement switch",
     },

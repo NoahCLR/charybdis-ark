@@ -70,7 +70,7 @@ export function stageAutocorrect(model) {
         onChange: (locality) => post(edits.autocorrectFeedbackLocality(feedback, current.id, locality))})));
     // How long a flash lasts is one setting for every case, on the stage
     // bar; Leader waiting holds as long as the leader waits instead, which
-    // is set on Host settings, a link away.
+    // is set on Typing settings, a link away.
     const waits = unitlessLabel(settingField(model, "leaderTimeout"));
     const leader = el(`<button class="btn tiny link" data-act="leader-waits" data-tip="Opens ${esc(sectionPath(model, "autocorrect"))}.">${esc(waits)} →</button>`);
     leader.addEventListener("click", () => { state.screen = screenOfSection("autocorrect") || "host"; state.reveal = '.setrow:has([data-macro="leaderTimeout"])'; render(); });

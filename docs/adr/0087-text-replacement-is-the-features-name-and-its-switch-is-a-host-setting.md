@@ -2,6 +2,8 @@
 
 Cited as D-L87.
 
+Amended 2026-11-18 (D-L102): Key swaps & typing is gone from Host, so the Text replacement card is the last on it, after Your computer, and Host is now named **Typing** (Typing settings outside the rail).
+
 Amended 2026-11-16: the Text replacement memory meter was the domain's bytes against the domain's ceiling (36,874), while what is free was bound by the text's ceiling, so the two disagreed and the text's limit appeared nowhere. The domain's ceiling is the text's plus every row at its count's ceiling (firmware `autocorrect-domain.md`), so the text or a count always meets its own first; it is a size, not a limit a person can reach, and is no longer shown. What is free is still bounded by it and by the profile's shared room, in case a keyboard reports them tighter.
 
 ## The name

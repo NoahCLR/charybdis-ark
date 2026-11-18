@@ -304,7 +304,7 @@ On the stage bar, under **Every case**, one setting for every case:
 - **Flash length**: how long one flash lasts, in milliseconds. The flash
   begins as the replacement starts to be typed. **Leader waiting** is no
   flash: it holds for as long as the leader waits, which **Leader waits**
-  sets on [Host settings](text-replacement.md#turning-it-on-and-off); the
+  sets on [Typing settings](text-replacement.md#turning-it-on-and-off); the
   **Leader waits →** link beside it goes there.
 
 One flash shows at a time: an undo straight after a replacement takes its
@@ -321,7 +321,7 @@ the line says so. The board shows where each case lands, not the flash
 itself.
 
 With **Enabled** off under **Text replacement** on
-[Host settings](text-replacement.md#turning-it-on-and-off) nothing is replaced, so this
+[Typing settings](text-replacement.md#turning-it-on-and-off) nothing is replaced, so this
 stage paints nothing: its tab reads off, and its stage bar says **Text
 replacement is off**. Its controls stay editable. Click those words to go to
 that switch. With a leader input on your list the tab stays live instead,

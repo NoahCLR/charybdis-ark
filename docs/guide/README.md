@@ -8,7 +8,7 @@ page for whatever you want to change.
 2. [The board and layers](board-and-layers.md): the board, the hover card,
    layer tabs, previewing layers together, renaming and reordering layers.
 3. [Keys](keys.md): what a key sends, the keycode picker, custom keys (and
-   swapping their slots) and keyboard-wide key swaps.
+   swapping their slots).
 4. [Behaviours](behaviours.md): what a key does on tap, hold and long hold,
    for each tap count, and its timing.
 5. [Combos](combos.md): keys pressed together.

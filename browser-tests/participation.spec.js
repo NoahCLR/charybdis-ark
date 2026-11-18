@@ -205,7 +205,7 @@ test("a Lighting stage a global switch keeps from painting says so, reads off, a
         ["auto", "Auto-mouse is off →", "This stage paints nothing. Turn it on in Pointer settings →", "pointer", "autoMouse"],
         ["combo", "Combos are off →", "This stage paints nothing. Turn them on in Combo settings →", "combos", "combosEnabled"],
         ["key", "Behaviours are off →", "This stage paints nothing. Turn them on in Behaviour settings →", "behaviours", "behaviorsEnabled"],
-        ["autocorrect", "Text replacement is off →", "This stage paints nothing. Turn it on in Host settings →", "host", "autocorrect"]]) {
+        ["autocorrect", "Text replacement is off →", "This stage paints nothing. Turn it on in Typing settings →", "host", "autocorrect"]]) {
         await open(stage);
         await expect(banner).toHaveText(words);
         await expect(banner).toHaveAttribute("data-tip", tip);

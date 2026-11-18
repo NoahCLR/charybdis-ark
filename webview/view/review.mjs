@@ -87,7 +87,7 @@ const CATEGORIES = ["Keys", "Lighting", "Macros", "Text replacement", "Pointer",
 /** @type {Readonly<Record<string, [string, number]>>} */
 export const SECTION_ROWS = {
     keyTiming: ["Keys", 32], startupLayers: ["Keys", 22], behaviorSettings: ["Keys", 31], comboSettings: ["Keys", 40], comboReferences: ["Keys", 41],
-    keyboardOptions: ["Keys", 50], lightingPower: ["Lighting", -1], rgbAppearance: ["Lighting", 1], lightingFeedback: ["Lighting", 15], replacementFeedback: ["Lighting", 16],
+    lightingPower: ["Lighting", -1], rgbAppearance: ["Lighting", 1], lightingFeedback: ["Lighting", 15], replacementFeedback: ["Lighting", 16],
     normalPointerSpeed: ["Pointer", 1], sniping: ["Pointer", 2], autoMouse: ["Pointer", 3], autocorrect: ["Text replacement", 1],
 };
 /** @param {string} id @param {Readonly<Record<string, string>>} sections @returns {[string, string, number] | undefined} */
@@ -116,7 +116,7 @@ function categoryOf(item, names, stages, sections) {
             return stageRow(place.stage, stages);
         }
         case "settings": return place.stage ? stageRow(place.stage, stages) : sectionRow(place.section || "", sections)
-            || (item.unit === OTHER_KEY_OPTIONS_UNIT ? sectionRow("keyboardOptions", sections) : undefined) || ["Other", item.title, 0];
+            || (item.unit === OTHER_KEY_OPTIONS_UNIT ? ["Keys", item.title, 50] : ["Other", item.title, 0]);
         default: return ["Other", item.title, 0];
     }
 }

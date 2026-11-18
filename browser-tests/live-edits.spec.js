@@ -160,8 +160,8 @@ test("auto-mouse turned off by a key shows beside its switch, which says keyboar
 });
 
 // AC_OFF and AC_TOGG (firmware D-F66) switch text replacement the same way,
-// and its switch, on the Host screen with the other switches' kind, says so.
-test("text replacement turned off by a key shows beside its Host switch, which says keyboard keys change it", async ({page}) => {
+// and its switch, on the Typing screen with the other switches' kind, says so.
+test("text replacement turned off by a key shows beside its Typing switch, which says keyboard keys change it", async ({page}) => {
     await openLive(page, "host");
     const row = page.locator('.settings-group[data-section="autocorrect"] .setrow:has([data-macro="autocorrect"])');
     await expect(row.locator(".kk-mark")).toHaveText(["↺ keyboard keys change this too"]);

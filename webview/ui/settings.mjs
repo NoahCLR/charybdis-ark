@@ -1,6 +1,6 @@
 // @ts-check
 // The Settings screens: the keyboard's global policy, exactly as it reports
-// it, a screen per subject (Behaviours, Combos, Pointer, Host).
+// it, a screen per subject (Behaviours, Combos, Pointer, Typing).
 //
 // The sections, fields, hints and limits all come from the device snapshot, so
 // these screens render what the firmware says it has rather than a list this
@@ -11,7 +11,7 @@
 
 // Selector assertions refer to elements created by this module's authored markup.
 import * as edits from "../view/edits.mjs";
-import {el, esc, html} from "../lib/dom.mjs";
+import {el, esc} from "../lib/dom.mjs";
 import {getModel, layers, post, render, state} from "../store.mjs";
 import {editGate} from "../view/edit-gate.mjs";
 import {layerCalled} from "../view/vocabulary.mjs";
@@ -25,7 +25,7 @@ import {durationControl} from "./duration.mjs";
 import {choiceField} from "./segmented.mjs";
 import {settingOptions} from "../view/choices.mjs";
 import {layerSwitchGrid} from "./layer-switches.mjs";
-import {fieldParts, isLayerSwitch, sectionsOn, unitlessLabel} from "../view/settings-layout.mjs";
+import {isLayerSwitch, sectionsOn, unitlessLabel} from "../view/settings-layout.mjs";
 import {foldEmptyLayers} from "../view/empty-layers.mjs";
 import {emptyLayersButton, emptyLayersShown} from "./empty-layers.mjs";
 import {attachInfoMarks, infoMark} from "./info-mark.mjs";
@@ -40,8 +40,8 @@ export const screenCombos = () => settingsScreen("combos", "Combos",
     "Where combos run, how they are timed and how they match.");
 export const screenPointer = () => settingsScreen("pointer", "Pointer",
     "Pointer speed, sniping and the pointer layer.");
-export const screenHost = () => settingsScreen("host", "Host",
-    "The computer you type on, text replacement's switch, and key swaps for every layer.");
+export const screenHost = () => settingsScreen("host", "Typing",
+    "The computer you type on, and text replacement's switch.");
 
 // One Settings screen: its sections as cards, all open, each saved whole.
 /** @param {string} screen @param {string} title @param {string} subtitle */
@@ -62,8 +62,6 @@ function settingsScreen(screen, title, subtitle) {
     else if (!canEdit && !gate.quiet) {
         pad.appendChild(el(`<div class="unavailable">${esc(gate.why || "These settings cannot be edited right now.")}</div>`));
     }
-    // A section the keyboard has not filled in yet (Key swaps before its
-    // options are read) still shows, to say why it is empty.
     for (const section of sections) {
         if (section.id === "comboSettings") pad.appendChild(combosCard(model, section, canEdit));
         else if (section.id === "comboReferences") pad.appendChild(referenceCard(model, section, canEdit));
@@ -191,21 +189,13 @@ function sectionCard(model, section, canEdit, {extra} = {}) {
     // row of layers rather than a row each.
     const grouped = section.layerGroup ? section.fields.filter(isLayerSwitch) : [];
     const slot = section.fields.some((entry) => entry.governs && !grouped.includes(entry));
-    for (const {part, fields} of fieldParts(section.fields)) {
-        if (part) rows.appendChild(el(`<div class="setrow-part">${esc(part)}</div>`));
-        for (const field of fields) {
-            if (grouped.includes(field)) {
-                if (field === grouped[0] && section.layerGroup) rows.appendChild(layerGroupRow(section.layerGroup, grouped, canEdit, submit, `settings:${section.id}`));
-                continue;
-            }
-            rows.appendChild(fieldRow(field, canEdit, submit, slot, durations));
-            if (extra && field.macro === extra.after) rows.append(...extra.nodes);
+    for (const field of section.fields) {
+        if (grouped.includes(field)) {
+            if (field === grouped[0] && section.layerGroup) rows.appendChild(layerGroupRow(section.layerGroup, grouped, canEdit, submit, `settings:${section.id}`));
+            continue;
         }
-    }
-    // A section QMK owns whole says so once, by its title, not on every row.
-    if (section.fields.length > 1 && section.fields.every((field) => field.keyboardKeys)) {
-        node.querySelectorAll(".rows .kk-mark").forEach((mark) => mark.remove());
-        node.querySelector(":scope > .card-h > h3")?.insertAdjacentHTML("afterend", html(keyboardKeysMark(section.fields[0])));
+        rows.appendChild(fieldRow(field, canEdit, submit, slot, durations));
+        if (extra && field.macro === extra.after) rows.append(...extra.nodes);
     }
     attachInfoMarks(node);
     return node;

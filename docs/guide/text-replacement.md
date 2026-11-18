@@ -11,7 +11,7 @@ them.
 
 Your list is part of the keyboard's profile: Ark edits it, both halves store
 it, and a backup holds it. The list is on the **Text replacement** screen;
-its switch is a setting, on **Host**.
+its switch is a setting, on **Typing**.
 
 ## How the keyboard uses the list
 
@@ -128,7 +128,7 @@ phone number is all the computer sees.
 - It sends as soon as no other input that fires after Leader could still
   follow: with `pn` on your list, Leader then `p` `n` sends at once.
 - When one such input begins another, `abc` and `abcd`, press Enter to send
-  the shorter one, or wait: after **Leader waits** on Host (2000 ms unless
+  the shorter one, or wait: after **Leader waits** on Typing (2000 ms unless
   you set another, 1000 to 10000), it is sent too.
 - A character that leaves what you typed the start of no such input drops
   it, that character included, and nothing is sent. Escape drops it too, and
@@ -147,14 +147,14 @@ does not flash. While the leader
 waits, the keyboard can hold a colour of its own, **Leader waiting**, which
 you set on [Lighting's Replacement feedback tab](lighting.md#replacement-feedback).
 
-The leader works with text replacement switched off, on Host or by key. Ark
+The leader works with text replacement switched off, on Typing or by key. Ark
 warns before you apply a list with replacements that fire after Leader and no
 Leader key anywhere, and a Leader key with nothing on the list that fires
 after it.
 
 ## Turning it on and off
 
-The switch is on **Host**, under **Text replacement**: **Enabled** turns it
+The switch is on **Typing**, under **Text replacement**: **Enabled** turns it
 on or off for the whole keyboard. It is there because replacements are typed
 through the host layout chosen above it, and because every such switch is a
 Settings screen's: Behaviours, Combos and Pointer have theirs. It is saved
@@ -170,7 +170,7 @@ terminal a replacement is wrong, so put a key on the keyboard to switch it
 off there: **Text replacement Off** (`AC_OFF`) or **Toggle Text
 replacement** (`AC_TOGG`), with **Text replacement On** (`AC_ON`) to switch
 it back. They are [switch keys](behaviours.md#switch-keys): they work until
-the keyboard restarts, save nothing, and can't turn on what is off in Host.
+the keyboard restarts, save nothing, and can't turn on what is off in Typing.
 That is why the switch says **↺ keyboard keys change this too**, and
 **turned off by key** while a key has it off; the ⓘ beside its section's
 title says what each means. The picker lists them under

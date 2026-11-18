@@ -79,8 +79,8 @@ export const SCREENS = Object.freeze({
         available: configureReady, render: renderers => renderers.screenPointer(),
     }),
     host: screen({
-        label: "Host", group: "Settings", keepOnPublish: true,
-        icon: '<svg viewBox="0 0 16 16"><rect x="1.5" y="2.5" width="13" height="8.5" rx="1.5"/><path d="M5.5 14h5M8 11v3"/></svg>',
+        label: "Typing", group: "Settings", keepOnPublish: true,
+        icon: '<svg viewBox="0 0 16 16" stroke-linecap="round"><path d="M2.5 3.5h7M6 3.5v9"/><path d="M12 6v7M10.75 6h2.5M10.75 13h2.5"/></svg>',
         available: configureReady, render: renderers => renderers.screenHost(),
     }),
     profile: screen({

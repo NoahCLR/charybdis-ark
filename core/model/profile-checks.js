@@ -172,7 +172,7 @@ function profileFindings(decoded, destination = {}) {
     }
     // Text replacements the host layout cannot type (D-L84): the keyboard
     // skips them, so they are carried and said once, however many there are.
-    // A layout changed on the Host screen is what leaves them so.
+    // A layout changed on the Typing screen is what leaves them so.
     const layoutName = word(VOCABULARY.hostLayouts, host.layout);
     const macroNames = decoded.settings.macroNames || [];
     const listed = listWarnings(decoded.autocorrect || {entries: []}, {layout: host.layout, layoutName, macroNames, emptyMacros});

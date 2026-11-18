@@ -12,15 +12,14 @@ import {vocabulary} from "./vocabulary.mjs";
 // sections open in the order a person reads them: where behaviours run and
 // what a key press feels like; combos and the layers they match on; how
 // the trackball moves the pointer; the computer the keyboard is plugged into,
-// text replacement, which types through that computer's layout, and the
-// keyboard-wide swaps. Combos also holds the combo timing, saved
+// and text replacement, which types through that computer's layout. Combos also holds the combo timing, saved
 // with the combos. Default layers is on none: moving the base layer covers
 // it, and the keyboard's stored value is kept as it is.
 export const SETTINGS_SCREENS = Object.freeze({
     behaviours: Object.freeze(["behaviorSettings", "keyTiming"]),
     combos: Object.freeze(["comboSettings", "comboReferences"]),
     pointer: Object.freeze(["normalPointerSpeed", "sniping", "autoMouse"]),
-    host: Object.freeze(["host", "autocorrect", "keyboardOptions"]),
+    host: Object.freeze(["host", "autocorrect"]),
 });
 /** @typedef {keyof typeof SETTINGS_SCREENS} SettingsScreen */
 
@@ -97,17 +96,3 @@ export const settingLabel = (model, macro) => unitlessLabel(settingField(model, 
 // one row of layers.
 /** @param {Field} field */
 export const isLayerSwitch = (field) => field.kind === "toggle" && field.governs?.kind === "layer";
-
-// The parts a section lists its fields under, in the order the first of
-// each comes; a section without parts is one unnamed part.
-/** @param {readonly Field[]} fields @returns {{part: string, fields: Field[]}[]} */
-export function fieldParts(fields) {
-    /** @type {Map<string, Field[]>} */
-    const parts = new Map();
-    for (const field of fields) {
-        const part = field.part || "";
-        if (!parts.has(part)) parts.set(part, []);
-        parts.get(part)?.push(field);
-    }
-    return [...parts].map(([part, list]) => ({part, fields: list}));
-}

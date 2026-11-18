@@ -50,7 +50,7 @@ the Key tab says so. A keycode you set here goes on the top layer and wins.
 **Pick…**, or double-clicking a key or a behaviour cell, opens the keycode
 picker. It starts with
 a board labelled for your computer's keyboard layout (set in
-[Host settings](macros.md#your-computer)), with Shift above each legend and
+[Typing settings](macros.md#your-computer)), with Shift above each legend and
 Option or AltGr on the right. Below it are sections by task: **Letters and
 digits**, **Symbols**, **Numpad**, **Common keys**, then the things you own,
 **Layers**, **Macros**, **Custom keys** and **Pointing modes**, then **Mouse**,
@@ -228,26 +228,3 @@ that way, a tap-toggle shortcut only holds its layers: its taps belong to its
 own key. A combo set to run its output's behaviour is the exception: it acts
 as the custom key itself, so its taps can lock a tap-toggle shortcut's layers
 as the key's own do.
-
-## Key swaps & typing
-
-**Key swaps & typing**, on **Host settings** below Your computer, holds
-keyboard-wide options that apply on every layer:
-
-- **Modifiers**: swap left Ctrl and Caps Lock, use Caps Lock as left Ctrl,
-  swap Option and Command on either side, disable the Command keys, swap Ctrl
-  and Command on either side.
-- **Keys**: swap backtick and Escape, backslash and Backspace, or Escape and
-  Caps Lock.
-- **Typing**: one-shot modifiers and layers, and more than six keys at once.
-
-**Text replacement**, the card above these on Host, has the switch for
-[text replacement](text-replacement.md#turning-it-on-and-off): **Enabled**.
-It sits under **Your computer**
-because replacements are typed through the layout chosen there.
-
-An option this firmware was built without says **Not in this firmware** and
-does nothing. These options are marked **↺ keyboard keys change this too**:
-a key on the keyboard can change them until the keyboard restarts, and they
-then come back to what is set here. The ⓘ beside the section's title says
-so too.
