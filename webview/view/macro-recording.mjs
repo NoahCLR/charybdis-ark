@@ -5,7 +5,7 @@ import {MAX_DELAY, samePayload, serializeMacroStep} from "./macro.mjs";
 
 /** @typedef {{keycode: string, type: 'keydown' | 'keyup', time: number}} RecordedKey */
 /** @typedef {{step: import('./types.js').MacroStep, time: number, end: number}} TimedStep */
-/** @typedef {{explicit?: boolean, delays?: boolean, threshold?: number, round?: number, finished?: boolean, finishedAt?: number}} RecordingOptions */
+/** @typedef {{explicit?: boolean, delays?: boolean, threshold?: number, finished?: boolean, finishedAt?: number}} RecordingOptions */
 
 // Every browser key code the macro format can send, by the QMK name the
 // payload stores. Keys the format has no code for stay unrecorded, and the
@@ -190,15 +190,18 @@ function delayPayload(duration) {
     return result;
 }
 
+// A recorded pause is kept to the nearest 5 ms: finer than a person can time
+// a key, coarse enough that a take reads as round numbers.
+const DELAY_STEP_MS = 5;
+
 /** @param {string} before @param {readonly RecordedKey[]} events @param {RecordingOptions} [options] */
-export function recordedTakePayload(before, events, {explicit = false, delays = true, threshold = 0, round = 1, finished = true, finishedAt} = {}) {
+export function recordedTakePayload(before, events, {explicit = false, delays = true, threshold = 0, finished = true, finishedAt} = {}) {
     const keys = balanced(events, !explicit || finished, finished ? finishedAt : undefined);
     const steps = explicit ? explicitSteps(keys) : groups(keys).flatMap(group => compactGroup(group) ?? explicitSteps(group));
-    const rounding = Math.max(1, Number(round) || 1);
     let result = before, previous = null;
     for (const entry of steps) {
         const gap = previous === null ? 0 : Math.max(0, entry.time - previous);
-        if (delays && gap > Math.max(0, threshold)) result += delayPayload(Math.round(gap / rounding) * rounding);
+        if (delays && gap > Math.max(0, threshold)) result += delayPayload(Math.round(gap / DELAY_STEP_MS) * DELAY_STEP_MS);
         result += serializeMacroStep(entry.step);
         previous = entry.end;
     }

@@ -104,7 +104,7 @@ The ⓘ beside **Record** sums up what a take does and what each option below
 changes.
 
 - **Record delays** keeps the pauses longer than the time after each step,
-  rounded to the second time. The wait before the first key is never recorded.
+  rounded to 5 ms. The wait before the first key is never recorded.
 - **Preserve hold timing** keeps every press and release with its timing, for
   a macro that needs keys held for a while. It keeps Record delays on.
 - **Clear take** puts back what the slot held before you recorded. Once you

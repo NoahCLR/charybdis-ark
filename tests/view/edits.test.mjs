@@ -855,8 +855,8 @@ test("a recorded take appends to what the payload held, with no pause before the
         {keycode: "KC_A", type: "keydown", time: 900}, {keycode: "KC_A", type: "keyup", time: 950},
         {keycode: "KC_B", type: "keydown", time: 1074}, {keycode: "KC_B", type: "keyup", time: 1124},
         {keycode: "KC_C", type: "keydown", time: 1144}, {keycode: "KC_C", type: "keyup", time: 1194},
-    ], {threshold: 30, round: 10});
-    assert.equal(payload, "{KC_H}{KC_A}{120}{KC_B}{KC_C}", "gaps under the threshold are dropped");
+    ], {threshold: 30});
+    assert.equal(payload, "{KC_H}{KC_A}{125}{KC_B}{KC_C}", "gaps under the threshold are dropped");
     const draft = session();
     stage(draft, edits.macroMessage("MACRO_1", payload, draft.current.fingerprint));
     assert.equal(draft.dirty, true);
