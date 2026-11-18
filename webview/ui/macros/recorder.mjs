@@ -25,7 +25,7 @@ let escapeHold;
 
 const recordingOptions = () => ({explicit: state.recordPreserveHoldTiming,
     delays: state.recordPreserveHoldTiming || state.recordDelays !== false,
-    threshold: state.recordDelayThreshold, round: state.recordDelayRound});
+    threshold: state.recordDelayThreshold});
 
 // The recorder's two switches, as they are labelled and its info mark names them.
 const RECORD_DELAYS = "Record delays", PRESERVE_HOLD_TIMING = "Preserve hold timing";
@@ -34,8 +34,8 @@ const RECORD_DELAYS = "Record delays", PRESERVE_HOLD_TIMING = "Preserve hold tim
 /** @param {MacroSlot} slot */
 const recordInfo = (slot) => infoMark({id: `macro-info-record-${slot.keycode}`, label: "How recording works", heading: "How recording works",
     lead: "Appends what you type as key steps: overlapping keys become one chord, and held modifiers join each shortcut. Leaving this recorder finishes the take.",
-    rows: [{term: RECORD_DELAYS, says: "Keeps the pauses longer than the time after each step, rounded to the second time."},
-        {term: PRESERVE_HOLD_TIMING, says: `Keeps individual presses and releases with their timing. ${RECORD_DELAYS} stays on; its two times set the precision.`}]});
+    rows: [{term: RECORD_DELAYS, says: "Keeps the pauses longer than the time after each step, rounded to 5 ms."},
+        {term: PRESERVE_HOLD_TIMING, says: `Keeps individual presses and releases with their timing. ${RECORD_DELAYS} stays on, and its time sets the precision.`}]});
 
 /** @param {Model} model @param {MacroSlot} slot @param {boolean} canEdit */
 export function recorder(model, slot, canEdit) {
@@ -49,8 +49,7 @@ export function recorder(model, slot, canEdit) {
             <div class="row record-opts">
                 <label class="sw"><input type="checkbox" data-f="macro:${esc(slot.keycode)}:record-delays" data-delays ${delays ? "checked" : ""} ${state.recordPreserveHoldTiming ? "disabled" : ""}>
                     <span class="track"></span><span class="txt">${esc(RECORD_DELAYS)}</span></label>
-                <label class="ms-field"><span class="affix unit"><input class="input mono num" aria-label="Delay after each step" data-f="macro:${esc(slot.keycode)}:record-threshold" data-threshold inputmode="numeric" value="${esc(state.recordDelayThreshold)}" ${delays ? "" : "disabled"}><i>ms</i></span><span>after each step,</span></label>
-                <label class="ms-field"><span>rounded to</span><span class="affix unit"><input class="input mono num" aria-label="Round delays to" data-f="macro:${esc(slot.keycode)}:record-round" data-round inputmode="numeric" value="${esc(state.recordDelayRound)}" ${delays ? "" : "disabled"}><i>ms</i></span></label>
+                <label class="ms-field"><span class="affix unit"><input class="input mono num" aria-label="Delay after each step" data-f="macro:${esc(slot.keycode)}:record-threshold" data-threshold inputmode="numeric" value="${esc(state.recordDelayThreshold)}" ${delays ? "" : "disabled"}><i>ms</i></span><span>after each step</span></label>
                 <label class="sw"><input type="checkbox" data-f="macro:${esc(slot.keycode)}:record-preserve-hold-timing" data-preserve-hold-timing ${state.recordPreserveHoldTiming ? "checked" : ""} ${recording ? "disabled" : ""}>
                     <span class="track"></span><span class="txt">${esc(PRESERVE_HOLD_TIMING)}</span></label>
             </div>
@@ -68,9 +67,6 @@ export function recorder(model, slot, canEdit) {
     /** @type {HTMLInputElement} */ (node.querySelector("[data-delays]")).addEventListener("change", (event) => { state.recordDelays = /** @type {HTMLInputElement} */ (event.target).checked; render(); });
     /** @type {HTMLInputElement} */ (node.querySelector("[data-threshold]")).addEventListener("change", (event) => {
         state.recordDelayThreshold = Math.max(0, Number(/** @type {HTMLInputElement} */ (event.target).value) || 0);
-    });
-    /** @type {HTMLInputElement} */ (node.querySelector("[data-round]")).addEventListener("change", (event) => {
-        state.recordDelayRound = Math.max(1, Number(/** @type {HTMLInputElement} */ (event.target).value) || 1);
     });
     // Clear take puts the payload back to what it was before Record. A take
     // still in progress was never staged; a finished one was, so its restore

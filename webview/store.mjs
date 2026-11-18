@@ -131,7 +131,6 @@ export const STATE_FIELDS = {
     recordDelays: kept(true),
     recordPreserveHoldTiming: kept(false),
     recordDelayThreshold: kept(30),
-    recordDelayRound: kept(10),
     // The accent being added or changed on a Lighting stage (D-L77): its
     // table, whether it lights for all of its owners, its place (null for a
     // new one), the LEDs picked on the board, its colour and whether it takes
