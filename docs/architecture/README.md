@@ -104,7 +104,9 @@ Around the core:
 - What that view shows at each key of the board (the key that answers, the
   layer supplying it, its light, dots, badges and the icons of the kinds of
   thing it reaches): `boardKeys(view)`,
-  `webview/view/board-keys.mjs`; `webview/ui/board.mjs` only draws it. What
+  `webview/view/board-keys.mjs`; `webview/ui/board.mjs` only draws it, and
+  `webview/ui/board-drag.mjs` drags a key on it to swap, across layers,
+  drawing the dragged key on a layer of its own over the page. What
   reaches one key, for the hover card and the Key tab: `keyReachAt(view,
   index)`, `webview/view/key-reach.mjs`.
 - Which key a spelling is (the name the profile knows it by, one spelling

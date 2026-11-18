@@ -44,16 +44,28 @@ const {CHARYBDIS_4X6_LAYOUT_MATRIX, LAYERS, matrixPosition} = require("../data/c
 /** @param {string} text @param {string} [code] */
 const refuse = (text, code = "PROFILE_DRAFT_CONFLICT") => Object.assign(new Error(text), {code});
 
-// A layout message is untrusted like any other: its layer and every key
+// A layout message is untrusted like any other: its layer, any layer a
+// change names for itself (a key swapped from another layer), and every key
 // are checked before anything is written.
 /** @type {Handler<"updateLayoutKeys">} */
 function editLayout(document, {layer: reference, changes}, draft) {
     const {capabilities} = draft;
-    const layer = layerOfRef(reference);
-    if (layer === undefined || !(layer < LAYERS) || !Array.isArray(changes)) throw refuse("Choose a layer reported by this keyboard.");
+    /** @param {unknown} named */
+    const layerOf = named => {
+        const layer = layerOfRef(named);
+        return layer !== undefined && layer < LAYERS ? layer : undefined;
+    };
+    const unknownLayer = () => refuse("Choose a layer reported by this keyboard.");
+    const layer = layerOf(reference);
+    if (layer === undefined || !Array.isArray(changes)) throw unknownLayer();
+    const writes = changes.map(change => {
+        const at = change?.layer === undefined ? layer : layerOf(change.layer);
+        if (at === undefined) throw unknownLayer();
+        return {change, layer: at};
+    });
     return editProfileDomains(document, draft, open => {
         const layers = open("keymap");
-        for (const change of changes) {
+        for (const {change, layer} of writes) {
             const position = Number.isInteger(change.layoutIndex) && CHARYBDIS_4X6_LAYOUT_MATRIX[change.layoutIndex];
             const code = keycodes.encode(change.keycode) ?? (knownActionAbi(capabilities?.actionAbiDigest ?? 0) ? resolveNativeQmkExpression(change.keycode, {}) : undefined);
             if (!position || code === undefined || !Number.isInteger(code)) throw refuse(`Cannot represent the key ${change.keycode} on this keyboard.`);

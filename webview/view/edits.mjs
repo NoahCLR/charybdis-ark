@@ -34,7 +34,7 @@ export const reviewPortableProfile = (text, name) => ({type: "reviewPortableProf
 
 // ── layout keys ─────────────────────────────────────────────────────────
 
-/** @param {import("../../contracts/edits.js").LayerReference} layer @param {{layoutIndex: number, keycode: string}[]} changes @returns {import("../../contracts/edits.js").EditOf<'updateLayoutKeys'>} */
+/** @param {import("../../contracts/edits.js").LayerReference} layer @param {import("../../contracts/edits.js").EditOf<'updateLayoutKeys'>["changes"]} changes @returns {import("../../contracts/edits.js").EditOf<'updateLayoutKeys'>} */
 export const layoutKeys = (layer, changes) => ({type: "updateLayoutKeys", layer, changes});
 /** @param {import("../../contracts/edits.js").LayerReference} layer @param {number} layoutIndex @param {string} keycode */
 export const setKey = (layer, layoutIndex, keycode) => layoutKeys(layer, [{layoutIndex, keycode}]);
@@ -43,10 +43,13 @@ export const setKey = (layer, layoutIndex, keycode) => layoutKeys(layer, [{layou
 export const clearKey = (layer, layoutIndex) => setKey(layer, layoutIndex, "KC_TRANSPARENT");
 /** @param {number} layer @param {number} layoutIndex @param {boolean} useBehavior @param {boolean} joinCombos @returns {import("../../contracts/edits.js").EditOf<'updatePlacementPolicy'>} */
 export const placementPolicy = (layer, layoutIndex, useBehavior, joinCombos) => ({type: "updatePlacementPolicy", layer, layoutIndex, useBehavior, joinCombos});
-// A swap is one message, so one undo takes both keys back.
-/** @param {import("../../contracts/edits.js").LayerReference} layer @param {{layoutIndex: number, keycode: string}} from @param {{layoutIndex: number, keycode: string}} to */
-export const swapKeys = (layer, from, to) => layoutKeys(layer, [
-    {layoutIndex: from.layoutIndex, keycode: to.keycode},
+// A swap is one message, so one undo takes both keys back. It is the edit of
+// the layer the key landed on; the key it came from names its own layer when
+// it was dragged there from another.
+/** @typedef {{layer: import("../../contracts/edits.js").LayerReference, layoutIndex: number, keycode: string}} PlacedKey */
+/** @param {PlacedKey} from @param {PlacedKey} to */
+export const swapKeys = (from, to) => layoutKeys(to.layer, [
+    {layoutIndex: from.layoutIndex, keycode: to.keycode, ...(from.layer === to.layer ? {} : {layer: from.layer})},
     {layoutIndex: to.layoutIndex, keycode: from.keycode},
 ]);
 

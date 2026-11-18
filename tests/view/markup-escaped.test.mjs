@@ -51,7 +51,7 @@ const PASSES_ON_PURPOSE = [
     ["webview/ui/keys/key-tab.mjs", ["stackRows(model, layer, position)"], "the layer stack's rows, markup templates joined"],
     ["webview/ui/pointing/link.mjs", ["names"], "the layers the pointer layer covers, each by layerMarked, joined in prose by listed()"],
     ["webview/ui/keys/behaviour-editor.mjs", ["name"], "a dashed cell's name, which inheritedShown(), holdTierShown() and impliedShown() build with actionNamed() or esc()"],
-    ["webview/ui/layerbar.mjs", ["tint"], "a style attribute holding layerSwatch()'s css() colour"],
+    ["webview/ui/layerbar.mjs", ["light"], "a style attribute holding layerSwatch()'s css() colour, as the tab's light and, while it is on, its tint"],
     ["webview/ui/pointing/empty-slot.mjs", ["listed(parts)"], "the ways still reaching an empty slot, joined in prose (view/vocabulary.mjs listed): each a template of counts, marked layer names and marked actions"],
     ["webview/ui/review-items.mjs", ['head.map(row).join("")', 'rest.map(row).join("")', "show", "discard"], "field rows from field(), and the Show and Discard buttons the review overlay builds"],
     ["webview/ui/marks.mjs", ["REACH_ICONS.pointing", "PLAIN_ICONS[kind]", "look"], "the Pointing modes, Macros, Custom keys and Text replacement screens' authored SVG icons (view/screens.mjs REACH_ICONS and SCREENS), and a style attribute holding a css() colour: a layer swatch's or a pointing slot's light"],

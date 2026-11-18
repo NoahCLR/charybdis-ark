@@ -16,6 +16,7 @@ import * as edits from "../../webview/view/edits.mjs";
 import * as controls from "../../webview/view/controls.mjs";
 import {behaviourEditorRow, behaviourTimingEdit, behaviourTimingField} from "../../webview/view/behavior-editor.mjs";
 import {shareHold} from "../../webview/view/share.mjs";
+import {draftMarks} from "../../webview/view/review.mjs";
 import {durationMilliseconds, durationValue} from "../../webview/view/duration.mjs";
 import {AXIS, DIRECTIONAL_STARTER_THRESHOLD, KIND, LINK_ENDS, MODIFIER_POLICY, SCROLL_AXES, SCROLL_STARTER, SHIPPED_SCROLL, dpiOptions, scrollStarter, modeDpi, newMode, readConfig, settleTaps, startingRecord, thresholdDistance} from "../../webview/view/pointing-config.mjs";
 
@@ -127,11 +128,32 @@ test("swapping two keys is one message and one draft step", () => {
     stage(draft, edits.setKey("Layer 1", 0, "KC_A"));
     stage(draft, edits.setKey("Layer 1", 1, "KC_B"));
     const before = profileLayers(draft.document)[1].slice();
-    stage(draft, edits.swapKeys("Layer 1", {layoutIndex: 0, keycode: "KC_A"}, {layoutIndex: 1, keycode: "KC_B"}));
+    stage(draft, edits.swapKeys({layer: "Layer 1", layoutIndex: 0, keycode: "KC_A"}, {layer: "Layer 1", layoutIndex: 1, keycode: "KC_B"}));
     assert.equal(profileLayers(draft.document)[1][slotOf(0)], 0x05);
     assert.equal(profileLayers(draft.document)[1][slotOf(1)], 0x04);
     draft.undo(draft.revision);
     assert.deepEqual(profileLayers(draft.document)[1], before, "one undo takes both keys back");
+});
+
+// A key dragged onto another layer (the board follows a hovered layer tab)
+// swaps with the key it lands on there, in one message on the layer it
+// landed on: the key it came from names its own layer.
+test("swapping keys on two layers is one message and one draft step", () => {
+    const draft = session();
+    stage(draft, edits.setKey("Layer 1", 0, "KC_A"));
+    stage(draft, edits.setKey("Layer 2", 5, "KC_B"));
+    const before = profileLayers(draft.document).map((layer) => layer.slice());
+    const message = edits.swapKeys({layer: "Layer 1", layoutIndex: 0, keycode: "KC_A"}, {layer: "Layer 2", layoutIndex: 5, keycode: "KC_B"});
+    assert.equal(message.layer, "Layer 2", "it is the layer it landed on's edit");
+    stage(draft, message);
+    assert.equal(profileLayers(draft.document)[1][slotOf(0)], 0x05);
+    assert.equal(profileLayers(draft.document)[2][slotOf(5)], 0x04);
+    const view = draft.view({selectedDeviceId: "test-device", connected: true});
+    assert.equal(view.undoLabel, "Swapped two keys");
+    const marks = draftMarks(view.changes).keys;
+    assert.ok(marks.get(1)?.has(0) && marks.get(2)?.has(5), "each layer marks its own key as changed");
+    draft.undo(draft.revision);
+    assert.deepEqual(profileLayers(draft.document), before, "one undo takes both keys back");
 });
 
 test("an edit from a stale form is refused rather than silently rebased", () => {

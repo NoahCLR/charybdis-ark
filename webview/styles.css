@@ -549,6 +549,29 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
   border-color: color-mix(in srgb, var(--tab-tint, var(--text-3)) 60%, transparent);
 }
 .layer-tab.on:hover { background: color-mix(in srgb, var(--tab-tint, var(--text-3)) 24%, var(--surface-2)); }
+/* A tab held under a dragged key glows in its layer's light (the focus
+   colour for a layer that shows none), and the bar along its foot fills over
+   the moment it is held for, so the switch to its layer is seen coming
+   (ui/board-drag.mjs sets --spring and how much of it has passed). The strip
+   scrolls, so it clips: the glow stays inside the tab, spilling below only
+   as far as the strip's foot (--sp-2). Without motion there is no bar, since
+   a full one would read as switched before the switch. */
+.layer-tab.drop-target {
+  --held: var(--tab-light, var(--focus));
+  position: relative; color: var(--text);
+  background: color-mix(in srgb, var(--held) 14%, var(--surface-3));
+  border-color: color-mix(in srgb, var(--held) 55%, transparent);
+  box-shadow: inset 0 -12px 16px -10px color-mix(in srgb, var(--held) 60%, transparent), 0 3px 8px -3px color-mix(in srgb, var(--held) 55%, transparent);
+}
+.layer-tab.drop-target::after {
+  content: ""; position: absolute; left: var(--sp-2); right: var(--sp-2); bottom: 3px; height: 2px; border-radius: var(--r-mark);
+  /* A quarter of the ink, so the bar reads on a dark light as on a pale one. */
+  background: color-mix(in srgb, var(--held) 75%, var(--text)); box-shadow: 0 0 6px var(--held);
+  transform-origin: left; transform: scaleX(0);
+  animation: tab-held var(--spring) linear calc(-1 * var(--spring-passed, 0ms)) forwards;
+}
+@keyframes tab-held { to { transform: scaleX(1); } }
+@media (prefers-reduced-motion: reduce) { .layer-tab.drop-target::after { display: none; } }
 /* A tab's or chip's swatch is outlined in the theme's own line, so a dark
    colour reads on the dark theme and a pale one on the light; a layer or stage
    with no colour, unlit or never read, is the outline alone, as a tier with
@@ -720,8 +743,17 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 .kc-ring { fill: none; stroke: var(--ring); stroke-width: 2.4; }
 /* Where the selected row is reached from. It rides outside the key edge so it
    reads apart from the selection ring drawn inside it. */
-.kc.dragging { cursor: grabbing; filter: drop-shadow(var(--shadow-drag)); }
+.kc.dragging { cursor: grabbing; pointer-events: none; filter: drop-shadow(var(--shadow-drag)); }
 .kc.dragging .kc-rect { transition: none; }
+.kc.carried { visibility: hidden; }
+/* The layer a dragged key's picture is drawn on (ui/board-drag.mjs): laid
+   over the board's drawing at its scale, above the layer tabs, and never in
+   the pointer's way. */
+.drag-layer { position: fixed; z-index: var(--z-popover); overflow: visible; pointer-events: none; }
+/* Off the board a dragged key fades: dropped there it does nothing, and over
+   the tabs a held tab shows through it. */
+.drag-layer .kc.dragging { transition: opacity .12s ease; }
+.drag-layer.off-board .kc.dragging { opacity: .45; }
 /* The key a drag would swap with glows rather than taking a ring: every ring
    already means something, and a key's lit stroke is inline, so a stroke
    here would not show on a painted key anyway. */
@@ -811,6 +843,8 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 .info-pop dt { max-width: 18ch; color: var(--text); font-weight: var(--fw-regular); }
 .info-pop dt.mono { max-width: none; font-family: var(--mono); font-size: var(--fs-sm); white-space: nowrap; }
 .info-pop dd { margin: 0; color: var(--text-2); }
+/* A row's note: a qualification of what it says, under it in smaller type. */
+.info-note { display: block; margin-top: var(--sp-1); font-size: var(--fs-xs); color: var(--text-3); }
 .info-lead { display: block; max-width: 400px; margin-bottom: var(--sp-3); font-size: var(--fs-sm); line-height: 1.45; color: var(--text); }
 /* A part's heading, under the list before it, as the list's own heading is. */
 .info-part { display: block; margin: var(--sp-2) 0; font-size: var(--fs-sm); font-weight: var(--fw-strong); color: var(--text); }

@@ -19,7 +19,7 @@ import {layerCalled} from "../view/vocabulary.mjs";
 import {REACH_ICONS} from "../view/screens.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {pageTextMeasure} from "../lib/measure-text.mjs";
-import {hideHover} from "./hover.mjs";
+import {carryOnto, dragToSwap} from "./board-drag.mjs";
 
 // A key's icons stand in a centred row under the legend, above the line on a
 // key with one (keyFaceRows, keyIconsX): one per kind of thing it reaches.
@@ -49,18 +49,36 @@ const ledLabel = (x, y, led) => {
 /** @param {number} cx @param {number} cy @param {number} led */
 const ledLabelAt = (cx, cy, led) => ledLabel(cx - ledLabelWidth(led) / 2 + LED_LABEL.over, cy - LED_LABEL.height / 2 + LED_LABEL.over, led);
 
+// A key's rotation, which its glow and its cap share.
+/** @param {number} index */
+const rotation = (index) => {
+    const visual = keyVisual(index);
+    return visual.angle ? ` transform="rotate(${visual.angle} ${visual.x + GEO.keyW / 2} ${visual.y + GEO.keyH / 2})"` : "";
+};
+// The light a key casts round its cap, frosted where the cap is glass.
+/** @param {import("../view/board-keys.mjs").BoardKey} key */
+const keyGlow = (key) => {
+    const visual = keyVisual(key.index);
+    return `<rect class="kc-glow${key.glass ? " kc-glow-trns" : ""}" x="${visual.x}" y="${visual.y}" width="${GEO.keyW}" height="${GEO.keyH}" rx="${GEO.radius}" fill="${css(key.light)}"${rotation(key.index)}></rect>`;
+};
+
 /** @param {import("../view/keyface-types.js").LayerView} view @param {import("./surface-types.js").BoardOptions} [options] */
 export function board(view, options = {}) {
     const {selected, holding = [], reach = [], pdActive = null, comboActive = null, behaviourActive = null, replacementActive = null, drafted = null, faces = true, ledIndex = false, accent = null, glass = true, card = true,
         onKey, onOpen, onSwap, onLed} = options;
 
     const measure = pageTextMeasure() ?? estimateWidth;
-    let glow = "", keys = "";
-    for (const key of boardKeys(view, {faces, pdActive, comboActive, behaviourActive, replacementActive, accent, glass})) {
+    const shows = {faces, pdActive, comboActive, behaviourActive, replacementActive, accent, glass};
+    // One key's cap with everything on it. The picture of a key being
+    // dragged (keyPicture) is no key: it carries the key's face and marks of
+    // what it does, but nothing of the place it lies in, neither its rings,
+    // its LED nor its draft dot, and it is out of the tab order and unheard.
+    /** @param {import("../view/board-keys.mjs").BoardKey} key @param {boolean} [picture] */
+    const keyCap = (key, picture = false) => {
         const {index, from, tiers, badges, icons, sub, led, picked} = key;
         const visual = keyVisual(index);
-        const cx = visual.x + GEO.keyW / 2, cy = visual.y + GEO.keyH / 2;
-        const transform = visual.angle ? ` transform="rotate(${visual.angle} ${cx} ${cy})"` : "";
+        const cx = visual.x + GEO.keyW / 2;
+        const transform = rotation(index);
         const classes = ["kc",
             key.kind === "transparent" ? "kc-trns" : "",
             key.kind === "disabled" ? "kc-none" : "",
@@ -70,7 +88,6 @@ export function board(view, options = {}) {
         const text = idealText(key.light);
         const paint = css(key.light);
         const fill = ` style="fill:${paint};stroke:${key.glass ? "none" : "var(--light-outline)"}"`;
-        glow += `<rect class="kc-glow${key.glass ? " kc-glow-trns" : ""}" x="${visual.x}" y="${visual.y}" width="${GEO.keyW}" height="${GEO.keyH}" rx="${GEO.radius}" fill="${paint}"${transform}></rect>`;
 
         const rows = keyFaceRows(visual.y,
             {tiers: tiers.length > 0, combos: badges.length > 0, sub: Boolean(sub), icons: icons.length > 0});
@@ -129,20 +146,27 @@ export function board(view, options = {}) {
         // What the rings and dots say, said to a screen reader too: the
         // selected key is the current one, an LED picked for an accent is
         // pressed, and a key the draft changed says so after its name.
-        const said = accent ? (picked ? ' aria-pressed="true"' : ' aria-pressed="false"') : selected === index ? ' aria-current="true"' : "";
-        keys += `<g class="${classes}${selected === index ? " sel" : ""}" data-key="${esc(index)}"${card ? " data-card" : ""}${led === undefined ? "" : ` data-led="${esc(led)}"`} tabindex="0" role="button"${said}
-            aria-label="${esc(key.name)}${ledIndex && led !== undefined ? `, LED ${esc(led)}` : ""}${from ? `, from ${esc(layerCalled(from))}` : ""}${drafted?.keys?.has(index) ? `, ${esc(drafted.after)}` : ""}"${transform}>
+        const current = !picture && selected === index;
+        const said = accent ? (picked ? ' aria-pressed="true"' : ' aria-pressed="false"') : current ? ' aria-current="true"' : "";
+        const identity = picture ? ' aria-hidden="true"' : ` data-key="${esc(index)}"${card ? " data-card" : ""}${led === undefined ? "" : ` data-led="${esc(led)}"`} tabindex="0" role="button"${said}
+            aria-label="${esc(key.name)}${ledIndex && led !== undefined ? `, LED ${esc(led)}` : ""}${from ? `, from ${esc(layerCalled(from))}` : ""}${drafted?.keys?.has(index) ? `, ${esc(drafted.after)}` : ""}"`;
+        return `<g class="${classes}${current ? " sel" : ""}${picture ? " dragging" : ""}"${identity}${transform}>
             <rect class="kc-rect" x="${visual.x}" y="${visual.y}" width="${GEO.keyW}" height="${GEO.keyH}" rx="${GEO.radius}"${fill}></rect>
-            ${selected === index || holding.includes(index) ? ring("kc-ring") : ""}
-            ${picked ? ring("kc-pick") : ""}
-            ${reach.includes(index) ? `<rect class="kc-reach" x="${visual.x - 3}" y="${visual.y - 3}" width="${GEO.keyW + 6}" height="${GEO.keyH + 6}" rx="${GEO.radius + 2}"></rect>` : ""}
-            ${ledIndex && led !== undefined ? ledLabel(visual.x, visual.y, led) : ""}
+            ${current || (!picture && holding.includes(index)) ? ring("kc-ring") : ""}
+            ${!picture && picked ? ring("kc-pick") : ""}
+            ${!picture && reach.includes(index) ? `<rect class="kc-reach" x="${visual.x - 3}" y="${visual.y - 3}" width="${GEO.keyW + 6}" height="${GEO.keyH + 6}" rx="${GEO.radius + 2}"></rect>` : ""}
+            ${!picture && ledIndex && led !== undefined ? ledLabel(visual.x, visual.y, led) : ""}
             ${marks}
-            ${drafted?.keys?.has(index) ? `<circle class="kc-draft" cx="${visual.x + GEO.keyW - 5.5}" cy="${visual.y + 5.5}" r="2.6"></circle>` : ""}
+            ${!picture && drafted?.keys?.has(index) ? `<circle class="kc-draft" cx="${visual.x + GEO.keyW - 5.5}" cy="${visual.y + 5.5}" r="2.6"></circle>` : ""}
             ${sub ? `<line class="kc-sep" x1="${visual.x + 8}" y1="${esc(rows.separatorY)}" x2="${visual.x + GEO.keyW - 8}" y2="${esc(rows.separatorY)}" stroke="${text || "var(--light-detail)"}" stroke-width="1"></line>` : ""}
             ${label}
             ${legend.sub ? `<text class="kc-sub" x="${cx}" y="${esc(legend.sub.y)}" font-size="${esc(legend.sub.size)}"${squeeze(legend.sub)}${fillText}>${esc(sub)}</text>` : ""}
         </g>`;
+    };
+    let glow = "", keys = "";
+    for (const key of boardKeys(view, shows)) {
+        glow += keyGlow(key);
+        keys += keyCap(key);
     }
 
     // The trackball LED is index 56 and belongs to no key, but it is lit like
@@ -153,79 +177,27 @@ export function board(view, options = {}) {
     const node = /** @type {import("./surface-types.js").BoardNode} */ (el(`<div class="board ${options.picking ? "picking" : ""}">
         <svg viewBox="${GEO.viewBox}" xmlns="http://www.w3.org/2000/svg">${glow}${ball.markup}${keys}</svg></div>`));
 
+    // A key is dragged to swap it (ui/board-drag.mjs). What is dragged is
+    // what this layer stores, so its picture is the key as the board draws
+    // the layer with nothing previewed under it: a transparent key answered
+    // from below is carried as the transparent key it is.
+    /** @param {number} index */
+    const keyPicture = (index) => {
+        const key = boardKeys(view.alone, shows).find((each) => each.index === index);
+        const svg = key && el(`<svg xmlns="http://www.w3.org/2000/svg">${keyCap(key, true)}</svg>`);
+        return /** @type {SVGGElement | null} */ (svg?.firstElementChild ?? null);
+    };
+    /** @type {import("./surface-types.js").BoardSwap | null} */
+    const swap = onSwap && view.layer ? {layer: view.layer.index, onSwap, picture: keyPicture} : null;
     /** @type {NodeListOf<SVGGElement>} */ (node.querySelectorAll("[data-key]")).forEach((group) => {
         const index = Number(group.dataset.key);
         if (onKey) group.addEventListener("click", () => { if (!node.justDragged) onKey(index); });
         if (onOpen) group.addEventListener("dblclick", () => onOpen(index));
-        if (onSwap) dragToSwap(node, group, index, onSwap);
+        if (swap) dragToSwap(node, group, index, swap);
     });
+    if (swap) carryOnto(node, swap);
     if (onLed) node.querySelectorAll("[data-led], [data-trackball]").forEach((group) => pickByDrag(/** @type {SVGGElement} */ (group), onLed));
     return node;
-}
-
-// Drag one key onto another to swap what they store. The key follows the
-// pointer and the key under it is marked, so the swap is visible before it
-// lands; a press that never moves stays a click.
-const DRAG_THRESHOLD = 4;
-
-/** @param {import("./surface-types.js").BoardNode} node @param {SVGGElement} group @param {number} index @param {(from: number, to: number) => void} onSwap */
-function dragToSwap(node, group, index, onSwap) {
-    const svg = /** @type {SVGSVGElement} */ (node.querySelector("svg"));
-    const resting = group.getAttribute("transform") || "";
-    /** @type {import("./surface-types.js").KeyDrag | null} */
-    let drag = null;
-
-    /** @param {PointerEvent} event @returns {SVGGElement | null} */
-    const targetAt = (event) => document.elementsFromPoint(event.clientX, event.clientY)
-        .map((hit) => /** @type {SVGGElement | null} */ (hit.closest("[data-key]")))
-        .find((hit) => hit && hit !== group) || null;
-    /** @param {SVGGElement | null} target */
-    const mark = (target) => {
-        if (!drag || drag.target === target) return;
-        drag.target?.classList.remove("drop-target");
-        target?.classList.add("drop-target");
-        drag.target = target;
-    };
-    const reset = () => {
-        group.classList.remove("dragging");
-        if (resting) group.setAttribute("transform", resting); else group.removeAttribute("transform");
-        drag?.target?.classList.remove("drop-target");
-        drag = null;
-    };
-
-    group.addEventListener("pointerdown", (event) => {
-        if (event.button !== 0) return;
-        drag = {x: event.clientX, y: event.clientY, moved: false, target: null};
-        group.setPointerCapture?.(event.pointerId);
-    });
-    group.addEventListener("pointermove", (event) => {
-        if (!drag) return;
-        const dx = event.clientX - drag.x, dy = event.clientY - drag.y;
-        if (!drag.moved) {
-            if (Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
-            drag.moved = true;
-            group.classList.add("dragging");
-            hideHover();
-            // Raise it above its neighbours; moving the node drops capture, so re-arm it.
-            svg.appendChild(group);
-            group.setPointerCapture?.(event.pointerId);
-        }
-        const scale = svg.viewBox.baseVal.width / svg.getBoundingClientRect().width;
-        group.setAttribute("transform", `translate(${dx * scale} ${dy * scale}) ${resting}`.trim());
-        mark(targetAt(event));
-    });
-    group.addEventListener("pointerup", (event) => {
-        if (!drag) return;
-        const moved = drag.moved || Math.hypot(event.clientX - drag.x, event.clientY - drag.y) >= DRAG_THRESHOLD;
-        const target = moved ? targetAt(event) : null;
-        reset();
-        if (!moved) return;
-        // The click that follows this release belongs to the drag, not a selection.
-        node.justDragged = true;
-        setTimeout(() => { node.justDragged = false; });
-        if (target) onSwap(index, Number(target.dataset.key));
-    });
-    group.addEventListener("pointercancel", reset);
 }
 
 // Picking an accent's LEDs: a press picks the LED under it, or takes it back,

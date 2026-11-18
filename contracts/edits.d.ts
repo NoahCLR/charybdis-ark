@@ -106,7 +106,8 @@ export interface SettingEdit {macro: string; enabled?: boolean; value?: Scalar |
 
 export interface EditPayloads {
     reviewPortableProfile: {text: string; name: string};
-    updateLayoutKeys: {layer: LayerReference; changes: {layoutIndex: number; keycode: string}[]};
+    /** A change names its own `layer` only when it is not the message's: a key swapped onto another layer. */
+    updateLayoutKeys: {layer: LayerReference; changes: {layoutIndex: number; keycode: string; layer?: LayerReference}[]};
     updatePlacementPolicy: {layer: number; layoutIndex: number; useBehavior: boolean; joinCombos: boolean};
     deleteBehavior: {expectedBase?: Partial<BaseIdentity>; keycode: string};
     retargetBehavior: {expectedBase?: Partial<BaseIdentity>; keycode: string; target: string; conflict?: 'swap' | 'overwrite'};

@@ -50,7 +50,8 @@ key that has a behaviour of its own, a second card shows that behaviour.
   <sub>Hover cards for Esc, <code>V</code> and Right Option.</sub>
 </p>
 
-Drag one key onto another to swap them, or copy a key to another layer with
+Drag one key onto another to swap them; hold it over another layer's tab to
+swap it with a key there. Copy a key to another layer with
 ⌘C and ⌘V (Ctrl on Windows and Linux). Drag a macro, custom key or pointing
 mode onto another slot to swap the two: every key that reached it follows,
 and so does its colour. When layers are reordered, layer keys

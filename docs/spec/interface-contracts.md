@@ -155,7 +155,8 @@ The same kind of control looks and sits the same on every screen.
   layers together, which reads the board, whether or not the board takes an
   edit; while it takes none, the rest of the list says only what still
   works, selecting a key and copying it, all in this computer's shortcut
-  words (`boardShortcuts`, `webview/ui/keys/board-card.mjs`, drawn by the
+  words. Holding a dragged key over a layer tab is a note under the drag's
+  row, in smaller type, not a row of its own (a row's `note`) (`boardShortcuts`, `webview/ui/keys/board-card.mjs`, drawn by the
   one info mark, `webview/ui/info-mark.mjs`, in its corner form;
   `browser-tests/shortcut-glyphs.spec.js`).
 - A number field's unit rides inside the input (`.affix.unit`), so its label
@@ -328,6 +329,30 @@ The same kind of control looks and sits the same on every screen.
   under its table's last band, "Empty slots" with their count, as its layer
   list folds the empty layers (`toggleAllSlots`); the picked slot and one the
   draft changed always show (`browser-tests/lighting-controls.spec.js`).
+- A key dragged on the Keymap board onto another key posts their swap as one
+  `updateLayoutKeys`, one undo step. Held over a layer tab for a moment (400
+  ms), the drag shows that layer, as a click on the tab does, and goes on
+  carrying the key, so it lands on a key there: the message is the layer it
+  landed on's, and its first change names the layer the key came from
+  (`layer` on a change, checked like the message's). A drag that passes over
+  a tab switches nothing. The held tab glows in its layer's light (the focus
+  colour for a layer that shows none), and a bar along its foot fills over
+  the moment, shown only with motion; a tab held while the board is drawn
+  again stays held, glowing, its bar picking up where it was, whether or not
+  the pointer moves. Released off a key, on Escape, or when the page loses
+  the pointer, it posts nothing and the board stays on the layer it shows;
+  two keys that are one key post nothing either. What follows the pointer is the key its
+  layer stores, drawn as the board draws that layer with nothing previewed
+  under it, without the rings, LED number or draft dot of its place, on a
+  layer of its own over the page laid over the board's drawing, so it rides
+  above the layer tabs and past the board's edge, faded while off the board,
+  where letting go does nothing, so a tab under it shows through: a
+  transparent key answered from below in a preview is carried as the
+  transparent key, since that is what the swap moves, and a drop on such a key
+  swaps with the transparent key; the dragged key's place stays empty while
+  it is away (`dragToSwap`, `carryOnto`, `webview/ui/board-drag.mjs`;
+  `tests/model/draft-editor.test.js`, `tests/model/draft-edits.test.js`,
+  `tests/view/edits.test.mjs`, `browser-tests/board-drag.spec.js`).
 - Keys and Lighting draw the same layer strip on the board
   (`tests/view/navigation-profile-ui.test.mjs`), Rename & reorder included
   (no test).

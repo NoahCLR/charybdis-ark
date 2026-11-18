@@ -60,6 +60,20 @@ test("a profile form read from an older draft is refused; one read from this dra
     assert.equal(key.layers[0][matrixPosition(0)], 0x05);
 });
 
+// A key swapped onto another layer is one message on the layer it landed on;
+// the key it came from names its own layer, checked like the message's.
+test("a layout change that names its own layer is written there, and one naming no layer of this keyboard refuses the message", () => {
+    const {snapshot, identity} = draft();
+    const edit = message => applyDraftEdit(snapshot, message, {capabilities, identity});
+    const keys = settled(edit({type: "updateLayoutKeys", layer: "Layer 2", changes: [{layoutIndex: 0, keycode: "KC_B", layer: "Layer 1"}, {layoutIndex: 5, keycode: "KC_A"}]}));
+    assert.equal(keys.layers[1][matrixPosition(0)], 0x05, "the change naming Layer 1 is written there");
+    assert.equal(keys.layers[2][matrixPosition(5)], 0x04, "the other on the message's layer");
+    for (const layer of ["Layer 99", "Base", 1]) {
+        assert.throws(() => edit({type: "updateLayoutKeys", layer: "Layer 2", changes: [{layoutIndex: 5, keycode: "KC_A"}, {layoutIndex: 0, keycode: "KC_B", layer}]}),
+            {code: "PROFILE_DRAFT_CONFLICT", message: "Choose a layer reported by this keyboard."}, String(layer));
+    }
+});
+
 test("the edit a custom key carries is checked as its own: an older profile form refuses the whole step", () => {
     const {snapshot, identity} = draft();
     const made = {type: "updateCustomKeyShortcut", keycode: "CUSTOM_KEY_9", shortcut: {mods: 0x11, keys: [], layers: 0, layerKind: 0}, name: "Left Ctrl + Right Ctrl"};

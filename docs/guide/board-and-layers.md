@@ -78,7 +78,14 @@ a key does.
 ## Editing on the board
 
 - Click a key to select it. Double-click to open the keycode picker.
-- Drag one key onto another to swap them.
+- Drag one key onto another to swap them. To swap it with a key on another
+  layer, hold it over that layer's tab until the board shows the layer (the
+  tab glows in the layer's colour and a bar under its name fills), then drop
+  it on the key. Escape, or letting go away from a key, leaves both
+  alone; off the board's canvas the key fades, since letting go there does
+  nothing. While layers are previewed together, a key seen through from below
+  is carried as the transparent key it is, since that is what moves; holding
+  a tab shows that layer on its own.
 - ⌘C copies the selected key and ⌘V pastes it onto the selected key, on any
   layer.
 - Delete or Backspace makes the selected key transparent.
