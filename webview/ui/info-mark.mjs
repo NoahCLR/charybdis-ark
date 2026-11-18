@@ -21,7 +21,7 @@ const ICON = `<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" 
 // least height a list is given however short the window.
 const GAP = 6, LEAST = 96;
 
-/** @typedef {{term: string, mono?: boolean, says: string}} InfoRow */
+/** @typedef {{term: string, mono?: boolean, says: string, note?: string}} InfoRow */
 /** @typedef {{heading: string, lead?: string, rows: readonly InfoRow[]}} InfoPart */
 /** What an info mark's list says: a lead, its rows, then its parts, each optional. @typedef {{lead?: string, rows?: readonly InfoRow[], parts?: readonly InfoPart[]}} InfoContent */
 
@@ -33,8 +33,8 @@ let kept = null;
 // An info mark's markup. `label` names the mark and `heading` heads its list
 // (`named` names the list where its heading alone would not say what of);
 // `lead` is an optional sentence or two before the list; `rows` are its list,
-// each a term and what it says, all plain text; a mono term is written as it
-// is typed. `parts` follow the rows, each a list of its own under a heading
+// each a term and what it says, all plain text, with an optional note in
+// smaller type under what it says; a mono term is written as it is typed. `parts` follow the rows, each a list of its own under a heading
 // of its own (the choices of one field, say), with an optional lead.
 // `corner` draws the larger mark that rides a card's top-right corner. With
 // nothing to say there is no mark: the markup is empty. A node that holds one
@@ -44,7 +44,7 @@ export function infoMark({id, label, heading, named = heading, lead = "", rows =
     if (!lead && !rows.length && !parts.length) return "";
     const open = kept === id;
     /** @param {readonly InfoRow[]} list */
-    const listed = (list) => list.length ? `<dl>${list.map((row) => `<dt${row.mono ? ` class="mono"` : ""}>${esc(row.term)}</dt><dd>${esc(row.says)}</dd>`).join("")}</dl>` : "";
+    const listed = (list) => list.length ? `<dl>${list.map((row) => `<dt${row.mono ? ` class="mono"` : ""}>${esc(row.term)}</dt><dd>${esc(row.says)}${row.note ? `<span class="info-note">${esc(row.note)}</span>` : ""}</dd>`).join("")}</dl>` : "";
     return `<span class="info-mark${corner ? " corner" : ""}" data-info-mark${open ? " data-open" : ""}>
         <button type="button" class="info-button" aria-label="${esc(label)}" aria-describedby="${esc(id)}" aria-controls="${esc(id)}" aria-expanded="${open}">${ICON}</button>
         <span class="info-pop" id="${esc(id)}" role="group" aria-label="${esc(named)}"><span class="info-body" tabindex="-1"><span class="info-h">${esc(heading)}</span>${lead ? `<span class="info-lead">${esc(lead)}</span>` : ""}${listed(rows)}${parts

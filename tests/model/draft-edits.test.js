@@ -71,6 +71,15 @@ test("each edit is recorded in its own words", () => {
     assert.equal(layout([{layoutIndex: 0, keycode: "KC_A"}]), "Changed a key");
     assert.equal(layout([{layoutIndex: 0, keycode: "KC_A"}, {layoutIndex: 1, keycode: "KC_B"}, {layoutIndex: 2, keycode: "KC_C"}]), "Changed 3 keys at once");
     assert.equal(layout([{layoutIndex: 0, keycode: stored(1)}, {layoutIndex: 1, keycode: stored(0)}]), "Swapped two keys");
+    // Across layers, each change is read on its own layer.
+    const keyed = draft();
+    for (const [layer, layoutIndex, keycode] of [["Layer 0", 0, "KC_A"], ["Layer 1", 5, "KC_B"]]) {
+        keyed.stage({type: "updateLayoutKeys", draftRevision: keyed.revision, layer, changes: [{layoutIndex, keycode}]});
+    }
+    const across = [{layoutIndex: 0, keycode: "KC_B", layer: "Layer 0"}, {layoutIndex: 5, keycode: "KC_A"}];
+    assert.equal(draftEditLabel({type: "updateLayoutKeys", layer: "Layer 1", changes: across}, keyed.document), "Swapped two keys", "a swap across layers");
+    assert.equal(draftEditLabel({type: "updateLayoutKeys", layer: "Layer 1", changes: [{layoutIndex: 0, keycode: "KC_B"}, across[1]]}, keyed.document),
+        "Changed 2 keys at once", "the same keys read on one layer are no swap");
     const behaviours = require("../../core/model/portable-profile").validateSnapshot(document).behaviors.rows;
     const saved = keycodes.resolve(behaviours[0].target.operand).name;
     const unused = ["KC_F24", "KC_F23", "KC_F22"].find(key => !behaviours.some(row => keycodes.resolve(row.target.operand)?.name === key));

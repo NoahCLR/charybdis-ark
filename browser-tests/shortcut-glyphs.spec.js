@@ -67,6 +67,9 @@ test("the board's info mark previews its Shortcuts list on hover, and a press ke
     await expect(list).toBeVisible();
     await expect(list).toContainText("Double-click");
     await expect(list).toContainText("Swap the two keys");
+    // Holding over a layer tab is a note on the drag, not a row of its own.
+    await expect(list.locator("dd", {hasText: "Swap the two keys"}).locator(".info-note")).toHaveText("Hold over a layer tab to reach its keys");
+    await expect(list.locator("dt", {hasText: "layer tab"})).toHaveCount(0);
     await expect(list).toContainText("Make the selected key transparent");
     // The pointer can cross onto the list without it closing.
     await list.hover();

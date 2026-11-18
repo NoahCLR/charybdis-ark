@@ -75,14 +75,14 @@ export function boardShortcuts(model) {
 
 /** @param {boolean} editable @returns {import("../info-mark.mjs").InfoRow[]} */
 function shortcutRows(editable) {
-    /** @param {string} term @param {string} says */
-    const row = (term, says) => ({term, says});
+    /** @param {string} term @param {string} says @param {string} [note] */
+    const row = (term, says, note) => (note ? {term, says, note} : {term, says});
     // Previewing layers together reads the board, so it is listed whether or
     // not the board can be edited (ui/layerbar.mjs, view/layer-set.mjs).
     const layers = row(`${modifierKey()}-click a layer`, "Preview it on with the others");
     return editable
         ? [row("Double-click", "Pick a keycode"),
-            row("Drag onto a key", "Swap the two keys"),
+            row("Drag onto a key", "Swap the two keys", "Hold over a layer tab to reach its keys"),
             row(`${shortcut("C")}, ${shortcut("V")}`, "Copy a key, paste it onto the selected one"),
             row("Delete", "Make the selected key transparent"),
             row(`${shortcut("Z")}, ${shortcut("Z", {shift: true})}`, "Undo, redo"),

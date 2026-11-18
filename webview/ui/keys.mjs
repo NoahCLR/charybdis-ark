@@ -83,7 +83,7 @@ export function screenKeys() {
             render();
         },
         onOpen: gate.editable ? (/** @type {number} */ index) => pickKeycodeFor(index) : undefined,
-        onSwap: gate.editable ? (/** @type {number} */ from, /** @type {number} */ to) => swapKeys(from, to) : undefined,
+        onSwap: gate.editable ? swapKeys : undefined,
     }));
     // How the layer is lit belongs to Lighting; the foot here only says
     // which layers a held preview stacks. It lies over the board's

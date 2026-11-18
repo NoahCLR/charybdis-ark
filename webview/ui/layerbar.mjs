@@ -64,8 +64,10 @@ export function layerBar(trailing = "") {
             : ` · ${ADD_KEY}-click to preview with the layers on`;
         // A layer on under the top one is tinted with its own light, so the
         // set reads at a glance without being mistaken for the picked tab.
-        const tint = on && swatch.colour ? ` style="--tab-tint:${swatch.colour}"` : "";
-        return `<button class="layer-tab${on ? " on" : ""}"${tint} role="tab" id="layer-tab-${esc(index)}" data-layer="${esc(index)}" aria-selected="${state.layer === index}"
+        // Every lit tab carries its light, which it glows with while a
+        // dragged key is held over it (ui/board-drag.mjs).
+        const light = swatch.colour ? ` style="--tab-light:${swatch.colour}${on ? `;--tab-tint:${swatch.colour}` : ""}"` : "";
+        return `<button class="layer-tab${on ? " on" : ""}"${light} role="tab" id="layer-tab-${esc(index)}" data-layer="${esc(index)}" aria-selected="${state.layer === index}"
             data-tip="${esc(swatch.tip)}${drafted.has(layer.index) ? ` · ${esc(editWords(model?.draft).after)}` : ""}${esc(how)}">${swatch.html}
             <span>${esc(layerCalled(layer))}</span>${layerCalled(layer) === layer.name ? "" : `<span class="idx">${esc(layer.index)}</span>`}${drafted.has(layer.index) ? '<i class="draft-dot"></i>' : ""}</button>`;
     }).join("");
