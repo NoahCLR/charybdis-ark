@@ -415,8 +415,6 @@ export interface SettingFieldBase extends SettingBits {
     /** The global switch this field is, whose runtime override a switch key turns off for now (the published `offByKey`). */
     offSwitch?: SettingOffSwitch;
     governs?: {kind: 'tier'; tier: string} | {kind: 'branches'} | {kind: 'layer'; layer: number};
-    /** The heading a field is listed under within its section. */
-    part?: string;
 }
 export interface StoredSettingField extends SettingFieldBase {
     header?: undefined;

@@ -141,7 +141,7 @@ sums this up.
 ## Your computer
 
 Text is typed through your computer's keyboard layout, so Ark needs to know
-which one you use. Set it under **Your computer** on **Host settings**; the
+which one you use. Set it under **Your computer** on **Typing settings**; the
 button at the foot of the macro editor takes you there, and the ⓘ beside it
 says how text types with your setup. If the layout you chose isn't one for
 your computer's system, a warning under the button says so.

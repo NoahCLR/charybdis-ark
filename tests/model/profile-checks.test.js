@@ -16,7 +16,7 @@ test("whole-profile checks report inert actions and destination blockers", () =>
     const unplayable = checks.find(row => row.kind === "unplayableMacro");
     assert.equal(unplayable?.place.index, 0);
     assert.equal(unplayable?.title, "Macro 0 cannot play with the settings in Your computer");
-    assert.equal(unplayable?.fix, "Fix the macro or change Host settings → Your computer before playing it.");
+    assert.equal(unplayable?.fix, "Fix the macro or change Typing settings → Your computer before playing it.");
     // The fixture's lighting colours are brighter than 100 too.
     assert.deepEqual([...new Set(checks.filter(row => row.level === "blocker").map(row => row.kind))], ["brightnessBlocker", "colourBrightnessBlocker", "effectBlocker"]);
 });

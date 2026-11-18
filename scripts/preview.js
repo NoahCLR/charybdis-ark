@@ -195,8 +195,8 @@ function buildModel(shell = WEB_SHELL, {live = false, mode = 2, stopped = false,
         summary: portable.summary(doc),
         identity: {generation: 42},
         hostOs: {detected: 1},
-        // The key options current firmware reports, so the option switches
-        // (Key swaps & typing, Autocorrect's own) are there to drive.
+        // The key options current firmware reports, so Text replacement's
+        // switch is there to drive.
         options: require("../core/session/demo-session").DEMO_OPTIONS,
     };
     const deviceId = "preview-charybdis";

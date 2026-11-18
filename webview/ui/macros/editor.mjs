@@ -63,7 +63,7 @@ export function editor(model, slot, canEdit) {
     card.addEventListener("pointerdown", event => {
         if (/** @type {HTMLElement | null} */ (/** @type {Element} */ (event.target).closest('[data-act="clear"]'))) setMacroForm(slot.keycode, {cancelBlur: true});
     });
-    // The host section, on Host settings.
+    // The host section, on Typing settings.
     /** @type {HTMLElement | null} */ (card.querySelector("[data-host-settings]"))?.addEventListener("click", () => {
         Object.assign(state, {screen: "host", reveal: '.settings-group[data-section="host"]'});
         render();
@@ -153,7 +153,7 @@ function nameField(model, slot, canEdit) {
 // this macro picked in its Macros tab, on the row for the first of those
 // routes, so the board rings its keys and the table marks the row.
 
-// How a macro's text types, read once in the info mark by the Host button
+// How a macro's text types, read once in the info mark by the Your computer button
 // (D-L96); a layout that is not the computer's is a warning on show.
 /** @param {Model} model */
 function typingWords(model) {

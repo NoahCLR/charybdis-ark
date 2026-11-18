@@ -181,16 +181,16 @@ _Avoid_: reset, wipe, factory reset (for this)
 **Screen**:
 One of Ark's top-level views chosen from the rail, in three groups: Keymap,
 Lighting, Macros, Text replacement, Custom keys and Pointing modes under
-Configure; Behaviours, Combos, Pointer and Host under Settings; Backups and
+Configure; Behaviours, Combos, Pointer and Typing under Settings; Backups and
 Keyboard under Keyboard. Outside the rail, a Settings screen is named with "settings" after
-it (Behaviour settings, Combo settings, Pointer settings, Host settings),
+it (Behaviour settings, Combo settings, Pointer settings, Typing settings),
 since nothing around a link or a tip says it is one.
 _Avoid_: page, tab, area (for this), surface, panel
 
 **Text replacement**:
 What a person calls the keyboard replacing what is typed when a word ends: a
 typo fixed, longer text typed, a macro played. It is the name on the rail,
-the screen, the Host card, the Memory panel, the picker and every message.
+the screen, the Typing card, the Memory panel, the picker and every message.
 The keyboard, its firmware and its keys call it **autocorrect**, and Ark's
 code, contracts, screen id, domain name and files keep that name
 (`autocorrect`, `AC_ON`, `core/model/autocorrect-*.js`). A person reads
@@ -253,7 +253,7 @@ _Avoid_: leader sequence, leader typo, shortcut, code
 **Leader waits** (the leader timeout):
 How long the leader waits after its last key before it sends an input that a
 longer one begins with, or drops what is held: settings scalar 32,
-1000 to 10000 ms, on Host under **Text replacement**.
+1000 to 10000 ms, on Typing under **Text replacement**.
 _Avoid_: leader term, leader window
 
 **Leader waiting**:

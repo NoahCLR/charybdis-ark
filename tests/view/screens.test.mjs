@@ -9,7 +9,7 @@ test("the registry owns every rail screen and renderer in the existing order", (
         ["Keyboard", ["profile", "device"]],
     ]);
     assert.deepEqual(Object.values(SCREENS).map((definition) => definition.label), ["Keymap", "Lighting", "Macros", "Text replacement", "Custom keys", "Pointing modes",
-        "Behaviours", "Combos", "Pointer", "Host", "Backups", "Keyboard"]);
+        "Behaviours", "Combos", "Pointer", "Typing", "Backups", "Keyboard"]);
     const renderers = Object.fromEntries(["Keys", "Lighting", "Macros", "Autocorrect", "CustomKeys", "Pointing", "Behaviours", "Combos", "Pointer", "Host", "Profile", "Device"]
         .map(name => [`screen${name}`, () => name[0].toLowerCase() + name.slice(1)]));
     for (const [id, definition] of Object.entries(SCREENS)) {

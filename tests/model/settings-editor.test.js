@@ -58,7 +58,7 @@ test("Defaults and inherited behaviour timing come entirely from the complete ke
     const current = snapshot(), view = settingsEditorView(current);
     assert.equal(view.brightnessMax, 200);
     const model = buildDeviceModel({settingsView: view, capabilities: {compiledLayerCount: 16}});
-    assert.equal(model.configDefaults.length, 16, "Combos, behaviours, the read-only macro host setup, All lighting, the autocorrect switch and each feedback flash have a section");
+    assert.equal(model.configDefaults.length, 15, "Combos, behaviours, the read-only macro host setup, All lighting, the autocorrect switch and each feedback flash have a section");
     const fields = model.configDefaults.flatMap(section => section.fields);
     assert.equal(fields.find(field => field.macro === "volumeDpi"), undefined, "a pointing mode's speed is set on its slot, not in settings");
     assert.equal(fields.find(field => field.macro === "pointerLayer").value, "Layer 4");
@@ -225,13 +225,12 @@ test("all native controls preserve a complete profile unchanged, including unkno
     const current = withSettings(settings => {settings.values[24] = 0x8004; settings.values[21] = 0xff1e0101;});
     for (const section of settingsEditorView(current).sections) assert.deepEqual(draftEdit(current, message(current, section.id)), current.document);
     const fields = settingsEditorView(current).sections.flatMap(section => section.fields);
-    assert.equal(fields.find(field => field.macro === "swapLeftAltGui").enabled, true);
-    assert.equal(fields.find(field => field.macro === "nkro").readOnly, true);
+    // Ark has no switch for QMK's key options (D-L102): Text replacement's
+    // is the one field on their word.
+    assert.deepEqual(fields.filter(field => field.id === 24).map(field => field.macro), ["autocorrect"]);
+    assert.equal(settingsEditorView(current).sections.some(({id}) => id === "keyboardOptions"), false, "Typing has no Key swaps & typing");
     assert.equal(fields.find(field => field.macro === "effectMode").choices[1].label, "Breathing");
     assert.equal(fields.find(field => field.macro === "effectMode").choices[0].label, "Solid colour", "spelled as the rest of the app spells colour");
-    const next = draftEdit(current, message(current, "keyboardOptions", {swapLeftAltGui:false, swapControlCaps:true}));
-    assert.equal(validateSnapshot(next).settings.values[24], 0x8001);
-    assert.throws(() => draftEdit(current, message(current, "keyboardOptions", {nkro:true})), /Not in this firmware/);
 });
 test("startup layers validate the final mask, and combo references edit only their layer's record", () => {
     const current = withSettings(() => {});
@@ -254,28 +253,6 @@ test("lighting choices only allow reported effects and LED classes, while preser
     delete current.options;
     assert.throws(() => draftEdit(current, message(current, "rgbAppearance", {effectMode:"2"})));
 });
-test("key options use masks supplied by the keyboard rather than assuming bitfield layout", () => {
-    const current = withSettings(settings => {settings.values[24] = 0x8000;});
-    current.options.keymapMasks[0] = 0x8000;
-    const field = settingsEditorView(current).sections.flatMap(section => section.fields).find(field => field.macro === "swapControlCaps");
-    assert.equal(field.enabled, true);
-    const next = draftEdit(current, message(current, "keyboardOptions", {swapControlCaps:false}));
-    assert.equal(validateSnapshot(next).settings.values[24], 0);
-});
-
-test("Key Options follows the effective host vocabulary, including unknown Auto and manual overrides", () => {
-    for (const [detected, selected, alt, gui] of [[0,0,"Alt","GUI"], [1,0,"Option","Command"], [2,0,"Alt","Windows"], [3,0,"Alt","Super"], [1,3,"Alt","Super"]]) {
-        const current = withSettings(settings => {settings.values[27] = selected;});
-        current.hostOs = {detected};
-        const fields = settingsEditorView(current).sections.find(({id}) => id === "keyboardOptions").fields;
-        const label = macro => fields.find(field => field.macro === macro).label;
-        assert.equal(label("swapLeftAltGui"), `Swap left ${alt} and ${gui}`);
-        assert.equal(label("swapRightAltGui"), `Swap right ${alt} and ${gui}`);
-        assert.equal(label("disableGui"), `Disable ${gui} keys`);
-        assert.equal(label("swapLeftControlGui"), `Swap left Ctrl and ${gui}`);
-    }
-});
-
 test("the Host section offers the effective OS's layouts", () => {
     const {document} = require("../fixtures/portable-profile");
     const {fingerprint} = require("../../core/model/portable-profile");
@@ -373,7 +350,7 @@ test("the behaviour, combo and auto-mouse switches say keyboard keys change them
 });
 
 // Text replacement's switch (autocorrect, to the keyboard) is key option 12,
-// stored with the swaps (firmware settings-domain.md) and drawn on the Host
+// stored with QMK's key options (firmware settings-domain.md) and drawn on the Typing
 // screen as a section of its own (D-L87), edited through the keyboard's own
 // mask.
 test("the text replacement switch is a Settings section of its own, saying where its list is as the combo switch does, and edits only its key option", () => {
@@ -387,11 +364,14 @@ test("the text replacement switch is a Settings section of its own, saying where
     // (firmware D-F66), so it says so and names its switch.
     assert.deepEqual([section.fields[0].keyboardKeys, section.fields[0].offSwitch], [true, "autocorrect"]);
     assert.equal(sections.flatMap(entry => entry.fields).filter(field => field.offSwitch).length, 4);
-    assert.equal(sections.find(({id}) => id === "keyboardOptions").fields.some(field => field.macro === "autocorrect"), false, "Key swaps & typing no longer lists it");
     const on = draftEdit(current, message(current, "autocorrect", {autocorrect: true}));
     assert.equal(validateSnapshot(on).settings.values[24], 0x1004, "the other options stay");
     current.options.keymapMasks[12] = 0x4000;
     assert.equal(validateSnapshot(draftEdit(current, message(current, "autocorrect", {autocorrect: true}))).settings.values[24], 0x4004, "the keyboard's mask, not an assumed bit");
+    current.options.supportedKeymapOptions &= ~(1 << 12);
+    const unbuilt = settingsEditorView(current).sections.find(({id}) => id === "autocorrect").fields[0];
+    assert.deepEqual([unbuilt.readOnly, unbuilt.notBuilt, unbuilt.hint], [true, true, "Not in this firmware (does nothing)."]);
+    assert.throws(() => draftEdit(current, message(current, "autocorrect", {autocorrect: true})), /Not in this firmware/);
     delete current.options;
     assert.deepEqual(settingsEditorView(current).sections.find(({id}) => id === "autocorrect").fields.map(field => field.macro), ["leaderTimeout"], "nothing to switch before the keyboard's options are read");
 });
@@ -457,7 +437,7 @@ test("each feedback flash has its own length: the behaviour flash interval and t
     assert.deepEqual({macro: flash.macro, id: flash.id, label: flash.label, unit: flash.unit, min: flash.min, max: flash.max, value: flash.value, validate: flash.validate},
         {macro: "replacementFlash", id: 31, label: "Flash length (ms)", unit: "ms", min: 1, max: 65535, value: "200", validate: "positive-int"});
     assert.equal(flash.hint, "How long one flash lasts.");
-    assert.equal(flash.tooltip, "Leader waiting is no flash: it holds for as long as the leader waits (Leader waits, in Host settings → Text replacement).", "Leader waiting holds rather than flashes (D-L92)");
+    assert.equal(flash.tooltip, "Leader waiting is no flash: it holds for as long as the leader waits (Leader waits, in Typing settings → Text replacement).", "Leader waiting holds rather than flashes (D-L92)");
     assert.doesNotMatch(interval.hint, /replacement/i, "the flash interval is the behaviour flash's alone");
     const longer = validateSnapshot(draftEdit(current, message(current, "replacementFeedback", {replacementFlash: "350"}))).settings.values;
     const before = validateSnapshot(current.document).settings.values;

@@ -7,7 +7,7 @@ const {openControls} = require("./control-preview");
 // or its tip. A tip adds to what the row shows and never repeats its hint,
 // so no sentence is in both (D-L96).
 // A row with a tip, on each screen that has one, is hovered to see it.
-const SAMPLE = {behaviours: "setting:tappingTerm", combos: "", pointer: "setting:normalDpi", host: "setting:swapControlCaps"};
+const SAMPLE = {behaviours: "setting:tappingTerm", combos: "", pointer: "setting:normalDpi", host: ""};
 for (const [screen, identity] of Object.entries(SAMPLE)) {
     test(`every ${screen} setting says what it does once`, async ({page}) => {
         await openControls(page, screen);

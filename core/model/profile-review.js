@@ -7,7 +7,7 @@ const {hostKeyLabel, keyKind, keyLabel, keyLabelWithName, keyLayer, profileKeyNa
 const {hostSettings, HOST_SETTING} = require("../schema/host-settings");
 const {SETTING, shortcutIdentity, shortcutPresent} = require("../schema/settings-domain-v1");
 const {decodedOf} = require("./portable-profile");
-const {settingsEditorView, COMBO_TIMING} = require("./settings-editor");
+const {settingsEditorView, ownedKeyOptions, COMBO_TIMING} = require("./settings-editor");
 const {macroEditorView} = require("./macro-editor");
 const {TRIGGER_NAMES, heldTypo, pairEntries, replacementCalled, replacementSaid, inputForm} = require("./autocorrect-list");
 const {entryKey, triggerOf} = require("../schema/autocorrect-domain-v1");
@@ -539,7 +539,7 @@ function profileReview(before, after, capabilities) {
                         ? [[VOCABULARY.macroUninterruptible.label, protectionWords("auto", playback.typing.some(route => route.method !== "layout"))]] : []),
                 ]));
             };
-            // The effect belongs to Host, so discarding it restores Host and
+            // The effect belongs to Your computer, so discarding it restores that section and
             // preserves independently edited macro text and names.
             item(AREA.macros, UNIT.settings("host"), `${macroDefaultName(index)}${macro.name ? ` · ${macro.name}` : ""} · ${VOCABULARY.settingsSections.host} settings`, fields(old, oldHost), fields(next, nextHost), {kind: "macro", index, keycode: macroName(index)}, [true, true]);
             /** @type {Change} */ (items.at(-1)).note = `Playback changes because of ${settingsPath("host", "host")}. Discard it together with that change.`;
@@ -637,7 +637,7 @@ function profileReview(before, after, capabilities) {
             change.note = `Its behaviour now follows the ${now === b.settings.values[SETTING.TAPPING_TERM] ? "dual-role" : "tap / hold"} threshold, as its shortcut's layer kind makes the key ${now === b.settings.values[SETTING.TAPPING_TERM] ? "" : "no longer "}dual-role.`;
         }
     }
-    const masks = after.options?.keymapMasks.reduce((mask, value) => mask | value, 0) || 0;
+    const masks = ownedKeyOptions(after.options);
     item(AREA.settings, UNIT.settings("otherKeyOptions"), "Other key options", new Map([["Stored bits", `0x${(a.settings.values[SETTING.KEYMAP_OPTIONS] & ~masks).toString(16)}`]]),
         new Map([["Stored bits", `0x${(b.settings.values[SETTING.KEYMAP_OPTIONS] & ~masks).toString(16)}`]]), {kind: "settings"}, [true, true]);
     for (let id = 0; id < Math.max(a.pdModes?.length || 0, b.pdModes?.length || 0); id++) {

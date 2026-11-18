@@ -82,7 +82,7 @@ test("Show goes to where each kind of item is edited", () => {
     assert.deepEqual(placeState({kind: "slots", bank: "pdModes", slots: [1, 6]}), {screen: "pointing", pointingSlot: 1, pdKind: null, pdTaps: null});
     assert.equal(placeState({kind: "lighting", stage: "pd"}).stage, "pd");
     assert.equal(placeState(null), null, "the profile fallback has nowhere to go");
-    // Text replacement's switch is a Host setting; its list is its own screen's, an entry shown by its id.
+    // Text replacement's switch is a Typing setting; its list is its own screen's, an entry shown by its id.
     assert.deepEqual(placeState({kind: "settings", section: "autocorrect", area: "Settings"}), {screen: "host", reveal: '.settings-group[data-section="autocorrect"]'});
     // Show opens the entry in its editor, as a macro's opens the macro: what
     // was open, being made or searched for gives way to it.
@@ -103,7 +103,6 @@ test("Show goes to where each kind of item is edited", () => {
     assert.equal(lands("comboSettings").screen, "combos", "the combo timing too, saved with the combos");
     assert.equal(lands("comboReferences").screen, "combos");
     assert.equal(lands("host").screen, "host");
-    assert.equal(lands("keyboardOptions").screen, "host");
     for (const section of ["normalPointerSpeed", "sniping", "autoMouse"]) {
         assert.deepEqual(lands(section, "Pointer"), {screen: "pointer", reveal: `.settings-group[data-section="${section}"]`}, `${section} is a pointer setting`);
     }
@@ -149,12 +148,12 @@ test("a profile file's differences are counted by what they configure, split as 
         at({kind: "settings", section: "automouseFade", area: "Lighting", stage: "auto"}),
         at({kind: "combo", index: 7}, {status: "removed"}), at({kind: "key", layer: 3}), at({kind: "key", layer: 0}), at({kind: "key", layer: 3}),
         at({kind: "settings", section: "keyTiming"}), at({kind: "behaviour"}, {status: "added"}), at({kind: "layers"}, {unit: "layerName:2"}),
-        at({kind: "settings"}, {unit: "settings:otherKeyOptions"}), at({kind: "macro", index: 4, keycode: "MACRO_4"}), at(null, {unit: "profile", title: "Stored profile"}),
+        at({kind: "settings"}, {unit: "settings:otherKeyOptions", title: "Other key options"}), at({kind: "macro", index: 4, keycode: "MACRO_4"}), at(null, {unit: "profile", title: "Stored profile"}),
     ], {names: ["Base", "Numbers", "Symbols", "Navigation"]});
     assert.deepEqual(groups.map((group) => [group.category, group.count]),
         [["Keys", 8], ["Lighting", 7], ["Macros", 1], ["Pointer", 2], ["Pointing modes", 1], ["Other", 1]], "the rail's order");
     const rows = (category) => groups.find((group) => group.category === category).rows.map((row) => `${row.label} ${row.count}`);
-    assert.deepEqual(rows("Keys"), ["Keys on Base 1", "Keys on Navigation 2", "Layer names 1", "Behaviours 1", "Tap & hold timing 1", "Combos 1", "Key swaps & typing 1"],
+    assert.deepEqual(rows("Keys"), ["Keys on Base 1", "Keys on Navigation 2", "Layer names 1", "Behaviours 1", "Tap & hold timing 1", "Combos 1", "Other key options 1"],
         "the board's keys by layer first, then the rest of the Keys screen");
     assert.deepEqual(rows("Lighting"), ["All lighting 1", "Stages on or off 1", "Background effect 1", "Layer colours 1", "Auto-mouse fade 1", "Behaviour feedback 2"],
         "all lighting first, then stages in paint order; a setting edited on a stage counts with it");
@@ -174,7 +173,7 @@ test("a profile file's settings sections are counted under the vocabulary's word
         .flatMap((group) => group.rows.map((row) => [row.label, group.category])));
     assert.deepEqual(labels, {
         "Tap & hold timing": "Keys", "Default layers": "Keys", "Behaviour settings": "Keys", "Combo settings": "Keys", "Combo layer matching": "Keys",
-        "Key swaps & typing": "Keys", "All lighting": "Lighting", "Background effect": "Lighting", "Behaviour feedback": "Lighting", "Replacement feedback": "Lighting",
+        "All lighting": "Lighting", "Background effect": "Lighting", "Behaviour feedback": "Lighting", "Replacement feedback": "Lighting",
         "Pointer speed": "Pointer", "Auto-sniping": "Pointer", "Auto-mouse": "Pointer", "Text replacement switch": "Text replacement",
     });
 });

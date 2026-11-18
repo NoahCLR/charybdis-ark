@@ -282,7 +282,7 @@ The same kind of control looks and sits the same on every screen.
   (`browser-tests/macro-ux.spec.js`,
   `browser-tests/custom-key-behaviour.spec.js`,
   `browser-tests/pointing-controls.spec.js`).
-- A Settings screen (Behaviours, Combos, Pointer, Host) draws its
+- A Settings screen (Behaviours, Combos, Pointer, Typing) draws its
   sections as open cards, none folding, and offers no search
   (`tests/view/settings-layout.test.mjs`,
   `browser-tests/settings-screens.spec.js`).
@@ -825,9 +825,9 @@ Which settings sections each Settings screen draws, in order, is
 Show goes, is `screenOfSection`; a note names it as the screen, named as
 outside the rail, then the section ("Behaviour settings → Tap & hold timing",
 `sectionPath`). Lighting's Auto-mouse links open Pointer settings and the
-macro editor's Your computer link opens Host settings. A section that
+macro editor's Your computer link opens Typing settings. A section that
 switches what a Configure screen edits says where that is in its switch's
-hint, as words (Combo settings' "in Keymap → Combos", Host's Text replacement
+hint, as words (Combo settings' "in Keymap → Combos", Typing's Text replacement
 card's "in Text replacement"; no card has a link of its own, D-L88), and that
 screen says when the switch is off, with the way back (D-L87). Outside the rail, a
 Settings screen is named as `vocabulary.settingsScreens` names it ("Pointer
@@ -1807,17 +1807,17 @@ generates `core/data/host-layouts.json` from the firmware's fixture
 (`npm run upstream`) and never re-derives it, so what the editor accepts is
 what the keyboard types (D-L56; `tests/data/host-layouts.test.js`).
 
-- A Host edit that changes the effective OS carries the layout along
+- A Your computer edit that changes the effective OS carries the layout along
   (`followHostOs`); detection is not an edit, so Auto never rewrites it, and
-  Host warns while the layout belongs to another OS
+  Your computer warns while the layout belongs to another OS
   (`tests/schema/host-settings.test.js`, `tests/model/settings-editor.test.js`).
 - On macOS, Unicode entry is a layout choice, not a switch
   (`tests/schema/host-settings.test.js`).
 - The editor refuses a character the layout cannot type without Unicode entry,
   and an ordinary key held across text that needs it
   (`tests/model/macro-editor.test.js`).
-- Review lists text macros whose routes change with a Host edit; those rows
-  belong to Host and discard with it. An unplayable macro is a warning, not a
+- Review lists text macros whose routes change with a Your computer edit; those rows
+  belong to Your computer and discard with it. An unplayable macro is a warning, not a
   save blocker (`browser-tests/macro-host-review.spec.js`,
   `tests/model/profile-checks.test.js`).
 
@@ -1829,7 +1829,7 @@ Automatic turns on for text the layout must enter as Unicode
 (`tests/model/macro-editor.test.js`). An explicit choice is a three-byte
 canonical prefix in the macro's bytes that edits keep and the bank counts;
 Automatic stores none (`tests/schema/macro-payload.test.js`). Review groups
-Automatic's effect with Host and an explicit choice with its macro (no test).
+Automatic's effect with Your computer and an explicit choice with its macro (no test).
 
 ## Participation controls
 

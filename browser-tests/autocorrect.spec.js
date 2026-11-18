@@ -500,12 +500,12 @@ test("what the host layout cannot type is said once across the screen and on its
     await publish(page, (model) => {
         const warning = "US cannot type “é”, so this replacement will not be typed.";
         model.autocorrect.entries.push({id: "café", label: "café", correction: "café", fires: "word", warnings: [warning], typos: [{typo: "cafe", input: "cafe", warnings: []}]});
-        model.autocorrect.notices = ["US cannot type 1 replacement, so the keyboard skips it. Change Host settings → Your computer back, or edit the replacements marked."];
+        model.autocorrect.notices = ["US cannot type 1 replacement, so the keyboard skips it. Change Typing settings → Your computer back, or edit the replacements marked."];
         model.configDefaults.find((section) => section.id === "autocorrect").fields.find((field) => field.macro === "autocorrect").enabled = false;
     });
     // The core's notice, whole, as the callout the switch's banner is: both run across the two panes, one as wide as the other.
     const notice = page.locator(".library-head [data-ac-notice]");
-    await expect(notice).toHaveText("US cannot type 1 replacement, so the keyboard skips it. Change Host settings → Your computer back, or edit the replacements marked.");
+    await expect(notice).toHaveText("US cannot type 1 replacement, so the keyboard skips it. Change Typing settings → Your computer back, or edit the replacements marked.");
     await expect(notice).toHaveClass(/callout/);
     const [noticeBox, bannerBox, padBox] = [await notice.boundingBox(), await page.locator(".library-head [data-master-off]").boundingBox(), await page.locator(".pad.autocorrect").boundingBox()];
     expect(Math.abs(noticeBox.width - bannerBox.width)).toBeLessThan(1);
@@ -573,15 +573,15 @@ test("every control of the screen has a name, and the keyboard reaches them in r
     await expect(editor(page).locator('[data-act="ac-try-clear"]')).toBeDisabled();
 });
 
-// ── the switch is a Host setting (D-L87) ───────────────────────────────
+// ── the switch is a Typing setting (D-L87) ─────────────────────────────
 
-test("the switch is a Host setting that says where its list is, and the list's screen says so while it is off", async ({page}) => {
+test("the switch is a Typing setting that says where its list is, and the list's screen says so while it is off", async ({page}) => {
     await openControls(page, "host");
     const card = page.locator('.settings-group[data-section="autocorrect"]');
     await expect(card.locator("h3")).toHaveText("Text replacement");
-    // After Your computer, whose layout it types through, and before the key swaps.
-    await expect(page.locator(".settings-pad > .settings-group")).toHaveCount(3);
-    expect(await page.locator(".settings-pad > .settings-group").evaluateAll((cards) => cards.map((node) => node.getAttribute("data-section")))).toEqual(["host", "autocorrect", "keyboardOptions"]);
+    // After Your computer, whose layout it types through, and last on Typing (D-L102).
+    await expect(page.locator(".settings-pad > .settings-group")).toHaveCount(2);
+    expect(await page.locator(".settings-pad > .settings-group").evaluateAll((cards) => cards.map((node) => node.getAttribute("data-section")))).toEqual(["host", "autocorrect"]);
     const setting = card.locator(".setrow").first();
     await expect(setting.locator(".nm")).toContainText("Enabled");
     await expect(setting.locator(".kk-mark")).toHaveText(["↺ keyboard keys change this too"]);
@@ -607,21 +607,21 @@ test("the switch is a Host setting that says where its list is, and the list's s
     await wait.fill("3500");
     await wait.press("Tab");
     await expect.poll(async () => (await posted(page)).filter((message) => message.type === "updateConfigDefaults").at(-1)?.fields.find((field) => field.macro === "leaderTimeout")).toEqual({macro: "leaderTimeout", value: "3500"});
-    // Key swaps & typing does not list it.
-    await expect(page.locator('.settings-group[data-section="keyboardOptions"] [data-macro="autocorrect"]')).toHaveCount(0);
+    // Typing has no Key swaps & typing card (D-L102), and nothing else lists the switch.
+    await expect(page.locator('.settings-group[data-section="keyboardOptions"]')).toHaveCount(0);
     await expect(page.locator('[data-macro="autocorrect"]')).toHaveCount(1);
     await page.locator('[data-screen="autocorrect"]').click();
     await expect(page.locator(".main > .topbar h1")).toHaveText("Text replacement");
     // Off, the list's screen says so across its head, over both panes, as the combo and behaviour editors do, and the banner goes to the switch.
     const banner = page.locator(".pad.autocorrect > .library-head [data-master-off]");
     await expect(banner).toContainText("Text replacement is off.");
-    await expect(banner).toContainText("Turn it on in Host settings");
+    await expect(banner).toContainText("Turn it on in Typing settings");
     await expect(page.locator(".pad.autocorrect > :first-child")).toHaveClass(/library-head/);
     const across = await banner.boundingBox(), left = await bank(page).boundingBox(), right = await editor(page).boundingBox();
     expect(Math.abs(across.x - left.x)).toBeLessThan(2);
     expect(Math.abs(across.x + across.width - (right.x + right.width))).toBeLessThan(2);
     await banner.click();
-    await expect(page.locator(".main > .topbar h1")).toHaveText("Host");
+    await expect(page.locator(".main > .topbar h1")).toHaveText("Typing");
     await expect(page.locator('.settings-group[data-section="autocorrect"]')).toBeVisible();
 });
 
@@ -1183,7 +1183,7 @@ test("in the demo Try it previews as the keyboard would replace, keeps case, und
     // No keyboard is connected in the demo, so nothing says one is replacing.
     await expect(page.locator("[data-ac-try-running]")).toHaveCount(0);
 
-    // The switch: on in the demo, so the list's screen has no banner; turned off on Host.
+    // The switch: on in the demo, so the list's screen has no banner; turned off on Typing.
     await expect(page.locator(".pad.autocorrect [data-master-off]")).toHaveCount(0);
     await page.locator('[data-screen="host"]').click();
     const toggle = page.locator('.settings-group[data-section="autocorrect"] [data-macro="autocorrect"]');

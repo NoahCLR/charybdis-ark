@@ -8,7 +8,6 @@ const {LED_FLAGS, SETTING, SETTING_FIELD, SETTING_FIELDS, SETTINGS, validSetting
 const {hostSettings, followHostOs, UNICODE_ENABLED, LAYOUT_SHIFT, MACOS, MACOS_ISO, OS_OF} = require("../schema/host-settings");
 const {hostLayouts} = require("../data/host-layouts");
 const {dpiChoices} = require("./pointer-dpi");
-const {hostKeyLabel} = require("./key-names");
 const {layerName, PROFILE_AREAS, REVIEW_AREAS: AREA, VOCABULARY, settingsPath, word} = require("./vocabulary");
 // Each section's heading, and the thresholds' names, are the vocabulary's.
 const SECTION = VOCABULARY.settingsSections, THRESHOLD = VOCABULARY.thresholdNames;
@@ -143,31 +142,19 @@ const sections = [
     ]},
 ];
 
-// In the keyboard's bit order: an option's place here is its bit. `part` is
-// what it changes, the heading it is listed under: modifier keys, other
-// keys, or how typing works.
-/** @type {[string, string, string, "Modifiers" | "Keys" | "Typing"][]} */
-const optionLabels = [
-    ["swapControlCaps", "Swap left Control and Caps Lock", "Exchange the actions of left Control and Caps Lock across all layers.", "Modifiers"],
-    ["capsToControl", "Use Caps Lock as left Control", "Make Caps Lock send left Control instead; left Control keeps its own action.", "Modifiers"],
-    ["swapLeftAltGui", "Swap left Alt and GUI", "Exchange the left Alt and GUI modifier actions across all layers.", "Modifiers"],
-    ["swapRightAltGui", "Swap right Alt and GUI", "Exchange the right Alt and GUI modifier actions across all layers.", "Modifiers"],
-    ["disableGui", "Disable GUI keys", "Prevent either GUI modifier from being sent. Other modifiers still work.", "Modifiers"],
-    ["swapGraveEscape", "Swap backtick and Escape", "Exchange the backtick and Escape key actions across all layers.", "Keys"],
-    ["swapBackslashBackspace", "Swap backslash and Backspace", "Exchange the backslash and Backspace key actions across all layers.", "Keys"],
-    ["nkro", "Allow more than six simultaneous keys", "Use N-key rollover so the keyboard can report more than six ordinary keys held at once.", "Typing"],
-    ["swapLeftControlGui", "Swap left Control and GUI", "Exchange the left Control and GUI modifier actions across all layers.", "Modifiers"],
-    ["swapRightControlGui", "Swap right Control and GUI", "Exchange the right Control and GUI modifier actions across all layers.", "Modifiers"],
-    ["oneshot", "One-shot modifiers and layers", "Allow one-shot modifier and layer keys to affect the next key after they are released.", "Typing"],
-    ["swapEscapeCaps", "Swap Escape and Caps Lock", "Exchange the Escape and Caps Lock key actions across all layers.", "Keys"],
-    ["autocorrect", "Enabled", "Off, the keyboard types every word as you typed it and keeps your list. Replacements and their inputs are in Text replacement.", "Typing"],
-];
-// Text replacement's switch (autocorrect, in the keyboard's names) is a key
-// option the keyboard stores with the others (option 12, firmware
-// settings-domain.md). It has a section of its own on the Host screen, since
-// replacements are typed through the host layout chosen there; the list it
-// turns on is the Text replacement screen's.
-const AUTOCORRECT_SWITCH = "autocorrect";
+// Text replacement's switch (autocorrect, in the keyboard's names) is key
+// option 12, which the keyboard stores in one word with QMK's own key options
+// (firmware settings-domain.md). It has a section of its own on the Typing
+// screen, since replacements are typed through the host layout chosen there;
+// the list it turns on is the Text replacement screen's. Ark has no switch
+// for QMK's key options, the modifier and key swaps, N-key rollover and
+// one-shot keys (D-L102): the keyboard keeps whatever it stores for them, and
+// the review lists a difference in them as Other key options.
+const AUTOCORRECT_OPTION = 12;
+// The key options bits an Ark field owns: the switch's, where the keyboard
+// placed it. The review and Discard treat every other bit as one more thing.
+/** @param {import("./types.js").SnapshotFacts["options"]} options */
+const ownedKeyOptions = options => options?.keymapMasks?.[AUTOCORRECT_OPTION] || 0;
 // Which bits of its settings word a field owns: one flag, a shifted byte or
 // nibble, or the whole word. Reading, writing and putting a field back to the
 // keyboard's value all go through this.
@@ -274,16 +261,10 @@ function settingsSections(snapshot, settings) {
     // A layer's combo reference is in its layer record, not a setting value.
     result.push({id: "comboReferences", area: AREA.settings, label: SECTION.comboReferences, description: "Each layer matches its combos against the keys of the layer chosen here. Choose the layer itself to keep its combos independent.", fields:
         everyLayer(i => ({...layer(`comboReference${i}`, undefined, `Combos on ${name(i)}`), record: /** @type {const} */ ("reference"), layer: i, governs: {kind: /** @type {const} */ ("layer"), layer: i}}))});
-    /** @type {import("../../contracts/model.js").StoredSettingField[]} */
-    const keyOptions = options ? optionLabels.map(([macro, label, hint, part], i) => ({...toggle(macro, SETTING.KEYMAP_OPTIONS, hostKeyLabel(label, host.effective)), tooltip: hostKeyLabel(hint, host.effective), part, bitMask: options.keymapMasks[i], keyboardKeys: true, readOnly: !(options.supportedKeymapOptions & (1 << i)), notBuilt: !(options.supportedKeymapOptions & (1 << i)), hint: options.supportedKeymapOptions & (1 << i) ? "" : "Not in this firmware (does nothing)."})) : [];
-    result.push({id: "keyboardOptions", area: AREA.settings, label: SECTION.keyboardOptions, ...(options ? {} : {description: "Read the keyboard to see the key options it supports."}), fields:
-        keyOptions.filter(field => field.macro !== AUTOCORRECT_SWITCH)});
-    // Its switch keys override it until the keyboard restarts (switchedByKeys),
-    // so it is no longer a "Typing" option among the swaps. How long the
-    // leader waits follows it: the leader works whatever the switch says
-    // (firmware D-F71).
+    const built = Boolean(options && options.supportedKeymapOptions & (1 << AUTOCORRECT_OPTION));
     result.push({id: "autocorrect", area: AREA.settings, label: SECTION.autocorrect, fields: [
-        ...keyOptions.filter(field => field.macro === AUTOCORRECT_SWITCH).map(({part, tooltip, ...field}) => switchedByKeys({...field, hint: field.hint || tooltip}, "autocorrect")),
+        ...(options ? [switchedByKeys({...toggle("autocorrect", SETTING.KEYMAP_OPTIONS, "Enabled", built ? "Off, the keyboard types every word as you typed it and keeps your list. Replacements and their inputs are in Text replacement." : "Not in this firmware (does nothing)."),
+            bitMask: options.keymapMasks[AUTOCORRECT_OPTION], readOnly: !built, notBuilt: !built}, "autocorrect")] : []),
         number("leaderTimeout", SETTING.LEADER_TIMEOUT, `${LEADER_WAITS} (ms)`, "How long the Leader key waits after your last key before it sends a leader input that a longer one begins with, from 1000 to 10000. It works with the switch off, and when a key turned it off."),
     ]});
     /** @param {number} id */
@@ -326,7 +307,7 @@ function settingsSections(snapshot, settings) {
     return result;
 }
 
-// Capabilities decide which Host fields can be edited; Review and revert read
+// Capabilities decide which Your computer fields can be edited; Review and revert read
 // values without them.
 /** @param {import("./types.js").ProfileSnapshot | null | undefined} snapshot */
 function settingsEditorView(snapshot) {
@@ -436,4 +417,4 @@ function editSettings(document, message, draft) {
     });
 }
 
-module.exports = {settingsEditorView, editSettings, fieldMask, baseLighting, COMBO_TIMING};
+module.exports = {settingsEditorView, editSettings, ownedKeyOptions, fieldMask, baseLighting, COMBO_TIMING};

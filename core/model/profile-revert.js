@@ -9,7 +9,7 @@
 // result passes the same validation as any other edit.
 
 const {editProfileDomains, readProfileDomains, validateSnapshot} = require("./portable-profile");
-const {settingsEditorView, fieldMask} = require("./settings-editor");
+const {settingsEditorView, ownedKeyOptions, fieldMask} = require("./settings-editor");
 const {singleComboRemovalIndex} = require("./profile-review");
 const {settingsShortcutRefusal} = require("./shortcut-layers");
 const {UNIT, parseUnit} = require("./review-units");
@@ -83,7 +83,7 @@ function revertUnits(before, after, units, capabilities) {
             } else if (unit.kind === "settings") {
                 const settings = domain("settings");
                 if (unit.section === "otherKeyOptions") {
-                    const masks = after.options?.keymapMasks?.reduce((mask, value) => mask | value, 0) || 0;
+                    const masks = ownedKeyOptions(after.options);
                     settingBits(settings, 24, ~masks >>> 0);
                 } else {
                     const fields = sections.get(unit.section);

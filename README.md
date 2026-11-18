@@ -207,14 +207,12 @@ combo, behaviour feedback case or replacement case shows.
   <sub>Navigation previewed, with the stages and the behaviour feedback colours.</sub>
 </p>
 
-### Host and Keyboard screens
+### Typing and Keyboard screens
 
-The **Host** screen tells Ark and the keyboard which system the computer runs
+The **Typing** screen tells Ark and the keyboard which system the computer runs
 (Auto, macOS, Windows or Linux) and which keyboard layout it uses. Keys are
 then labelled as the computer types them, and macros type the right
-characters. It also has the switch for text replacement, and key swaps for
-every layer, such as Ctrl with Caps Lock, Ctrl with Command or Escape with
-backtick.
+characters. It also has the switch for text replacement.
 
 The **Keyboard** screen sets the name the computer shows for the keyboard,
 and shows how full the profile is. An edit that wouldn't fit is refused
@@ -289,7 +287,7 @@ imports the same way, bringing its keys and macros.
    page loads the newest Ark each time it opens.
 3. Click **Choose keyboard…** and select the keyboard. From then on the page
    connects to it whenever it opens.
-4. In **Host**, set your computer's system and keyboard layout, so keys and
+4. In **Typing**, set your computer's system and keyboard layout, so keys and
    macros type the right characters, and save. Then export a first backup
    from **Backups**.
 

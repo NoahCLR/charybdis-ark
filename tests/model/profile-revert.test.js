@@ -103,3 +103,19 @@ test("replacement feedback goes back apart from its stage switch and its accents
     const all = revertUnits(draft.base, draft.current, new Set(rows.map(row => row.unit)), capabilities);
     assert.deepEqual(profileReview(draft.base, snapshotOf(all)), []);
 });
+
+// Ark has no switch for QMK's key options (D-L102), so a swap stored in the
+// draft and not on the keyboard is one Other key options change, and Discard
+// puts back those bits and leaves Text replacement's switch to its own unit.
+test("a key option Ark has no switch for is one Other key options change, and Discard puts back only its bits", () => {
+    const {editDomain} = require("../fixtures/profile-document");
+    const options = require("../fixtures/keyboard-options").options();
+    const base = {...snapshotOf(pdDocument()), options};
+    const keymap = validateSnapshot(base.document, capabilities).settings.values[24];
+    const document = editDomain(pdDocument(), "settings", (settings) => {settings.values[24] = (keymap ^ 0x0001 ^ 0x1000) >>> 0;});
+    const current = {...base, document, fingerprint: fingerprint(document)};
+    const rows = profileReview(base, current);
+    assert.deepEqual(rows.map((row) => [row.unit, row.title]).sort(), [["settings:autocorrect", "Text replacement"], ["settings:otherKeyOptions", "Other key options"]]);
+    const restored = revertUnits(base, current, new Set(["settings:otherKeyOptions"]), capabilities);
+    assert.equal(validateSnapshot(restored, capabilities).settings.values[24], (keymap ^ 0x1000) >>> 0, "the switch's own bit stays as edited");
+});

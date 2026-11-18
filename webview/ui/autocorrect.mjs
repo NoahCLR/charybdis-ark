@@ -10,7 +10,7 @@
  */
 // Text replacement: what the keyboard replaces as a word ends (firmware
 // D-F68, where the feature is autocorrect, a replacement a correction and an
-// input a typo; the code keeps those names). Its switch is a Host setting, as
+// input a typo; the code keeps those names). Its switch is a Typing setting, as
 // every switch is a Settings screen's, and a banner says so while it is off
 // (D-L87).
 //

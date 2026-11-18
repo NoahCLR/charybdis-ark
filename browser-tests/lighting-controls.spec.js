@@ -929,7 +929,7 @@ test("the Flash length field posts its own setting edit and keeps its focus acro
     // What it means is on the stage's info mark alone, never also in a tip.
     await expect(field).not.toHaveAttribute("data-tip", /./);
     await expect(where.locator(".info-pop")).toContainText("How long one flash lasts");
-    // Leader waiting lasts as long as the leader waits instead, set on Host settings, a link away.
+    // Leader waiting lasts as long as the leader waits instead, set on Typing settings, a link away.
     await expect(where.locator('[data-act="leader-waits"]')).toHaveText("Leader waits →");
     const input = field.locator("input");
     await expect(input).toHaveValue("200");
@@ -1042,7 +1042,7 @@ test("Leader waiting holds from the Leader key, or on every key with none, takes
     const where = body(page).locator('.field:has([data-f="lighting:autocorrect:leadingColor:locality"]) .hint');
     await expect(where).toHaveText("Trigger key: the Leader key you pressed.");
     await expect(body(page).locator(".stage-bar .info-pop")).toContainText("which holds as long as the leader waits");
-    await expect(body(page).locator('[data-act="leader-waits"]')).toHaveAttribute("data-tip", /^Opens Host settings/);
+    await expect(body(page).locator('[data-act="leader-waits"]')).toHaveAttribute("data-tip", /^Opens Typing settings/);
     // An accent for Leader waiting alone.
     const section = body(page).locator('[data-accents="autocorrect"]');
     await expect(section.locator(".accent-band")).toHaveText(["For Leader waiting", "For every case"]);

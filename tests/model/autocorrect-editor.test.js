@@ -77,7 +77,7 @@ test("warnings are published on the entry or input they are about, and the layou
     assert.deepEqual(german.notices, []);
     assert.equal(german.layoutName, "German (Windows)");
     const us = autocorrectEditorView(fixture(entries), CURRENT_CAPABILITIES);
-    assert.deepEqual(us.notices, ["US cannot type 2 replacements, so the keyboard skips them. Change Host settings → Your computer back, or edit the replacements marked."],
+    assert.deepEqual(us.notices, ["US cannot type 2 replacements, so the keyboard skips them. Change Typing settings → Your computer back, or edit the replacements marked."],
         "said once, whole, with what to do about it");
     assert.equal(us.entries.reduce((total, entry) => total + entry.warnings.length + entry.typos.reduce((sum, typo) => sum + typo.warnings.length, 0), 0), 4);
     assert.match(us.entries.find(entry => entry.correction === "über").warnings[0], /US cannot type “ü”/);
@@ -325,7 +325,7 @@ test("Review warns once of the replacements the host layout cannot type, and of 
         {level: "warning", count: 3, title: "US cannot type 3 text replacements", place: {kind: "autocorrect", entry: "a"}});
     assert.match(finding.detail, /US cannot type a character in “a”, “straße”, “über”\. The keyboard stores them and skips them\./);
     assert.deepEqual(profileFindings(validateSnapshot(fixture([["über", "ueber"]], GERMAN).document)).filter(row => row.kind === "untypableAutocorrect"), []);
-    assert.equal(finding.fix, "Change Host settings → Your computer back, or edit the replacements marked on the Text replacement screen.");
+    assert.equal(finding.fix, "Change Typing settings → Your computer back, or edit the replacements marked on the Text replacement screen.");
     assert.equal(untypable([["über", "ueber"]])[0].title, "US cannot type 1 text replacement");
     // A replacement that plays a macro is named in the sentence as one.
     const named = profileFindings(validateSnapshot(fixture([[5, "sig"], ["a", "ä"]], 0, {5: "Kind regards"}).document)).find(row => row.kind === "untypableAutocorrect");

@@ -224,7 +224,7 @@ replacement**, which are QMK's autocorrect keys (`AC_ON`, `AC_OFF`,
 `AC_TOGG`).
 Nothing is saved, and the switches in Ark stay as they are. That is why each
 switch, the **Enabled** of Behaviour settings and Combo settings, Pointer
-settings' **Auto-mouse** and the **Enabled** of Host settings' **Text
+settings' **Auto-mouse** and the **Enabled** of Typing settings' **Text
 replacement**, says
 **↺ keyboard keys change this too**. When a
 switch key has turned one off while Ark has it on, its settings mark it

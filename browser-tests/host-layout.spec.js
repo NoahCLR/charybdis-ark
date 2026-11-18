@@ -5,7 +5,7 @@ const {openPreview} = require("./shell-page");
 const {buildDeviceModel} = require("../core/session/device-model");
 
 // Sends the production model for a host layout, as the host would after the
-// Host settings change.
+// Typing settings change.
 async function sendLayout(page, effective, layout, macosIso = false) {
     const patch = buildDeviceModel({settingsView: {host: {effective, layout, macosIso}}});
     await page.evaluate(patch => {
