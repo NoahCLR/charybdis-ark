@@ -36,6 +36,7 @@ test("each unit goes back to the keyboard's value, and nothing else moves", () =
         assert.ok(units.some((unit) => unit.startsWith(`${kind}:`)), `the fixture edits a ${kind} unit`);
     }
     assert.ok(units.includes("comboTiming"), "the fixture edits the combo timing");
+    assert.ok(units.includes("rgb:autocorrect"), "the fixture edits replacement feedback");
     for (const unit of units) {
         const document = revertUnits(base, current, new Set([unit]), capabilities);
         const left = profileReview(base, {...current, document, fingerprint: fingerprint(document)});
@@ -82,4 +83,39 @@ test("discarding a default-layer change alone that would put a shortcut on an al
         /^Error: These settings cannot be discarded on their own: \S+ is turned on by Custom key 9's shortcut, and a shortcut cannot turn on a default layer/);
     // Discarded together, both go back.
     assert.doesNotThrow(() => revertUnits(keyboard, draft, new Set([startup, "customKey:9"]), capabilities));
+});
+
+test("replacement feedback goes back apart from its stage switch and its accents, and each of those apart from it", () => {
+    const draft = new ProfileDraftSession(snapshotOf(pdDocument()), "board", capabilities);
+    const stage = message => draft.stage({...message, draftId: draft.id, draftRevision: draft.revision});
+    const before = validateSnapshot(draft.base.document).rgb;
+    stage({type: "updateAutocorrectFeedback", config: {textColor: {h: 106, s: 255, v: 200}, textLocality: "RGB_KEY_HALF", macroColor: {h: 0, s: 0, v: 0}, macroLocality: "RGB_BOTH_HALVES",
+        undoColor: {h: 0, s: 255, v: 200}, undoLocality: "RGB_KEY_HALF", leadingColor: {h: 170, s: 255, v: 200}, leadingLocality: "RGB_KEY_HALF"}});
+    stage({type: "updateRgbStages", stageEnableMask: before.stageEnableMask | 32});
+    stage({type: "addRgbLedGroup", group: {target: "autocorrect", owner: "AUTOCORRECT_FEEDBACK_GROUP_ALL", ledIndices: [24, 25], h: 0, s: 0, v: 0}});
+    const rows = profileReview(draft.base, draft.current);
+    assert.deepEqual(rows.map(row => row.unit).sort(), ["rgb:autocorrect", "rgb:groups", "rgb:stages"]);
+    const rgb = unit => validateSnapshot(revertUnits(draft.base, draft.current, new Set([unit]), capabilities)).rgb;
+    const now = validateSnapshot(draft.document).rgb;
+    assert.deepEqual(rgb("rgb:autocorrect"), {...now, autocorrectFeedback: before.autocorrectFeedback}, "the colours and the locality alone");
+    assert.deepEqual(rgb("rgb:stages"), {...now, stageEnableMask: before.stageEnableMask}, "the switch alone");
+    assert.deepEqual(rgb("rgb:groups"), {...now, groups: before.groups, autocorrectGroupRows: []}, "the accent alone, with the LED set it took");
+    const all = revertUnits(draft.base, draft.current, new Set(rows.map(row => row.unit)), capabilities);
+    assert.deepEqual(profileReview(draft.base, snapshotOf(all)), []);
+});
+
+// Ark has no switch for QMK's key options (D-L102), so a swap stored in the
+// draft and not on the keyboard is one Other key options change, and Discard
+// puts back those bits and leaves Text replacement's switch to its own unit.
+test("a key option Ark has no switch for is one Other key options change, and Discard puts back only its bits", () => {
+    const {editDomain} = require("../fixtures/profile-document");
+    const options = require("../fixtures/keyboard-options").options();
+    const base = {...snapshotOf(pdDocument()), options};
+    const keymap = validateSnapshot(base.document, capabilities).settings.values[24];
+    const document = editDomain(pdDocument(), "settings", (settings) => {settings.values[24] = (keymap ^ 0x0001 ^ 0x1000) >>> 0;});
+    const current = {...base, document, fingerprint: fingerprint(document)};
+    const rows = profileReview(base, current);
+    assert.deepEqual(rows.map((row) => [row.unit, row.title]).sort(), [["settings:autocorrect", "Text replacement"], ["settings:otherKeyOptions", "Other key options"]]);
+    const restored = revertUnits(base, current, new Set(["settings:otherKeyOptions"]), capabilities);
+    assert.equal(validateSnapshot(restored, capabilities).settings.values[24], (keymap ^ 0x1000) >>> 0, "the switch's own bit stays as edited");
 });

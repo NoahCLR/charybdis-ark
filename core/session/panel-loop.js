@@ -76,6 +76,10 @@ const {watchLive} = require("./live-watch");
 const {readFlashFigures} = require("./flash-pauses");
 const {demoControl, demoExport, demoUnsaved, leaveDemo, panelState} = require("./demo-session");
 const {macroInputStatus} = require("../model/macro-editor");
+const {editNames, importPreview, newWarnings, tryText} = require("../model/autocorrect-editor");
+const {parseAutocorrectFile} = require("../model/autocorrect-import");
+const {applyDraftEdit} = require("../model/draft-editor");
+const {draftEditEntry} = require("../model/draft-edits");
 const {FILE_MAX_BYTES} = require("../model/portable-profile");
 const {failureSentence, sayable} = require("../model/vocabulary");
 
@@ -224,6 +228,25 @@ function overlayOf(value, base) {
 /** @param {unknown} value @returns {value is Record<string, unknown>} */
 const isRecord = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
 
+// What an autocorrect edit would newly warn about, and the entry it names,
+// its refusal thrown: the edit is made of the draft as it stands and the
+// result thrown away, so the check and the edit cannot disagree. An add that
+// names no input yet is not made: it is only asked which entry it would be.
+// A refusal of the edit still says which entry its replacement is (`named`
+// on what is thrown), since whether the list has it is true either way.
+/** @param {import("../model/types.js").CompleteSnapshot} snapshot @param {import("../../contracts/edits.js").AutocorrectEdit} edit @param {import("../model/types.js").ProfileDestination} [capabilities] @returns {Pick<import("../../contracts/messages.js").AutocorrectValidation, "warnings" | "entry" | "label" | "listed" | "listedSaid">} */
+function autocorrectEditStatus(snapshot, edit, capabilities) {
+    if (draftEditEntry(edit?.type)?.editor !== "autocorrect") throw Object.assign(new Error("Unsupported draft edit."), {code: "PROFILE_DRAFT_CONFLICT"});
+    const {entry, label, listed, listedSaid, joins, unfinished} = editNames(snapshot, edit);
+    const named = entry === undefined ? {} : {entry, label, listed: Boolean(listed), ...(listedSaid ? {listedSaid} : {})};
+    if (unfinished) return {warnings: [], ...named};
+    try {
+        return {warnings: [...(joins ? [joins] : []), ...newWarnings(snapshot, applyDraftEdit(snapshot, edit, {capabilities}))], ...named};
+    } catch (error) {
+        throw Object.assign(/** @type {object} */ (error), {named});
+    }
+}
+
 // Edit/control paths publish, including the ones that decline or fail:
 // the webview waits on that reply — a combo builder closes when its edit is
 // accepted and stays open when it is refused — and a refusal reaches the panel
@@ -244,6 +267,55 @@ async function handleMessage(session, message, shell) {
             reply.validation = {error: failureSentence(error), code: /** @type {import("./types.js").OperationFailure} */ (error).code || "MACRO_EDIT_CONFLICT"};
         }
         // Local inspection neither stages an edit nor emits a toast or HID.
+        await shell.post(reply);
+        return;
+    }
+    if (message && panelControl(message.type)?.action === "validateAutocorrect") {
+        const inspection = /** @type {Extract<Message, {type: "validateAutocorrect"}>} */ (message);
+        /** @type {Extract<import("../../contracts/messages.js").PanelResponse, {type: "autocorrectValidation"}>} */
+        const reply = {type: "autocorrectValidation", requestId: inspection.requestId, draftId: message.draftId, draftRevision: message.draftRevision, validation: {error: "", code: "", warnings: []}};
+        try {
+            const draft = boundDraft(session, panelState(session), message, "Read the keyboard and wait for its current operation before editing your text replacements.");
+            reply.validation = {...reply.validation, ...autocorrectEditStatus(draft.current, inspection.edit, draft.capabilities)};
+        } catch (error) {
+            reply.validation = {error: failureSentence(error), code: /** @type {import("./types.js").OperationFailure} */ (error).code || "AUTOCORRECT_EDIT_REFUSED", warnings: [],
+                .../** @type {{named?: Pick<import("../../contracts/messages.js").AutocorrectValidation, "entry" | "label" | "listed" | "listedSaid">}} */ (error).named};
+        }
+        // As a macro's inspection: nothing staged, no toast, no HID.
+        await shell.post(reply);
+        return;
+    }
+    if (message && panelControl(message.type)?.action === "tryAutocorrect") {
+        const tried = /** @type {Extract<Message, {type: "tryAutocorrect"}>} */ (message);
+        /** @type {Extract<import("../../contracts/messages.js").PanelResponse, {type: "autocorrectTry"}>} */
+        const reply = {type: "autocorrectTry", requestId: tried.requestId, draftId: message.draftId, draftRevision: message.draftRevision};
+        try {
+            reply.result = tryText(boundDraft(session, panelState(session), message, "Read the keyboard and wait for its current operation before trying your text replacements.").current, tried);
+        } catch (error) {
+            reply.error = failureSentence(error);
+        }
+        // As an edit's inspection: nothing staged, no toast, no HID.
+        await shell.post(reply);
+        return;
+    }
+    const inspected = message && panelControl(message.type)?.action;
+    if (message && (inspected === "previewAutocorrectImport" || inspected === "chooseAutocorrectFile")) {
+        /** @type {Extract<import("../../contracts/messages.js").PanelResponse, {type: "autocorrectImportPreview"}>} */
+        const reply = {type: "autocorrectImportPreview", requestId: /** @type {{requestId: number}} */ (message).requestId, name: "", draftId: message.draftId, draftRevision: message.draftRevision};
+        try {
+            // The file is read against the draft it would change. A chooser
+            // opened in the click is waited for; closed without a file, it
+            // answers with no preview.
+            const chosen = message.type === "chooseAutocorrectFile" ? await shell.chooseProfile?.() : message.type === "previewAutocorrectImport" ? message : null;
+            if (chosen !== undefined && chosen !== null) {
+                const draft = boundDraft(session, panelState(session), message, "Read the keyboard and wait for its current operation before importing a text replacement list.");
+                reply.name = typeof chosen === "string" ? "" : chosen.name || "";
+                const file = parseAutocorrectFile(typeof chosen === "string" ? chosen : chosen.text, reply.name);
+                reply.preview = importPreview(draft.current, file, draft.capabilities);
+            }
+        } catch (error) {
+            reply.error = failureSentence(error);
+        }
         await shell.post(reply);
         return;
     }

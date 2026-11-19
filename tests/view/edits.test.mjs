@@ -16,6 +16,7 @@ import * as edits from "../../webview/view/edits.mjs";
 import * as controls from "../../webview/view/controls.mjs";
 import {behaviourEditorRow, behaviourTimingEdit, behaviourTimingField} from "../../webview/view/behavior-editor.mjs";
 import {shareHold} from "../../webview/view/share.mjs";
+import {draftMarks} from "../../webview/view/review.mjs";
 import {durationMilliseconds, durationValue} from "../../webview/view/duration.mjs";
 import {AXIS, DIRECTIONAL_STARTER_THRESHOLD, KIND, LINK_ENDS, MODIFIER_POLICY, SCROLL_AXES, SCROLL_STARTER, SHIPPED_SCROLL, dpiOptions, scrollStarter, modeDpi, newMode, readConfig, settleTaps, startingRecord, thresholdDistance} from "../../webview/view/pointing-config.mjs";
 
@@ -33,8 +34,7 @@ const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require(path.join(here, "..", "..", "core"
 const {RGB_LOCALITIES} = require(path.join(here, "..", "..", "core", "schema", "rgb-domain-v1"));
 const {document: pdDocument} = require(path.join(here, "..", "fixtures", "pd-profile"));
 
-const capabilities = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 3}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0x67df11b3,
-    featureFlags: require(path.join(here, "..", "..", "core", "protocol", "profile-wire-v1")).PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES};
+const {CURRENT_CAPABILITIES: capabilities} = require("../fixtures/portable-profile.js");
 
 test("the playback protection control stages a portable policy and Review/discard/undo preserve text", () => {
     const {hostMacros} = require("../fixtures/host-macros");
@@ -128,11 +128,32 @@ test("swapping two keys is one message and one draft step", () => {
     stage(draft, edits.setKey("Layer 1", 0, "KC_A"));
     stage(draft, edits.setKey("Layer 1", 1, "KC_B"));
     const before = profileLayers(draft.document)[1].slice();
-    stage(draft, edits.swapKeys("Layer 1", {layoutIndex: 0, keycode: "KC_A"}, {layoutIndex: 1, keycode: "KC_B"}));
+    stage(draft, edits.swapKeys({layer: "Layer 1", layoutIndex: 0, keycode: "KC_A"}, {layer: "Layer 1", layoutIndex: 1, keycode: "KC_B"}));
     assert.equal(profileLayers(draft.document)[1][slotOf(0)], 0x05);
     assert.equal(profileLayers(draft.document)[1][slotOf(1)], 0x04);
     draft.undo(draft.revision);
     assert.deepEqual(profileLayers(draft.document)[1], before, "one undo takes both keys back");
+});
+
+// A key dragged onto another layer (the board follows a hovered layer tab)
+// swaps with the key it lands on there, in one message on the layer it
+// landed on: the key it came from names its own layer.
+test("swapping keys on two layers is one message and one draft step", () => {
+    const draft = session();
+    stage(draft, edits.setKey("Layer 1", 0, "KC_A"));
+    stage(draft, edits.setKey("Layer 2", 5, "KC_B"));
+    const before = profileLayers(draft.document).map((layer) => layer.slice());
+    const message = edits.swapKeys({layer: "Layer 1", layoutIndex: 0, keycode: "KC_A"}, {layer: "Layer 2", layoutIndex: 5, keycode: "KC_B"});
+    assert.equal(message.layer, "Layer 2", "it is the layer it landed on's edit");
+    stage(draft, message);
+    assert.equal(profileLayers(draft.document)[1][slotOf(0)], 0x05);
+    assert.equal(profileLayers(draft.document)[2][slotOf(5)], 0x04);
+    const view = draft.view({selectedDeviceId: "test-device", connected: true});
+    assert.equal(view.undoLabel, "Swapped two keys");
+    const marks = draftMarks(view.changes).keys;
+    assert.ok(marks.get(1)?.has(0) && marks.get(2)?.has(5), "each layer marks its own key as changed");
+    draft.undo(draft.revision);
+    assert.deepEqual(profileLayers(draft.document), before, "one undo takes both keys back");
 });
 
 test("an edit from a stale form is refused rather than silently rebased", () => {
@@ -152,6 +173,58 @@ test("the picker posts layer keys by index, and wraps the key in modifiers and L
         stage(draft, edits.setKey("Layer 0", 5, keycode));
     }
     assert.equal(profileLayers(draft.document)[0][slotOf(5)], 0x0304, "C(S(KC_A))");
+});
+
+// The keyboard's switch keys for behaviours (firmware D-F66) are plain
+// keycodes it names: picked by name, they go on a key, as a combo's output and
+// in a behaviour, a behaviour of their own included, and read back by name
+// from a backup of the draft.
+test("the switch keys for behaviours go where those for combos go, and come back by name from a backup", () => {
+    const draft = session();
+    stage(draft, edits.setKey("Layer 0", 5, "BH_TOGG"));
+    stage(draft, edits.comboMessage(null, {inputs: ["KC_D", "KC_F"], output: "BH_OFF", termMs: ""}));
+    stage(draft, edits.saveBehaviour({keycode: "KC_Q", stored: false, steps: []}, {change: {tapCount: 0, kind: "tap", branch: {style: "TAP_SENDS", action: "BH_ON"}}}, draft.identity()));
+    stage(draft, edits.saveBehaviour({keycode: "BH_TOGG", stored: false, steps: []}, {change: {tapCount: 1, kind: "tap", branch: {style: "TAP_SENDS", action: "CM_TOGG"}}}, draft.identity()));
+    assert.equal(profileLayers(draft.document)[0][slotOf(5)], 0x7ee2);
+    const output = decoded(draft).combos.rows.at(-1).output;
+    assert.deepEqual([output.kind, output.operand], [1, 0x7ee1]);
+    const rows = decoded(draft).behaviors.rows;
+    const tap = rows.find((row) => row.target.operand === 0x14).steps[0].tap;
+    assert.deepEqual([tap.kind, tap.operand], [1, 0x7ee0]);
+    assert.ok(rows.some((row) => row.target.kind === 1 && row.target.operand === 0x7ee2), "a switch key may have a behaviour of its own");
+    const backup = portable.validateSnapshot(JSON.parse(JSON.stringify(draft.document))).document;
+    const model = publishedModel(backup);
+    const key = model.layers[0].positions.find((position) => position.layoutIndex === 5);
+    assert.deepEqual([key.keycode, key.semantic, key.display], ["0x7EE2", "BH_TOGG", "Toggle Behaviours"]);
+    assert.ok(model.keyBehaviors.some((row) => row.keycode === "BH_TOGG"), "its row is keyed as the key means it");
+    assert.equal(model.qmkKeyLabels["0x7EE1"], "Behaviours Off");
+    assert.equal(model.qmkKeycodeAliases["0x7EE0"], "BH_ON");
+    assert.ok(model.qmkKeycodes.some((entry) => entry.value === "BH_TOGG" && entry.keycode === 0x7ee2));
+});
+
+// The switch keys for auto-mouse (firmware D-F66) go the same places, and come
+// back the same way.
+test("the switch keys for auto-mouse go where those for combos go, and come back by name from a backup", () => {
+    const draft = session();
+    stage(draft, edits.setKey("Layer 0", 5, "AM_TOGG"));
+    stage(draft, edits.comboMessage(null, {inputs: ["KC_D", "KC_F"], output: "AM_OFF", termMs: ""}));
+    stage(draft, edits.saveBehaviour({keycode: "KC_Q", stored: false, steps: []}, {change: {tapCount: 0, kind: "tap", branch: {style: "TAP_SENDS", action: "AM_ON"}}}, draft.identity()));
+    stage(draft, edits.saveBehaviour({keycode: "AM_TOGG", stored: false, steps: []}, {change: {tapCount: 1, kind: "tap", branch: {style: "TAP_SENDS", action: "BH_TOGG"}}}, draft.identity()));
+    assert.equal(profileLayers(draft.document)[0][slotOf(5)], 0x7ef2);
+    const output = decoded(draft).combos.rows.at(-1).output;
+    assert.deepEqual([output.kind, output.operand], [1, 0x7ef1]);
+    const rows = decoded(draft).behaviors.rows;
+    const tap = rows.find((row) => row.target.operand === 0x14).steps[0].tap;
+    assert.deepEqual([tap.kind, tap.operand], [1, 0x7ef0]);
+    assert.ok(rows.some((row) => row.target.kind === 1 && row.target.operand === 0x7ef2), "a switch key for auto-mouse may have a behaviour of its own");
+    const backup = portable.validateSnapshot(JSON.parse(JSON.stringify(draft.document))).document;
+    const model = publishedModel(backup);
+    const key = model.layers[0].positions.find((position) => position.layoutIndex === 5);
+    assert.deepEqual([key.keycode, key.semantic, key.display], ["0x7EF2", "AM_TOGG", "Toggle Auto-mouse"]);
+    assert.ok(model.keyBehaviors.some((row) => row.keycode === "AM_TOGG"), "its row is keyed as the key means it");
+    assert.equal(model.qmkKeyLabels["0x7EF1"], "Auto-mouse Off");
+    assert.equal(model.qmkKeycodeAliases["0x7EF0"], "AM_ON");
+    assert.ok(model.qmkKeycodes.some((entry) => entry.value === "AM_TOGG" && entry.keycode === 0x7ef2));
 });
 
 // ── keyboard shortcuts ──────────────────────────────────────────────────
@@ -432,7 +505,7 @@ test("a pointing-mode colour keeps the locality posted beside it", () => {
     assert.deepEqual(row.color, {h: 21, s: 255, v: 180});
 });
 
-test("key feedback posts the whole record with one colour or policy replaced", () => {
+test("behaviour feedback posts the whole record with one case's colour or locality, or the policy, replaced", () => {
     const draft = session();
     // the screen redraws from the new model after each edit, so each message
     // is built from the record as it stands then
@@ -441,10 +514,62 @@ test("key feedback posts the whole record with one colour or policy replaced", (
     stage(draft, edits.keyFeedback(feedback(), "branch:0", {h: 12, s: 200, v: 100}));
     const stored = decoded(draft).rgb.keyFeedback;
     assert.deepEqual(stored.holdActiveColor, {h: 99, s: 255, v: 150});
-    assert.deepEqual(stored.tapBranchColors[0], {h: 12, s: 200, v: 100});
-    stage(draft, edits.keyFeedback(feedback(), null, null, {locality: "RGB_BOTH_HALVES"}));
+    assert.deepEqual(stored.tapBranches[0].color, {h: 12, s: 200, v: 100});
+    stage(draft, edits.keyFeedback(feedback(), null, null, {tapCommitMode: "KEY_FEEDBACK_TAP_COMMIT_OFF"}));
     assert.deepEqual(decoded(draft).rgb.keyFeedback.holdActiveColor, {h: 99, s: 255, v: 150}, "and earlier edits survive the next one");
-    assert.equal(decoded(draft).rgb.keyFeedback.locality, RGB_LOCALITIES.RGB_BOTH_HALVES);
+    assert.equal(decoded(draft).rgb.keyFeedback.tapCommitMode, 0);
+    // A locality changes its own case alone (D-L93).
+    const before = decoded(draft).rgb.keyFeedback;
+    const hold = edits.keyFeedbackLocality(feedback(), "holdActiveColor", "RGB_BOTH_HALVES");
+    const unchanged = edits.keyFeedback(feedback()).config;
+    assert.deepEqual(Object.entries(hold.config).filter(([field, value]) => JSON.stringify(value) !== JSON.stringify(unchanged[field])).map(([field]) => field), ["holdActiveLocality"], "only the hold's locality changes");
+    stage(draft, hold);
+    stage(draft, edits.keyFeedbackLocality(feedback(), "branch:2", "RGB_KEYS_ONLY"));
+    const after = decoded(draft).rgb.keyFeedback;
+    assert.equal(after.holdActiveLocality, RGB_LOCALITIES.RGB_BOTH_HALVES);
+    assert.deepEqual(after.tapBranches.map((branch) => branch.locality), before.tapBranches.map((branch, index) => index === 2 ? RGB_LOCALITIES.RGB_KEYS_ONLY : branch.locality));
+    assert.deepEqual([after.tapCommittedLocality, after.longHoldActiveLocality], [before.tapCommittedLocality, before.longHoldActiveLocality]);
+    assert.deepEqual(after.tapBranches[0].color, {h: 12, s: 200, v: 100});
+});
+
+test("replacement feedback posts the whole record with one case's colour or locality replaced, and off as HSV(0, 0, 0)", () => {
+    const draft = session();
+    const feedback = () => buildSnapshotModel(draft.current, draft.capabilities, {editable: true, reason: ""}).rgb.autocorrectFeedback;
+    const shown = {textColor: {h: "1", s: "2", v: "3"}, textLocality: "RGB_KEY_HALF", macroColor: {h: "4", s: "5", v: "6"}, macroLocality: "RGB_LEFT_HALF",
+        undoColor: {h: "7", s: "8", v: "9"}, undoLocality: "RGB_KEYS_ONLY", leadingColor: {h: "10", s: "11", v: "12"}, leadingLocality: "RGB_BOTH_HALVES"};
+    const posted = {textColor: {h: 1, s: 2, v: 3}, textLocality: "RGB_KEY_HALF", macroColor: {h: 4, s: 5, v: 6}, macroLocality: "RGB_LEFT_HALF",
+        undoColor: {h: 7, s: 8, v: 9}, undoLocality: "RGB_KEYS_ONLY", leadingColor: {h: 10, s: 11, v: 12}, leadingLocality: "RGB_BOTH_HALVES"};
+    assert.deepEqual(edits.autocorrectFeedback(shown, "macroColor", {h: 0, s: 0, v: 0}), {type: "updateAutocorrectFeedback", config: {...posted, macroColor: {h: 0, s: 0, v: 0}}});
+    assert.deepEqual(edits.autocorrectFeedbackLocality(shown, "undoColor", "RGB_RIGHT_HALF"), {type: "updateAutocorrectFeedback", config: {...posted, undoLocality: "RGB_RIGHT_HALF"}}, "one case's locality alone");
+    stage(draft, edits.autocorrectFeedback(feedback(), "textColor", {h: 99, s: 255, v: 150}));
+    stage(draft, edits.autocorrectFeedback(feedback(), "undoColor", {h: 0, s: 0, v: 0}));
+    assert.deepEqual(decoded(draft).rgb.autocorrectFeedback.textColor, {h: 99, s: 255, v: 150});
+    assert.deepEqual(decoded(draft).rgb.autocorrectFeedback.undoColor, {h: 0, s: 0, v: 0}, "a case switched off");
+    const before = decoded(draft).rgb.autocorrectFeedback;
+    stage(draft, edits.autocorrectFeedbackLocality(feedback(), "leadingColor", "RGB_KEYS_ONLY"));
+    const stored = decoded(draft).rgb.autocorrectFeedback;
+    assert.deepEqual([stored.textColor, stored.undoColor, stored.leadingLocality], [{h: 99, s: 255, v: 150}, {h: 0, s: 0, v: 0}, RGB_LOCALITIES.RGB_KEYS_ONLY], "earlier edits survive the next one");
+    assert.deepEqual([stored.textLocality, stored.macroLocality, stored.undoLocality], [before.textLocality, before.macroLocality, before.undoLocality], "the other cases keep theirs");
+    assert.ok(reviewAreas(draft).includes("Lighting"));
+    assert.throws(() => stage(session(), edits.autocorrectFeedback(feedback(), "textColor", {h: 1, s: 1, v: 201})), /Brightness must be between 0 and 200/);
+});
+
+test("replacement feedback's switch is bit 32 of the stage mask, and its accents land in its own table", () => {
+    const draft = session();
+    const model = buildSnapshotModel(draft.current, draft.capabilities, {editable: true, reason: ""});
+    const bit = model.rgb.stages.find((row) => row.id === "autocorrect").bit;
+    assert.equal(bit, 32);
+    const mask = decoded(draft).rgb.stageEnableMask;
+    stage(draft, edits.rgbStages(mask, bit, !(mask & bit)));
+    assert.equal(decoded(draft).rgb.stageEnableMask, mask ^ bit);
+    const rows = () => decoded(draft).rgb.autocorrectGroupRows, before = rows().length;
+    const ledsOf = (row) => decoded(draft).rgb.groups.find((group) => group.id === row.groupId).leds;
+    stage(draft, edits.addAccent({target: "autocorrect", owner: "AUTOCORRECT_FEEDBACK_GROUP_MACRO", leds: [57, 3], colour: {h: 10, s: 255, v: 100}}));
+    assert.deepEqual([rows().length, rows().at(-1).semantic, rows().at(-1).color, ledsOf(rows().at(-1))], [before + 1, 1, {h: 10, s: 255, v: 100}, [3, 57]]);
+    stage(draft, edits.updateAccent(before, {target: "autocorrect", owner: "AUTOCORRECT_FEEDBACK_GROUP_ALL", leds: [4], colour: {h: 0, s: 0, v: 0}}));
+    assert.deepEqual([rows().length, rows()[before].semantic, rows()[before].color, ledsOf(rows()[before])], [before + 1, 255, {h: 0, s: 0, v: 0}, [4]], "changed where it stands");
+    stage(draft, edits.deleteAccent("autocorrect", before));
+    assert.equal(rows().length, before);
 });
 
 test("auto-mouse fade and combo feedback post their colour beside their mode", () => {
@@ -458,29 +583,96 @@ test("auto-mouse fade and combo feedback post their colour beside their mode", (
     assert.equal(rgb.comboFeedback.locality, RGB_LOCALITIES.RGB_KEYS_ONLY);
 });
 
-test("LED group rows land in every table, and groups renumber when one is deleted", () => {
+test("accents land in every table, change where they stand, and Ark keeps the groups they light", () => {
     const draft = session();
     const rgb = () => decoded(draft).rgb;
     const ledsOf = (id) => rgb().groups.find((group) => group.id === id).leds;
-    const startCount = rgb().groups.length;
+    const lit = () => new Set([rgb().layerGroupRows, rgb().pdModeGroupRows, rgb().comboGroupRows, rgb().keyGroupRows].flat().map((row) => row.groupId));
+    const used = rgb().groups.filter((group) => lit().has(group.id)).length;
     const colour = {h: 10, s: 255, v: 100};
     for (const [target, owner] of [["layer", "Layer 2"], ["pdMode", "POINTING_MODE_VOLUME"], ["combo", "ignored"], ["keyBehavior", "KEY_FEEDBACK_GROUP_HOLD_ACTIVE"]]) {
-        stage(draft, edits.ledRow({target, owner, source: ""}, [1, 2], colour));
+        stage(draft, edits.addAccent({target, owner, leds: [2, 1], colour}));
     }
-    assert.equal(rgb().groups.length, startCount + 1, "rows with the same LEDs share one group");
-    assert.equal(edits.ledRow({target: "combo", owner: "x", source: ""}, [1], colour).group.owner, undefined, "a combo row has no owner");
+    assert.equal(rgb().groups.length, used + 1, "accents lighting the same LEDs share one group, and a group no accent lit is gone");
+    assert.equal(edits.addAccent({target: "combo", owner: "x", leds: [1], colour}).group.owner, undefined, "a combo accent has no owner");
+    assert.deepEqual(edits.addAccent({target: "layer", owner: "Layer 2", leds: [9, 3], colour}).group.ledIndices, [3, 9], "LEDs go in order");
 
-    for (const leds of [[40], [41], [42]]) stage(draft, edits.saveLedGroup(leds));
-    const byLeds = (leds) => rgb().groups.find((group) => group.leds.join() === leds.join()).id;
-    stage(draft, edits.ledRow({target: "layer", owner: "Layer 3", source: `Group ${byLeds([42])}`}, [], {h: 1, s: 1, v: 1}));
-    stage(draft, edits.deleteLedGroup(`Group ${byLeds([40])}`));
+    stage(draft, edits.addAccent({target: "layer", owner: "Layer 3", leds: [42], colour: {h: 1, s: 1, v: 1}}));
+    const rows = () => rgb().layerGroupRows;
+    const first = rows().findIndex((row) => row.selector === 2);
+    stage(draft, edits.updateAccent(first, {target: "layer", owner: "RGB_LAYER_GROUP_ALL", leds: [40, 41], colour: {h: 0, s: 0, v: 0}}));
+    assert.equal(rows()[first].selector, 255, "a changed accent keeps its place in its table, now lighting for every layer");
+    assert.deepEqual([ledsOf(rows()[first].groupId), rows()[first].color], [[40, 41], {h: 0, s: 0, v: 0}], "with its new LEDs, taking its stage's colour");
+    assert.deepEqual(ledsOf(rows().find((row) => row.selector === 3).groupId), [42], "the accent after it is untouched");
+
+    stage(draft, edits.updateAccent(first, {target: "layer", owner: "Layer 2", leds: [40], colour}));
+    assert.ok(!rgb().groups.some((group) => group.leds.join() === "40,41"), "LEDs no accent lights any more give their group back");
     const ids = rgb().groups.map((group) => group.id);
     assert.deepEqual(ids, ids.map((_, index) => index), "ids stay consecutive from zero");
-    const layerRow = rgb().layerGroupRows.find((row) => row.selector === 3);
-    assert.deepEqual(ledsOf(layerRow.groupId), [42], "a row still paints the LEDs it pointed at");
-    const before = rgb().layerGroupRows.length;
-    stage(draft, edits.deleteLedRow("layer", before - 1));
-    assert.equal(rgb().layerGroupRows.length, before - 1);
+    assert.deepEqual(ledsOf(rows().find((row) => row.selector === 3).groupId), [42], "and every accent still lights the LEDs it named");
+    const before = rows().length;
+    stage(draft, edits.deleteAccent("layer", before - 1));
+    assert.equal(rows().length, before - 1);
+    assert.ok(!rgb().groups.some((group) => group.leds.join() === "42"), "a removed accent's LEDs go with it");
+    assert.throws(() => stage(draft, edits.addAccent({target: "layer", owner: "Layer 2", leds: [], colour})), /Pick LEDs/, "an accent lights some LEDs");
+});
+
+// ── autocorrect ─────────────────────────────────────────────────────────
+
+test("each text replacement edit is posted as written and staged as the keyboard stores it", () => {
+    const draft = session();
+    const list = () => decoded(draft).autocorrect.entries.map((entry) => [entry.macro ?? entry.correction, ...entry.typos.map((typo) => `${typo.typo}:${typo.match}`)]);
+    const of = (replacement) => list().find(([name]) => name === replacement);
+    const identity = () => draft.current.fingerprint;
+    // The field's text goes as it was typed: core reads its inputs.
+    const added = edits.addAutocorrectInputs({correction: " then "}, " Tehn  thne ", identity());
+    assert.deepEqual(added, {type: "addAutocorrectTypos", correction: " then ", inputs: " Tehn  thne ", expectedFingerprint: identity()});
+    stage(draft, added);
+    assert.deepEqual(of("then"), ["then", "tehn:0", "thne:0"]);
+    assert.ok(reviewAreas(draft).includes("Text replacement"));
+    stage(draft, edits.addAutocorrectInputs({correction: "then"}, "thn*", identity()));
+    assert.deepEqual(of("then"), ["then", "tehn:0", "thn:1", "thne:0"], "added to again, the replacement gains the input, its * read as where it matches");
+    assert.deepEqual(edits.changeAutocorrectReplacement({correction: "then"}, {correction: "Then"}, "f"), {type: "updateAutocorrectCorrection", correction: "then", to: "Then", expectedFingerprint: "f"});
+    assert.deepEqual(edits.changeAutocorrectReplacement({correction: "then"}, {macro: 4}, "f"), {type: "updateAutocorrectCorrection", correction: "then", toMacro: 4, expectedFingerprint: "f"});
+    assert.deepEqual(edits.changeAutocorrectReplacement({macro: 4}, {correction: "then"}, "f"), {type: "updateAutocorrectCorrection", macro: 4, to: "then", expectedFingerprint: "f"});
+    stage(draft, edits.changeAutocorrectReplacement({correction: "then"}, {correction: "Then"}, identity()));
+    assert.deepEqual(edits.changeAutocorrectInput("thn", "*thn*", "f"), {type: "updateAutocorrectTypo", typo: "thn", to: "*thn*", expectedFingerprint: "f"});
+    stage(draft, edits.changeAutocorrectInput("thn", "*thn*", identity()));
+    stage(draft, edits.changeAutocorrectInput("thn", "*thnn*", identity()));
+    stage(draft, edits.deleteAutocorrectTypo("thne", identity()));
+    assert.deepEqual(of("Then"), ["Then", "tehn:0", "thnn:3"]);
+    stage(draft, edits.deleteAutocorrectTypo("thnn", identity()));
+    assert.deepEqual(of("Then"), ["Then", "tehn:0"]);
+    // A replacement that plays a macro, by its slot: added, joined by
+    // another, made text and deleted.
+    stage(draft, edits.addAutocorrectInputs({macro: 4}, "sig", identity()));
+    stage(draft, edits.changeAutocorrectReplacement({correction: "Then"}, {macro: 4}, identity()));
+    assert.deepEqual([of(4), of("Then")], [[4, "sig:0", "tehn:0"], undefined]);
+    stage(draft, edits.changeAutocorrectReplacement({macro: 4}, {correction: "Then"}, identity()));
+    assert.deepEqual(of("Then"), ["Then", "sig:0", "tehn:0"]);
+    assert.deepEqual(edits.deleteAutocorrectEntry({correction: "Then"}, "f"), {type: "deleteAutocorrectEntry", correction: "Then", expectedFingerprint: "f"});
+    assert.deepEqual(edits.deleteAutocorrectEntry({macro: 4}, "f"), {type: "deleteAutocorrectEntry", macro: 4, expectedFingerprint: "f"});
+    stage(draft, edits.deleteAutocorrectEntry({correction: "Then"}, identity()));
+    assert.equal(of("Then"), undefined);
+    assert.throws(() => stage(draft, edits.addAutocorrectInputs({correction: "ten"}, "teh", identity())), /is already an input for/);
+    assert.throws(() => stage(draft, edits.addAutocorrectInputs({macro: 4}, "sig*", identity())), /A macro plays for a whole word/);
+    assert.deepEqual(edits.autocorrectValidationMessage(added, 7), {type: "validateAutocorrect", edit: added, requestId: 7});
+});
+
+test("an import is one staged edit of a preview's entries, and the list's file controls are built as posted", () => {
+    const draft = session();
+    const entries = [{correction: "then", typos: [{typo: "tehn", match: 0}]}, {correction: "thing", typos: [{typo: "tihngs", match: 3}]}];
+    const message = edits.importAutocorrect("add", entries, draft.current.fingerprint);
+    assert.deepEqual(message, {type: "importAutocorrect", mode: "add", entries, expectedFingerprint: draft.current.fingerprint});
+    stage(draft, message);
+    const corrections = () => decoded(draft).autocorrect.entries.map((entry) => entry.correction);
+    assert.ok(corrections().includes("then") && corrections().length > 2, "added to what the list had");
+    stage(draft, edits.importAutocorrect("replace", entries, draft.current.fingerprint));
+    assert.deepEqual(corrections(), ["then", "thing"]);
+    assert.deepEqual(controls.previewAutocorrectFile(":teh: -> the", "a.txt", 3), {type: "previewAutocorrectImport", text: ":teh: -> the", name: "a.txt", requestId: 3});
+    assert.deepEqual(controls.tryAutocorrect({before: "a ", typed: "teh \b", capsLock: true}, 6), {type: "tryAutocorrect", before: "a ", typed: "teh \b", capsLock: true, requestId: 6});
+    assert.deepEqual(controls.chooseAutocorrectFile(5), {type: "chooseAutocorrectFile", requestId: 5});
+    assert.deepEqual(controls.exportAutocorrect("csv"), {type: "exportAutocorrect", format: "csv"});
 });
 
 // ── macros ──────────────────────────────────────────────────────────────
@@ -533,7 +725,7 @@ test("a custom key's shortcut is posted as a mask, its keys and layers, reviewed
     assert.deepEqual(decoded(draft).settings.customKeyShortcuts[2], {mods: 0x41, keys: [0x0e], layers: 0, layerKind: 0});
     assert.deepEqual(profileLayers(draft.document), layers, "a shortcut moves no key");
     const view = draft.view({selectedDeviceId: "test-device", connected: true});
-    assert.ok(view.changes.some((change) => change.unit === "customKey:2" && change.fields.some((field) => field.label === "Shortcut" && field.after === "Left Ctrl + Right Alt + K")));
+    assert.ok(view.changes.some((change) => change.unit === "customKey:2" && change.fields.some((field) => field.label === "Shortcut" && field.after === "Ctrl+Right Alt+K")));
     assert.equal(view.undoLabel, "Changed a custom key's shortcut");
     stage(draft, edits.customKeyShortcutMessage("CUSTOM_KEY_2", {mods: 0x0f}));
     assert.deepEqual(decoded(draft).settings.customKeyShortcuts[2], {mods: 0x0f, keys: [], layers: 0, layerKind: 0}, "modifiers alone");
@@ -543,7 +735,7 @@ test("a custom key's shortcut is posted as a mask, its keys and layers, reviewed
     assert.deepEqual(decoded(draft).settings.customKeyShortcuts[2], {mods: 0x08, keys: [], layers: 0b101000, layerKind: 0}, "modifiers and two layers");
     const layered = draft.view({selectedDeviceId: "test-device", connected: true});
     const shortcutField = layered.changes.find((change) => change.unit === "customKey:2")?.fields.find((field) => field.label === "Shortcut");
-    assert.match(String(shortcutField?.after), /^Left (GUI|Command|Win|Super) \+ Navigation \+ Extra 1$/);
+    assert.match(String(shortcutField?.after), /^(GUI|Command|Windows|Super)\+Navigation\+Extra 1$/);
     assert.throws(() => stage(draft, edits.customKeyShortcutMessage("CUSTOM_KEY_2", {layers: 1})), /base layer/, "the base layer is always on");
     stage(draft, edits.customKeyShortcutMessage("CUSTOM_KEY_2", {layers: 1 << 3}));
     assert.deepEqual(decoded(draft).settings.customKeyShortcuts[2], {mods: 0, keys: [], layers: 1 << 3, layerKind: 0}, "layers alone");
@@ -568,13 +760,13 @@ test("a custom key's shortcut is posted as a mask, its keys and layers, reviewed
 test("a custom key made for a shortcut no keycode holds is named and placed in one draft step", () => {
     const draft = session();
     const before = draft.document;
-    const message = edits.customKeyForShortcut("CUSTOM_KEY_9", {mods: 0x88, keys: [], layers: 0, layerKind: 0}, " Left GUI + Right GUI ", edits.setKey("Layer 0", 27, "CUSTOM_KEY_9"), draft.current.fingerprint);
+    const message = edits.customKeyForShortcut("CUSTOM_KEY_9", {mods: 0x88, keys: [], layers: 0, layerKind: 0}, " GUI+Right GUI ", edits.setKey("Layer 0", 27, "CUSTOM_KEY_9"), draft.current.fingerprint);
     assert.deepEqual(message, {type: "updateCustomKeyShortcut", keycode: "CUSTOM_KEY_9", shortcut: {mods: 0x88, keys: [], layers: 0, layerKind: 0}, expectedFingerprint: draft.current.fingerprint,
-        name: "Left GUI + Right GUI", then: {type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 27, keycode: "CUSTOM_KEY_9"}]}});
+        name: "GUI+Right GUI", then: {type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 27, keycode: "CUSTOM_KEY_9"}]}});
     stage(draft, message);
     const after = decoded(draft);
     assert.deepEqual(after.settings.customKeyShortcuts[9], {mods: 0x88, keys: [], layers: 0, layerKind: 0}, "both GUIs, no key");
-    assert.equal(after.settings.customKeyNames[9], "Left GUI + Right GUI");
+    assert.equal(after.settings.customKeyNames[9], "GUI+Right GUI");
     assert.equal(profileLayers(draft.document)[0][slotOf(27)], customKeyCode(9), "placed on the key the picker was for");
     assert.equal(draft.view({selectedDeviceId: "test-device", connected: true}).undoLabel, "Made a custom key for a shortcut");
     draft.undo(draft.revision);
@@ -588,7 +780,7 @@ test("a custom key made for a behaviour cell's shortcut is sent by that cell in 
     const before = draft.document;
     const behaviour = {keycode: "KC_Q", steps: []};
     const then = edits.saveBehaviour(behaviour, {change: {tapCount: 0, kind: "hold", branch: edits.cellBranch("hold", {action: "CUSTOM_KEY_9", style: "PRESS_AND_HOLD_UNTIL_RELEASE"})}}, draft.identity());
-    stage(draft, edits.customKeyForShortcut("CUSTOM_KEY_9", {mods: 0x11, keys: [], layers: 0, layerKind: 0}, "Left Ctrl + Right Ctrl", /** @type {any} */ (then)));
+    stage(draft, edits.customKeyForShortcut("CUSTOM_KEY_9", {mods: 0x11, keys: [], layers: 0, layerKind: 0}, "Ctrl+Right Ctrl", /** @type {any} */ (then)));
     const after = decoded(draft);
     assert.deepEqual(after.settings.customKeyShortcuts[9], {mods: 0x11, keys: [], layers: 0, layerKind: 0});
     const row = after.behaviors.rows.find((entry) => entry.target.operand === 0x14);
@@ -596,7 +788,7 @@ test("a custom key made for a behaviour cell's shortcut is sent by that cell in 
     draft.undo(draft.revision);
     assert.deepEqual(draft.document, before, "one undo takes back both");
     // Without a following edit the key is only named and given the shortcut.
-    stage(draft, edits.customKeyForShortcut("CUSTOM_KEY_9", {mods: 0x11, keys: [], layers: 0, layerKind: 0}, "Left Ctrl + Right Ctrl"));
+    stage(draft, edits.customKeyForShortcut("CUSTOM_KEY_9", {mods: 0x11, keys: [], layers: 0, layerKind: 0}, "Ctrl+Right Ctrl"));
     assert.deepEqual(decoded(draft).settings.customKeyShortcuts[9], {mods: 0x11, keys: [], layers: 0, layerKind: 0});
     assert.deepEqual(profileLayers(draft.document), profileLayers(before));
     assert.throws(() => stage(draft, {...edits.customKeyForShortcut("CUSTOM_KEY_8", {mods: 0x11, keys: [], layers: 0, layerKind: 0}, ""), then: /** @type {any} */ ({type: "renameKeyboard", name: "x"})}),
@@ -606,11 +798,11 @@ test("a custom key made for a behaviour cell's shortcut is sent by that cell in 
 test("a combo kept with the custom key its output picker offered makes both in one draft step", () => {
     const draft = session();
     const before = draft.document;
-    const made = {keycode: "CUSTOM_KEY_9", shortcut: {mods: 0x11, keys: [], layers: 0, layerKind: 0}, name: "Left Ctrl + Right Ctrl"};
+    const made = {keycode: "CUSTOM_KEY_9", shortcut: {mods: 0x11, keys: [], layers: 0, layerKind: 0}, name: "Ctrl+Right Ctrl"};
     const combo = edits.comboMessage(null, {output: "CUSTOM_KEY_9", inputs: ["KC_A", "KC_B"], termMs: "50", followsDefault: false, holdTermMs: "200"});
     const message = edits.comboKept(combo, made, draft.current.fingerprint);
     assert.deepEqual(message, {type: "updateCustomKeyShortcut", keycode: "CUSTOM_KEY_9", shortcut: {mods: 0x11, keys: [], layers: 0, layerKind: 0},
-        expectedFingerprint: draft.current.fingerprint, name: "Left Ctrl + Right Ctrl", then: combo});
+        expectedFingerprint: draft.current.fingerprint, name: "Ctrl+Right Ctrl", then: combo});
     const combos = decoded(draft).combos.rows.length;
     stage(draft, message);
     const after = decoded(draft);
@@ -663,8 +855,8 @@ test("a recorded take appends to what the payload held, with no pause before the
         {keycode: "KC_A", type: "keydown", time: 900}, {keycode: "KC_A", type: "keyup", time: 950},
         {keycode: "KC_B", type: "keydown", time: 1074}, {keycode: "KC_B", type: "keyup", time: 1124},
         {keycode: "KC_C", type: "keydown", time: 1144}, {keycode: "KC_C", type: "keyup", time: 1194},
-    ], {threshold: 30, round: 10});
-    assert.equal(payload, "{KC_H}{KC_A}{120}{KC_B}{KC_C}", "gaps under the threshold are dropped");
+    ], {threshold: 30});
+    assert.equal(payload, "{KC_H}{KC_A}{125}{KC_B}{KC_C}", "gaps under the threshold are dropped");
     const draft = session();
     stage(draft, edits.macroMessage("MACRO_1", payload, draft.current.fingerprint));
     assert.equal(draft.dirty, true);
@@ -1092,6 +1284,19 @@ test("a settings section is posted whole, and a partial section is refused", () 
         /complete settings section/i);
 });
 
+test("each feedback flash's length is posted as its own one-field section, and lands in its own stored value", () => {
+    const draft = session();
+    const sectionOf = (id) => settingsEditorView(draft.current).sections.find((row) => row.id === id);
+    const message = edits.settingsSection(sectionOf("replacementFeedback"), () => "350", draft.current.fingerprint);
+    assert.deepEqual(message, {type: "updateConfigDefaults", sectionId: "replacementFeedback", fields: [{macro: "replacementFlash", value: "350"}], expectedFingerprint: draft.current.fingerprint});
+    stage(draft, message);
+    assert.deepEqual([decoded(draft).settings.values[31], decoded(draft).settings.values[15]], [350, 200], "the replacement flash, not the behaviour flash");
+    stage(draft, edits.settingsSection(sectionOf("lightingFeedback"), () => "120", draft.current.fingerprint));
+    assert.deepEqual([decoded(draft).settings.values[31], decoded(draft).settings.values[15]], [350, 120]);
+    assert.deepEqual(draft.steps().at(-2).changes.map((change) => [change.unit, change.area]), [["settings:replacementFeedback", "Lighting"]]);
+    assert.throws(() => stage(draft, edits.settingsSection(sectionOf("replacementFeedback"), () => "0", draft.current.fingerprint)), /range/);
+});
+
 test("the auto-mouse fade is posted as a share, and a new timeout rescales it in the same step", () => {
     const draft = session();
     const sectionOf = (id) => settingsEditorView(draft.current).sections.find((row) => row.id === id);
@@ -1187,7 +1392,7 @@ test("participation controls preserve definitions, review their scopes, and undo
     assert.equal(stored.enabled, false); assert.equal(stored.allowedLayers, 32768);
     assert.deepEqual(stored.steps, original.steps);
     change = draft.view({selectedDeviceId: "test-device", connected: true}).changes.find(row => row.unit.startsWith("behavior:"));
-    assert.deepEqual(change.fields.map(field => field.label), ["Enabled", "Allowed layers"]);
+    assert.deepEqual(change.fields.map(field => field.label), ["Use this behaviour", "Layers it runs on"]);
     // Another edit from a form that omits the fields must keep both permissions.
     stage(draft, {type: "saveBehavior", behavior: {...edits.saveBehaviour(behavior).behavior, enabled: undefined, allowedLayers: undefined}});
     stored = decoded(draft).behaviors.rows.find(row => JSON.stringify(row.target) === JSON.stringify(original.target));
@@ -1198,7 +1403,7 @@ test("participation controls preserve definitions, review their scopes, and undo
     assert.equal(decoded(draft).combos.rows[0].enabled, false);
     assert.equal(decoded(draft).combos.rows[0].allowedLayers, 32768);
     change = draft.view({selectedDeviceId: "test-device", connected: true}).changes.find(row => row.unit === "combo:0");
-    assert.deepEqual(change.fields.map(field => field.label), ["Enabled", "Allowed layers"]);
+    assert.deepEqual(change.fields.map(field => field.label), ["Use this combo", "Layers it runs on"]);
     draft.discard(draft.revision, change.group); assert.deepEqual(draft.document, base);
 });
 
@@ -1312,7 +1517,7 @@ test("the layer panel's toggle, moves and save reach the draft through the real 
     assert.deepEqual(draft.document, before, "the layer panel stages nothing until it is saved");
     await send(controls.saveLayers(panel.portableLayers.names));
     assert.equal(panel.portableLayers, undefined);
-    assert.deepEqual(draft.order, order);
+    assert.deepEqual(draft.order.layers, order);
     assert.equal(draft.current.summary.names[1], "777", "the renamed layer moved to its new slot");
     assert.deepEqual(profileLayers(draft.document)[0], profileLayers(before)[5], "Make base put layer 5's keys at the bottom");
     draft.undo(draft.revision);

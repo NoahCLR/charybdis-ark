@@ -74,6 +74,18 @@ test("the page names its files itself, carries its policy, and says what it was 
         assert.ok(!page.includes(`src="./${manifest.panel}"`), "the panel is not a script of the page's own");
         assert.ok(page.includes(`<link rel="modulepreload" href="./${manifest.panel}">`));
         assert.match(page, /Charybdis Ark 1\.2\.3 \(abc123\)/);
+        // A shell that never starts (no JavaScript, a file that did not
+        // load, an address below the root, a browser too old) leaves words,
+        // never a blank page; the shell replaces them as it starts, and the
+        // stylesheet keeps them unseen for a moment, so an ordinary load
+        // never flashes them.
+        const root = page.match(/<div id="root">([\s\S]*?)<\/div>\s*<\/body>/)?.[1] || "";
+        assert.match(root, /<main class="load-failure page-starting">/);
+        assert.match(root, /Chrome or Edge on a computer/);
+        assert.match(root, /<noscript>[^<]*<p>[^<]*JavaScript[^<]*<\/p>[^<]*<\/noscript>/);
+        assert.doesNotMatch(root, /\sstyle=/, "hidden by the stylesheet, not inline");
+        const styles = fs.readFileSync(path.join(outdir, manifest.styles), "utf8");
+        assert.match(styles, /\.page-starting\{[^}]*animation:[^}]*page-starting[^}]*\}/);
         const policy = unescape(page.match(/http-equiv="Content-Security-Policy" content="([^"]+)"/)[1]);
         assert.equal(policy, pagePolicy());
         for (const rule of ["default-src 'none'", "script-src 'self'", "worker-src 'self'", "style-src 'self'", "connect-src 'none'"]) {
@@ -172,7 +184,7 @@ test("the entry exports what its readers use, and each is there, under Node as i
     // build's tests' (browser-tests/: core-exercise.js and the specs that
     // drive the bundled core).
     assert.deepEqual(Object.keys(core).sort(), [
-        "FILE_MAX_BYTES", "FILE_TOO_LARGE", "openPanelLoop", "recoveryFileName", "VOCABULARY", "WebHidDeviceAdapter",
+        "FILE_MAX_BYTES", "FILE_TOO_LARGE", "LIST_FILE_MAX_BYTES", "LIST_FILE_TOO_LARGE", "openPanelLoop", "recoveryFileName", "VOCABULARY", "WebHidDeviceAdapter",
         "ApplyProgress", "Buffer", "buildPanelModel", "ProfileDraftSession", "startLayerEdit",
         "comboDomain", "keyBehaviorDomain", "pdModeDomain", "portable", "profileBlob", "rgbDomain", "settingsDomain",
     ].sort());

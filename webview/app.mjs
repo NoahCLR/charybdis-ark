@@ -8,31 +8,34 @@
 import {createPanelMessages} from "./messages.mjs";
 import * as controls from "./view/controls.mjs";
 import {el, esc} from "./lib/dom.mjs";
-import {captureContentScroll, captureKeysBenchHeight, revealSelectedContentRow, revealSelectedListRow, restoreContentScroll, restoreKeysBenchHeight} from "./lib/scroll.mjs";
+import {captureBenchHeight, captureContentScroll, revealSelectedContentRow, revealSelectedListRow, restoreBenchHeight, restorePickerScroll, restoreContentScroll} from "./lib/scroll.mjs";
 import {activateOnKey, focusDialog, redrawKeepingFocus, trapTab} from "./lib/focus.mjs";
 import {mountNumberEntry} from "./lib/number-entry.mjs";
 import {announce, mountAnnouncer} from "./lib/announce.mjs";
 import {announcements} from "./view/announcements.mjs";
 import {getModel, post, postLeavingDemo, setRenderer, state} from "./store.mjs";
 import {historyAction} from "./view/edits.mjs";
-import {chooseKeyboard, shellOf, otherTheme, setTheme} from "./view/shell-panel.mjs";
+import {chooseKeyboard, githubMark, shellOf, otherTheme, setTheme} from "./view/shell-panel.mjs";
 import {DEMO_WORDS, demoOf, leaveDemo, openDemo, openDemoProfile} from "./view/demo.mjs";
 import {readScreen} from "./view/readiness.mjs";
+import {FIRMWARE_NEEDED} from "./view/keyboard-view.mjs";
 import {SCREENS, screenAvailable, screenDefinition, secondaryScreen} from "./view/screens.mjs";
 import {hideHover, mountHover} from "./ui/hover.mjs";
 import {pickerOverlay} from "./ui/picker.mjs";
 import {screenKeys} from "./ui/keys.mjs";
 import {keysShortcut} from "./ui/keys/shortcuts.mjs";
 import {matchBehavioursHeight} from "./ui/keys/bench.mjs";
+import {matchTallestStageHeight} from "./ui/lighting/stage-body.mjs";
 import {historyOverlay} from "./ui/history.mjs";
 import {discardLayers} from "./ui/layers.mjs";
 import {escapeKeyboardMenu} from "./ui/keyboard-menu.mjs";
-import {escapeBoardShortcuts} from "./ui/keys/board-card.mjs";
+import {escapeInfoMark} from "./ui/info-mark.mjs";
 import {screenLighting} from "./ui/lighting.mjs";
 import {screenBehaviours, screenCombos, screenHost, screenPointer} from "./ui/settings.mjs";
 import {screenPointing} from "./ui/pointing.mjs";
 import {screenMacros} from "./ui/macros.mjs";
 import {receiveMacroValidation} from "./ui/macros/validation.mjs";
+import {closeAutocorrectImport, receiveAutocorrectImport, receiveAutocorrectTry, receiveAutocorrectValidation, screenAutocorrect} from "./ui/autocorrect.mjs";
 import {reconcileRecording} from "./ui/macros/recorder.mjs";
 import {macroClipboardShortcut, macroHistoryShortcut} from './ui/macros/history.mjs';
 import {macroStepShortcut} from "./ui/macros/steps.mjs";
@@ -49,7 +52,7 @@ const root = /** @type {HTMLElement} */ (document.getElementById("root"));
 let renderedScreen = null;
 
 const SCREEN_RENDERERS = {
-    screenKeys, screenLighting, screenMacros, screenCustomKeys, screenPointing,
+    screenKeys, screenLighting, screenMacros, screenAutocorrect, screenCustomKeys, screenPointing,
     screenBehaviours, screenCombos, screenPointer, screenHost, screenProfile, screenDevice,
 };
 
@@ -58,7 +61,7 @@ function render({keepScreen = false} = {}) {
     reconcileRecording();
     const keptScreen = keepScreen && renderedScreen === state.screen ? root.querySelector(".app > .main") : null;
     const scroll = captureContentScroll(root, renderedScreen, state.screen);
-    const benchHeight = captureKeysBenchHeight(root, renderedScreen, state.screen, state.resetBenchHeight);
+    const benchHeight = captureBenchHeight(root, renderedScreen, state.screen, state.resetBenchHeight);
     state.resetBenchHeight = false;
     redrawKeepingFocus(root, () => drawApp(keptScreen, scroll, benchHeight));
     focusDialog(root);
@@ -66,8 +69,35 @@ function render({keepScreen = false} = {}) {
     announce(announcements(getModel(), state));
 }
 
-/** @param {Element | null} keptScreen @param {ReturnType<typeof captureContentScroll>} scroll @param {ReturnType<typeof captureKeysBenchHeight>} benchHeight */
+// A fault while the page is drawn never leaves it empty: the rail and a
+// statement take the screen's place, so every other screen, Backups among
+// them, is still a click away, and the fault goes to the console. Nothing is
+// drawn again until something asks for it.
+/** @param {Element | null} keptScreen @param {ReturnType<typeof captureContentScroll>} scroll @param {ReturnType<typeof captureBenchHeight>} benchHeight */
 function drawApp(keptScreen, scroll, benchHeight) {
+    try {drawFrame(keptScreen, scroll, benchHeight);}
+    catch (fault) {
+        console.error(fault);
+        drawFault();
+    }
+}
+
+const SCREEN_FAULT = Object.freeze({title: "Ark could not draw this screen",
+    detail: "Ark ran into a problem of its own drawing it; the browser's console says what. Your draft is kept while this page stays open: choose another screen from the menu to carry on."});
+
+function drawFault() {
+    renderedScreen = null;
+    const app = el(`<div class="app"></div>`);
+    try {app.appendChild(rail());} catch (fault) {console.error(fault);}
+    app.appendChild(el(`<div class="main">${topbar(screenDefinition(state.screen)?.label || "Ark", "")}
+        <div class="content"><div class="pad"><div class="read-placeholder" role="alert">
+            <i class="dot err" aria-hidden="true"></i><h2>${esc(SCREEN_FAULT.title)}</h2><p>${esc(SCREEN_FAULT.detail)}</p>
+        </div></div></div></div>`));
+    root.replaceChildren(app);
+}
+
+/** @param {Element | null} keptScreen @param {ReturnType<typeof captureContentScroll>} scroll @param {ReturnType<typeof captureBenchHeight>} benchHeight */
+function drawFrame(keptScreen, scroll, benchHeight) {
     hideHover();
     const model = getModel();
     root.replaceChildren();
@@ -89,8 +119,9 @@ function drawApp(keptScreen, scroll, benchHeight) {
     reserveCommitRoom(app);
     const theme = shellOf(model).theme;
     root.querySelector('[data-act="theme"]')?.addEventListener("click", () => post(setTheme(otherTheme(theme))));
-    restoreKeysBenchHeight(root, benchHeight);
+    restoreBenchHeight(root, benchHeight);
     matchBehavioursHeight(root);
+    matchTallestStageHeight(root);
     restoreContentScroll(root, scroll);
     revealSelectedListRow(root);
     revealSelectedContentRow(root);
@@ -98,6 +129,7 @@ function drawApp(keptScreen, scroll, benchHeight) {
 
     const picker = pickerOverlay();
     if (picker) root.appendChild(picker);
+    restorePickerScroll(root, scroll);
     const review = reviewOverlay();
     if (review) root.appendChild(review);
     const history = historyOverlay();
@@ -113,6 +145,9 @@ function drawApp(keptScreen, scroll, benchHeight) {
 /** @param {NonNullable<ReturnType<typeof readScreen>>} read @param {import("../contracts/panel.js").PublishedModel | null} model */
 function readPlaceholder(read, model) {
     const loading = read.state === "loading";
+    // The dot is red only when the keyboard reports an error; otherwise the
+    // page is waiting, and nothing is wrong.
+    const tone = model?.device?.health?.error ? "err" : "";
     // Without a keyboard, the page offers its picker first.
     const choose = shellOf(model).chooseKeyboard && !model?.device?.connected;
     // Without a keyboard the demo is offered beside it; a shell that cannot
@@ -121,9 +156,20 @@ function readPlaceholder(read, model) {
     // Titled as the rail item it sits under, which the rail highlights.
     const screenTitle = screenDefinition(state.screen)?.label || "Ark";
     const secondary = secondaryScreen(model, state.screen);
+    // Until a keyboard is reached and read, a new user may not have the
+    // firmware yet: a card under the placeholder, outside what its status
+    // announces. A connected keyboard shows it only when its read failed or
+    // its firmware is not one this Ark edits (`read.firmware`).
+    const connected = Boolean(model?.device?.connected);
+    const firmware = !loading && read.state !== "blocked" && (!connected || read.firmware) ? `<section class="firmware-first" aria-labelledby="firmware-first-title">
+            <div class="firmware-first-copy"><span class="eyebrow">${esc(FIRMWARE_NEEDED.eyebrow)}</span>
+                <h3 id="firmware-first-title">${esc(FIRMWARE_NEEDED.title)}</h3><p>${esc(connected ? FIRMWARE_NEEDED.wordsConnected : FIRMWARE_NEEDED.words)}</p></div>
+            <a class="btn firmware-install" href="${esc(FIRMWARE_NEEDED.href)}" target="_blank" rel="noopener">${githubMark("firmware-install-mark")}<span>${esc(FIRMWARE_NEEDED.label)}</span><span aria-hidden="true">↗</span></a>
+            <p class="firmware-first-via"><strong>${esc(FIRMWARE_NEEDED.viaLead)}</strong> ${esc(FIRMWARE_NEEDED.via)}</p>
+        </section>` : "";
     const screen = el(`<div class="main">${topbar(screenTitle, "Change what your Charybdis does. Nothing is saved until you review it.")}
         <div class="content"><div class="pad"><div class="read-placeholder" role="status" aria-live="polite">
-            ${loading ? '<span class="spin" aria-hidden="true"></span>' : '<i class="dot err" aria-hidden="true"></i>'}
+            ${loading ? '<span class="spin" aria-hidden="true"></span>' : `<i class="dot ${tone}" aria-hidden="true"></i>`}
             <h2>${esc(read.title)}</h2><p>${esc(read.detail)}</p>
             ${loading ? '<p class="note">The menus open when their keyboard data is ready.</p>'
                 : read.state === "blocked" ? (demoHere ? `<div class="read-actions">${exploreButton("primary")}</div>` : "")
@@ -131,7 +177,7 @@ function readPlaceholder(read, model) {
                     ${model?.device?.connected ? '<button class="btn primary" data-act="retry">Read keyboard</button>' : ""}
                     ${demoHere ? exploreButton("ghost") : ""}
                     ${secondary ? `<button class="btn ghost" data-act="secondary">${esc(secondary.label)}</button>` : ""}</div>`}
-        </div></div></div></div>`);
+        </div>${firmware}</div></div></div>`);
     screen.querySelector('[data-act="explore-demo"]')?.addEventListener("click", () => post(openDemo()));
     screen.querySelector('[data-act="choose-keyboard"]')?.addEventListener("click", () => post(chooseKeyboard()));
     screen.querySelector('[data-act="retry"]')?.addEventListener("click", () => post(controls.control("refresh")));
@@ -184,7 +230,7 @@ function refreshCommitBar() {
     announce(announcements(getModel(), state));
 }
 
-const receivePanelMessage = createPanelMessages({root, refreshCommitBar, render, receiveMacroValidation});
+const receivePanelMessage = createPanelMessages({root, refreshCommitBar, render, receiveMacroValidation, receiveAutocorrectValidation, receiveAutocorrectImport, receiveAutocorrectTry});
 // Replies from the core cross the message boundary as copies, in the shapes
 // contracts/ declares. Device values have already passed core's validators.
 addEventListener("message", (event) => receivePanelMessage(/** @type {import("../contracts/messages.js").PanelResponse} */ (event.data)));
@@ -223,7 +269,12 @@ addEventListener("keydown", (event) => {
     if (event.key !== "Escape") return;
     hideHover();
     if (escapeKeyboardMenu()) return;
-    if (state.picker) { state.picker = null; render(); return; }
+    // Over the picker, Esc first closes its info mark's list, then the picker.
+    if (state.picker) {
+        const picker = root.querySelector(".sheet.picker");
+        if (picker && escapeInfoMark(picker)) return;
+        state.picker = null; render(); return;
+    }
     if (state.retarget) { state.retarget = null; render(); return; }
     if (state.layersOpen) { discardLayers(); render(); return; }
     if (state.overlay) {
@@ -240,6 +291,8 @@ addEventListener("keydown", (event) => {
     // sits over everything below, so it answers before any of them.
     const proposal = getModel()?.liveProposal;
     if (proposal) { post(controls.cancelLiveEdit(proposal.id)); return; }
+    // Esc on a list file's summary is its Cancel.
+    if (state.screen === "autocorrect" && closeAutocorrectImport()) return;
     // Esc on the backup's comparison is its Cancel, unless it is busy.
     const portable = getModel()?.portable;
     if (portable?.review && state.screen === "profile") {
@@ -248,15 +301,17 @@ addEventListener("keydown", (event) => {
     }
     // Esc on a recovery copy's "Delete this copy?" is its Cancel.
     if (state.recoveryAsk !== null && state.screen === "profile") { state.recoveryAsk = null; render(); return; }
-    escapeBoardShortcuts();
+    // Esc shuts an open info mark's list, the board's or a section's.
+    escapeInfoMark();
 });
 // A resize lets the workbench find its height again at the new width, the
-// Behaviours tab's included, once per frame however many events come.
+// Behaviours tab's or the tallest Lighting stage's included, once per frame
+// however many events come.
 let resizing = 0;
 addEventListener("resize", () => {
     /** @type {HTMLElement | null} */ (root.querySelector(".keys-pad .bench"))?.style.removeProperty("min-height");
     cancelAnimationFrame(resizing);
-    resizing = requestAnimationFrame(() => matchBehavioursHeight(root));
+    resizing = requestAnimationFrame(() => { matchBehavioursHeight(root); matchTallestStageHeight(root); });
 });
 
 // A dropped file must never navigate away from Ark and lose the draft,

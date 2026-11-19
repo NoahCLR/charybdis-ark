@@ -33,13 +33,31 @@ test("the slot list opens on the modes in use; New opens the first free slot, an
     await list.locator('[data-act="new-slot"]').click();
     const free = await page.evaluate(async () => (await import("/webview/store.mjs")).getModel().pdModes.find(slot => !slot.kind).id);
     await expect(editor(page).locator(".card-h h3")).toHaveText("New pointing mode");
-    await expect(editor(page).locator(".card-h .tag")).toHaveText(`Slot ${free}`);
+    await expect(editor(page).locator(".card-h .tag")).toHaveText(`Pointing mode ${free}`);
     expect(await posted(page)).toEqual([]);
     await list.locator('[data-all-slots="pointing"]').click();
     await expect(list.locator(".pd-tile")).toHaveCount(32);
     // An empty slot that keys still reach is marked, and says so.
     await expect(list.locator(`.pd-tile[data-slot="${free}"]`)).toHaveClass(/warn/);
     await expect(list.locator(`.pd-tile[data-slot="${free}"]`)).toHaveAttribute("data-tip", /still reach it/);
+});
+
+test("a search finds a mode by its name or slot number, through every slot, and says when none is", async ({page}) => {
+    await openControls(page, "pointing", {pointingSlot: 0});
+    const list = page.getByRole("list", {name: "Pointing slots"});
+    const search = page.locator("#pointingSearch");
+    const named = await page.evaluate(async () => (await import("/webview/store.mjs")).getModel().pdModes.find(slot => slot.kind));
+    await search.fill(named.name.slice(1, 4).toUpperCase());
+    await expect(list.locator(`.pd-tile[data-slot="${named.id}"]`)).toBeVisible();
+    await expect(list.locator('[data-act="new-slot"], [data-all-slots]')).toHaveCount(0);
+    // An empty slot, folded until now, by its number.
+    await search.fill("31");
+    await expect(list.locator(".pd-tile")).toHaveCount(1);
+    await expect(list.locator('.pd-tile[data-slot="31"]')).toBeVisible();
+    await search.fill("no such mode");
+    await expect(page.locator(".card:has(#pointingSearch) .card-b > .note")).toHaveText("No pointing mode is named “no such mode”.");
+    await search.fill("");
+    await expect(list.locator('[data-all-slots="pointing"]')).toBeVisible();
 });
 
 test("every scrolling tuning field posts the visible value once, retaining the rest of the record", async ({page}) => {
@@ -245,6 +263,34 @@ test("shortcut picker, duplicate, clear and empty-slot creation post their comma
     await expectPost(page, {type: "duplicatePdMode", slot: 8, source: 5});
 });
 
+test("making a mode leaves its card's header and step 1 where they were", async ({page}) => {
+    await openControls(page, "pointing", {pointingSlot: 8});
+    /** @param {number} slot */
+    const header = async slot => {
+        await page.evaluate(async slot => {
+            const store = await import("/webview/store.mjs");
+            store.state.pointingSlot = slot;
+            store.render();
+        }, slot);
+        const head = editor(page).locator(".name-titlebar");
+        await expect(head.locator(".tag")).toHaveText(`Pointing mode ${slot}`);
+        const box = async locator => {
+            const {x, y, height} = /** @type {{x: number, y: number, height: number}} */ (await locator.boundingBox());
+            return {x, y, height};
+        };
+        const title = head.locator(".title-name"), first = editor(page).locator(".pd-step").first();
+        return {
+            head: await box(head), title: await box(title), tag: {y: (await box(head.locator(".tag"))).y},
+            font: await title.locator("h3, input").evaluate(node => getComputedStyle(node).font),
+            step: await box(first.locator(".pd-step-h h4")), kinds: await box(first.locator(".pd-kinds")),
+        };
+    };
+    const empty = await header(8);
+    await expect(editor(page).locator(".card-h h3")).toHaveText("New pointing mode");
+    await expect(editor(page).locator(".pd-step h4")).toHaveText(["What the ball does"]);
+    expect(await header(4)).toEqual(empty);
+});
+
 test("pointing navigation reaches placement and lighting without an edit", async ({page}) => {
     await openControls(page, "pointing", {pointingSlot: 4});
     await editor(page).locator('[data-act="place"]').click();
@@ -259,7 +305,7 @@ test("pointing navigation reaches placement and lighting without an edit", async
 test("the reach row places the hold key on a key, and an empty slot names what still reaches it", async ({page}) => {
     await openControls(page, "pointing", {pointingSlot: 4});
     const place = editor(page).locator('[data-act="place"]');
-    await expect(place).toHaveText("Place on a key…");
+    await expect(place).toHaveText("Place on a key →");
     await expect(place).toHaveAttribute("data-tip", /hold key/);
     const hold = await page.evaluate(async () => {
         const store = await import("/webview/store.mjs");
@@ -386,20 +432,52 @@ test("Pointer: auto-sniping's layers post one switch each, beside its master swi
     ])});
 });
 
-test("every setting in a mode says what it does, under Advanced too", async ({page}) => {
+test("every setting in a mode says what it does once, under Advanced too", async ({page}) => {
     for (const slot of [0, 4]) {
         await openControls(page, "pointing", {pointingSlot: slot, pdAdvanced: true});
         // Every number field, and every few-option choice outside the
-        // per-direction table, carries a tip on the field itself.
-        const untipped = await editor(page).locator(".field").evaluateAll(fields => fields
+        // per-direction table, says what it does once (D-L96): in a tip on the
+        // field, in the line under it, or in the info mark of its step or
+        // Advanced section, by its name or each of its choices' words.
+        const said = await editor(page).locator(".field").evaluateAll(fields => fields
             .filter(field => field.querySelector("input.input, .seg, .pd-switches, .pd-mods") && !field.closest(".pd-taps"))
-            .filter(field => !(field.getAttribute("data-tip") || field.querySelector(".seg[data-tip]")?.getAttribute("data-tip")))
-            .map(field => field.querySelector("span")?.textContent));
-        expect(untipped, `slot ${slot}`).toEqual([]);
+            .map(field => {
+                const name = field.querySelector("span")?.textContent?.trim() || "";
+                const info = field.closest(".pd-step, .pd-sect")?.querySelector(".info-pop");
+                const terms = [...(info?.querySelectorAll("dt, .info-part") || [])].map(term => term.textContent?.trim());
+                const choices = [...field.querySelectorAll(".seg label > span")].map(choice => choice.textContent?.trim());
+                return {name,
+                    tip: Boolean(field.getAttribute("data-tip") || field.querySelector(".seg[data-tip]")?.getAttribute("data-tip")),
+                    help: Boolean(field.closest(".field-block")?.querySelector(":scope > .field-help")?.textContent?.trim()),
+                    info: terms.includes(name) || (choices.length > 0 && choices.every(choice => terms.includes(choice)))};
+            }));
+        const ways = (/** @type {{tip: boolean, help: boolean, info: boolean}} */ field) => [field.tip, field.help, field.info].filter(Boolean).length;
+        expect(said.filter(field => !ways(field)).map(field => field.name), `slot ${slot}: unsaid`).toEqual([]);
+        expect(said.filter(field => ways(field) > 1).map(field => field.name), `slot ${slot}: said twice`).toEqual([]);
     }
     await openControls(page, "pointing", {pointingSlot: 0, pdAdvanced: true});
-    await expect(editor(page).locator(".field").filter({hasText: "Axis selection ratio"})).toHaveAttribute("data-tip", /1\.75 times/);
+    const scrollTuning = editor(page).locator(".pd-sect").filter({has: page.locator("h4", {hasText: "Scroll tuning"})});
+    await expect(scrollTuning.locator(".field-help")).toHaveCount(0);
+    await expect(scrollTuning.locator(".info-pop")).toContainText("1.75 times");
     await expect(editor(page).locator(".field").filter({hasText: "Axis kept after the ball stops"})).toHaveAttribute("data-tip", /once the ball stops/);
+});
+
+// A step's choices are explained once, in its info mark, under the field's
+// own name, each choice in its own words (D-L96); the field has no tip.
+test("a step's info mark says what each of its choices does, and a press keeps it open", async ({page}) => {
+    await openControls(page, "pointing", {pointingSlot: 4});
+    const step = editor(page).locator(".pd-step").nth(1);
+    const mark = step.locator(".pd-step-h .info-mark");
+    await expect(mark.locator(".info-part")).toHaveText(["When a direction has no key", "How often it sends"]);
+    await expect(mark.locator("dt")).toHaveText(["Its neighbours take over", "Send both neighbours", "Nothing", "Every step", "Once per movement"]);
+    await expect(step.locator('.seg[aria-label="How often it sends"]')).not.toHaveAttribute("data-tip", /./);
+    await mark.locator(".info-button").click();
+    await expect(mark.locator(".info-pop")).toBeVisible();
+    await page.mouse.move(0, 0);
+    await expect(mark.locator(".info-pop")).toBeVisible();
+    const running = editor(page).locator(".pd-step").nth(3).locator(".pd-step-h .info-mark");
+    await expect(running.locator(".info-part")).toHaveText(["Pointer layer"]);
+    await expect(running.locator(".info-lead")).toHaveText("A mode its layers started never keeps the pointer layer on.");
 });
 
 test("the pointer layer is set where the mode's running is, and no Advanced section is called Behaviour", async ({page}) => {

@@ -117,7 +117,8 @@ test("an edit that would add a trap asks first; Go back and Send anyway post the
 });
 
 test("Escape on a live edit's question is its Go back, even with the board's Shortcuts list open under it", async ({page}) => {
-    await openLive(page, "keys", {boardShortcuts: true});
+    await openLive(page, "keys");
+    await page.getByRole("button", {name: "Shortcuts"}).hover();
     await expect(page.locator("#board-shortcuts")).toBeVisible();
     await withModel(page, model => {model.liveProposal = {id: 8, label: "Set Base · Q to TG(2)", checks: [{kind: "trap", level: "trap", status: "new", key: "trap:2", layers: [2], title: "Layer 2 has no way back", detail: "", fix: ""}]};});
     await expect(page.locator(".sheet.live-ask")).toBeVisible();
@@ -131,6 +132,74 @@ test("combos turned off by a key show beside the switch, not as a change", async
     await expect(mark).toHaveCount(1);
     await expect(mark).toHaveText("turned off by key");
     await expect(page.locator(".commit.live")).toContainText("1 unsaved change");
+});
+
+// The switch keys BH_OFF and BH_TOGG (firmware D-F66) turn behaviours off as
+// CM_OFF and CM_TOGG do combos, and Behaviour settings says so the same way.
+test("behaviours turned off by a key show beside their switch, which says keyboard keys change it", async ({page}) => {
+    await openLive(page, "behaviours");
+    const row = page.locator('.setrow:has([data-macro="behaviorsEnabled"])');
+    await expect(row.locator(".kk-mark")).toHaveText(["↺ keyboard keys change this too"]);
+    await withModel(page, model => {model.offByKey = {combo: false, behaviour: true, autoMouse: false, autocorrect: false};});
+    await expect(row.locator(".off-by-key")).toHaveText("turned off by key");
+    await expect(page.locator(".off-by-key")).toHaveCount(1);
+});
+
+// AM_OFF and AM_TOGG (firmware D-F66) switch auto-mouse the same way, and
+// Pointer settings says so beside its Auto-mouse switch, still on.
+test("auto-mouse turned off by a key shows beside its switch, which says keyboard keys change it", async ({page}) => {
+    await openLive(page, "pointer");
+    const row = page.locator('.setrow:has([data-macro="autoMouse"])');
+    await expect(row.locator(".kk-mark")).toHaveText(["↺ keyboard keys change this too"]);
+    await expect(row.locator(".off-by-key")).toHaveCount(0);
+    await withModel(page, model => {model.offByKey = {combo: false, behaviour: false, autoMouse: true, autocorrect: false};});
+    await expect(row.locator(".off-by-key")).toHaveText("turned off by key");
+    await expect(row.locator('[data-macro="autoMouse"]')).toBeChecked();
+    await expect(page.locator(".off-by-key")).toHaveCount(1);
+    await expect(page.locator(".commit.live")).toContainText("1 unsaved change");
+});
+
+// AC_OFF and AC_TOGG (firmware D-F66) switch text replacement the same way,
+// and its switch, on the Typing screen with the other switches' kind, says so.
+test("text replacement turned off by a key shows beside its Typing switch, which says keyboard keys change it", async ({page}) => {
+    await openLive(page, "host");
+    const row = page.locator('.settings-group[data-section="autocorrect"] .setrow:has([data-macro="autocorrect"])');
+    await expect(row.locator(".kk-mark")).toHaveText(["↺ keyboard keys change this too"]);
+    await expect(row.locator(".off-by-key")).toHaveCount(0);
+    await withModel(page, model => {model.offByKey = {combo: false, behaviour: false, autoMouse: false, autocorrect: true};});
+    await expect(row.locator(".off-by-key")).toHaveText("turned off by key");
+    await expect(page.locator(".off-by-key")).toHaveCount(1);
+    await expect(page.locator(".commit.live")).toContainText("1 unsaved change");
+});
+
+// In the live modes a builder's Keep sends its edit to the keyboard at once,
+// and posts as in Review and save.
+test("the combo builder's Keep says it sends the combo to the keyboard, and posts", async ({page}) => {
+    await openLive(page, "keys");
+    await page.locator('[data-tab="combos"]').click();
+    await page.locator('[data-act="new-combo"]').click();
+    const builder = page.locator(".combo-builder");
+    await builder.locator("[data-output]").fill("KC_A");
+    await builder.locator('[data-act="pickboard"]').click();
+    await page.locator('.board-card [data-key="1"]').click();
+    await page.locator('.board-card [data-key="2"]').click();
+    const keep = builder.locator('[data-act="keep"]');
+    await expect(keep).toHaveText("Send combo to keyboard");
+    await expect(builder).toContainText("until you send it.");
+    await keep.click();
+    await expectPost(page, {type: "addCombo", output: "KC_A"});
+});
+
+// In the live modes a change runs on the keyboard and the draft's base is what
+// it saved, so the marks say unsaved, not in your draft.
+test("change marks say unsaved, and the macro editor has no way back but ⌘Z", async ({page}) => {
+    await openLive(page, "keys");
+    await expect(page.locator(".legend-item").filter({has: page.locator(".draft-dot")})).toHaveText("Unsaved change");
+    await expect(page.locator(".board [aria-label$=', unsaved change']")).toHaveCount(1);
+    await expect(page.locator(".board [aria-label$=', changed in your draft']")).toHaveCount(0);
+    await openLive(page, "macros", {macroSlot: "MACRO_0"});
+    await expect(page.locator(".macro-titlebar [data-local-state]"), "the slot's dot marks a change").toHaveCount(0);
+    await expect(page.locator('.macro-titlebar [data-act="discard"]'), "⌘Z takes an edit back").toHaveCount(0);
 });
 
 // The change goes in as the expression Playwright evaluates: the page runs
@@ -160,10 +229,13 @@ test("halves apart: the rail says so and the bar offers Revert, not Save", async
 test("halves that stored different modes are settled by choosing the mode again; a mode not stored yet is marked", async ({page}) => {
     await openLive(page, "keys");
     await withModel(page, model => {model.editMode.conflict = true; model.editMode.notStored = true;});
-    await expect(page.locator('.rail-mode [data-tip*="Unplugging it now may lose the mode"]')).toHaveCount(1);
+    await expect(page.locator('.rail-mode [data-tip*="not stored its edit mode yet"]')).toHaveCount(1);
+    await expect(page.locator('.rail-mode [data-tip*="Unplugging"]')).toHaveCount(0);
     await expect(page.locator('.rail-mode [data-tip*="halves stored different modes"]')).toHaveCount(1);
     const menu = await keyboardMenu(page);
-    await expect(menu.locator(".rail-menu-note")).toHaveAttribute("data-tip", /Unplugging it now may lose the mode/);
+    // What unplugging risks is on screen in the menu, not in a tip (D-L96).
+    await expect(menu.locator(".rail-menu-note")).toContainText("Unplugging it now may lose the mode");
+    await expect(menu.locator(".rail-menu-note")).not.toHaveAttribute("data-tip", /./);
     await menu.locator('[data-act="edit-mode-settle"]').click();
     const ask = page.locator(".sheet.edit-mode-ask");
     await expect(ask).toContainText("settles halves");
@@ -228,6 +300,7 @@ test("behaviours: a custom key's behaviour posts", async ({page}) => {
     await page.locator('[data-all-slots="customKeys"]').click();
     await page.locator('.macro-grid [data-custom-key="CUSTOM_KEY_5"]').click();
     await page.locator('.custom-key-behaviour [data-cell="0-long"]').click();
+    await expect(page.locator(".ce-actions")).toHaveText("Changes reach the keyboard as you make them.");
     await clearPosts(page);
     await change(page.locator('[data-f="behaviour:CUSTOM_KEY_5:0-long:action"]'), "KC_B");
     await expect.poll(() => posted(page)).toEqual([expect.objectContaining({type: "saveBehavior"})]);

@@ -6,6 +6,7 @@ const {decodedDeviceProfile} = require("../fixtures/device-profile");
 const catalog = require("../../core/data/keycode-catalog");
 const keycodes = require("../../core/schema/keycodes");
 const {PD_MODE_KEYS} = require("../../core/data/pd-mode-keys");
+const {ACTION_ABI} = require("../../core/schema/actions");
 
 const PD_MODE_0 = PD_MODE_KEYS[0].holdCode;
 
@@ -66,7 +67,7 @@ test("a key reads by the profile's name for it, under every name it is known by"
     });
     assert.equal(keyLabel(names, PD_MODE_0), "Dragscroll · hold", "not the catalogue's bare user slot");
     assert.equal(names.labels.PD_MODE_0, "Dragscroll · hold");
-    assert.equal(keyLabel(names, PD_MODE_KEYS[1].holdCode), "Slot 1 · hold (empty)", "an empty slot says so");
+    assert.equal(keyLabel(names, PD_MODE_KEYS[1].holdCode), "Pointing mode 1 · hold (empty)", "an empty slot says so");
     assert.equal(keyLabel(names, PD_MODE_KEYS[0].lockCode), "Dragscroll · lock");
     assert.equal(names.labels.MACRO_0, "Copy line");
     assert.equal(names.labels.MACRO_1, "Macro 1", "an unnamed macro reads by its number");
@@ -83,6 +84,25 @@ test("every custom key reads by its name, or by its number without one", () => {
     assert.equal(names.custom.length, 128);
     assert.equal(names.aliases[keycodes.resolve(0x7f00).name], "CUSTOM_KEY_0");
     assert.deepEqual(profileKeyNames({actionsKnown: false}).custom, [], "an unknown ABI numbers its keys otherwise");
+});
+
+test("the switch keys for behaviours read by their words, as those for combos do, on the vocabulary that has them", () => {
+    const names = profileKeyNames({actionsKnown: true});
+    assert.deepEqual([0x7ee0, 0x7ee1, 0x7ee2].map(code => keyLabel(names, code)), ["Behaviours On", "Behaviours Off", "Toggle Behaviours"]);
+    assert.deepEqual(["QK_COMBO_ON", "QK_COMBO_OFF", "QK_COMBO_TOGGLE"].map(name => keyLabel(names, /** @type {number} */ (keycodes.encode(name)))), ["Combo On", "Combo Off", "Toggle Combo"]);
+    assert.equal(names.labels.BH_TOGG, "Toggle Behaviours");
+    assert.equal(names.aliases[keycodes.resolve(0x7ee2).name], "BH_TOGG");
+    assert.equal(keyLabel(names, 0x7ee3), "0x7EE3", "the rest of the block names nothing");
+    assert.equal(keyLabel(profileKeyNames({actionsKnown: false}), 0x7ee2), "0x7EE2", "an unknown ABI numbers its keys otherwise");
+});
+
+test("the switch keys for auto-mouse read by their words too, on the vocabulary that has them", () => {
+    const names = profileKeyNames({actionsKnown: true});
+    assert.deepEqual([0x7ef0, 0x7ef1, 0x7ef2].map(code => keyLabel(names, code)), ["Auto-mouse On", "Auto-mouse Off", "Toggle Auto-mouse"]);
+    assert.equal(names.labels.AM_TOGG, "Toggle Auto-mouse");
+    assert.equal(names.aliases[keycodes.resolve(0x7ef2).name], "AM_TOGG");
+    assert.equal(keyLabel(names, 0x7ef3), "0x7EF3", "the rest of the block names nothing");
+    assert.equal(keyLabel(profileKeyNames({actionsKnown: false}), 0x7ef2), "0x7EF2", "an unknown ABI numbers its keys otherwise");
 });
 
 test("a key's name is added only where it tells two alike labels apart", () => {
@@ -124,13 +144,15 @@ for (const [hostOs, alt, gui] of [[0, "Alt", "GUI"], [1, "Option", "Command"], [
     test(`host ${hostOs} shares all eight modifier names with basic keys, shortcuts and mod-taps`, () => {
         const names = profileKeyNames({hostOs});
         const {modifiers, pickerModifiers} = hostKeyVocabulary(hostOs);
-        assert.deepEqual(modifiers.map(([, label]) => label), ["Left Ctrl", "Left Shift", `Left ${alt}`, `Left ${gui}`, "Right Ctrl", "Right Shift", `Right ${alt}`, `Right ${gui}`]);
+        // Held together, the left one is unmarked (D-L83); a modifier key on
+        // its own keeps its side.
+        assert.deepEqual(modifiers.map(([, label]) => label), ["Ctrl", "Shift", alt, gui, "Right Ctrl", "Right Shift", `Right ${alt}`, `Right ${gui}`]);
         for (let i = 0; i < 8; i++) {
             const [bit, label] = modifiers[i];
-            assert.equal(keyLabel(names, 0xe0 + i), label);
+            assert.equal(keyLabel(names, 0xe0 + i), i < 4 ? `Left ${label}` : label);
             const control = pickerModifiers[i];
             assert.equal(control.bit, bit);
-            assert.equal(control.label, i < 4 ? label.replace(/^Left /, "") : label);
+            assert.equal(control.label, label);
             const encodedMods = i < 4 ? bit : 0x10 | (bit >> 4);
             const shortcut = keycodes.resolve((encodedMods << 8) | 4);
             assert.equal(keyLabel(names, shortcut.value), `${control.label}+A`);
@@ -208,9 +230,9 @@ test("macOS ISO labels swap the same positions as playback, including modified k
 
 test("the layout read counts only keys the app cannot name", () => {
     const {unnamedKeyCount} = require("../../core/model/key-names");
-    const layers = [{layer: 0, keys: [0x0004, 0x7e42, 0x7e85, 0x7ea3, 0x7ec2, 0x7e90, 0x7ee0].map((keycode) => ({keycode, resolved: keycodes.resolve(keycode)}))}];
-    assert.equal(unnamedKeyCount(layers, {actionAbiDigest: 0x67df11b3}), 1, "configured or empty pointing slots are named; a code past the blocks is not");
-    for (const actionAbiDigest of [0x1d3fcacc, 0x61072732]) assert.equal(unnamedKeyCount(layers, {actionAbiDigest}), 5, "older firmware's user keys are not read as blocks");
+    const layers = [{layer: 0, keys: [0x0004, 0x7e42, 0x7e85, 0x7ea3, 0x7ec2, 0x7e90, 0x7ee2, 0x7ef2, 0x7ef3].map((keycode) => ({keycode, resolved: keycodes.resolve(keycode)}))}];
+    assert.equal(unnamedKeyCount(layers, {actionAbiDigest: ACTION_ABI}), 1, "configured or empty pointing slots and the switch keys are named; a code past the blocks is not");
+    for (const actionAbiDigest of [0x1d3fcacc, 0x61072732, 0x67df11b3, 0xb2205fc3]) assert.equal(unnamedKeyCount(layers, {actionAbiDigest}), 7, "older firmware's user keys are not read as blocks");
 });
 
 test("what a keycode is, where the interface treats it apart: transparent, disabled, a macro's or a custom key's", () => {
@@ -224,4 +246,15 @@ test("what a keycode is, where the interface treats it apart: transparent, disab
     for (const value of [keycodes.encode("KC_A"), QK.MACRO.first - 1, QK.MACRO.last + 1, customKeyCode(CUSTOM_KEY_SLOTS), PD_MODE_KEYS[0].holdCode]) {
         assert.equal(keyKind(value), undefined, `0x${value.toString(16)}`);
     }
+});
+
+// The picker's footer spells a shortcut's layers as the layer key its kind
+// acts as (rules/shortcut-notation.mjs); that list follows core's stored
+// kinds and reads by the same verb as the layer key does.
+test("a shortcut's layer kinds and the layer keys its chord spells them as stay in step", () => {
+    const {SHORTCUT_LAYER_FUNCTIONS} = require("../../rules/shortcut-notation.mjs");
+    const {SHORTCUT_LAYER_KINDS} = require("../../core/schema/settings-domain-v1");
+    const {VOCABULARY} = require("../../core/model/vocabulary");
+    assert.deepEqual(Object.values(SHORTCUT_LAYER_KINDS), SHORTCUT_LAYER_FUNCTIONS.map((_, kind) => kind));
+    assert.deepEqual(SHORTCUT_LAYER_FUNCTIONS.map((form) => VOCABULARY.layerKeyVerbs[form]), VOCABULARY.customKeys.layerKinds.map(([, verb]) => verb));
 });

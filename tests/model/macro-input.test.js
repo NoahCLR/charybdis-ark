@@ -3,7 +3,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const {inspectMacroInput, inspectMacroPlayback} = require("../../core/model/macro-input");
 const {encodeMacroPayload} = require("../../core/schema/macro-payload");
-const context = {enabled: true, mode: 1, bankFree: 34903};
+const context = {enabled: true, mode: 1, bankFree: 40960};
 
 test("playback routes use the fixture's native strokes, Unicode entry and macOS ISO swap", () => {
     const dutch = {layout: 2, effective: 1, unicodeMode: 0};
@@ -51,14 +51,14 @@ test("the shared memory is the only size limit, and counts the replaced slot's b
 test("inspection refuses setup and syntax errors without throwing or mutating context", () => {
     assert.equal(inspectMacroInput("café", {...context, mode: 0}).code, "UNICODE_SETUP_REQUIRED");
     // The advice names the screen and card as they are titled.
-    assert.match(inspectMacroInput("café", {...context, mode: 0}).error, /Host settings → Your computer/);
+    assert.match(inspectMacroInput("café", {...context, mode: 0}).error, /Typing settings → Your computer/);
     assert.equal(inspectMacroInput("hello", {...context, enabled: false, mode: 0}).error, "");
     // ASCII is typed with ordinary keys, so a held key may span it.
     assert.equal(inspectMacroInput("{+KC_A}text{-KC_A}", context).error, "");
     for (const payload of [null, "{KC_NO_SUCH_KEY}", "{65536}", "{KC_A", "{+KC_A}", "{-KC_A}", "{KC_A,KC_A}", "{+KC_A}café{-KC_A}", "\ud800"]) {
         assert.ok(inspectMacroInput(payload, context).error, String(payload));
     }
-    assert.deepEqual(context, {enabled: true, mode: 1, bankFree: 34903});
+    assert.deepEqual(context, {enabled: true, mode: 1, bankFree: 40960});
 });
 
 // Core's refusal and the step editor say a macro does not read in the same
@@ -70,4 +70,14 @@ test("a macro that does not read says why in the vocabulary's words", () => {
     assert.equal(inspectMacroInput("{+KC_A}").error, VOCABULARY.macroProblems.stillHeld);
     assert.equal(inspectMacroInput("{KC_A,KC_A}").error, VOCABULARY.macroProblems.chord);
     assert.equal(inspectMacroInput("{KC_A}", {bankFree: 100}).error, "");
+});
+
+// The keyboard report has six key slots whatever the build, so an edit holds
+// at most six keys at once besides its modifiers (firmware D-F65).
+test("an edit that holds more than six keys at once besides modifiers is refused in the vocabulary's words", () => {
+    const {VOCABULARY} = require("../../core/model/vocabulary");
+    assert.equal(inspectMacroInput("{KC_E,KC_Y,KC_K,KC_SCLN,KC_P,KC_0,KC_U}").error, VOCABULARY.macroProblems.reportFull);
+    assert.equal(inspectMacroInput("{KC_LGUI,KC_LALT,KC_LCTL,KC_LSFT,KC_E,KC_Y,KC_K,KC_SCLN,KC_P,KC_0}", {bankFree: 40960}).error, "");
+    assert.equal(inspectMacroInput("{+KC_A}{+KC_B}{+KC_C}{+KC_D}{+KC_E}{+KC_F}z{-KC_F}{-KC_E}{-KC_D}{-KC_C}{-KC_B}{-KC_A}").error, VOCABULARY.macroProblems.reportFull);
+    assert.throws(() => encodeMacroPayload("{KC_E,KC_Y,KC_K,KC_SCLN,KC_P,KC_0,KC_U}"), {code: "INVALID_MACRO"});
 });

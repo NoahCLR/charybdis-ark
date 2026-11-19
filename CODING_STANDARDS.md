@@ -82,6 +82,11 @@ decisions are cited as D-L<n> (`docs/adr/`) and firmware D-F<n>.
   `webview/lib/focus.mjs`.
 - Colour comes from the model through `webview/view/lighting.mjs`; a stage
   that is off looks off.
+- A tip (`data-tip`) is one control's one line: what it does, or what
+  pressing it changes. What a section or an idea means goes behind its info
+  mark (`webview/ui/info-mark.mjs`), and what is needed every time (state,
+  warnings, values, units) stays on screen; no sentence lives in two of them
+  (D-L96).
 - Look a key up by what it means, `keyMeaning(position)`, never by
   `position.keycode`: behaviour rows, macros and pointing slots are keyed by
   the semantic name.
@@ -123,7 +128,7 @@ decisions are cited as D-L<n> (`docs/adr/`) and firmware D-F<n>.
 | Every `core/` module has a test in the matching `tests/` layer, and every `rules/` module one in `tests/rules/` | `tests/layering.test.js` |
 | Every source module starts with `// @ts-check` and is in a type-check configuration; the strict type checks pass | `tests/scripts/conventions.test.js`, `tests/scripts/syntax-coverage.test.js`, `npm run typecheck` |
 | Screens author no colour literals | `tests/scripts/conventions.test.js` |
-| The stylesheet writes no raw font size, weight, radius, layer or colour outside its token blocks (`:root` and the light theme's); the exceptions say why | `tests/scripts/conventions.test.js` |
+| The stylesheet writes no raw font size, weight, radius, layer, spacing (padding, margin, gap) or colour outside its token blocks (`:root` and the light theme's); the exceptions say why | `tests/scripts/conventions.test.js` |
 | Markup reaches an HTML sink only in the interface, as `.innerHTML =`, `.outerHTML =` or `.insertAdjacentHTML(…)` handed one `html(…)` call, `webview/lib/dom.mjs`'s Trusted Types policy for markup (D-L74), the forms the escape check judges; a sink is named no other way (a quoted name, a key, `Object.assign`), and no module uses a sink no policy passes (`setHTMLUnsafe`, `DOMParser`, `createContextualFragment`, `document.write`, `srcdoc`, `importScripts`), and only `web/page.mjs` starts a worker | `tests/scripts/conventions.test.js`, the browser suite on the built page and the preview, both under Trusted Types |
 | A QMK keycode number from `0x2000` to `0x7fff` is written only in `rules/qmk-keycodes.mjs`, `core/data/user-keycodes.js` and the interface's pinned copy of the layer-lock block, in hex or, where it meets a name that says code, in decimal | `tests/scripts/conventions.test.js` |
 | No layer mask is written as `0xffff` or `(1 << 16) - 1`, and no layer count as `16` (`{length: 16}`, `new Array(16)`, a comparison or default), outside their homes and pinned copies; the exceptions say why | `tests/scripts/conventions.test.js` |
@@ -135,6 +140,7 @@ decisions are cited as D-L<n> (`docs/adr/`) and firmware D-F<n>.
 | Only `core/model/draft-editor.js` runs an editor's edit (`editSettings`, `editMacro`, `editCustomKey`, `editKeyboardName`, `PROFILE_EDITS`), in tests too; only `core/model/device-profile-edits.js` and the behaviour editor's own test run `editKeyBehaviors` | `tests/scripts/conventions.test.js` |
 | Only `core/session/connection-state.js` writes what the device service holds of a connection, through the writer bound to it (`ConnectionState.of()`, a `Held`); the apply's steps (`liveApply`) and the live watch's missed looks (`missedLooks`) are its only plain fields | `tests/scripts/conventions.test.js`, `tests/session/connection-state.test.js`, `npm run typecheck` |
 | No webview module posts an object literal: `post()` and `postLeavingDemo()` take a builder's output or a message the store hands back | `tests/scripts/conventions.test.js` |
+| Every tip is a `data-tip`, shown by `webview/ui/hover.mjs` at the pointer (D-L80): no interface or web module writes a `title` attribute, sets `.title`, or makes a `role="tooltip"` or `.tip` of its own | `tests/scripts/conventions.test.js`, `browser-tests/tooltips.spec.js` |
 | Every stored enum value has a word | `tests/model/vocabulary.test.js` |
 | A draft edit type agrees across `core/model/draft-edits.js`, `contracts/edits.d.ts` and `webview/view/edits.mjs` | `tests/model/draft-edits.test.js` |
 | A webview number that is also a wire number equals the schema's | `tests/view/enum-drift.test.mjs` |

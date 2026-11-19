@@ -6,12 +6,22 @@ on the board and in the keycode picker.
 
 ## The slots
 
-The **Slots** list opens on the slots in use, in order, each with its name
+The **Macros** list opens on the slots in use, in order, each with its name
 or a preview of its steps, and on the slot open in the editor. **+ New
 macro** opens the first free slot with its name ready to type. **Show all
 128 slots** lists the unused ones after it, M0 to M127. The heading counts
 the slots in use, such as "18 of 128 used". **Search by name** finds a macro
 by its name or its slot, through every slot.
+
+Drag a slot onto another to swap the two. Each macro moves with its steps and
+its name, and every key, behaviour, combo, pointing mode and text
+replacement that played it still plays it, under its new number. So does a
+key you chose to place and have not yet placed, and a new replacement not yet
+on the list; a combo you were building closes, as it does when the draft
+changes under it. From the keyboard, focus a slot and
+press Shift+Space to hold it, then Shift+Space on the other slot; Escape lets
+go. Review lists the swaps as one **Macro order** change (see [Review and
+save](review-and-save.md#review)).
 
 A slot can carry a mark:
 
@@ -24,13 +34,15 @@ A slot can carry a mark:
 ## Writing a macro
 
 Pick a slot. Its name is the editor's title: click it to rename, Enter to
-finish, Escape to put it back.
+finish, Escape to put it back. The tag beside it names the slot, such as
+**Macro 3**, which is also what the macro is called until you name it.
 
 Add steps with the buttons above the sequence:
 
 - **+ Text** types what you type or paste, exactly: code, braces, line
   breaks, accents and emoji included.
-- **+ Key or chord** taps a key, or up to 16 keys together, such as ⌘C.
+- **+ Key or chord** taps a key, or up to six keys together plus any
+  modifiers, such as ⌘C.
 - **+ Delay** waits, a number of milliseconds (ms).
 - **+ Press** holds a key down, and **+ Release** lets it go.
 
@@ -51,17 +63,20 @@ While you work in the macro editor, ⌘Z and ⇧⌘Z undo and redo whole steps.
 Text fields keep their own typing undo.
 
 A step that can't work, such as a key let go before it was pressed or still
-held at the end, is marked ! and explained. Ark keeps such an edit out of
-your draft until it is fixed, and never loses the last good version.
-**Back to draft** puts the macro back to what your draft holds, dropping an
-edit that isn't in the draft yet. The chip
-beside it says where the macro stands: **edited here** while an edit is not in
-the draft yet, **changed in draft** once the draft changes the macro, and
-**as read** when it matches the keyboard (in the demo, the demo profile).
+held at the end, is marked ! and explained. So is one that would hold more
+than six keys at once besides modifiers: that's all the keyboard can send
+together. Keys still held count with a chord's keys, and text needs one of
+the six free. Ark keeps an edit with such a step out of your draft until it
+is fixed, and never loses the last good version: ⌘Z takes the edit back. A
+macro your draft changes has a dot on its slot. In the live modes an edit reaches the keyboard once Ark has checked it, and the dot
+marks a change the keyboard hasn't saved.
 
-**Clear macro** empties the slot. **Place on a key…** takes you to the Keymap
-screen to put the macro on a key. Beside the title, chips name the layers
-that use the macro; click one to see it there.
+**Clear macro** empties the slot: its steps, its name and its playback
+protection, in one step you can undo. Keys that play it stay on the board and
+do nothing until the slot holds a macro again. **Place on a key →** takes you to the Keymap
+screen to put the macro on a key. Under the title, chips name the layers
+that use the macro and how (a key, a behaviour or a combo), or say it is not
+placed yet; click one to see it there.
 
 ### Edit as text
 
@@ -85,9 +100,11 @@ the recorder finishes the take; so does switching slot or screen, or
 switching to another window. A chord you were in the middle of when you
 switched away (⌘Tab, Alt+Tab) is left out. The recorder's heading says **recording** while
 it captures, and **recorded** while **Clear take** can still put the slot back.
+The ⓘ beside **Record** sums up what a take does and what each option below
+changes.
 
-- **Record delays** keeps pauses longer than **After**, rounded to **Round
-  to**. The wait before the first key is never recorded.
+- **Record delays** keeps the pauses longer than the time after each step,
+  rounded to 5 ms. The wait before the first key is never recorded.
 - **Preserve hold timing** keeps every press and release with its timing, for
   a macro that needs keys held for a while. It keeps Record delays on.
 - **Clear take** puts back what the slot held before you recorded. Once you
@@ -118,13 +135,16 @@ Each macro has an **Uninterruptible playback** setting:
 While a macro plays uninterruptibly, only the macro types. New key presses
 are ignored, not queued. Keys you were already holding are suspended: modifiers
 come back afterwards, but other keys need to be let go and pressed again. The
-trackball and other keyboards are not held back.
+trackball and other keyboards are not held back. The ⓘ beside the setting
+sums this up.
 
 ## Your computer
 
 Text is typed through your computer's keyboard layout, so Ark needs to know
-which one you use. Set it under **Your computer** on **Host settings**; the
-button at the foot of the macro editor takes you there.
+which one you use. Set it under **Your computer** on **Typing settings**; the
+button at the foot of the macro editor takes you there, and the ⓘ beside it
+says how text types with your setup. If the layout you chose isn't one for
+your computer's system, a warning under the button says so.
 
 - **Operating system**: **Auto** (what the keyboard detects over USB, named
   in the choice, such as **Auto (macOS detected)**), **macOS**, **Windows** or
@@ -166,8 +186,9 @@ same.
 ## Memory
 
 Macros share the profile's memory with everything else, within a macro limit
-of their own. The **Macro memory** bar shows how much is used. A key tap takes
-3 bytes; text takes its UTF-8 bytes. One macro can use all of it.
+of their own. The **Macro memory** bar shows how much is used, and the line
+under it how much is free. A key tap takes 3 bytes; text takes its UTF-8
+bytes; the ⓘ beside the heading says so. One macro can use all of it.
 
 Every empty slot keeps room for ten key taps. When there isn't enough left,
 the highest empty slots become **unavailable** until you shorten or clear a

@@ -3,9 +3,11 @@
 
 // Checks that a folder is static files only before it is published to
 // Cloudflare Pages: nothing there that Pages would run as server code, and
-// nothing the web build does not write. The publish workflow runs it on
-// dist/web/ after the browser tests and before Wrangler; run it locally the
-// same way after `npm run build:web`.
+// nothing the web build does not write. Cloudflare Pages' Git integration
+// publishes dist/web/ after `npm ci && npm run build:web` and runs no check,
+// so `npm run check` holds the contract instead: tests/scripts/web-build.test.js
+// runs this on a fresh build. Run it on dist/web/ after `npm run build:web`
+// with `npm run check:site`.
 //
 //     node scripts/check-static-site.js [folder] [--project DIR]
 //

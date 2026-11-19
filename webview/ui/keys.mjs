@@ -6,22 +6,20 @@
 // the key, its behaviour, its combos, and what this layer reaches. The board
 // card's parts, the workbench and each of its tabs live in ui/keys/.
 
-import {isOff, label as hsvLabel} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {toggleComboInput} from "../view/combo-reach.mjs";
-import {layerColourRow, stageEnabled} from "../view/lighting.mjs";
 import {currentView, getModel, post, render, state} from "../store.mjs";
 import {editGate} from "../view/edit-gate.mjs";
 import * as edits from "../view/edits.mjs";
 import {draftMarks} from "../view/review.mjs";
-import {vocabulary, word} from "../view/vocabulary.mjs";
+import {editWords} from "../view/edit-mode.mjs";
 import {board} from "./board.mjs";
 import {layerBar} from "./layerbar.mjs";
 import {linkTabPanel} from "../lib/tabs.mjs";
 import {attachLayersControl} from "./layers.mjs";
 import {topbar} from "./frame.mjs";
 import {bench} from "./keys/bench.mjs";
-import {legend, pickBar, placementBar, previewFoot} from "./keys/board-card.mjs";
+import {boardShortcuts, legend, pickBar, placementBar, previewFoot} from "./keys/board-card.mjs";
 import {behaviourKey, selectBehaviourKey} from "./keys/behaviour-selection.mjs";
 import {pickKeycodeFor, swapKeys} from "./keys/key-edits.mjs";
 import {reachHighlight} from "./keys/reach.mjs";
@@ -49,13 +47,11 @@ export function screenKeys() {
     const content = el(`<div class="content"><div class="pad keys-pad"></div></div>`);
     const pad = /** @type {HTMLElement} */ (content.firstElementChild);
 
-    // The board, how that layer is lit and the layer tabs under them are one
-    // card; the legend reads under it. The tabs sit at the card's foot, next to
-    // the workbench, so switching layers mid-edit is a short reach.
+    // The board and the layer tabs under it are one card; the legend reads
+    // under it. The tabs sit at the card's foot, next to the workbench, so
+    // switching layers mid-edit is a short reach.
     const stage = el(`<div class="stack keys-stage"></div>`);
     const card = el(`<div class="board-card"></div>`);
-    const row = layerColourRow(model, layer.index);
-    const lit = stageEnabled(model, "layers") && row && !isOff(row.color);
     if (state.placement) card.appendChild(placementBar());
     else if (state.combo.picking) card.appendChild(pickBar());
     // One indication at a time: while a combo is being built its inputs are
@@ -63,7 +59,7 @@ export function screenKeys() {
     const building = state.combo.picking || (state.combo.open && state.tab === "combos");
     const drawn = card.appendChild(board(view, {
         selected: state.selected,
-        drafted: draftMarks(model?.draft?.changes).keys.get(layer.index),
+        drafted: {keys: draftMarks(model?.draft?.changes).keys.get(layer.index), after: editWords(model?.draft).after},
         reach: building ? view.combos.inputKeys(state.combo.inputs) : reachHighlight(view),
         picking: state.combo.picking || Boolean(state.placement),
         onKey: (/** @type {number} */ index) => {
@@ -87,11 +83,14 @@ export function screenKeys() {
             render();
         },
         onOpen: gate.editable ? (/** @type {number} */ index) => pickKeycodeFor(index) : undefined,
-        onSwap: gate.editable ? (/** @type {number} */ from, /** @type {number} */ to) => swapKeys(from, to) : undefined,
+        onSwap: gate.editable ? swapKeys : undefined,
     }));
-    card.appendChild(view.previewing ? previewFoot(view) : el(`<div class="board-foot"><span class="board-foot-text">${lit
-        ? `Lit ${esc(hsvLabel(row.color))} · ${esc(word(vocabulary(model).paintModes, row.mode).toLowerCase())}`
-        : "No layer colour · the background effect shows through"}</span></div>`));
+    // How the layer is lit belongs to Lighting; the foot here only says
+    // which layers a held preview stacks. It lies over the board's
+    // bottom-left corner, as Lighting's does, so the card keeps its height
+    // whether one layer is shown or several.
+    if (view.previewing) drawn.appendChild(previewFoot(view));
+    drawn.appendChild(boardShortcuts(model));
     card.append(bar);
     linkTabPanel(/** @type {HTMLElement | null} */ (bar.querySelector(".layer-tabs")), drawn);
     stage.append(card, legend(model));

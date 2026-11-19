@@ -41,10 +41,10 @@ for (const [name, events, expected] of [
     });
 }
 
-test("explicit recording retains each event and rounds every event gap", () => {
+test("explicit recording retains each event and rounds every event gap to 5 ms", () => {
     const events = [down("KC_LGUI", 900), down("KC_A", 950), up("KC_A", 1074), up("KC_LGUI", 1080)];
     assert.equal(record(events, {explicit: true}), "{+KC_LGUI}{+KC_A}{-KC_A}{-KC_LGUI}");
-    assert.equal(record(events, {explicit: true, delays: true, threshold: 30, round: 10}), "{+KC_LGUI}{50}{+KC_A}{120}{-KC_A}{-KC_LGUI}");
+    assert.equal(record(events, {explicit: true, delays: true, threshold: 30}), "{+KC_LGUI}{50}{+KC_A}{125}{-KC_A}{-KC_LGUI}");
 });
 
 test("an explicit live take displays held presses; finishing adds only missing releases", () => {
@@ -55,12 +55,12 @@ test("an explicit live take displays held presses; finishing adds only missing r
 
 test("compact delays measure pauses between completed taps and chords, without a leading delay", () => {
     const events = [down("KC_A", 900), up("KC_A", 1000), down("KC_LGUI", 1124), down("KC_C", 1224), up("KC_C", 1300), up("KC_LGUI", 1500), down("KC_B", 1520), up("KC_B", 1530)];
-    assert.equal(recordedTakePayload("hello {{braces}}", events, {threshold: 30, round: 10}), "hello {{braces}}{KC_A}{120}{KC_LGUI,KC_C}{KC_B}");
+    assert.equal(recordedTakePayload("hello {{braces}}", events, {threshold: 30}), "hello {{braces}}{KC_A}{125}{KC_LGUI,KC_C}{KC_B}");
 });
 
 test("a held modifier preserves pauses between its shortcuts", () => {
     const events = [down("KC_LGUI", 900), down("KC_A", 910), up("KC_A", 950), down("KC_C", 1074), up("KC_C", 1100), up("KC_LGUI", 1200)];
-    assert.equal(record(events, {delays: true, threshold: 30, round: 10}), "{KC_LGUI,KC_A}{120}{KC_LGUI,KC_C}");
+    assert.equal(record(events, {delays: true, threshold: 30}), "{KC_LGUI,KC_A}{125}{KC_LGUI,KC_C}");
 });
 
 test("long idle pauses split into delays the macro format can store", () => {
@@ -73,7 +73,7 @@ test("ending a take timestamps synthetic releases at the end, without adding idl
     const options = {explicit: true, delays: true, finishedAt: 12000};
     assert.equal(record([down('KC_A', 10000)], options), '{+KC_A}{2000}{-KC_A}');
     assert.equal(record([down('KC_A', 10000), up('KC_A', 10500)], options), '{+KC_A}{500}{-KC_A}');
-    assert.equal(record([down('KC_LGUI', 10000), down('KC_A', 10010)], {...options, threshold: 30, round: 10}), '{+KC_LGUI}{+KC_A}{1990}{-KC_A}{-KC_LGUI}');
+    assert.equal(record([down('KC_LGUI', 10000), down('KC_A', 10010)], {...options, threshold: 30}), '{+KC_LGUI}{+KC_A}{1990}{-KC_A}{-KC_LGUI}');
     assert.equal(record([down('KC_A', 10000)], {...options, finishedAt: 9990}), '{+KC_A}{-KC_A}');
     assert.equal(record([down('KC_A', 10000)], {finishedAt: 12000}), '{KC_A}');
     assert.equal(record([], options), '');

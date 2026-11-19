@@ -26,19 +26,21 @@
 const {panelControl} = require("./panel-control-registry");
 const {hasCurrentLayers} = require("./firmware-support");
 const {validateSnapshot, FILE_MAX_BYTES, FILE_TOO_LARGE} = require("../model/portable-profile");
+const {BLANK_SLATE, VIA_IMPORT_LABEL, importViaLayout, viaClearable, viaLayoutOf} = require("../model/via-layout");
 const {firmwareUpdateRequired} = require("../schema/profile-blob-v1");
 const {failureSentence} = require("../model/vocabulary");
+const {exportedList} = require("../model/autocorrect-editor");
 const {DEMO_WORDS, panelCapabilities, panelState} = require("./demo-session");
 const {SHELL_WORDS, applyLayerEdit, discardDraftForDevice, layerEditDocument, startLayerEdit} = require("./panel-session");
 const {followRead, readFailed} = require("./draft-follow");
 const {closeEditors, whileApplying} = require("./panel-session-state");
-const {compose} = require("../model/layer-order");
-const {LAYER_IDENTITY} = require("../data/charybdis-layout");
+const {IDENTITY, compose} = require("../model/draft-order");
 const {RECONNECT_WORDS, expectReconnect, renamedTo} = require("./keyboard-reconnect");
 const {LIVE_ACTIONS, proposeLive, readNews, setEditMode} = require("./live-edits");
 const {restartKeyboard, putBackAfterRestart} = require("./keyboard-restart");
 const {startingTimeout} = require("./keyboard-starting");
 const {keyboardLabel, selectedDevice} = require("./device-model");
+const {recoveryStorageFailure} = require("./recovery-copy");
 const {forget, keptFor, remember} = require("./kept");
 
 /** @template T @param {Shell} shell @param {string} title @param {() => Promise<T>} work */
@@ -92,6 +94,10 @@ const READ_TITLES = Object.freeze({
 /** @param {Session} session @param {string | undefined} selectedDeviceId @param {Shell} [shell] */
 async function readKeyboard(session, selectedDeviceId, shell = {}) {
     const service = session.service;
+    // "No keyboard found" holds only while the page has none it may open: a
+    // read of one it lists takes it back, as soon as the read publishes.
+    const noneFound = shell.words?.noneFound || SHELL_WORDS.noneFound;
+    if (session.noticeSaid === noneFound && service.snapshot().devices?.length) session.notice = "";
     const read = await service.readForEditor(selectedDeviceId, {
         progress: (step, work) => run(shell, READ_TITLES[step], work),
         // A follow-back's read the keyboard moved under is the live watch's
@@ -99,7 +105,7 @@ async function readKeyboard(session, selectedDeviceId, shell = {}) {
         failed: (error) => {if (session.reconnect && session.draft?.live) readFailed(session, error);},
     });
     if (read.kind === "none") {
-        session.notice = shell.words?.noneFound || SHELL_WORDS.noneFound;
+        session.notice = noneFound;
         return false;
     }
     if (read.kind === "firmware") {
@@ -127,7 +133,7 @@ async function readKeyboard(session, selectedDeviceId, shell = {}) {
             ? "compiled defaults"
             : `saved profile, generation ${state.committed.generation}`;
         const failures = state.committed.failures?.length || 0;
-        session.notice = `Read the keyboard's ${description}.` + (failures ? ` ${failures} part${failures === 1 ? "" : "s"} of it could not be read; see Diagnostics on the Keyboard screen.` : "");
+        session.notice = `Read the keyboard's ${description}.` + (failures ? ` ${failures} part${failures === 1 ? "" : "s"} of it could not be read.` : "");
     }
     if (macroFailure) session.notice += macroFailure;
     // A live keyboard that restarted (a replug, a lost connection) since Ark
@@ -221,7 +227,7 @@ const DRAFT_ACTIONS = Object.freeze({
     putBack: liveOr("putBack", ({draft, revision, session}) => {
         const before = keptFor(session, "beforeApply", session.service.snapshot(), draft.deviceId);
         if (!before) throw new Error("There is no copy from before a save on this keyboard to put back.");
-        draft.replace(before.document, revision, "edit", "Put back what the keyboard had before the save", LAYER_IDENTITY);
+        draft.replace(before.document, revision, "edit", "Put back what the keyboard had before the save", IDENTITY);
         session.resetDraftForms = true;
     }),
     apply: async ({draft, revision, message, session, service, shell}) => {
@@ -284,12 +290,40 @@ const PORTABLE_ACTIONS = Object.freeze({
         const text = typeof chosen === "string" ? chosen : chosen.text;
         if (typeof text !== "string") throw new Error("This file could not be read.");
         if (Buffer.byteLength(text, "utf8") > FILE_MAX_BYTES) throw new Error(FILE_TOO_LARGE);
-        const value = validateSnapshot(text, panelCapabilities(session) || undefined);
-        session.portableReview = {document: value.document, fileName: typeof chosen === "string" ? null : chosen.name || null,
-            before: session.draft?.current || await service.readPortableProfile({forRestore: true}), revision: session.draft?.revision,
-            deviceId: panelState(session).selectedDeviceId, draftId: session.draft?.id};
+        const capabilities = panelCapabilities(session) || undefined;
+        const fileName = typeof chosen === "string" ? null : chosen.name || null;
+        const origin = {revision: session.draft?.revision, deviceId: panelState(session).selectedDeviceId, draftId: session.draft?.id};
+        // A VIA layout holds keys and macros only, so it comes into the
+        // draft's own profile (D-L97); with no draft there is none to keep.
+        const via = viaLayoutOf(text);
+        if (via) {
+            if (!session.draft) throw new Error("Read the keyboard's whole profile before importing a VIA layout: it changes keys and macros only, and keeps the rest.");
+            session.portableReview = viaReview(session.draft.current, {via, clear: BLANK_SLATE}, capabilities, {fileName, ...origin});
+        } else {
+            const value = validateSnapshot(text, capabilities);
+            session.portableReview = {document: value.document, fileName,
+                before: session.draft?.current || await service.readPortableProfile({forRestore: true}), ...origin};
+        }
         session.portableLayers = undefined;
         return;
+    },
+    // A blank slate for a VIA layout's import (D-L97): the draft's behaviours,
+    // combos or custom keys go too, or stay, and the review is made again.
+    viaClears: ({session, message}) => {
+        const review = requireReview(session.portableReview);
+        if (!review.viaSource) throw new Error("Only a VIA layout's import removes behaviours, combos or custom keys.");
+        const {clear} = /** @type {Extract<PortableMessage, {type: "setViaImportClears"}>} */ (message);
+        const chosen = {behaviors: clear?.behaviors === true, combos: clear?.combos === true, customKeys: clear?.customKeys === true};
+        const {document, via, differences, viaSource, ...origin} = review;
+        session.portableReview = viaReview(review.before, {via: viaSource.via, clear: chosen}, panelCapabilities(session) || undefined, origin);
+    },
+    // The draft's autocorrect list as a file (D-L85): what is on screen, the
+    // edits not yet saved included. Saving the file is the shell's.
+    exportAutocorrect: async ({session, message, shell}) => {
+        if (!session.draft) throw new Error("Read the keyboard before exporting its text replacement list.");
+        const {format} = /** @type {Extract<PortableMessage, {type: "exportAutocorrect"}>} */ (message);
+        const where = await shell.saveExport?.(exportedList(session.draft.current, format));
+        if (where) session.notice = `Text replacement list exported to ${where}`;
     },
     manageLayers: async ({session, service}) => {
         const before = session.draft?.current || await service.readPortableProfile();
@@ -325,15 +359,15 @@ const PORTABLE_ACTIONS = Object.freeze({
             // replacement, which needs nothing unsaved (firmware D-F32).
             const draft = session.draft;
             closeEditors(session, {resetForms: true});
-            if (entry.kind === "layers") await proposeLive(session, {document, origin: "layers", label: "Edited layers", order: compose(draft.order, entry.editor.order)});
-            else await proposeLive(session, {document, origin: "edit", label: "Imported a profile", order: LAYER_IDENTITY}, {replaceWhenLarge: true});
+            if (entry.kind === "layers") await proposeLive(session, {document, origin: "layers", label: "Edited layers", order: compose(draft.order, {layers: entry.editor.order})});
+            else await proposeLive(session, {document, origin: "edit", label: importLabel(entry.editor), order: IDENTITY}, {replaceWhenLarge: true});
             return;
         }
         if (session.draft) {
             // An import has no layer order to keep: its layers are
             // compared slot by slot with the keyboard's.
             if (entry.kind === "layers") session.draft.editLayers(document, session.draft.revision, entry.editor.order);
-            else session.draft.replace(document, session.draft.revision, "edit", "Imported a profile", LAYER_IDENTITY);
+            else session.draft.replace(document, session.draft.revision, "edit", importLabel(entry.editor), IDENTITY);
             closeEditors(session, {resetForms: true});
             return;
         }
@@ -356,6 +390,23 @@ async function portableControl(session, message, shell = {}) {
     await action({session, message, shell, service: session.service});
 }
 
+// A VIA layout's review: the file read into the draft's profile, with the
+// blank slate chosen, kept with the file so another choice reads it again.
+// `origin` is the file's name and the keyboard and draft it was opened on.
+/** @param {import("../model/types.js").ProfileSnapshot} before @param {import("./types.js").PortableReview["viaSource"] & {}} source @param {import("../model/types.js").ProfileDestination | undefined} capabilities @param {Omit<import("./types.js").PortableReview, "document" | "before" | "via" | "viaSource">} origin @returns {import("./types.js").PortableReview} */
+function viaReview(before, source, capabilities, origin) {
+    if (before.incomplete || !before.document) throw new Error("Read the keyboard's whole profile before importing a VIA layout.");
+    // A complete snapshot holds a complete document.
+    const base = /** @type {import("../model/types.js").PortableDocument} */ (before.document);
+    const imported = importViaLayout(base, source.via, {capabilities, hostOs: before.hostOs, clear: source.clear});
+    return {...origin, document: imported.document, before, viaSource: source,
+        via: {layers: imported.layers, macros: imported.macros, pointer: imported.pointer, left: imported.left, kept: imported.kept, clearable: viaClearable(base, capabilities), clear: source.clear}};
+}
+
+// What the draft's history calls an import.
+/** @param {import("./types.js").PortableReview | import("./types.js").LayerEditState} review */
+const importLabel = review => "via" in review && review.via ? VIA_IMPORT_LABEL : "Imported a profile";
+
 /** @template T @param {T | null | undefined} value @returns {T} */
 function requireReview(value) {
     if (!value) throw new Error("Review the profile before restoring it.");
@@ -363,13 +414,15 @@ function requireReview(value) {
 }
 
 // The shell's recovery copy, saying what made it and the keyboard it comes
-// from, named as the Keyboard screen's title names it at that moment.
+// from, named as the Keyboard screen's title names it at that moment. Storage
+// that would not keep it is said as its cause (recovery-copy.js).
 /** @param {Shell} shell @param {Session} session @param {import("../../contracts/model.js").RecoveryCause} cause @returns {import("./types.js").SaveRecovery} */
-const recoveryFor = (shell, session, cause) => (document) => {
+const recoveryFor = (shell, session, cause) => async (document) => {
     if (typeof shell.saveRecovery !== "function") throw new TypeError("shell.saveRecovery is not a function");
     const state = session.service.snapshot();
     const device = selectedDevice(state);
-    return shell.saveRecovery(document, {cause, keyboard: keyboardLabel({...state, device})});
+    try {return await shell.saveRecovery(document, {cause, keyboard: keyboardLabel({...state, device})});}
+    catch (error) {throw recoveryStorageFailure(error);}
 };
 
 module.exports = {readKeyboard, draftControl, portableControl, DRAFT_ACTIONS, PORTABLE_ACTIONS};

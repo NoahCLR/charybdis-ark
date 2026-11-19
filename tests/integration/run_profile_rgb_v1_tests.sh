@@ -4,7 +4,7 @@ ROOT="${FIRMWARE_ROOT:?Set FIRMWARE_ROOT}"
 APP="${CHARYBDIS_ARK_ROOT:?Set CHARYBDIS_ARK_ROOT}"
 BUILD_DIR="$(mktemp -d)"
 trap 'rm -rf "$BUILD_DIR"' EXIT INT TERM
-# Format 4 at the default depth and the supported eight-tap configuration.
+# Format 5 at the default depth and the supported eight-tap configuration.
 for depth in 5 8; do
 node "$APP/tests/integration/rgb-corpus.js" "$ROOT" "$BUILD_DIR/corpus.bin" "$depth"
 for variant in normal sanitized; do

@@ -19,14 +19,20 @@ test("a row carries its key's built-in first tap and hold, named as a person rea
     const row = (operand) => ({target: {kind: 1, operand}, tapHoldTerm: 0, longHoldTerm: 0, multiTapTerm: 0,
         keepsAutoMouseAnchored: false, steps: [{tapIndex: 1, tap: {kind: 1, operand: 4}}]});
     const domain = decodeKeyBehaviorDomain(encodeKeyBehaviorDomain({rows: [row(0x2a16), row(0x4338), row(0xe3)]}));
-    const byKey = (rows) => Object.fromEntries(rows.map((entry) => [entry.keycode, entry.builtIn]));
-    const rows = byKey(behaviorRowsForView(domain));
+    // Each row's empty cells come with them (tests/model/empty-cells.test.js).
+    const byKey = (rows) => Object.fromEntries(rows.map(({keycode, builtIn: {cells, ...builtIn}}) => [keycode, builtIn]));
+    const views = behaviorRowsForView(domain);
+    const rows = byKey(views);
+    assert.deepEqual(views[0].builtIn.cells["1-hold"], {implied: {meaning: "tapsOnRelease", tap: {step: 1, tier: "tap"}}}, "and what each empty cell does, naming the branch it shows");
     assert.deepEqual(rows["MT(MOD_LSFT|MOD_LGUI,KC_S)"], {
         tap: {style: "TAP_SENDS", action: "KC_S", label: "S"},
         hold: {style: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "LSFT(LGUI(KC_NO))", repeatHz: "0", label: "Shift+GUI"},
     }, "a modifiers-only hold reads as its modifiers, not Shift+GUI+N/A");
     assert.deepEqual(rows["LT(3,KC_SLASH)"].hold, {style: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "MO(3)", repeatHz: "0"});
-    assert.deepEqual(rows.KC_LEFT_GUI, {});
+    assert.deepEqual(rows.KC_LEFT_GUI, {releaseTaps: true,
+        tap: {style: "TAP_SENDS", action: "KC_LEFT_GUI", label: "Left GUI"},
+        hold: {style: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "KC_LEFT_GUI", repeatHz: "0", label: "Left GUI", fallback: true},
+    }, "a bare modifier taps and holds itself, like any plain key");
 });
 
 test("a behaviour branch carries the readable name of the keycode it stores, when one exists", () => {
@@ -83,11 +89,20 @@ test("real device RGB retains every value and reference through the presentation
     assert.equal(view.automouseFade.mode, "FOLLOW_REAL_DESTINATION");
     assert.deepEqual(view.automouseFade.end_color, {h: "167", s: "255", v: "199"});
     assert.equal(view.keyBehaviorFeedback.tapCommitMode, "KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS");
-    assert.equal(view.keyBehaviorFeedback.tapBranchColors.length, 4);
-    assert.deepEqual(view.ledGroups[1].ledIndices, [24, 25, 26, 27, 28, 53, 54, 55]);
-    assert.equal(view.ledGroups[1].usageCount, 3);
-    assert.equal(view.pdModeLedGroups[0].owner, "RGB_POINTING_MODE_GROUP_ALL");
-    assert.equal(view.keyBehaviorFeedbackLedGroups[0].owner, "KEY_FEEDBACK_GROUP_ALL");
+    assert.equal(view.keyBehaviorFeedback.tapBranches.length, 4);
+    assert.deepEqual([...view.keyBehaviorFeedback.tapBranches.map((branch) => branch.locality), view.keyBehaviorFeedback.tapCommittedLocality,
+        view.keyBehaviorFeedback.holdActiveLocality, view.keyBehaviorFeedback.longHoldActiveLocality], Array(7).fill("RGB_KEY_HALF"), "each case's locality, by name");
+    assert.deepEqual(view.pdModeAccents[0].ledIndices, [24, 25, 26, 27, 28, 53, 54, 55], "an accent carries the LEDs its group holds");
+    assert.equal(view.pdModeAccents[0].leds, "LEDs 24–28, 53–55", "named as Lighting and the review name them");
+    assert.equal("ledGroups" in view, false, "the groups themselves are Ark's to keep (D-L77)");
+    assert.equal(view.pdModeAccents[0].owner, "RGB_POINTING_MODE_GROUP_ALL");
+    assert.equal(view.keyFeedbackAccents[0].owner, "KEY_FEEDBACK_GROUP_ALL");
+    // Replacement feedback as the keyboard's compiled defaults have it.
+    assert.deepEqual(view.autocorrectFeedback, {textColor: {h: "106", s: "255", v: "200"}, textLocality: "RGB_KEY_HALF", macroColor: {h: "234", s: "255", v: "200"}, macroLocality: "RGB_KEY_HALF",
+        undoColor: {h: "0", s: "255", v: "200"}, undoLocality: "RGB_KEY_HALF", leadingColor: {h: "170", s: "255", v: "200"}, leadingLocality: "RGB_KEY_HALF"});
+    assert.deepEqual(view.autocorrectFeedbackAccents.map(({index, owner, color, leds}) => ({index, owner, color, leds})),
+        [{index: 0, owner: "AUTOCORRECT_FEEDBACK_GROUP_ALL", color: {h: "0", s: "0", v: "0"}, leds: "LEDs 24–28, 53–55"}]);
+    assert.deepEqual(view.stages.at(-1), {id: "autocorrect", label: "Replacement feedback", bit: 32, enabled: true});
     assert.equal(JSON.stringify(rgb), original, "converting a snapshot cannot mutate it");
 });
 
@@ -97,12 +112,16 @@ test("RGB selectors and disabled stages are displayed without inventing enabled 
     rgb.layerGroupRows = [{selector: 0, groupId: 0, color: {h: 0, s: 0, v: 0}}, {selector: 255, groupId: 0, color: {h: 1, s: 2, v: 3}}];
     rgb.pdModeGroupRows[0].selector = 0;
     rgb.keyGroupRows[0].semantic = 0;
+    rgb.autocorrectGroupRows = [0, 1, 2].map(semantic => ({semantic, groupId: 0, color: {h: 0, s: 0, v: 0}}));
+    rgb.autocorrectFeedback.textColor = {h: 9, s: 0, v: 0};
     const view = rgbForView(rgb);
     assert.ok(view.stages.every(stage => !stage.enabled));
-    assert.deepEqual(view.layerLedGroups.map(r => r.owner), ["Layer 0", "RGB_LAYER_GROUP_ALL"]);
-    assert.deepEqual(view.layerLedGroups.map(r => r.ownerLayer), [0, undefined], "a layer's own group names its layer by number");
-    assert.equal(view.pdModeLedGroups[0].owner, "POINTING_MODE_DRAGSCROLL");
-    assert.equal(view.keyBehaviorFeedbackLedGroups[0].owner, "KEY_FEEDBACK_GROUP_TAP_BRANCH_PENDING");
+    assert.deepEqual(view.layerAccents.map(r => r.owner), ["Layer 0", "RGB_LAYER_GROUP_ALL"]);
+    assert.deepEqual(view.layerAccents.map(r => r.ownerLayer), [0, undefined], "a layer's own group names its layer by number");
+    assert.equal(view.pdModeAccents[0].owner, "POINTING_MODE_DRAGSCROLL");
+    assert.equal(view.keyFeedbackAccents[0].owner, "KEY_FEEDBACK_GROUP_TAP_COUNT_2", "semantic 0 is the double tap's branch alone (firmware D-F73)");
+    assert.deepEqual(view.autocorrectFeedbackAccents.map(r => r.owner), ["AUTOCORRECT_FEEDBACK_GROUP_TEXT", "AUTOCORRECT_FEEDBACK_GROUP_MACRO", "AUTOCORRECT_FEEDBACK_GROUP_UNDO"]);
+    assert.deepEqual(view.autocorrectFeedback.textColor, {h: "9", s: "0", v: "0"}, "a colour that paints nothing is reported as stored, hue included");
 });
 
 test("authored and built-in behaviour labels use the profile's host naming rule", () => {

@@ -8,13 +8,16 @@ const {RAW_HID_REPORT_SIZE, normalizeRawHidReport} = require("../transport/devic
 const PROFILE_WIRE_V1 = Object.freeze({
     // Profile Wire 2.0 opens the new base (firmware D-F28): every profile
     // length and offset is 32 bits, and the feature word holds only what a
-    // build varies by. Ark requires this version exactly (D-L64).
+    // build varies by. 2.1 adds the switch keys for behaviours (firmware
+    // D-F66), and for auto-mouse with no version change; 2.2 the Leader key
+    // (firmware D-F71). Ark requires this version exactly (D-L64).
     PROTOCOL_MAJOR: 2,
-    PROTOCOL_MINOR: 0,
+    PROTOCOL_MINOR: 2,
     // Response layout 3 (firmware D-F28): page 1 the ceilings that fit a byte,
-    // page 2 the wider ones. Any other layout is refused.
+    // page 2 the wider ones, page 3 the autocorrect list's (firmware D-F68).
+    // Any other layout is refused.
     CAPABILITY_LAYOUT: 3,
-    CAPABILITY_PAGE_COUNT: 3,
+    CAPABILITY_PAGE_COUNT: 4,
     CHANNEL: 0x00,
     COMMAND_GET: 0x08,
     PAYLOAD_OFFSET: 7,
@@ -193,17 +196,20 @@ function readU32(buffer, offset) {
     ) >>> 0;
 }
 
+const OLDER_CAPABILITIES = "Unsupported Profile Wire capability layout: Ark supports only current firmware. Update both halves.";
 /** @param {Uint8Array[]} pages */
 function decodeCapabilityPages(pages) {
     assertPageSet(pages, PROFILE_WIRE_V1.CAPABILITY_PAGE_COUNT, "capability");
     const identity = pages[0];
     const capacity = pages[1];
     const wide = pages[2];
+    const autocorrect = pages[3];
     if (identity[0] !== PROFILE_WIRE_V1.CAPABILITY_LAYOUT || identity[1] !== PROFILE_WIRE_V1.CAPABILITY_PAGE_COUNT) {
-        throw new ProfileWireProtocolError("INCOMPATIBLE_RESPONSE", "Unsupported Profile Wire capability layout: Ark supports only current firmware. Update both halves.");
+        throw new ProfileWireProtocolError("INCOMPATIBLE_RESPONSE", OLDER_CAPABILITIES);
     }
     assertZeroRange(capacity, 16, 25, "capability page 1");
-    assertZeroRange(wide, 18, 25, "capability page 2");
+    assertZeroRange(wide, 20, 25, "capability page 2");
+    assertZeroRange(autocorrect, 12, 25, "capability page 3");
     const decoded = {
         responseVersion: identity[0],
         protocol: {major: identity[2], minor: identity[3]},
@@ -222,7 +228,11 @@ function decodeCapabilityPages(pages) {
         maxCombos: capacity[4],
         maxKeysPerCombo: capacity[5],
         maxReusableRgbGroups: capacity[6],
-        maxRgbStageGroupRows: capacity[7],
+        // Firmware D-F63: page 1 byte 7 is the group rows of one lighting
+        // table and page 2 bytes 18-19 those of all four. Firmware before it
+        // leaves bytes 18-19 zero, and its byte 7 is the total.
+        maxRgbTableGroupRows: capacity[7],
+        maxRgbStageGroupRows: readU16(wide, 18) || capacity[7],
         physicalLedCount: capacity[8],
         ledBitmapSize: capacity[9],
         customKeySlots: capacity[10],
@@ -236,6 +246,12 @@ function decodeCapabilityPages(pages) {
         maxProfilePayload: readU32(wide, 6),
         profileSlotPayload: readU32(wide, 10),
         macroBytes: readU32(wide, 14),
+        maxAutocorrectCorrections: readU16(autocorrect, 0),
+        maxAutocorrectTypos: readU16(autocorrect, 2),
+        autocorrectTextBytes: readU16(autocorrect, 4),
+        autocorrectBytes: readU32(autocorrect, 6),
+        autocorrectTextMax: autocorrect[10],
+        autocorrectCorrectionMax: autocorrect[11],
     };
     assertKnownMask(decoded.featureFlags, PROFILE_WIRE_KNOWN_MASKS.FEATURE_FLAGS, "capability feature flags");
     assertKnownMask(decoded.supportedDomainMask, PROFILE_WIRE_KNOWN_MASKS.SUPPORTED_DOMAINS, "supported domain mask");
@@ -344,9 +360,18 @@ async function readProfilePages(connection, valueId, pageCount, options = {}) {
     return pages;
 }
 
+// A keyboard without a capability page Ark reads is older firmware, as one
+// whose page 0 counts other pages is: the released firmware has three and
+// refuses the fourth as an unknown page.
 /** @param {import("../transport/types.js").RequestConnection} connection @param {import("./types.js").ReadOptions} [options] */
 async function readProfileCapabilities(connection, options) {
-    return decodeCapabilityPages(await readProfilePages(connection, PROFILE_WIRE_V1.VALUE_CAPABILITIES, PROFILE_WIRE_V1.CAPABILITY_PAGE_COUNT, options));
+    let pages;
+    try {pages = await readProfilePages(connection, PROFILE_WIRE_V1.VALUE_CAPABILITIES, PROFILE_WIRE_V1.CAPABILITY_PAGE_COUNT, options);}
+    catch (error) {
+        if (!isUnknownPage(error)) throw error;
+        throw new ProfileWireProtocolError("INCOMPATIBLE_RESPONSE", OLDER_CAPABILITIES, {cause: error});
+    }
+    return decodeCapabilityPages(pages);
 }
 
 /** @param {import("../transport/types.js").RequestConnection} connection @param {import("./types.js").ReadOptions} [options] */

@@ -34,7 +34,7 @@ test("the layout is each layer's visible keys in layout order, each keycode reso
 
 test("a committed readback decodes each domain alone, so one that drifted leaves the others readable", () => {
     const bytes = Buffer.from(compiled().profile, "base64");
-    const metadata = {generation: 7, digest: 0x1234, schema: {major: 4, minor: 3}, originHalf: 1};
+    const metadata = {generation: 7, digest: 0x1234, schema: {major: 4, minor: 4}, originHalf: 1};
     const read = committedRead({metadata, bytes}, "committed", CURRENT_CAPABILITIES);
     assert.deepEqual(read.failures, []);
     assert.equal(read.byteLength, bytes.length);

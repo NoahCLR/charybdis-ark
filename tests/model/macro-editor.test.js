@@ -8,6 +8,7 @@ const {SETTINGS} = require("../../core/schema/settings-domain-v1");
 const {fingerprint, validateSnapshot} = require("../../core/model/portable-profile");
 const {profileMacroBudget, macroEditorView, macroInputStatus, macroBudget, SLOT_RESERVE_TAPS} = require("../../core/model/macro-editor");
 const {decodeProfileBlob} = require("../../core/schema/profile-blob-v1");
+const {MACRO_DOMAIN_V1} = require("../../core/schema/macro-domain-v1");
 const {settingsEditorView} = require("../../core/model/settings-editor");
 const {draftEdit} = require("../fixtures/draft-edit");
 const {VOCABULARY, word} = require("../../core/model/vocabulary");
@@ -42,6 +43,16 @@ test("an empty macro may store protection and keeps its empty-slot reserve", () 
     assert.equal(view.macroBank.stored, macroEditorView(current, capabilities).macroBank.stored + 3);
 });
 
+test("Clear macro's one message empties the steps, the name and the protection, freeing the slot's bytes", () => {
+    const {hostMacros} = require("../fixtures/host-macros");
+    const {snapshot: fresh, capabilities} = hostMacros(1, []);
+    const filled = snapshot(draftEdit(fresh, {type: "updateMacro", keycode: "MACRO_0", payload: "hi", name: "Greeting", protection: "on"}, capabilities));
+    const cleared = snapshot(draftEdit(filled, {type: "updateMacro", keycode: "MACRO_0", payload: "", name: "", protection: "auto"}, capabilities));
+    const slot = macroEditorView(cleared, capabilities).macros[0];
+    assert.deepEqual([slot.empty, slot.name, slot.protection, slot.bytes], [true, "", "auto", 0]);
+    assert.equal(macroEditorView(cleared, capabilities).macroBank.stored, macroEditorView(fresh, capabilities).macroBank.stored);
+});
+
 test("stored macro status agrees with editing after a host layout change", () => {
     const {hostMacros} = require("../fixtures/host-macros");
     for (const host of [1 | (2 << 16), 1 | (3 << 16)]) {
@@ -58,7 +69,7 @@ test("the 128 macros populate the model, including empty slots and their names",
     let current = snapshot(pdDocument());
     current = snapshot(draftEdit(current, {type: "updateMacro", keycode: "MACRO_127", payload: "{KC_LGUI,KC_N}", name: "New note"}));
     const view = macroEditorView(current);
-    const model = buildDeviceModel({macroView: view, capabilities: {compiledLayerCount: 16, actionAbiDigest: 0x67df11b3}});
+    const model = buildDeviceModel({macroView: view, capabilities: {compiledLayerCount: 16, actionAbiDigest: CURRENT_CAPABILITIES.actionAbiDigest}});
     assert.equal(model.macros.length, 128);
     assert.equal(model.macros[0].empty, true);
     assert.equal(model.macros[127].name, "New note");
@@ -77,12 +88,12 @@ test("the 128 macros populate the model, including empty slots and their names",
 
 test("naming a macro changes its name and nothing else", () => {
     const source = pdDocument(), current = snapshot(source);
-    assert.equal(settingsDomain(source).version, 11);
+    assert.equal(settingsDomain(source).version, 13);
     const named = draftEdit(current, {type: "updateMacro", keycode: "MACRO_3", name: "  Zoom mute "});
     assert.deepEqual(profileMacros(named), profileMacros(source), "a rename leaves every macro's steps alone");
     const domain = settingsDomain(named);
-    assert.equal(domain.version, 11);
-    assert.equal(domain.payload[0], 11, "the payload repeats the envelope's version");
+    assert.equal(domain.version, 13);
+    assert.equal(domain.payload[0], 13, "the payload repeats the envelope's version");
     const settings = validateSnapshot(named).settings, before = validateSnapshot(source).settings;
     assert.equal(settings.macroNames[3], "Zoom mute", "names are trimmed");
     assert.deepEqual(settings.values, before.values);
@@ -131,7 +142,7 @@ test("wrong slots, empty messages and oversized macros are rejected before a wri
     for (const keycode of ["MACRO_128", "MACRO_01", "KC_A", "QK_MACRO_2", "CUSTOM_KEY_2"]) assert.throws(() => draftEdit(current, {...message, keycode}), /slot/);
     assert.equal(Buffer.from(profileMacros(draftEdit(current, {...message, keycode: "MACRO_127"}))[127], "base64").toString(), "hello", "the last slot is a slot");
     assert.throws(() => draftEdit(current, {type: "updateMacro", keycode: "MACRO_0"}), /steps, its name/);
-    assert.throws(() => draftEdit(current, {...message, payload: "x".repeat(34903)}), /bytes/);
+    assert.throws(() => draftEdit(current, {...message, payload: "x".repeat(MACRO_DOMAIN_V1.MAX_SIZE)}), /bytes/);
 });
 
 test("every empty slot keeps room for ten key taps; the highest ones run out of room first", () => {
@@ -159,16 +170,16 @@ test("every empty slot keeps room for ten key taps; the highest ones run out of 
 test("the model reports the bank and each macro's room; a macro past the free memory is refused", () => {
     let current = snapshot(pdDocument());
     current = snapshot(draftEdit(current, {type: "updateMacro", keycode: "MACRO_2", payload: "{KC_A}{KC_B}"}));
-    const view = macroEditorView(current, {macroBytes: 34903});
+    const view = macroEditorView(current, {macroBytes: 40960});
     const slot = view.macros[2];
     assert.equal(slot.playable, true);
     assert.equal(slot.available, true);
     assert.equal(slot.roomTaps, Math.floor(view.macroBank.free / 3));
-    assert.equal(view.macroBank.capacity, 34903);
+    assert.equal(view.macroBank.capacity, 40960);
     assert.equal(view.macroBank.slots, 128);
     assert.equal(view.macroBank.reserveTaps, 10);
     assert.equal(view.macroBank.available, 128);
-    const model = buildDeviceModel({macroView: view, capabilities: {compiledLayerCount: 16, actionAbiDigest: 0x67df11b3}});
+    const model = buildDeviceModel({macroView: view, capabilities: {compiledLayerCount: 16, actionAbiDigest: CURRENT_CAPABILITIES.actionAbiDigest}});
     assert.deepEqual(model.macroBank, view.macroBank);
     // The keyboard streams a macro in windows, so only the free memory bounds it.
     assert.doesNotThrow(() => draftEdit(current, {type: "updateMacro", keycode: "MACRO_2", payload: "{KC_A}".repeat(171)}));
@@ -254,7 +265,7 @@ test("macro text is judged against the host layout the keyboard types through", 
 });
 
 test("macros use the free bank and filled high slots survive lower empty slots running out of room", () => {
-    const capabilities = {...CURRENT_CAPABILITIES, macroBytes: 34903, maxProfilePayload: 53216};
+    const capabilities = {...CURRENT_CAPABILITIES, macroBytes: 40960, maxProfilePayload: 53216};
     let current = snapshot(document());
     const update = payload => {current = snapshot(draftEdit(current, {type: "updateMacro", keycode: "MACRO_127", payload}, capabilities));};
     const free = macroEditorView(current, capabilities).macroBank.free;
@@ -280,12 +291,12 @@ test("macros use the free bank and filled high slots survive lower empty slots r
 
 test("a long macro plays whatever its length while it fits the bank", () => {
     const current = snapshot(document()), payload = "a".repeat(600);
-    assert.equal(macroInputStatus(current, {keycode: "MACRO_0", payload}, {macroBytes: 34903}).error, "");
+    assert.equal(macroInputStatus(current, {keycode: "MACRO_0", payload}, {macroBytes: 40960}).error, "");
 });
 
 test("names and other domains consume the shared space offered to macros", () => {
     const current = snapshot(document());
-    const caps = {...CURRENT_CAPABILITIES, macroBytes: 34903,
+    const caps = {...CURRENT_CAPABILITIES, macroBytes: 40960,
         maxProfilePayload: validateSnapshot(current.document).candidate.length + 60};
     assert.equal(macroEditorView(current, caps).macroBank.free, 60);
     const named = snapshot(draftEdit(current, {type: "renameKeyboard", name: "a".repeat(32)}, caps));
@@ -298,14 +309,14 @@ test("names and other domains consume the shared space offered to macros", () =>
 
 test("the macro domain can use its full advertised capacity without an extra VIA sentinel", () => {
     const current = snapshot(document());
-    const caps = {...CURRENT_CAPABILITIES, macroBytes: 34903, maxProfilePayload: 130048};
+    const caps = {...CURRENT_CAPABILITIES, macroBytes: 40960, maxProfilePayload: 130048};
     const free = macroEditorView(current, caps).macroBank.free;
     const changed = draftEdit(current, {type: "updateMacro", keycode: "MACRO_0", payload: "a".repeat(free)}, caps);
     assert.equal(macroEditorView(snapshot(changed), caps).macroBank.free, 0);
     const decoded = validateSnapshot(changed, caps);
-    assert.equal(decoded.macroSlots.reduce((size, slot) => size + slot.length + 1, 0), 34903);
+    assert.equal(decoded.macroSlots.reduce((size, slot) => size + slot.length + 1, 0), caps.macroBytes);
     const domains = require("../../core/schema/profile-blob-v1").decodeProfileBlob(decoded.candidate).domains;
-    assert.equal(domains.find(domain => domain.id === 0x70).payload.length, 34903);
+    assert.equal(domains.find(domain => domain.id === 0x70).payload.length, caps.macroBytes);
 });
 
 test("unused macro tails survive names and layer edits, while stream edits reclaim their shared space", () => {
@@ -314,7 +325,7 @@ test("unused macro tails survive names and layer edits, while stream edits recla
     const source = pdDocument();
     source.profile = withPayload(Buffer.from(source.profile, "base64"), "macros", payload => Buffer.concat([payload, Buffer.alloc(99, 65), Buffer.from([0])])).toString("base64");
     const current = snapshot(source), bytes = Buffer.from(source.profile, "base64");
-    const caps = {...CURRENT_CAPABILITIES, macroBytes: 34903, maxProfilePayload: bytes.length};
+    const caps = {...CURRENT_CAPABILITIES, macroBytes: 40960, maxProfilePayload: bytes.length};
     assert.equal(profileMacroBudget(validateSnapshot(source), caps).free, 100);
     const changed = draftEdit(current, {type: "updateMacro", keycode: "MACRO_0", payload: "a".repeat(100)}, caps);
     assert.equal(Buffer.from(changed.profile, "base64").length, bytes.length, "the replacement uses the reclaimed tail");
@@ -323,4 +334,14 @@ test("unused macro tails survive names and layer edits, while stream edits recla
     assert.deepEqual(macros(named), macros(source));
     assert.deepEqual(macros(reorderLayers(source, [0, 2, 1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15])), macros(source));
     assert.deepEqual(Buffer.from(JSON.parse(JSON.stringify(source)).profile, "base64"), bytes, "portable JSON retains the exact complete blob");
+});
+
+// No macro is kept for the six-key limit's sake (firmware D-F65): a stored
+// one over it does not read, as any macro that does not read, so a backup
+// holding one is refused.
+test("a stored macro holding more than six keys besides modifiers does not read, and a backup holding one is refused", () => {
+    const {validateMacro} = require("../../core/model/portable-profile");
+    const keys = [0x08, 0x1c, 0x0e, 0x33, 0x13, 0x27, 0x18]; // E Y K ; P 0 U
+    const chord = Buffer.from([...keys.slice(0, -1).flatMap(key => [1, 2, key]), 1, 1, keys.at(-1), ...keys.slice(0, -1).reverse().flatMap(key => [1, 3, key])]);
+    assert.throws(() => validateMacro(chord), {message: VOCABULARY.macroProblems.reportFull});
 });

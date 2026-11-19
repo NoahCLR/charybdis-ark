@@ -10,7 +10,7 @@ const {candidateMetadataForBlob, buildCandidateBeginRequest} = require("../../co
 const {buildSnapshotModel} = require("../../core/session/device-model");
 function fixture() {
     const value = document(), snapshot = {document: value, fingerprint: fingerprint(value), summary: summary(value)};
-    const caps = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 3}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: value.actionAbiDigest};
+    const caps = {protocol: {major: 2, minor: 1}, schema: {major: 4, minor: 8}, compiledLayerCount: 16, supportedDomainMask: 255, actionAbiDigest: value.actionAbiDigest};
     const draft = new ProfileDraftSession(snapshot, "board", caps);
     const stage = message => draft.stage({...message, draftRevision: draft.revision});
     return {draft, stage, caps};
@@ -19,7 +19,7 @@ test("the six factory modes stay data, with 32 RGB rows and the remaining slots 
     const value = validateSnapshot(document());
     assert.equal(value.document.version, 5);
     assert.deepEqual(value.pdModes.map(mode => mode.name), ["Dragscroll", "Volume", "Brightness", "Zoom", "Arrow", "Pinch", ...Array(26).fill("")]);
-    assert.equal(value.rgb.formatVersion, 4); assert.equal(value.rgb.pdModeColors.length, 32);
+    assert.equal(value.rgb.formatVersion, 7); assert.equal(value.rgb.pdModeColors.length, 32);
     // Arrow keeps its masked arrows and no mouse button overrides: version 4
     // retired them (firmware D-F22).
     assert.equal(value.pdModes[4].directions.up.mask, 0x44);
@@ -43,8 +43,8 @@ test("create, bind, edit RGB and macros, reorder, review and undo share a PD dra
     const view = draft.view({connected: true, selectedDeviceId: "board"});
     const slot = view.changes.find(change => change.area === "Pointing modes" && change.unit === "pd:7");
     const field = label => slot.fields.find(entry => entry.label === label)?.after;
-    assert.equal(slot.status, "added"); assert.equal(slot.title, "Slot 7 · History");
-    assert.equal(field("Name"), "History");
+    assert.equal(slot.status, "added"); assert.equal(slot.title, "Pointing mode 7 · History");
+    assert.equal(field("Pointing mode name"), "History");
     assert.equal(field("Horizontal movement per tap"), 30);
     assert.match(field("Left"), /Inherit modifiers/);
     const model = buildSnapshotModel(draft.current, caps, {editable: true, reason: ""});
@@ -52,7 +52,7 @@ test("create, bind, edit RGB and macros, reorder, review and undo share a PD dra
     assert(model.qmkKeycodes.some(key => key.value === "PD_MODE_7" && key.keycode === 0x7e87 && key.label === "History · hold"));
     assert(model.qmkKeycodes.some(key => key.value === "PD_MODE_7_LOCK" && key.keycode === 0x7ea7 && key.label === "History · lock"));
     assert(!model.qmkKeycodes.some(key => key.value === "SLOT_7_MODE"));
-    assert(model.qmkKeycodes.some(key => key.value === "PD_MODE_6" && key.keycode === 0x7e86 && key.label === "Slot 6 · hold (empty)"),
+    assert(model.qmkKeycodes.some(key => key.value === "PD_MODE_6" && key.keycode === 0x7e86 && key.label === "Pointing mode 6 · hold (empty)"),
         "an unconfigured slot still offers its keycodes, so a button can be placed before the mode exists");
     assert(!settingsEditorView(draft.current).sections.some(section => section.fields.some(field => field.id >= 10 && field.id <= 14)));
     draft.undo(draft.revision); draft.undo(draft.revision); draft.undo(draft.revision);
@@ -81,10 +81,10 @@ test("keycode-picker modifier expressions are accepted as directional actions", 
     assert.equal(mode.directions.up.keycode, 0x081d);
     assert.equal(mode.directions.down.keycode, 0x081c);
 });
-test("logical Apply declares schema 4.3, all seven domains and storage format six", () => {
+test("logical Apply declares schema 4.8, all eight domains and storage format six", () => {
     const value = validateSnapshot(document());
     const metadata = candidateMetadataForBlob(value.profile, {actionAbiDigest: value.document.actionAbiDigest});
-    assert.equal(metadata.schemaMajor, 4); assert.equal(metadata.schemaMinor, 3); assert.equal(metadata.requestedDomains, 127); assert.equal(metadata.storeFormatVersion, 6);
+    assert.equal(metadata.schemaMajor, 4); assert.equal(metadata.schemaMinor, 8); assert.equal(metadata.requestedDomains, 255); assert.equal(metadata.storeFormatVersion, 6);
     const frame = buildCandidateBeginRequest(1, metadata);
     // Profile Wire 2 implies the store format: BEGIN carries a 32-bit length.
     assert.equal(frame.readUInt32LE(8), value.profile.length); assert.equal(frame.readUInt32LE(24), 0); assert.equal(frame.readUInt32LE(28), 0);
@@ -108,7 +108,7 @@ test("a cleared slot keeps its bindings, because the keyboard keeps its keycodes
     assert.equal(cleared.pdModes[7].kind, 0, "the slot is empty");
     assert.equal(cleared.danglingPointingKeys[7], 1, "and the key that still reaches it is counted, not refused");
     assert.equal(profileLayers(cleared.document)[0][0] !== 0, true, "the button stays on the board");
-    assert.equal(modelNow().qmkKeycodes.find(key => key.value === "PD_MODE_7").label, "Slot 7 · hold (empty)",
+    assert.equal(modelNow().qmkKeycodes.find(key => key.value === "PD_MODE_7").label, "Pointing mode 7 · hold (empty)",
         "and the keycode stays in the catalogue, described as empty rather than by a name that is gone");
 
     stage({type: "savePdMode", slot: 7, config: {kind: 1, name: "History", axis: 1, thresholdX: 30,

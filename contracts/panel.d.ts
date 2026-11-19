@@ -1,4 +1,4 @@
-import type {BaseIdentity, Behavior, BehaviorBranch, Combo, Colour, KeyFeedback, LayerReference, PointingSlot, Scalar, TimingTerm} from './edits.js';
+import type {AutocorrectFeedback, BaseIdentity, Behavior, BehaviorBranch, Combo, Colour, KeyFeedback, LayerReference, PointingSlot, Scalar, Tier, TimingTerm} from './edits.js';
 import type {ApplyView, Check, DemoView, HistoryStep, ShellPanel, LoadView, Participation, PhaseId, ProfileUsage, ReviewChange, SettingField, SettingsSection, TimingSource, Vocabulary} from './model.js';
 
 export interface Position {
@@ -23,12 +23,24 @@ export interface Layer {name: LayerReference; index: number; positions: Position
 export type {TimingSource} from './model.js';
 export interface KeyBehaviorDefaults {
     builtIn: BuiltIn;
+    /** Its empty cells, the set `behaviorEditing.cellPatterns` holds at this index: a key with no row shares them with every key of the same kind. */
+    cellPattern: number;
     timing: Record<string, Scalar | undefined>;
     timingSources?: Partial<Record<TimingTerm, TimingSource>>;
     timingAlone?: boolean;
 }
-export interface Branch extends BehaviorBranch { label?: string; fallback?: boolean; fromPress?: boolean}
-export interface BuiltIn {tap?: Branch; hold?: Branch; releaseTaps?: boolean}
+/** `armsOnRelease`: a One-shot hold that, let go after Tap / hold, arms its layers. */
+export interface Branch extends BehaviorBranch { label?: string; fallback?: boolean; fromPress?: boolean; armsOnRelease?: boolean}
+/** The standard key: what a key does where its row leaves a tier empty (core/model/built-in-behavior.js; firmware D-F64). `transparentTap`, the tap is the row's Transparent Single tap, the key below; `tapToggle`, with no row the key counts taps all the same; `laterHoldWaits`, a hold that runs from the press waits for Tap / hold on a later tap count the row leaves empty (a pointing-mode key); `cells`, what each empty grid cell does, by `${tapCount}-${tier}` (core/model/empty-cells.js). */
+export interface BuiltIn {tap?: Branch; hold?: Branch; releaseTaps?: boolean; transparentTap?: boolean; tapToggle?: boolean; laterHoldWaits?: boolean; cells?: Record<string, EmptyCell>}
+/** A branch an empty cell shows, named rather than copied (core/model/empty-cells.js): `own`, the key's built-in tap or hold; `step` and `tier`, a branch the row sets at that 0-based tap count. `times`: sent once per press of that many; `separate`: on a key that counts no taps, each press sent on its own as it is released; `below`: the row's Transparent Single tap, the key below; `waits`: a hold that otherwise runs from the press starts at Tap / hold here, on an empty tap count inside the row's depth; `locks`: a Tap-toggle key's quick tap that locks its layers. */
+export type CellRef = ({own: 'tap' | 'hold'} | {step: number; tier: Tier}) & {times?: number; separate?: boolean; below?: boolean; locks?: boolean; waits?: boolean};
+/** What an empty Hold or Long hold does because of the other tiers and the standard key. */
+export type HoldTierCell = {meaning: 'continues'; hold: CellRef} | {meaning: 'tapsBeforeLong'; tap: CellRef} | {meaning: 'tapsOnRelease'; tap: CellRef};
+/** `afterTaps`, a later tap count with nothing set: `tap` once per press before it, then the standard hold; `asSingle`, on a key that counts no taps: what a held Single tap does, its branch or what that tier implies. */
+export type ImpliedCell = HoldTierCell | {meaning: 'afterTaps'; tap?: CellRef; hold: CellRef}
+    | {meaning: 'asSingle'; as: {kind: Tier; branch: CellRef} | HoldTierCell};
+export type EmptyCell = {inherited: CellRef} | {implied: ImpliedCell};
 // A stored behaviour says whether it changes nothing (core/model/inert-behaviors.js).
 export interface BehaviorView extends Omit<Behavior, 'steps'> {
     builtIn?: BuiltIn;
@@ -41,8 +53,22 @@ export interface BehaviorView extends Omit<Behavior, 'steps'> {
 export interface ComboReachKey {layer: number; layoutIndex: number; fellThrough: boolean; whileHeld: boolean; reference?: boolean}
 /** Whether a combo fires from a layer: on `keys` under the smallest hold `held` (layer indexes) that covers all its inputs, or, when none does, the keys covering the most of them (`covered`). */
 export interface ComboReach {fires: boolean; covered: number; keys: ComboReachKey[]; held: number[]}
-export interface ComboView extends Combo {inputPositions?: number[]; /** The layers its output runs its behaviour on, judged from its last input's layer (core/model/participation.js). */ outputBehaviorLayers?: number; id: number; badge: string; inputDisplays: string[]; outputDisplay: string}
+export interface ComboView extends Combo {inputPositions?: number[]; /** The layers its output runs its behaviour on, judged from its last input's layer (core/model/participation.js). */ outputBehaviorLayers?: number;
+    /** The layers its output holds while it is held, ascending: such a combo shows no combo light, its layers' own light showing the hold (core/model/layer-effects.js comboHeldShows). */ holdsLayers?: number[];
+    /** The pointing slot its output runs, held or locked, which paints over its combo feedback; null when it runs none. */ runsPointing?: number | null; id: number; badge: string; inputDisplays: string[]; outputDisplay: string}
 export interface CatalogEntry {value: string; key: string; label: string; group: string; aliases: string[]; keycode: number; searchTerms: string[]; search: string; searchCompact: string; name?: string; tip?: string; /** False for an entry the keycode picker never offers (core/data/offered-keycodes.js). */ offered?: boolean}
+/** One input of a text replacement entry (a typo, in the firmware's and these contracts' names): its letters as stored (folded), which name it in an edit; as it is written, with `*` where other letters may go; and what will misbehave about it, in words. */
+export interface AutocorrectTypo {typo: string; input: string; warnings: string[]}
+/** One text replacement entry: what names it among the entries (`id`), what it is called wherever a replacement is listed (`label`: its text, or its macro's name after the mark of one that plays), its replacement (a correction, in the firmware's names) as text, or '' with the macro slot it plays, all its inputs, and what will misbehave about the entry, in words. */
+export interface AutocorrectEntry {id: string; label: string; correction: string; macro?: number; /** How it fires (D-L91): as you type, after the Leader key, or both. */ fires: import('./edits.js').AutocorrectTrigger; typos: AutocorrectTypo[]; warnings: string[]}
+/** The text replacement list as its screen draws it (core/model/autocorrect-editor.js): entries in stored order; what the list uses against what the keyboard holds (`share`, 0 to 1, its bytes of its own limit, which both memory meters draw; `free`, the bytes it can still grow by, bounded by its text's ceiling and the profile's shared room too; `textMax` the bytes in one input, `correctionMax` in one replacement's text; `shortInput`, the letters under which an input with `*` is warned about); what the chosen host layout cannot type, said once with what to do; and that layout's name. */
+export interface AutocorrectView {
+    entries: AutocorrectEntry[];
+    usage: {corrections: number; typos: number; /** The inputs of replacements that fire after the Leader key. */ leaders: number; maxTypos: number; textBytes: number; /** The bytes of text, replacements and inputs together, the keyboard holds for the list: the memory both meters draw. */ maxTextBytes: number; share: number; free: number; textMax: number; correctionMax: number; shortInput: number};
+    notices: string[];
+    /** The host layout entries are checked against, by name. */
+    layoutName: string;
+}
 export interface MacroSlot {keycode: string; name: string; /** What it is called while it has no name of its own. */ defaultName: string; payload: string; protection: 'auto' | 'on' | 'off'; uninterruptible: boolean; needsUnicodeEntry: boolean; needsUnicodeSetup: boolean; playbackError: string; playbackCode: string; empty: boolean; bytes: number; playable: boolean; available: boolean; roomTaps: number}
 /** A custom key's shortcut (firmware D-F26): a HID report modifier mask (bit 0 Left Ctrl … bit 7 Right GUI), its keys in press order (at most six, each once, at most one media and one system key), a mask of the layers it turns on, and how it turns them on (`layerKind`: 0 hold, 1 lock, 2 move to, 3 tap-toggle, 4 one-shot; 0 without layers). */
 export interface CustomKeyShortcut {mods: number; keys: number[]; layers: number; layerKind: number}
@@ -57,10 +83,10 @@ export interface ShortcutLayerTarget {layer: number; refusal: string; alwaysOn: 
 /** A layer that starts a slot's mode as the keyboard runs its link, and the layers whose being on ends a start from it, bit n layer n (0: nothing does; core/model/pointing-links.js linkStarts). */
 export interface PdLinkStart {layer: number; ends: number}
 export interface PdLinkTarget {layer: number; refusal: string; inert: 'default' | 'pointer' | ''; linkedBy: number | null; linkedByName: string}
-/** `shortcutLabel` names the shortcut in the host's words ("Left Ctrl + Right Alt + K"), empty for none. */
+/** `shortcutLabel` names the shortcut in the host's words ("Ctrl+Right Alt+K", the left modifiers unmarked, D-L83), empty for none. */
 export interface CustomKey {
-    slot: number; keycode: string; code: number; name: string; hasBehavior: boolean; shortcut: CustomKeyShortcut;
-    /** The whole shortcut in words: modifiers, keys, then layers, joined by " + ", the layers led by their kind's verb unless held ("Lock Navigation"). */
+    slot: number; keycode: string; code: number; name: string; /** What it is called while it has no name of its own ("Custom key 3"). */ defaultName: string; hasBehavior: boolean; shortcut: CustomKeyShortcut;
+    /** The whole shortcut in words: modifiers, keys, then layers, joined by "+", the layers led by their kind's verb unless held ("Lock Navigation"). */
     shortcutLabel: string;
     /** What it sends, one part each: modifiers in the host's words, then each key in press order; empty for layers alone. */
     shortcutKeys: string[];
@@ -106,21 +132,22 @@ export interface LiveKeyboardView {
     /** How long Live edit waits before the keyboard saves, in words ("3 seconds"; core/model/vocabulary.js quietWords). */
     quietWords: string;
 }
-export interface LedGroup {name: string; id: number; ledIndices: number[]; expression: string; usageCount: number; usages: {target: string; owner: string}[]}
-export interface LedRow {index: number; owner: string; color: Colour; ledGroup: string; ledGroupKind: string; ledIndices: number[]; /** For a layer LED group that one layer owns, that layer. */ ownerLayer?: number}
+/** An accent (D-L77): its place in its table, who it lights for, its colour (HSV(0, 0, 0) takes its stage's) and the LEDs it lights, by index and in core's words. */
+export interface Accent {index: number; owner: string; color: Colour; ledIndices: number[]; leds: string; /** For a layer's own accent, that layer. */ ownerLayer?: number}
 export interface RgbView {
     stageEnableMask: number;
     stages: {id: string; label: string; bit?: number; enabled: boolean}[];
-    ledGroups: LedGroup[];
     layerColors: {layer: LayerReference; layerId: number; color: Colour; mode: string}[];
-    layerLedGroups: LedRow[];
+    layerAccents: Accent[];
     automouseFade: {mode: string; end_color: Colour};
     pdModeColors: {pointingMode: string; color: Colour; locality: string}[];
-    pdModeLedGroups: LedRow[];
+    pdModeAccents: Accent[];
     comboFeedback: {color: Colour; locality: string};
-    comboFeedbackLedGroups: LedRow[];
+    comboAccents: Accent[];
     keyBehaviorFeedback: KeyFeedback<Colour>;
-    keyBehaviorFeedbackLedGroups: LedRow[];
+    keyFeedbackAccents: Accent[];
+    autocorrectFeedback: AutocorrectFeedback<Colour>;
+    autocorrectFeedbackAccents: Accent[];
 }
 export interface BaseRgbView {state: string; message?: string; enabled?: boolean; effectId?: number; hue?: number; saturation?: number; brightness?: number; speed?: number; readAt?: string; effectName?: string; brightnessPercent?: number; previewColor?: Colour}
 /** The fields every model of a build starts from, posted once as the catalog (core/model/profile-model.js panelCatalog). */
@@ -142,14 +169,14 @@ export interface PublishedModel {
     layers: Layer[];
     hostLayoutLegends: Record<string, string[]> | null;
     /** `pointerCovers`: the layers the slot's key turns on that the pointer layer covers while the mode keeps it, bit n layer n (core/model/pointing-links.js). */
-    pdModes: (PointingSlot & {displayName: string; keys: {slot: number; hold: string; lock: string; holdCode: number; lockCode: number}; pointerCovers: number; linkStarts: PdLinkStart[]})[];
+    pdModes: (PointingSlot & {displayName: string; /** What it is called while it has no name of its own ("Pointing mode 3"). */ defaultName: string; keys: {slot: number; hold: string; lock: string; holdCode: number; lockCode: number}; pointerCovers: number; linkStarts: PdLinkStart[]})[];
     pdModeEditing: {writable: boolean; dpiChoices: {value: number; label: string}[]; tapKeys: {plain: string[]; modified: string[]};
         /** Every layer as a link target (core/model/pointing-links.js): why the keyboard would ignore it in a link ("" when it would not), and the slot whose link names it. */
         linkTargets: PdLinkTarget[];
         /** The pointer layer, which names what covers a slot's `pointerCovers`. */
         pointerLayer: number | null};
     keyBehaviors: BehaviorView[];
-    behaviorEditing: {busy: boolean; writable: boolean; maxTapStepsPerBehavior: number; keyDefaults: Record<string, KeyBehaviorDefaults>};
+    behaviorEditing: {busy: boolean; writable: boolean; maxTapStepsPerBehavior: number; keyDefaults: Record<string, KeyBehaviorDefaults>; cellPatterns: Record<string, EmptyCell>[]};
     profileIdentity: Partial<BaseIdentity> | null;
     rgb: Partial<RgbView> & {maximumBrightness?: number; baseEffect: BaseRgbView};
     combos: ComboView[];
@@ -166,6 +193,9 @@ export interface PublishedModel {
     macroUnicode: {mode: number; enabled?: boolean; os?: number; layout?: number; layoutFits?: boolean; layoutName?: string; layoutChars?: string; entry?: string};
     macroProtectionChoices: {value: 'auto' | 'on' | 'off'; label: string}[];
     macroEditing: {identity: string; writable: boolean};
+    /** The autocorrect list (firmware D-F68), or null until a complete profile is read. */
+    autocorrect: AutocorrectView | null;
+    autocorrectEditing: {identity: string; writable: boolean};
     behaviorTimingDefaults: Record<string, string>;
     configDefaults: PresentedSection[];
     participation: Participation | null;
@@ -212,7 +242,7 @@ export interface PublishedModel {
     apply: ApplyView | null;
     /** Core always sets `progress`, possibly undefined, which a JSON transport drops. */
     postApplyRead: {step: import('./messages.js').ReadStep; progress?: import('./model.js').CountedProgress | null} | null;
-    portable: {available: boolean; busy: boolean; progress?: string; review: {incoming: ProfileSummary; current?: ProfileSummary | null; fileName: string | null; differences: import('./model.js').ReviewSummary[] | null; /** The file's profile bytes against this keyboard's memory. */ fits?: {used: number; capacity: number} | null} | null; layers: {key: string; order: number[]; names: string[]; /** Each layer as a person reads it: its name, or core's words for an unnamed one. */ titles: string[]; keysFollow: boolean} | null; usage: ProfileUsage | null; /** When the copy from before the last Apply on this keyboard was saved; Put back what it had uses it. */ putBack: string | null};
+    portable: {available: boolean; busy: boolean; progress?: string; review: {incoming: ProfileSummary; current?: ProfileSummary | null; fileName: string | null; differences: import('./model.js').ReviewSummary[] | null; /** The file's profile bytes against this keyboard's memory. */ fits?: {used: number; capacity: number} | null; /** Present when the file is a VIA layout. */ via?: import('./model.js').ViaImportView | null} | null; layers: {key: string; order: number[]; names: string[]; /** Each layer as a person reads it: its name, or core's words for an unnamed one. */ titles: string[]; keysFollow: boolean} | null; usage: ProfileUsage | null; /** When the copy from before the last Apply on this keyboard was saved; Put back what it had uses it. */ putBack: string | null};
     shell: ShellPanel;
     load: LoadView;
     /** A renamed keyboard that disconnected to take its new name, which the panel waits to see again. */
@@ -226,6 +256,8 @@ export interface PublishedModel {
     liveProposal: {id: number; label: string | null; checks: import('./model.js').Check[]} | null;
     /** Ark's own live edit or Revert, held by the keyboard until no key is held: what to do, what holds it, and whether Cancel edit is offered (never for a Revert). */
     liveWait: {title: string; detail: string; cancellable: boolean} | null;
-    /** Toggles a key turned off over a stored "on": shown as turned off by key, never as a change. */
-    runtime: {combosOffByKey: boolean; behavioursOffByKey: boolean} | null;
+    /** Each global switch a switch key turned off over a stored "on": shown as turned off by key, never as a change. Null without a keyboard's runtime read. */
+    offByKey: Readonly<Record<import('./model.js').SettingOffSwitch, boolean>> | null;
+    /** Whether the connected keyboard is replacing text now, as it reports it: its stored switch on and no key holding it off. False with no keyboard, and in the demo. */
+    autocorrectRunning: boolean;
 }

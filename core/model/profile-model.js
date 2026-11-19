@@ -13,24 +13,26 @@
 // be a lie about what the keyboard is running.
 
 const {PD_MODE_KEYS, formerNames, pdModeKeyOfCode} = require("../data/pd-mode-keys");
-const {VOCABULARY, layerName, slotName} = require("./vocabulary");
+const {TEXT_REPLACEMENT_KEYS, VOCABULARY, layerName, pointingDefaultName, slotName} = require("./vocabulary");
 const {comboOutputBehaviorLayers, participation} = require("./participation");
 const {comboReferenceLayers, publishedComboReach} = require("./combo-reach");
 const keycodeCatalog = require("../data/keycode-catalog");
 const {offered} = require("../data/offered-keycodes");
 const keycodes = require("../schema/keycodes");
 const keycodeLegacy = require("../data/keycode-legacy");
-const {behaviorRowsForView, builtInForView, comboRowsForView, rgbForView} = require("./device-profile-view");
+const {behaviorRowsForView, builtInBranches, comboRowsForView, rgbForView} = require("./device-profile-view");
+const {emptyCells} = require("./empty-cells");
 const {dualRole, effectiveTimings, holdTermSetting} = require("./gesture-timing");
 const {timingAlone} = require("./inert-behaviors");
-const {compactKeyLabels, heldModifierWords, hostKeyVocabulary, keyKind, keyLabel, keyLayer, keyLayerForm, layerModWords, layerTapWords, profileKeyNames, shortcutAct, shortcutKeys, shortcutLabel, shortcutLayerNames} = require("./key-names");
-const {keycodeAction, knownActionAbi, layerRef, nativeCode} = require("../schema/actions");
+const {SWITCH_KEY_FAMILIES, compactKeyLabels, heldModifierWords, hostKeyVocabulary, keyKind, keyLabel, keyLayer, keyLayerForm, layerModWords, layerTapWords, profileKeyNames, shortcutAct, shortcutKeys, shortcutLabel, shortcutLayerNames} = require("./key-names");
+const {LEADER_KEY_NAME, QMK_SWITCH_KEY_NAMES, keycodeAction, knownActionAbi, layerRef, nativeCode} = require("../schema/actions");
 const {dpiChoices} = require("./pointer-dpi");
 const {pointingTapKeys} = require("./pointing-taps");
 const {linkStarts, linkTargets, pointerCoveredLayers} = require("./pointing-links");
-const {keycodeLayersOn} = require("./layer-effects");
+const {comboHeldShows, keycodeLayersOn} = require("./layer-effects");
 const {settingsEditorView} = require("./settings-editor");
 const {macroEditorView} = require("./macro-editor");
+const {autocorrectEditorView} = require("./autocorrect-editor");
 const {customKeyEditorView} = require("./custom-key-editor");
 const {runningComboRows} = require("../schema/combo-domain-v1");
 const {SETTING, SHORTCUT_KEY_LIMITS, alwaysOnLayers} = require("../schema/settings-domain-v1");
@@ -52,19 +54,21 @@ const CATALOG_SOURCE = "vendored QMK keycode catalog";
  * @property {ReturnType<typeof import("./device-profile-view.js").baseRgbForView>} baseEffect
  * @property {ReturnType<typeof settingsEditorView> | null} [settingsView]
  * @property {ReturnType<typeof macroEditorView> | null} [macroView]
+ * @property {ReturnType<typeof autocorrectEditorView> | null} [autocorrectView]
  * @property {ReturnType<typeof customKeyEditorView> | null} [customKeyView]
  * @property {ReturnType<typeof import("./keyboard-name.js").keyboardNameView>} [keyboardNameView]
  * @property {Partial<import("../../contracts/edits.js").BaseIdentity> | null} identity
- * @typedef {{busy: boolean, behaviors: boolean, pointing: boolean, combos: boolean, macros: boolean, settings: boolean, customKeys: boolean}} Editing
+ * @typedef {{busy: boolean, behaviors: boolean, pointing: boolean, combos: boolean, macros: boolean, autocorrect: boolean, settings: boolean, customKeys: boolean}} Editing
  * @typedef {{actionAbiDigest?: number, maxTapStepsPerBehavior?: number} | null | undefined} Capabilities
  * @typedef {import("../../contracts/panel.js").CatalogEntry} CatalogEntry
  */
 
-// The three editor views of a complete snapshot, built here only: the
+// The four editor views of a complete snapshot, built here only: the
 // service keeps them for the profile it read, and a draft builds its own.
 /** @param {import("./types.js").ProfileSnapshot} snapshot @param {import("./types.js").ProfileDestination} [capabilities] */
 function editorViews(snapshot, capabilities) {
     return {settingsView: settingsEditorView(snapshot), macroView: macroEditorView(snapshot, capabilities),
+        autocorrectView: autocorrectEditorView(snapshot, capabilities),
         customKeyView: customKeyEditorView(snapshot, capabilities)};
 }
 
@@ -130,6 +134,13 @@ function profileModel(content, capabilities, editing) {
         present(code, {value: name, key: name, label, group: "Custom keys", aliases: [native], keycode: code, searchTerms: [name, label], search: `${name} ${label}`.toLowerCase(), searchCompact: `${name}${label}`.toLowerCase(),
             tip: does ? `${label} · ${does}` : `${label} · no shortcut`});
     }
+    // So is each switch key for behaviours and for auto-mouse, in a group of
+    // its own, on firmware whose vocabulary has them; the picker puts them
+    // beside QMK's switch keys for combos.
+    if (knownActionAbi(capabilities?.actionAbiDigest ?? 0)) for (const [family, codeOf] of SWITCH_KEY_FAMILIES) for (const name of family) {
+        const code = /** @type {number} */ (codeOf(name)), native = keycodes.resolve(code).name, label = names.labels[name];
+        present(code, {value: name, key: name, label, group: "Switch keys", aliases: [native], keycode: code, searchTerms: [name, label], search: `${name} ${label}`.toLowerCase(), searchCompact: `${name}${label}`.toLowerCase()});
+    }
     // Every keycode the profile holds is in the table by its name here, so the
     // interface names any of them by keycode and never composes a name itself:
     // a layer-tap cannot be listed ahead of time, one per layer and tap key.
@@ -157,7 +168,8 @@ function profileModel(content, capabilities, editing) {
     // and custom key's, by every name the interface reads it under, so the
     // interface says which keys reach a mode its layers start without
     // working out what a keycode does (layer-effects.js keycodeLayersOn).
-    const turnsOn = keycodeLayersOn(linkSettings ? {settings: linkSettings, pdModes: content.domains.pdModes || []} : {settings: {values: [], names: [], customKeyShortcuts: []}, pdModes: []});
+    const linkProfile = linkSettings ? {settings: linkSettings, pdModes: content.domains.pdModes || []} : {settings: {values: [], names: [], customKeyShortcuts: []}, pdModes: []};
+    const turnsOn = keycodeLayersOn(linkProfile);
     /** @type {Record<string, number>} */
     const keyTurnsOn = {};
     const pointingKeys = PD_MODE_KEYS.flatMap((keys) => [keys.holdCode, keys.lockCode]);
@@ -173,7 +185,11 @@ function profileModel(content, capabilities, editing) {
     const keyKinds = sharedRecord(keyKindsByName(catalog.aliases), base.catalog.qmkKeyKinds);
     const layers = layersForView(content.layers, catalog.labels, catalog.aliases, names, content.domains.settings?.values ? alwaysOnLayers(content.domains.settings.values) : 1);
     const outputLayers = comboOutputBehaviorLayers(content.domains.settings, content.domains.keyBehaviors?.rows || []);
-    const combos = comboRowsForView(content.comboRows, catalog.labels).map((combo, index) => ({...combo, outputBehaviorLayers: outputLayers(content.comboRows[index])}));
+    // What holding each combo shows instead of its combo feedback: the layers
+    // its output holds, or the pointing mode it runs (layer-effects.js).
+    const heldShows = comboHeldShows(linkProfile);
+    const combos = comboRowsForView(content.comboRows, catalog.labels).map((combo, index) =>
+        ({...combo, outputBehaviorLayers: outputLayers(content.comboRows[index]), ...heldShows(content.comboRows[index].output)}));
     // Which layer's keys combos match while each layer is on top
     // (combo-reach.js): the profile's records, else the keyboard's readback.
     const references = comboReferenceLayers(content.settingsView?.comboReferences, content.comboInfo?.layerReferences);
@@ -195,7 +211,7 @@ function profileModel(content, capabilities, editing) {
         // key turns on that the pointer layer covers (model/pointing-links.js),
         // and the layers that start its mode, each with the layers that end a
         // start from it (model/pointing-links.js linkStarts).
-        pdModes: (content.domains?.pdModes || []).map((slot) => ({...slot, displayName: slotName(slot), keys: PD_MODE_KEYS[slot.id],
+        pdModes: (content.domains?.pdModes || []).map((slot) => ({...slot, displayName: slotName(slot), defaultName: pointingDefaultName(slot.id), keys: PD_MODE_KEYS[slot.id],
             pointerCovers: linkSettings ? pointerCoveredLayers(linkSettings, slot) : 0, linkStarts: linkSettings ? linkStarts(linkSettings, slot) : []})),
         pdModeEditing: {writable: editing.pointing,
             dpiChoices: dpiChoices({normalSpeed: true}),
@@ -212,7 +228,7 @@ function profileModel(content, capabilities, editing) {
             busy: editing.busy,
             writable: editing.behaviors,
             maxTapStepsPerBehavior: capabilities?.maxTapStepsPerBehavior || 5,
-            keyDefaults: behaviorDefaults(content, capabilities, catalog.aliases, names),
+            ...behaviorDefaults(content, capabilities, catalog.aliases, names),
         },
         profileIdentity: content.identity,
         rgb: {...(content.domains.rgb ? rgbForView(content.domains.rgb) : {}),
@@ -232,6 +248,9 @@ function profileModel(content, capabilities, editing) {
         macroUnicode: content.macroView?.unicode || {mode: 0},
         macroProtectionChoices: content.macroView?.protectionChoices || [],
         macroEditing: {identity: content.macroView?.identity || "", writable: editing.macros},
+        autocorrect: content.autocorrectView ? {entries: content.autocorrectView.entries, usage: content.autocorrectView.usage,
+            notices: content.autocorrectView.notices, layoutName: content.autocorrectView.layoutName} : null,
+        autocorrectEditing: {identity: content.autocorrectView?.identity || "", writable: editing.autocorrect},
         behaviorTimingDefaults: content.settingsView?.timing || {},
         configDefaults: content.settingsView?.sections || [],
         participation: content.domains.settings?.values && content.domains.settings.layers ? participation(content.domains.settings).view() : null,
@@ -405,24 +424,40 @@ function behaviorFeatures(content) {
 // saved rows. Publish presentation only; these are not profile behaviours.
 // Every keycode the profile holds has them, and so does every custom key,
 // placed or not: Custom keys edits the behaviour of a key on no layer yet.
-/** @param {Configuration} content @param {Capabilities} capabilities @param {Record<string, string>} aliases @param {import("../../contracts/model.js").ProfileKeyNames} names @returns {import("../../contracts/panel.js").PublishedModel["behaviorEditing"]["keyDefaults"]} */
+// What every key runs on with no row of its own, and, apart, its empty grid
+// cells (empty-cells.js). Keys of the same kind have the same cells, so each
+// set is published once in `cellPatterns` and a key names its own by index.
+/** @param {Configuration} content @param {Capabilities} capabilities @param {Record<string, string>} aliases @param {import("../../contracts/model.js").ProfileKeyNames} names @returns {Pick<import("../../contracts/panel.js").PublishedModel["behaviorEditing"], "keyDefaults" | "cellPatterns">} */
 function behaviorDefaults(content, capabilities, aliases, names) {
     const defaults = content.settingsView?.timing || {};
     const values = [defaults.tappingTerm, defaults.tapHoldTerm, defaults.longHoldTerm, defaults.multiTapTerm];
     const features = behaviorFeatures(content);
     const customKeys = (content.customKeyView?.keys || []).map(key => key.code);
-    return Object.fromEntries([...new Set([...profileKeycodes(content, capabilities), ...customKeys])].filter(code => code > 1).map(code => {
+    /** @type {Record<string, import("../../contracts/panel.js").EmptyCell>[]} */
+    const cellPatterns = [];
+    /** @type {Map<string, number>} */
+    const patternAt = new Map();
+    /** @param {Record<string, import("../../contracts/panel.js").EmptyCell>} cells */
+    const pattern = (cells) => {
+        const key = JSON.stringify(cells);
+        if (!patternAt.has(key)) patternAt.set(key, cellPatterns.push(cells) - 1);
+        return /** @type {number} */ (patternAt.get(key));
+    };
+    /** @type {Record<string, import("../../contracts/panel.js").KeyBehaviorDefaults>} */
+    const keyDefaults = Object.fromEntries([...new Set([...profileKeycodes(content, capabilities), ...customKeys])].filter(code => code > 1).map(code => {
         const target = keycodeAction(code);
         const name = keycodes.resolve(code).name;
         const timing = effectiveTimings({target}, values, features.customKeyShortcuts);
         // Where each default comes from, named for the editor's placeholders.
         // A key follows the same one with or without a row (firmware D-F27).
         const source = holdTermSetting(target, features.customKeyShortcuts) === SETTING.TAPPING_TERM ? "tappingTerm" : "tapHoldTerm";
-        return [aliases[name] || name, {builtIn: builtInForView(target, features, names),
+        const builtIn = builtInBranches(target, features, names);
+        return [aliases[name] || name, {builtIn, cellPattern: pattern(emptyCells(builtIn)),
             timing: {tapHoldTerm: timing.hold, longHoldTerm: timing.long, multiTapTerm: timing.repeat},
             timingSources: {tapHoldTerm: source, longHoldTerm: "longHoldTerm", multiTapTerm: "multiTapTerm"},
             timingAlone: timingAlone(target, features.customKeyShortcuts)}];
     }));
+    return {keyDefaults, cellPatterns};
 }
 
 // What every model of a build starts from, built once and frozen: the
@@ -484,23 +519,31 @@ function catalogViews() {
     const entries = [];
     /** @type {Record<string, string>} */
     const labels = {};
+    /** @type {Readonly<Record<string, string | undefined>>} */
+    const reworded = TEXT_REPLACEMENT_KEYS;
     for (const entry of keycodeCatalog.entries()) {
-        const searchTerms = [entry.name, entry.label, ...entry.aliases].filter(Boolean);
+        // A key Ark words its own way keeps QMK's words among its search
+        // terms, so either name finds it.
+        const own = reworded[entry.name], label = own ?? entry.label;
+        const searchTerms = [entry.name, label, ...(own ? [entry.label] : []), ...entry.aliases].filter(Boolean);
         entries.push({
             value: entry.name,
             key: entry.name,
-            label: entry.label,
-            group: entry.group,
+            label,
+            // QMK's switch keys for combos and autocorrect are offered with
+            // the keyboard's own, in the one group the picker reads; the
+            // Leader key beside them, in text replacement's own (D-L91).
+            group: QMK_SWITCH_KEY_NAMES.includes(entry.name) ? "Switch keys" : entry.name === LEADER_KEY_NAME ? "Text replacement" : entry.group,
             aliases: entry.aliases,
             keycode: entry.value,
             searchTerms,
             search: searchTerms.join(" ").toLowerCase(),
             searchCompact: searchTerms.join("").toLowerCase(),
         });
-        labels[entry.name] = entry.label;
+        labels[entry.name] = label;
         for (const alias of entry.aliases) {
             if (!labels[alias]) {
-                labels[alias] = entry.label;
+                labels[alias] = label;
             }
         }
     }

@@ -13,7 +13,7 @@ import {stepMark, stepWord} from "../marks.mjs";
 import {vocabulary} from "../../view/vocabulary.mjs";
 import {inspectEdit} from "./validation.mjs";
 import {DONE, closesInPlace} from "../inline-editor.mjs";
-import {finishMacroHistoryGroup, rememberMacroEdit, selectedStepIds} from "./history.mjs";
+import {EMPTY_MACRO_FIELDS, finishMacroHistoryGroup, rememberMacroEdit, selectedStepIds} from "./history.mjs";
 
 // Like the board's deletion shortcut, consume Backspace before the shell turns
 // it into navigation. Keep normal editing keys inside form fields and dialogs.
@@ -35,14 +35,16 @@ export function macroStepShortcut(event) {
     return true;
 }
 
-/** @param {MacroSlot} slot @param {MacroStep[]} steps @param {boolean} [stage] @param {string | null} [group] */
-export function saveSteps(slot, steps, stage = false, group = null) {
+// `emptied` is Clear macro's: the slot's name and protection, which the
+// staged steps empty with them and an undo puts back.
+/** @param {MacroSlot} slot @param {MacroStep[]} steps @param {boolean} [stage] @param {string | null} [group] @param {import("../../state.js").MacroSlotFields} [emptied] */
+export function saveSteps(slot, steps, stage = false, group = null, emptied) {
     steps = focusSteps(slot, steps);
     const model = getModel();
     const {payload, error} = macroStepsInput(steps, model);
-    rememberMacroEdit(slot, payload, steps, group);
+    rememberMacroEdit(slot, payload, steps, group, emptied);
     const issues = sequenceIssues(steps, model, key => keyIdentity(model, key).label);
-    setMacroForm(slot.keycode, {steps, draft: payload, stepError: error || issues.find(Boolean) || "", cancelBlur: false});
+    setMacroForm(slot.keycode, {steps, draft: payload, stepError: error || issues.find(Boolean) || "", cancelBlur: false, ...(emptied ? {stageFields: EMPTY_MACRO_FIELDS} : {})});
     const raw = /** @type {HTMLTextAreaElement | null} */ (document.querySelector(`[data-raw-payload="${slot.keycode}"]`));
     if (raw && document.activeElement !== raw) raw.value = payload;
     inspectEdit(slot, stage);
@@ -58,6 +60,12 @@ export function focusSteps(slot, steps) {
     return identified;
 }
 
+// How many keys a key step's picker takes: a chord up to the keys the
+// keyboard tracks and the report's six besides its modifiers (firmware
+// D-F65), a press or release one.
+/** @param {MacroStep['kind']} kind */
+const pickLimits = kind => kind === "tap" ? {maxKeys: MAX_KEYS, heldToReport: true} : {maxKeys: 1};
+
 /** @param {import('../../../contracts/panel.js').PublishedModel} model @param {MacroSlot} slot @param {MacroStep[]} steps @param {MacroStep['kind']} kind */
 export function insertStep(model, slot, steps, kind) {
     /** @param {MacroStep} step */
@@ -71,7 +79,7 @@ export function insertStep(model, slot, steps, kind) {
     if (kind === "text") insert({kind, text: ""});
     else if (kind === "delay") insert({kind, delay: 120});
     else openPicker({title: stepKindName(model, kind), contextKeycode: slot.keycode,
-        mode: "list", seed: [], allowedKeys: model.macroPayloadKeycodes, maxKeys: kind === "tap" ? MAX_KEYS : 1,
+        mode: "list", seed: [], allowedKeys: model.macroPayloadKeycodes, ...pickLimits(kind),
         onPick: expression => insert({kind, keys: expression.split(",").map(key => key.trim()).filter(Boolean)}),
     });
 }
@@ -145,7 +153,7 @@ function paintTiles(node, model, slot, steps) {
             data-step-tile="${esc(index)}" data-step-id="${esc(step.focusId)}" data-act="macro-step:${esc(slot.keycode)}:${esc(step.focusId)}"
             draggable="${editable}" aria-pressed="${esc(selected)}" aria-label="${esc(title)}" ${issues[index] ? 'aria-invalid="true"' : ""} data-tip="${esc(title)}">
             <span class="macro-token-index" aria-hidden="true">${esc(index + 1)}</span><span class="macro-token-mark" aria-hidden="true">${stepMark(step.kind)}</span>
-            <span class="macro-token-label">${content}${step.kind === "delay" ? '<span class="macro-token-unit"> ms</span>' : ""}</span>
+            <span class="macro-token-label">${content}${step.kind === "delay" ? '<span class="macro-token-unit">ms</span>' : ""}</span>
             <span class="macro-token-kind">${esc(stepWord(model, step.kind, face.kind === "chord"))}</span>
             ${issues[index] ? '<span class="macro-token-error" aria-hidden="true">!</span>' : ""}</button>
             ${index < steps.length - 1 ? '<span class="macro-connector" aria-hidden="true">→</span>' : ""}</div>`);
@@ -225,7 +233,7 @@ function stepEditor(model, slot, steps, step, index, canEdit) {
         /** @type {HTMLElement | null} */ (document.querySelector(`[data-step-id="${CSS.escape(step.focusId || "")}"]`))?.focus();
     });
     /** @type {HTMLElement | null} */ (node.querySelector("[data-pick-step]"))?.addEventListener("click", () => openPicker({
-        title: label, contextKeycode: slot.keycode, mode: "list", seed: "keys" in step ? step.keys : [], allowedKeys: model.macroPayloadKeycodes, maxKeys: step.kind === "tap" ? MAX_KEYS : 1,
+        title: label, contextKeycode: slot.keycode, mode: "list", seed: "keys" in step ? step.keys : [], allowedKeys: model.macroPayloadKeycodes, ...pickLimits(step.kind),
         onPick: expression => {
             const next = macroForm(slot.keycode).steps ?? steps;
             saveSteps(slot, next.map((item, at) => at === index ? {...item, keys: expression.split(",").map(key => key.trim()).filter(Boolean)} : item), true); render();

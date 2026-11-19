@@ -1,22 +1,70 @@
 // @ts-check
 import {el} from "../../lib/dom.mjs";
 import {getModel, state} from "../../store.mjs";
+import {attachInfoMarks} from "../info-mark.mjs";
+import {benchHeightWith} from "../../lib/scroll.mjs";
 import {stageBase} from "./base.mjs";
 import {stageLayers} from "./layers.mjs";
 import {stageAuto} from "./auto.mjs";
 import {stagePointing} from "./pd.mjs";
 import {stageCombo} from "./combo.mjs";
 import {stageKey} from "./key.mjs";
-import {stageGroups} from "./groups.mjs";
+import {stageAutocorrect} from "./autocorrect.mjs";
+import {accentsOverview} from "./accents.mjs";
 
 // The bench chooses one surface; each stage owns its controls and listeners.
 /** @type {Readonly<Record<string, (model: import("../../../contracts/panel.js").PublishedModel) => HTMLElement>>} */
-const STAGES = Object.freeze({base: stageBase, layers: stageLayers, auto: stageAuto, pd: stagePointing, combo: stageCombo, key: stageKey, groups: stageGroups});
+const STAGES = Object.freeze({base: stageBase, layers: stageLayers, auto: stageAuto, pd: stagePointing, combo: stageCombo, key: stageKey, autocorrect: stageAutocorrect, accents: accentsOverview});
+
+// A stage's surface, its info marks wired. A global switch that keeps it
+// from painting is said on its stage bar (common.mjs), so the stage is laid
+// out the same either way.
+/** @param {import("../../../contracts/panel.js").PublishedModel} model @param {string} id */
+function surfaceOf(model, id) {
+    const surface = STAGES[id](model);
+    attachInfoMarks(surface);
+    return surface;
+}
+
+// The tallest stage with a list beside its editor sets Lighting's workbench
+// height for every tab, so switching stages never changes how tall the list
+// is, as the Keys workbench takes the Behaviours tab's (ui/keys/bench.mjs):
+// once the screen is on the page, the workbench takes its height with each
+// such stage in turn (benchHeightWith) and keeps the tallest. A stage's
+// height holds until the model, the width or what the stages show from the
+// panel's state changes, so a render that changes none of them lays out no
+// stage unseen.
+const LISTED = Object.freeze(["layers", "pd", "combo", "key", "autocorrect"]);
+/** @param {HTMLElement} surface */
+const holding = (surface) => { const box = el(`<div></div>`); box.appendChild(surface); return box; };
+/** @type {{model: object | null, key: string, heights: Map<string, number>}} */
+let measured = {model: null, key: "", heights: new Map()};
+/** @param {ParentNode} root */
+export function matchTallestStageHeight(root) {
+    const bench = /** @type {HTMLElement | null} */ (root.querySelector(".lighting-bench"));
+    const model = getModel();
+    if (!bench || !model) return;
+    const {accent, allSlotsShown, comboPreview, emptyLayersShown, feedbackRow, layer, layersOn, lightingGroupsShut, pointingSlot, replacementRow} = state;
+    const key = JSON.stringify([bench.clientWidth, accent, allSlotsShown, comboPreview, emptyLayersShown, feedbackRow, layer, layersOn, lightingGroupsShut, pointingSlot, replacementRow]);
+    if (measured.model !== model || measured.key !== key) measured = {model, key, heights: new Map()};
+    // The floor is rebuilt from the stages each time, never from the height
+    // the last render carried over (lib/scroll.mjs restoreBenchHeight), so an
+    // editor that grew the workbench for a while (an accent being added)
+    // gives the room back once it closes. Nothing paints between the two.
+    bench.style.minHeight = "";
+    let tallest = bench.getBoundingClientRect().height;
+    for (const stage of LISTED) {
+        if (stage === state.stage) continue;
+        const height = measured.heights.get(stage) ?? benchHeightWith(bench, holding(surfaceOf(model, stage)));
+        measured.heights.set(stage, height);
+        tallest = Math.max(tallest, height);
+    }
+    bench.style.minHeight = `${tallest}px`;
+}
 
 /** @param {HTMLElement} body */
 export function stageBody(body) {
     const model = getModel();
     if (!model) return;
-    const surface = Object.hasOwn(STAGES, state.stage) ? STAGES[state.stage] : undefined;
-    body.replaceChildren(surface?.(model) ?? el(`<div></div>`));
+    body.replaceChildren(Object.hasOwn(STAGES, state.stage) ? surfaceOf(model, state.stage) : el(`<div></div>`));
 }

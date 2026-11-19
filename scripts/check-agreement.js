@@ -144,6 +144,7 @@ function judge(contract, manifest, qmkRoot) {
         "layers": `${decoded.compiledLayerCount} of ${decoded.maxLogicalLayers}`,
         "custom keys": decoded.customKeySlots,
         "Profile macros": `${decoded.macroSlots} slots, ${decoded.macroBytes} bytes`,
+        "Autocorrect list": `${decoded.maxAutocorrectCorrections} corrections, ${decoded.maxAutocorrectTypos} typos, ${decoded.autocorrectBytes} bytes`,
         "feature flags": hex(decoded.featureFlags),
         "domains": `0x${decoded.supportedDomainMask.toString(16)}`,
     } : {};

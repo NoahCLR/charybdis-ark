@@ -1,4 +1,5 @@
 "use strict";
+const {CURRENT_CAPABILITIES} = require("../fixtures/portable-profile");
 const {profileLayers, editLayers} = require("../fixtures/profile-document");
 const test = require("node:test");
 const assert = require("node:assert/strict");
@@ -11,7 +12,7 @@ const {fingerprint, summary} = require("../../core/model/portable-profile");
 const {document} = require("../fixtures/pd-profile");
 const {FAILURE_WORDS} = require("../../core/model/vocabulary");
 
-const capabilities = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 3}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0x67df11b3, featureFlags: require("../../core/protocol/profile-wire-v1").PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES};
+const capabilities = CURRENT_CAPABILITIES;
 const snapshot = () => {
     const doc = document();
     return {document: doc, fingerprint: fingerprint(doc), summary: summary(doc), limits: {brightnessMax: 200}};
@@ -158,6 +159,17 @@ test("apply writes a recovery copy through the shell, then reads the keyboard ag
     assert.match(session.notice, /Recovery copy on Backups: \/recovery\/1\.json/);
     assert.match(session.notice, /both halves and verified/);
     assert.equal(session.resetDraftForms, true);
+});
+
+test("a recovery copy the browser's storage refuses stops the Apply, said as the storage's cause", async () => {
+    const session = sessionWithDraft(), draft = session.draft;
+    const h = {...shell(), saveRecovery: async () => {throw new DOMException("The quota has been exceeded.", "QuotaExceededError");}};
+    stage(session, {type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "KC_A"}]});
+    draft.review(draft.revision);
+    session.service.calls.length = 0;
+    await assert.rejects(draftControl(session, {type: "applyProfileDraft", draftRevision: draft.revision}, h),
+        (error) => error.code === "RECOVERY_STORAGE_FULL" && /Backups/.test(error.message) && error.storageError?.name === "QuotaExceededError");
+    assert.deepEqual(session.service.calls, ["restorePortableProfile"], "nothing is read back: the keyboard was not changed");
 });
 
 test("after Apply, Put back makes what the keyboard held before it the draft, one undoable step", async () => {
@@ -379,7 +391,7 @@ test("the layer panel's keys-follow toggle decides whether layer keys are renumb
         const after = draft.current.document;
         assert.deepEqual(profileLayers(after)[1].slice(2), profileLayers(before)[4].slice(2), "layer 4 moved to 1 with its keys");
         assert.equal(draft.current.summary.names[1], layer4Name, "its name moved with it");
-        assert.deepEqual(draft.order, [0, 4, 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], "the draft knows which layer each slot now holds");
+        assert.deepEqual(draft.order.layers, [0, 4, 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], "the draft knows which layer each slot now holds");
         const units = draft.changes().map((row) => row.unit);
         assert.equal(units.filter((unit) => unit === "layerOrder").length, 1, "the move is one item");
         if (keysFollow) assert.deepEqual(units.filter((unit) => unit.startsWith("layout:")).sort(), ["layout:0:0", "layout:0:1"], "only the keys edited before the move");

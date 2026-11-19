@@ -5,12 +5,13 @@
 // chooser, downloads, and the page itself for progress and errors. web/page.mjs starts it with the page's own globals; everything it
 // touches comes in through `env`, so it can be started with stand-ins.
 
-import {FILE_MAX_BYTES, FILE_TOO_LARGE, openPanelLoop, VOCABULARY, WebHidDeviceAdapter} from "./core.mjs";
+import {FILE_MAX_BYTES, FILE_TOO_LARGE, LIST_FILE_MAX_BYTES, LIST_FILE_TOO_LARGE, openPanelLoop, VOCABULARY, WebHidDeviceAdapter} from "./core.mjs";
 import {copyTitle} from "../webview/view/shell-panel.mjs";
 import {connectPanel} from "./panel-channel.mjs";
 import {nativePopups} from "./native-popups.mjs";
 import {openRecoveries} from "./recoveries.mjs";
 import {workerSleep} from "./sleep.mjs";
+import {TURN_CHANNEL, tabTurn} from "./tab-turn.mjs";
 
 // Why a tab cannot reach a keyboard at all (model.shell.blocked). `demo` says
 // the demo is still offered there: it needs no keyboard. A tab waiting on
@@ -51,18 +52,23 @@ export function initialTheme(saved, prefersLight) {
     return saved === "light" || saved === "dark" ? saved : prefersLight ? "light" : "dark";
 }
 
-// A chosen profile file as the loop takes it, refused when it is too large.
-/** @param {Pick<File, "size" | "text" | "name"> | undefined} file */
-export async function readProfileFile(file) {
+// The files a chooser offers and takes: a backup, or an autocorrect list in
+// one of its three formats (D-L85), each held to its own byte ceiling.
+const BACKUP_FILE = Object.freeze({accept: ".json,application/json", max: FILE_MAX_BYTES, tooLarge: FILE_TOO_LARGE});
+export const LIST_FILE = Object.freeze({accept: ".txt,.csv,.json,text/plain,text/csv,application/json", max: LIST_FILE_MAX_BYTES, tooLarge: LIST_FILE_TOO_LARGE});
+
+// A chosen file as the loop takes it, refused when it is too large for its
+// kind: a backup's ceiling unless another is given.
+/** @param {Pick<File, "size" | "text" | "name"> | undefined} file @param {{max: number, tooLarge: string}} [kind] */
+export async function readProfileFile(file, kind = BACKUP_FILE) {
     if (!file) return undefined;
-    // A chosen file is held to the backup's byte ceiling.
-    if (file.size > FILE_MAX_BYTES) throw new Error(FILE_TOO_LARGE);
+    if (file.size > kind.max) throw new Error(kind.tooLarge);
     return {text: await file.text(), name: file.name};
 }
 
 /** @param {import("./types.js").WebEnvironment} env */
 export function startWebShell(env) {
-    const {hid, locks, storage, indexedDB, localStorage, matchMedia, document, window, worker, build} = env;
+    const {hid, locks, BroadcastChannel: Channel, storage, indexedDB, localStorage, matchMedia, document, window, worker, build} = env;
     const recoveries = openRecoveries(indexedDB);
     const adapter = new WebHidDeviceAdapter({hid});
     /** @type {import("../contracts/model.js").ShellPanel["blocked"]} */
@@ -101,7 +107,7 @@ export function startWebShell(env) {
             return chosen;
         },
         saveExport: async (file) => {
-            download(document, window, file.fileName, file.text);
+            download(document, window, file.fileName, file.text, file.mime);
             return `${file.fileName} in your downloads`;
         },
         panel: () => ({chooseKeyboard: Boolean(hid) && !blocked, blocked, theme, recoveries: recoveryList, build, progress}),
@@ -113,10 +119,23 @@ export function startWebShell(env) {
     loop.watch({paused: nativePopups(document).paused});
     // A message whose handling failed still gets its answer, a notice; the
     // fault itself goes to the console for whoever looks into it.
-    const panel = connectPanel({receive, gesture, target: window, failed: (error) => {
+    const panel = connectPanel({receive: (message) => {faultSaid = false; return receive(message);}, gesture, target: window, failed: (error) => {
         console.error(error);
         loop.fail(error);
     }});
+    // A fault nothing caught, in the shell or the panel, is said the same
+    // way; the browser has put it in the console already. It is said once
+    // until the panel next posts, so a fault that drawing its notice raises
+    // again is not said again for ever.
+    let faultSaid = false;
+    /** @param {unknown} error */
+    const uncaught = (error) => {
+        if (faultSaid) return;
+        faultSaid = true;
+        try {loop.fail(error);} catch (also) {console.error(also);}
+    };
+    window.addEventListener("error", (event) => uncaught(/** @type {ErrorEvent} */ (event).error ?? /** @type {ErrorEvent} */ (event).message));
+    window.addEventListener("unhandledrejection", (event) => uncaught(/** @type {PromiseRejectionEvent} */ (event).reason));
 
     // Chrome opens its picker and file chooser only inside the click, so they
     // start here, before the message reaches the loop; the loop then waits
@@ -131,23 +150,45 @@ export function startWebShell(env) {
             choosing = chooseFile(document);
             choosing.catch(() => {});
         }
+        if (message?.type === "chooseAutocorrectFile") {
+            choosing = chooseFile(document, LIST_FILE);
+            choosing.catch(() => {});
+        }
     }
 
     // One tab holds the keyboard: the first to take the lock. Any other waits
-    // in line, and takes over when that one closes.
-    const holding = !hid ? Promise.resolve(false) : !locks ? Promise.resolve(true) : new Promise((resolve) => {
-        locks.request(LOCK, {ifAvailable: true}, (lock) => {
+    // in line, and takes over when that one closes. Where the browser refuses
+    // the lock (Chrome with site data blocked rejects the request), the tabs
+    // settle it among themselves (tab-turn.mjs), so the page never waits on a
+    // lock it cannot have; a browser with no way for them to do that goes on
+    // as one without locks does.
+    const takeOver = () => {
+        blocked = null;
+        void loop.handleMessage({type: "refresh"});
+    };
+    const giveWay = () => {
+        blocked = BLOCKED.otherTab;
+        loop.publish();
+    };
+    let refused = false;
+    /** @type {Promise<boolean>} */
+    const holding = !hid ? Promise.resolve(false) : !locks ? Promise.resolve(true) : new Promise((/** @type {(held: boolean | Promise<boolean>) => void} */ resolve) => {
+        Promise.resolve(locks.request(LOCK, {ifAvailable: true}, (lock) => {
             resolve(Boolean(lock));
             return lock ? new Promise(() => {}) : undefined;
+        })).catch(() => {
+            refused = true;
+            resolve(Channel ? tabTurn({channel: new Channel(TURN_CHANNEL), window, document, taken: takeOver, lost: giveWay}) : true);
         });
     }).then((held) => {
         if (held) return true;
         blocked = BLOCKED.otherTab;
-        locks?.request(LOCK, () => {
-            blocked = null;
-            void loop.handleMessage({type: "refresh"});
-            return new Promise(() => {});
-        });
+        if (!refused) {
+            locks?.request(LOCK, () => {
+                takeOver();
+                return new Promise(() => {});
+            });
+        }
         return false;
     });
 
@@ -242,23 +283,23 @@ function safely(read) {
 }
 
 // Chrome's file chooser, opened from the click that asked for it.
-/** @param {Document} document */
-function chooseFile(document) {
+/** @param {Document} document @param {{accept: string, max: number, tooLarge: string}} [kind] */
+function chooseFile(document, kind = BACKUP_FILE) {
     const input = document.createElement("input");
     input.type = "file";
-    input.accept = ".json,application/json";
+    input.accept = kind.accept;
     /** @type {Promise<File | undefined>} */
     const chosen = new Promise((resolve) => {
         input.addEventListener("change", () => resolve(input.files?.[0]), {once: true});
         input.addEventListener("cancel", () => resolve(undefined), {once: true});
     });
     input.click();
-    return chosen.then(readProfileFile);
+    return chosen.then((file) => readProfileFile(file, kind));
 }
 
-/** @param {Document} document @param {import("./types.js").WebEnvironment["window"]} window @param {string} name @param {string} text */
-function download(document, window, name, text) {
-    const url = window.URL.createObjectURL(new window.Blob([text], {type: "application/json"}));
+/** @param {Document} document @param {import("./types.js").WebEnvironment["window"]} window @param {string} name @param {string} text @param {string} [mime] */
+function download(document, window, name, text, mime = "application/json") {
+    const url = window.URL.createObjectURL(new window.Blob([text], {type: mime}));
     const link = document.createElement("a");
     link.href = url;
     link.download = name;

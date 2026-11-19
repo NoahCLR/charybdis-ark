@@ -17,9 +17,11 @@ import {formControls} from "./form-controls.mjs";
 import {movementChoice} from "./movement-choice.mjs";
 import {movement} from "./movement.mjs";
 import {lightRow, placeButton} from "./keys-and-light.mjs";
-import {startStep} from "./link.mjs";
+import {placedOnMarkup, showPlacements} from "../keys/reach.mjs";
+import {startInfo, startStep} from "./link.mjs";
 import {advancedControls} from "./advanced.mjs";
-import {tipFor, words} from "./common.mjs";
+import {step as pdStep} from "./step.mjs";
+import {choicesPart, tipFor, words} from "./common.mjs";
 
 /** @param {import("../../../contracts/panel.js").PublishedModel} model @param {import("../surface-types.js").PresentedSlot} slot @param {boolean} canEdit @param {import("../surface-types.js").PresentedSlot[]} slots */
 export function editor(model, slot, canEdit, slots) {
@@ -48,45 +50,47 @@ export function editor(model, slot, canEdit, slots) {
     const empties = slots.some((candidate) => !candidate.kind);
     const card = el(`<div class="card">
         <div class="card-h name-titlebar"><span class="mark-lg">${mark(model, {kind: "pointing", slot: slot.id})}</span>
-            ${titleName({f: `pointing:${slot.id}:name`, value: slot.name || "", placeholder: slot.displayName,
-                label: "Pointing mode name", perName: NAME_MAX_BYTES, canEdit})}
-            <span class="tag">Slot ${esc(slot.id)}</span>
+            ${titleName({f: `pointing:${slot.id}:name`, value: slot.name || "", placeholder: slot.defaultName,
+                label: words(model).fieldLabels.name, perName: NAME_MAX_BYTES, canEdit})}
+            <span class="tag">${esc(slot.defaultName)}</span>
             <span class="right row actions">
                 ${empties ? `<button class="btn tiny ghost" data-act="duplicate" ${canEdit ? "" : "disabled"}
                     data-tip="Copy this mode into the first empty slot.">Duplicate</button>` : ""}
-                <button class="btn tiny ghost" data-act="clear" ${canEdit ? "" : "disabled"}
+                <button class="btn tiny ghost destructive" data-act="clear" ${canEdit ? "" : "disabled"}
                     data-tip="Empty this slot. Keys bound to it stay on the board and do nothing until it holds a mode again.">Clear mode</button>
             </span></div>
-        <div class="card-b pd-steps"></div></div>`);
+        <div class="card-b pd-steps"><div class="slot-context">${placedOnMarkup(model, "pointing", String(slot.id),
+            "No key, behaviour, combo or layer starts this mode. Place it on a key to use it.")}</div></div></div>`);
     /** @type {HTMLElement} */ (card.querySelector(".right")).prepend(placeButton(slot, editGate(model, "keys").editable));
+    showPlacements(card, "pointing", String(slot.id));
     const nameInput = /** @type {HTMLInputElement} */ (card.querySelector("[data-name]"));
     form.name = () => nameInput.value.trim();
     // A rename stages the whole record, as every field of the mode does.
     attachTitleName(card, {stored: slot.name || "", perName: NAME_MAX_BYTES, rename: () => stage()});
 
     const steps = /** @type {HTMLElement} */ (card.querySelector(".pd-steps"));
-    /** @param {number} n @param {string} title @param {string} [hint] */
-    const step = (n, title, hint = "") => {
-        const node = el(`<section class="pd-step" aria-labelledby="pd-step-${esc(slot.id)}-${n}">
-            <div class="pd-step-h"><span class="pd-n" aria-hidden="true">${n}</span><h4 id="pd-step-${esc(slot.id)}-${n}">${esc(title)}</h4>${hint ? `<span class="note">${esc(hint)}</span>` : ""}</div>
-            <div class="pd-step-b"></div></section>`);
-        steps.append(node);
-        return /** @type {HTMLElement} */ (node.querySelector(".pd-step-b"));
-    };
+    /** @param {number} n @param {string} title @param {import("../info-mark.mjs").InfoContent} [info] */
+    const step = (n, title, info) => pdStep(steps, slot.id, n, title, {info});
+    const P = words(model);
     step(1, "What the ball does").append(movementChoice(model, slot.id, kind, {disabled: !canEdit,
         // Switching movement only redraws the form for the other kind: its
         // fields start empty, so staging now would post an invalid record.
         // The slot is staged once a field of the new form is changed.
         pick: (picked) => { state.pdKind = {slot: slot.id, kind: picked}; render(); }}));
-    step(2, scrolling ? "How it scrolls" : "What each direction sends", scrolling ? "" : "Click a key to change it.")
+    // What a step's choices mean is its info mark, read once, not each
+    // field's tip (D-L96).
+    step(2, scrolling ? "How it scrolls" : "What each direction sends", scrolling ? {rows: [{term: P.fieldLabels.scrollAxes, says: tipFor(model, "scrollAxes")}]} : {parts: [
+        choicesPart(model, "emptyDirection", P.fieldLabels.emptyDirection), choicesPart(model, "directionOutput", P.fieldLabels.directionOutput)]})
         .append(movement(model, slot, scrolling, controls, stage));
-    step(3, "What starts it").append(startStep(model, slot, controls, stage));
-    const runs = el(`<div class="pd-pair"></div>`);
-    runs.append(controls.choice("Pointer speed", dpiOptions(model.pdModeEditing?.dpiChoices, slot.dpi), slot.dpi ?? 0, "dpi",
+    step(3, "What starts it", startInfo(model, slot)).append(startStep(model, slot, controls, stage));
+    // The same four columns step 2 lays its fields in.
+    const runs = el(`<div class="pd-cols"></div>`);
+    const pointerLayer = controls.choice(P.pointerLayerLabel, P.pointerLayer, slot.pointerLayer, "pointerLayer");
+    pointerLayer.classList.add("span2");
+    runs.append(controls.choice(P.fieldLabels.dpi, dpiOptions(model.pdModeEditing?.dpiChoices, slot.dpi), slot.dpi ?? 0, "dpi",
         {tip: `${tipFor(model, "dpi")} Normal pointer speed keeps the DPI set in ${sectionPath(model, "normalPointerSpeed")}.`}),
-    lightRow(model, slot));
-    runs.append(controls.choice(words(model).pointerLayerLabel, words(model).pointerLayer, slot.pointerLayer, "pointerLayer", {tip: tipFor(model, "pointerLayer")}));
-    step(4, "While it runs").append(runs);
+    lightRow(model, slot), pointerLayer);
+    step(4, "While it runs", {parts: [choicesPart(model, "pointerLayer", P.pointerLayerLabel)]}).append(runs);
     wrap.append(card, advancedControls(model, slot, scrolling, controls));
 
     wrap.addEventListener("change", (event) => {

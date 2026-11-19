@@ -9,11 +9,12 @@ import * as edits from "../../view/edits.mjs";
 import {draftMarks, draftDot} from "../../view/review.mjs";
 import {reachAttrs, reachTable, rowPick} from "../groups.mjs";
 import {reachRowId, setReachGroupOpen} from "../../view/reach-groups.mjs";
-import {comboBadge, comboOutputMarked, keyNameMarked, keyNameText} from "../marks.mjs";
+import {comboBadge, comboInputChips, comboOutputMarked, keyNameMarked, keyNameText} from "../marks.mjs";
 import {vocabulary} from "../../view/vocabulary.mjs";
 import {keyMeaning, keyName} from "../../view/keyface.mjs";
 import {tabReach} from "../../view/tab-reach.mjs";
 import {comboBuilder} from "./combo-builder.mjs";
+import {masterOffBanner, underBanner} from "../participation.mjs";
 import {keysReach} from "./reach.mjs";
 
 /** @param {HTMLElement} body @param {HTMLElement} right */
@@ -23,15 +24,6 @@ export function tabCombos(body, right) {
     const canEdit = editGate(model, "combos").editable;
 
     right.replaceChildren();
-    // New combo opens the builder on a new combo; the builder closes itself
-    // (Cancel, Escape), so this never doubles as its close.
-    const building = state.combo.open && state.combo.editId === null;
-    const toggle = el(`<button class="btn tiny" data-act="new-combo" ${canEdit && !building ? "" : "disabled"}>New combo</button>`);
-    toggle.addEventListener("click", () => {
-        openComboBuilder(null, edits.comboDefaultWindowValue(model));
-        render();
-    });
-    right.appendChild(toggle);
 
     const node = el(`<div class="tab-split wide">
         <div id="comboTable"></div>
@@ -54,9 +46,9 @@ export function tabCombos(body, right) {
     const row = (group, entry, reachedBy) => {
         const combo = entry.combo;
         const requires = /** @type {("mustHold" | "mustTap" | "ordered")[]} */ (["mustHold", "mustTap", "ordered"]).filter((flag) => combo[flag]).map((flag) => vocabulary(model).comboOptions[flag]).join(" · ") || "—";
-        return `<tr${reachAttrs("combos", group, combo.id)} data-combo="${esc(String(combo.id))}"><td>${rowPick("combos", group, combo.id, `${comboBadge(model, combo.badge)}${changedCombos.has(combo.id) ? draftDot() : ""}`,
+        return `<tr${reachAttrs("combos", group, combo.id)} data-combo="${esc(String(combo.id))}"><td>${rowPick("combos", group, combo.id, `${comboBadge(model, combo.badge)}${changedCombos.has(combo.id) ? draftDot(model?.draft) : ""}`,
             `Combo ${combo.badge}: ${(combo.inputs || []).map((input) => keyNameText(model, input)).join(" + ")} sends ${keyNameText(model, combo.output)}`)}</td>
-            <td>${(combo.inputs || []).map((input, at) => `<span class="tok">${keyNameMarked(model, combo.inputDisplays?.[at] ?? input, input)}</span>`).join(" + ")}</td>
+            <td>${comboInputChips(model, combo)}</td>
             <td class="mono">${comboOutputMarked(model, combo)}</td>
             <td class="mono">${esc(combo.termMs ?? "")} ms${combo.followsDefault ? ` <span class="tag" data-tip="${esc(`Follows the default combo window (${vocabulary(model).settingsScreens.combos}), so it changes with it.`)}">default</span>` : ""}</td>
             <td class="muted">${esc(requires)}</td>
@@ -82,9 +74,10 @@ export function tabCombos(body, right) {
         ...reach.groups.map(({id, empty, entries}) => ({id, empty, drafted: entries.some((entry) => changedCombos.has(entry.combo.id)),
             rows: entries.map((entry) => row(id, entry, reachedBy(id, entry)))})),
     ];
+    const columns = vocabulary(model).comboFields;
     const comboTable = reachTable("combos", comboGroupRows, [
-        ["", "7%"], ["Inputs", "25%"], ["Sends", "21%"], ["Window", "10%"],
-        ["Conditions", "13%"], ["Reached by", "24%"]]);
+        ["", "7%"], [columns.inputs, "25%"], [columns.sends, "21%"], [columns.window, "10%"],
+        [columns.conditions, "13%"], ["Reached by", "24%"]], model?.draft);
     /** @type {HTMLElement} */ (node.querySelector("#comboTable")).replaceWith(comboTable);
 
     // A combo row is picked like any reach row — its keys ring on the board —
@@ -102,8 +95,18 @@ export function tabCombos(body, right) {
         }
         render();
     }));
+    // New combo heads the column the builder opens in, centred on the
+    // table's first group band. It stays put while the builder is open, off
+    // while that builder is a new combo's: it never doubles as its close
+    // (Cancel, Escape).
     const side = /** @type {HTMLElement} */ (node.querySelector("#comboSide"));
-    side.appendChild(state.combo.open ? comboBuilder(canEdit, () => edits.comboHoldTermValue(model, undefined)) : el(`<div class="empty-card">
-        <p class="note">Pick <b>New combo</b> to build one: choose what it sends, then click its input keys straight on the board.</p></div>`));
-    body.replaceChildren(node);
+    const building = state.combo.open && state.combo.editId === null;
+    const add = el(`<button type="button" class="new-tile" data-act="new-combo" ${canEdit && !building ? "" : "disabled"}><span aria-hidden="true">+</span>New combo</button>`);
+    add.addEventListener("click", () => {
+        openComboBuilder(null, edits.comboDefaultWindowValue(model));
+        render();
+    });
+    side.append(add, state.combo.open ? comboBuilder(canEdit, () => edits.comboHoldTermValue(model, undefined)) : el(`<div class="empty-card">
+        <p class="note">Pick <b>New combo</b> to build one: choose what it sends, then click its input keys straight on the board. Pick a combo in the list to edit it.</p></div>`));
+    body.replaceChildren(underBanner(masterOffBanner("combo"), node));
 }

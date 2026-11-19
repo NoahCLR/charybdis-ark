@@ -138,7 +138,7 @@ function writableKeyboard(options) {
                 assert.deepEqual(r, buildCandidateBeginRequest(id, {schemaMajor: r[5], schemaMinor: r[6], requestedDomains: r[7],
                     payloadLength: r.readUInt32LE(8), crc32: r.readUInt32LE(12), digest: r.readUInt32LE(16), actionAbiDigest: r.readUInt32LE(20)}));
                 assert.equal(r[5], C.SCHEMA_MAJOR); assert.equal(r[6], C.SCHEMA_MINOR);
-                assert.equal(r[7], 127); assert.equal(r.readUInt32LE(20), options.document.actionAbiDigest);
+                assert.equal(r[7], 255); assert.equal(r.readUInt32LE(20), options.document.actionAbiDigest);
                 assert.ok(r.subarray(24).every(byte => byte === 0), "BEGIN reserved bytes are zero");
                 candidate = Buffer.alloc(r.readUInt32LE(8)); transactionId = id; digest = r.readUInt32LE(16); checksum = r.readUInt32LE(12);
                 candidateState = S.RECEIVING; nextOffset = 0; operation = O.BEGIN; durable = false; activated = false; error = E.NONE; events.push("begin");

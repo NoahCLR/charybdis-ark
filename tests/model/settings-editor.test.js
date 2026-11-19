@@ -45,7 +45,7 @@ test("WinCompose setup links follow the effective Windows host and enabled Unico
         const {snapshot} = hostMacros(word, []);
         snapshot.hostOs.detected = detected;
         const host = settingsEditorView(snapshot).sections.find(section => section.id === "host");
-        assert.deepEqual(host.githubLink, visible ? {label: "WinCompose on GitHub", url: "https://github.com/samhocevar/wincompose"} : undefined,
+        assert.deepEqual(host.githubLink, visible ? {label: "WinCompose on GitHub", url: "https://github.com/ell1010/wincompose"} : undefined,
             `Host word ${word}, detected ${detected}`);
     }
 });
@@ -58,7 +58,7 @@ test("Defaults and inherited behaviour timing come entirely from the complete ke
     const current = snapshot(), view = settingsEditorView(current);
     assert.equal(view.brightnessMax, 200);
     const model = buildDeviceModel({settingsView: view, capabilities: {compiledLayerCount: 16}});
-    assert.equal(model.configDefaults.length, 14, "Combos, behaviours, the read-only macro host setup and All lighting each have a section");
+    assert.equal(model.configDefaults.length, 15, "Combos, behaviours, the read-only macro host setup, All lighting, the autocorrect switch and each feedback flash have a section");
     const fields = model.configDefaults.flatMap(section => section.fields);
     assert.equal(fields.find(field => field.macro === "volumeDpi"), undefined, "a pointing mode's speed is set on its slot, not in settings");
     assert.equal(fields.find(field => field.macro === "pointerLayer").value, "Layer 4");
@@ -74,11 +74,12 @@ test("Defaults and inherited behaviour timing come entirely from the complete ke
 test("every section names the screen it is edited on, and the pointer's own settings are Pointer's", () => {
     const areas = Object.fromEntries(settingsEditorView(snapshot()).sections.map(section => [section.id, section.area]));
     assert.deepEqual(Object.keys(areas).filter(id => areas[id] === "Pointer"), ["normalPointerSpeed", "sniping", "autoMouse"]);
-    assert.deepEqual(Object.keys(areas).filter(id => areas[id] === "Lighting"), ["automouseFade", "lightingPower", "rgbAppearance", "lightingFeedback"],
-        "lighting is set where it is coloured: the fade's timing, all lighting, the background effect and the feedback flash");
+    assert.deepEqual(Object.keys(areas).filter(id => areas[id] === "Lighting"), ["automouseFade", "lightingPower", "rgbAppearance", "lightingFeedback", "replacementFeedback"],
+        "lighting is set where it is coloured: the fade's timing, all lighting, the background effect and each feedback flash");
     const stages = Object.fromEntries(settingsEditorView(snapshot()).sections.map(section => [section.id, section.stage]));
-    assert.deepEqual([stages.automouseFade, stages.rgbAppearance, stages.lightingFeedback, stages.lightingPower], ["auto", "base", "key", undefined],
+    assert.deepEqual([stages.automouseFade, stages.rgbAppearance, stages.lightingFeedback, stages.replacementFeedback, stages.lightingPower], ["auto", "base", "key", "autocorrect", undefined],
         "a section is edited on its stage; All lighting darkens every stage, so it has none");
+    assert.equal(areas.autocorrect, "Settings", "text replacement's switch is a Settings one, as every switch is; its list is its own screen's");
     assert.ok(Object.values(areas).every(area => ["Pointer", "Lighting", "Settings"].includes(area)), "a section with no area of its own is a Settings one");
 });
 
@@ -177,6 +178,8 @@ test("invalid settings and incomplete sections fail before any device write", ()
     for (const value of ["", "1.5", "Infinity", "-1", "65536", " 150 "]) assert.throws(() => edit("keyTiming", {tapHoldTerm: value}));
     assert.throws(() => edit("normalPointerSpeed", {normalDpi: "500"}), /range/);
     assert.throws(() => edit("lightingFeedback", {feedbackFlash: "0"}), /range/);
+    assert.throws(() => edit("replacementFeedback", {replacementFlash: "0"}), /range/, "a replacement flash has a length");
+    assert.throws(() => edit("replacementFeedback", {replacementFlash: "65536"}), /range/);
     assert.throws(() => edit("lightingPower", {lightingTimeout: "86400001"}), /range/);
     const invalid = message(current, "keyTiming"); invalid.fields[0] = invalid.fields[1];
     assert.throws(() => draftEdit(current, invalid), /repeated/);
@@ -222,13 +225,12 @@ test("all native controls preserve a complete profile unchanged, including unkno
     const current = withSettings(settings => {settings.values[24] = 0x8004; settings.values[21] = 0xff1e0101;});
     for (const section of settingsEditorView(current).sections) assert.deepEqual(draftEdit(current, message(current, section.id)), current.document);
     const fields = settingsEditorView(current).sections.flatMap(section => section.fields);
-    assert.equal(fields.find(field => field.macro === "swapLeftAltGui").enabled, true);
-    assert.equal(fields.find(field => field.macro === "autocorrect").readOnly, true);
+    // Ark has no switch for QMK's key options (D-L102): Text replacement's
+    // is the one field on their word.
+    assert.deepEqual(fields.filter(field => field.id === 24).map(field => field.macro), ["autocorrect"]);
+    assert.equal(settingsEditorView(current).sections.some(({id}) => id === "keyboardOptions"), false, "Typing has no Key swaps & typing");
     assert.equal(fields.find(field => field.macro === "effectMode").choices[1].label, "Breathing");
     assert.equal(fields.find(field => field.macro === "effectMode").choices[0].label, "Solid colour", "spelled as the rest of the app spells colour");
-    const next = draftEdit(current, message(current, "keyboardOptions", {swapLeftAltGui:false, swapControlCaps:true}));
-    assert.equal(validateSnapshot(next).settings.values[24], 0x8001);
-    assert.throws(() => draftEdit(current, message(current, "keyboardOptions", {autocorrect:true})), /Not in this firmware/);
 });
 test("startup layers validate the final mask, and combo references edit only their layer's record", () => {
     const current = withSettings(() => {});
@@ -251,28 +253,6 @@ test("lighting choices only allow reported effects and LED classes, while preser
     delete current.options;
     assert.throws(() => draftEdit(current, message(current, "rgbAppearance", {effectMode:"2"})));
 });
-test("key options use masks supplied by the keyboard rather than assuming bitfield layout", () => {
-    const current = withSettings(settings => {settings.values[24] = 0x8000;});
-    current.options.keymapMasks[0] = 0x8000;
-    const field = settingsEditorView(current).sections.flatMap(section => section.fields).find(field => field.macro === "swapControlCaps");
-    assert.equal(field.enabled, true);
-    const next = draftEdit(current, message(current, "keyboardOptions", {swapControlCaps:false}));
-    assert.equal(validateSnapshot(next).settings.values[24], 0);
-});
-
-test("Key Options follows the effective host vocabulary, including unknown Auto and manual overrides", () => {
-    for (const [detected, selected, alt, gui] of [[0,0,"Alt","GUI"], [1,0,"Option","Command"], [2,0,"Alt","Windows"], [3,0,"Alt","Super"], [1,3,"Alt","Super"]]) {
-        const current = withSettings(settings => {settings.values[27] = selected;});
-        current.hostOs = {detected};
-        const fields = settingsEditorView(current).sections.find(({id}) => id === "keyboardOptions").fields;
-        const label = macro => fields.find(field => field.macro === macro).label;
-        assert.equal(label("swapLeftAltGui"), `Swap left ${alt} and ${gui}`);
-        assert.equal(label("swapRightAltGui"), `Swap right ${alt} and ${gui}`);
-        assert.equal(label("disableGui"), `Disable ${gui} keys`);
-        assert.equal(label("swapLeftControlGui"), `Swap left Ctrl and ${gui}`);
-    }
-});
-
 test("the Host section offers the effective OS's layouts", () => {
     const {document} = require("../fixtures/portable-profile");
     const {fingerprint} = require("../../core/model/portable-profile");
@@ -346,12 +326,68 @@ test("settings presentation owns combo timing words and explicit duration units"
         [["default", "Default combo window"], ["hold", "Combo hold threshold"]]);
     assert.ok(combos.comboTiming.every(field => field.hint));
     const fields = view.sections.flatMap(section => section.fields);
-    for (const macro of ["tappingTerm", "tapHoldTerm", "longHoldTerm", "multiTapTerm", "mouseTimeout", "mouseDebounce", "mouseDelay", "lightingTimeout", "feedbackFlash"]) {
+    for (const macro of ["tappingTerm", "tapHoldTerm", "longHoldTerm", "multiTapTerm", "mouseTimeout", "mouseDebounce", "mouseDelay", "lightingTimeout", "feedbackFlash", "replacementFlash"]) {
         assert.equal(fields.find(field => field.macro === macro).unit, "ms", macro);
     }
     for (const macro of ["normalDpi", "snipingDpi", "mouseThreshold", "hue", "brightness", "hostOs"]) {
         assert.equal(fields.find(field => field.macro === macro).unit, undefined, macro);
     }
+});
+
+// Switch keys override the three global switches until the keyboard restarts,
+// combos' with QMK's CM_*, behaviours' with the keyboard's BH_* and
+// auto-mouse's with its AM_* (firmware D-F66), so each says so and names the
+// switch whose "turned off by key" it shows; no key changes their layer
+// switches or the rest of auto-mouse.
+test("the behaviour, combo and auto-mouse switches say keyboard keys change them too, and name their switch", () => {
+    const sections = settingsEditorView(snapshot()).sections;
+    for (const [id, macro, offSwitch] of [["behaviorSettings", "behaviorsEnabled", "behaviour"], ["comboSettings", "combosEnabled", "combo"], ["autoMouse", "autoMouse", "autoMouse"]]) {
+        const fields = sections.find(section => section.id === id).fields;
+        assert.deepEqual(fields.filter(field => field.keyboardKeys).map(field => field.macro), [macro], id);
+        assert.deepEqual(fields.filter(field => field.offSwitch).map(field => [field.macro, field.offSwitch]), [[macro, offSwitch]], id);
+    }
+    assert.equal(sections.flatMap(section => section.fields).filter(field => field.offSwitch).length, 3, "no other field is a global switch before the key options are read");
+});
+
+// Text replacement's switch (autocorrect, to the keyboard) is key option 12,
+// stored with QMK's key options (firmware settings-domain.md) and drawn on the Typing
+// screen as a section of its own (D-L87), edited through the keyboard's own
+// mask.
+test("the text replacement switch is a Settings section of its own, saying where its list is as the combo switch does, and edits only its key option", () => {
+    const current = withSettings(settings => {settings.values[24] = 0x0004;});
+    const sections = settingsEditorView(current).sections;
+    const section = sections.find(({id}) => id === "autocorrect");
+    assert.deepEqual([section.area, section.label], ["Settings", "Text replacement"]);
+    assert.deepEqual(section.fields.map(field => [field.macro, field.kind, field.label, field.enabled, Boolean(field.readOnly)]), [["autocorrect", "toggle", "Enabled", false, false], ["leaderTimeout", "number", "Leader waits (ms)", true, false]]);
+    assert.equal(section.fields[0].hint, "Off, the keyboard types every word as you typed it and keeps your list. Replacements and their inputs are in Text replacement.");
+    // AC_ON, AC_OFF and AC_TOGG override it until the keyboard restarts
+    // (firmware D-F66), so it says so and names its switch.
+    assert.deepEqual([section.fields[0].keyboardKeys, section.fields[0].offSwitch], [true, "autocorrect"]);
+    assert.equal(sections.flatMap(entry => entry.fields).filter(field => field.offSwitch).length, 4);
+    const on = draftEdit(current, message(current, "autocorrect", {autocorrect: true}));
+    assert.equal(validateSnapshot(on).settings.values[24], 0x1004, "the other options stay");
+    current.options.keymapMasks[12] = 0x4000;
+    assert.equal(validateSnapshot(draftEdit(current, message(current, "autocorrect", {autocorrect: true}))).settings.values[24], 0x4004, "the keyboard's mask, not an assumed bit");
+    current.options.supportedKeymapOptions &= ~(1 << 12);
+    const unbuilt = settingsEditorView(current).sections.find(({id}) => id === "autocorrect").fields[0];
+    assert.deepEqual([unbuilt.readOnly, unbuilt.notBuilt, unbuilt.hint], [true, true, "Not in this firmware (does nothing)."]);
+    assert.throws(() => draftEdit(current, message(current, "autocorrect", {autocorrect: true})), /Not in this firmware/);
+    delete current.options;
+    assert.deepEqual(settingsEditorView(current).sections.find(({id}) => id === "autocorrect").fields.map(field => field.macro), ["leaderTimeout"], "nothing to switch before the keyboard's options are read");
+});
+
+// Under the switch, how long the leader waits (settings scalar 32, firmware
+// D-F71): 1000 to 10000 ms, typed in milliseconds like the keyboard's other
+// times, which the leader keeps whatever the switch says.
+test("the leader's wait is edited beside the switch in milliseconds, from 1000 to 10000, and changes only scalar 32", () => {
+    const current = withSettings(() => {});
+    const field = settingsEditorView(current).sections.find(({id}) => id === "autocorrect").fields.find(entry => entry.macro === "leaderTimeout");
+    assert.deepEqual([field.value, field.min, field.max, field.unit, field.presentation], ["2000", 1000, 10000, "ms", undefined]);
+    assert.match(field.hint, /works with the switch off/);
+    const longer = validateSnapshot(draftEdit(current, message(current, "autocorrect", {leaderTimeout: "3500"})));
+    assert.equal(longer.settings.values[32], 3500);
+    assert.deepEqual(longer.settings.values.slice(0, 32), validateSnapshot(current.document).settings.values.slice(0, 32), "nothing else moves");
+    for (const refused of ["999", "10001"]) assert.throws(() => draftEdit(current, message(current, "autocorrect", {leaderTimeout: refused})), undefined, refused);
 });
 
 // Settings v9: auto-sniping follows a set of layers beside its master switch,
@@ -370,4 +406,44 @@ test("auto-sniping is its switch and one switch per layer, saved as one layer ma
     const off = values({autoSniping: false, snipingOnLayer2: true});
     assert.deepEqual([off[8], off[9]], [0, (1 << 2) | (1 << 3)], "off keeps the layers chosen");
     assert.equal(values({snipingOnLayer3: false})[9], 0, "no layer at all is a set the keyboard stores");
+});
+
+test("a default that would put a behaviour's Long hold at or before its Tap / hold is refused, naming the behaviours it moves (D-L82)", () => {
+    const {editProfileDomains} = require("../../core/model/portable-profile");
+    const current = snapshot(), edit = (fields, from = current) => draftEdit(from, message(from, "keyTiming", fields));
+    // The defaults are 150 ms Tap / hold and 400 ms Long hold.
+    for (const [fields, long, hold] of [[{longHoldTerm: "150"}, 150, 150], [{tapHoldTerm: "400"}, 400, 400], [{tapHoldTerm: "300", longHoldTerm: "200"}, 200, 300]]) {
+        assert.throws(() => edit(fields), {message: `The long hold threshold, ${long} ms, must be later than the behaviour tap / hold threshold, ${hold} ms.`}, JSON.stringify(fields));
+    }
+    assert.equal(validateSnapshot(edit({longHoldTerm: "151"})).settings.values[2], 151);
+    // LGUI(KC_C) sets its own 300 ms Tap / hold: a Long hold default at or
+    // before it moves that behaviour, and is refused until its own timing changes.
+    const document = editProfileDomains(current.document, {}, open => { open("behaviors").rows[0].tapHoldTerm = 300; });
+    const own = {document, fingerprint: fingerprint(document), limits: current.limits};
+    assert.throws(() => edit({longHoldTerm: "250"}, own),
+        {message: "The behaviour on LGUI(KC_C): its Long hold threshold, 250 ms, must be later than its Tap / hold threshold, 300 ms. Change that behaviour's own timings first."});
+    assert.equal(validateSnapshot(edit({longHoldTerm: "301"}, own)).settings.values[2], 301);
+    // A profile the keyboard holds with the order reversed still takes other settings.
+    const reversed = editProfileDomains(current.document, {}, open => { open("behaviors").rows[0].tapHoldTerm = 500; });
+    const held = {document: reversed, fingerprint: fingerprint(reversed), limits: current.limits};
+    assert.equal(validateSnapshot(draftEdit(held, message(held, "autoMouse", {mouseTimeout: "900"}))).settings.values[6], 900);
+    assert.equal(validateSnapshot(edit({multiTapTerm: "200"}, held)).settings.values[3], 200);
+});
+
+test("each feedback flash has its own length: the behaviour flash interval and the replacement flash length edit one stored value each", () => {
+    const current = snapshot(), view = settingsEditorView(current);
+    const field = (section) => view.sections.find(entry => entry.id === section).fields[0];
+    const flash = field("replacementFeedback"), interval = field("lightingFeedback");
+    assert.deepEqual({macro: flash.macro, id: flash.id, label: flash.label, unit: flash.unit, min: flash.min, max: flash.max, value: flash.value, validate: flash.validate},
+        {macro: "replacementFlash", id: 31, label: "Flash length (ms)", unit: "ms", min: 1, max: 65535, value: "200", validate: "positive-int"});
+    assert.equal(flash.hint, "How long one flash lasts.");
+    assert.equal(flash.tooltip, "Leader waiting is no flash: it holds for as long as the leader waits (Leader waits, in Typing settings → Text replacement).", "Leader waiting holds rather than flashes (D-L92)");
+    assert.doesNotMatch(interval.hint, /replacement/i, "the flash interval is the behaviour flash's alone");
+    const longer = validateSnapshot(draftEdit(current, message(current, "replacementFeedback", {replacementFlash: "350"}))).settings.values;
+    const before = validateSnapshot(current.document).settings.values;
+    assert.deepEqual(longer.map((v, id) => id === 31 ? before[id] : v), before, "only scalar 31 moves");
+    assert.equal(longer[31], 350);
+    assert.equal(longer[15], 200, "the behaviour flash keeps its interval");
+    const faster = validateSnapshot(draftEdit(current, message(current, "lightingFeedback", {feedbackFlash: "120"}))).settings.values;
+    assert.deepEqual([faster[15], faster[31]], [120, 200], "and the other way round");
 });

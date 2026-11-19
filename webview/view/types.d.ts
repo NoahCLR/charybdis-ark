@@ -24,6 +24,9 @@ export interface FaceRows {
     comboY?: number;
     separatorY?: number;
     subY?: number;
+    /** The top of the row of icons, and how tall they are, when the key has any. */
+    iconY?: number;
+    iconSize?: number;
 }
 
 export interface ReviewBlock {
@@ -40,6 +43,8 @@ export interface DraftMarks {
     behaviours: Set<string>;
     combos: Set<number>;
     macros: Set<string>;
+    /** The autocorrect entries changed, by correction. */
+    autocorrect: Set<string>;
     customKeys: Set<string>;
     pointing: Set<number>;
     lighting: Set<string>;
@@ -49,7 +54,17 @@ export interface DraftMarks {
     layerNames: boolean;
 }
 
-export interface LightOptions {held?: number[]; pdActive?: null | {locality: string; triggerIndex?: number; color: import('../../contracts/edits.js').Colour; mode: string}}
+export interface LightOptions {held?: number[];
+    /** A running pointing mode: its colour, locality, the key or keys that started it (a holding combo's inputs), its mode id, and the layers its link names that the keyboard reads (bit n layer n), beneath the lowest of which that is on it paints (firmware D-F62). */
+    pdActive?: null | {locality: string; triggerIndex?: number | readonly number[]; color: import('../../contracts/edits.js').Colour; mode: string; link?: number};
+    /** A held combo's feedback: its colour, locality, the keys of its inputs in the view, and whether it paints beneath the pointing mode its output runs (comboHeld). */
+    comboActive?: null | {locality: string; inputs: readonly number[]; color: import('../../contracts/edits.js').Colour; beneath?: boolean};
+    /** A behaviour feedback case showing (D-L93): its case (an RGB_KEY_SEMANTICS name), that case's colour and locality, and the key that shows it, when the view has one. */
+    behaviourActive?: null | {owner: string; locality: string; triggerIndex?: number; color: import('../../contracts/edits.js').Colour};
+    /** A replacement flash showing: its case (an RGB_AUTOCORRECT_SEMANTICS name), that case's colour and locality, and the key that caused it, when one is known. */
+    replacementActive?: null | {owner: string; locality: string; triggerIndex?: number; color: import('../../contracts/edits.js').Colour}}
 export interface LedLight {colour: import('../../contracts/edits.js').Colour; source: string; layer?: number | null}
 
-export type PickerSection = {id: string; label: string} & ({kind: 'catalogue'; filter: (entry: Pick<import('../../contracts/panel.js').CatalogEntry, 'group'> & {value?: string; key?: string; name?: string}) => boolean} | {kind: 'board' | 'layers' | 'modes' | 'macros'});
+export type PickerEntry = Pick<import('../../contracts/panel.js').CatalogEntry, 'group'> & {value?: string; key?: string; name?: string; offered?: boolean};
+export type PickerKeyGroup = {name: string; takes: (entry: PickerEntry, model: import('../../contracts/panel.js').PublishedModel | null) => boolean; order?: string[]};
+export type PickerSection = {id: string; label: string} & ({kind: 'catalogue'; filter: (entry: PickerEntry) => boolean; groups: PickerKeyGroup[]} | {kind: 'board' | 'layers' | 'modes' | 'macros' | 'all'});

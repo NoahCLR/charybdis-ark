@@ -107,7 +107,7 @@ edits you haven't saved.
 The keyboard changes mode only with nothing unsaved, so Ark asks when a switch
 would lose something:
 
-- From Live preview + save with unsaved changes, it asks you to **Save on
+- From Live preview + save with unsaved changes, it asks you to **Save to
   keyboard** or **Revert** first.
 - From Review and save to a live mode with a draft, it asks whether to
   **Send live** (your draft starts running on the keyboard, unsaved) or
@@ -127,16 +127,30 @@ from the bar.
 The changes come first, grouped by the area they are edited in, each named
 as its screen is: Keys, Layers, Behaviours, Combos, Custom keys, Macros,
 Pointer, Pointing modes, Lighting, Settings (the other Settings screens) and
-so on. Each change shows the fields that differ, with the keyboard's value
-and the draft's side by side. **Checks** follow: what the draft lets the
+so on. Each change shows the fields that differ, named as the screen that
+edits them labels them, with the keyboard's value and the draft's side by
+side. **Checks** follow: what the draft lets the
 keyboard do, and what must be fixed first.
 
 - **Show** closes Review and opens the change where it is edited.
 - **Discard** puts that one change back.
 - Changes made by one edit, such as two keys swapped, are discarded together.
 
+A few things the keyboard stores have no control in Ark, so their change has
+no **Show**: the default layers, and QMK's key options, such as swapping Ctrl
+and Caps Lock, N-key rollover or one-shot keys. Ark keeps whatever the keyboard
+stores for those options and never changes them on its own, so they differ
+only when a backup or another tool sets them; Review then lists them as one
+**Other key options** change, which **Discard** puts back.
+
 Layers are compared by which layer they are, not where they sit, so a
-reorder is one change and a key edited afterwards is another.
+reorder is one change and a key edited afterwards is another. Macros, custom
+keys and pointing modes are compared the same way when their slots are
+swapped: the swaps of a bank are one change, **Macro order**, **Custom key
+order** or **Pointing mode order**, listing where each thing sits now, and a
+macro edited after a swap is its own change. Discarding the order puts every
+macro, key or mode of that bank back where the keyboard holds it; the edits
+stay with their things.
 
 ## Checks
 
@@ -147,13 +161,19 @@ the draft fixes it.
 
 - A **Trap** is a layer that can lock on with no way back to the base layer,
   or a pointing mode that can lock with nothing left to turn it off. Review
-  shows the steps into it and a way out.
+  shows the steps into it and a way out. It counts a behaviour's later taps
+  too: past its deepest tap count every press is the standard key, so a
+  layer key there still locks, toggles or holds its layer, and Review names
+  the fewest taps that do it, such as "Triple-tap TG(3)". A toggle or a
+  one-shot layer takes an odd number of taps.
 - A **Blocker** keeps Save disabled until it is fixed, such as a lighting
   effect or brightness this keyboard can't show.
 - A **Warning** is something Ark asks about before saving: a layer nothing
   reaches, a layer key onto an empty layer, a combo that can't fire, a macro
   your computer's settings can't play, and so on.
-- A **Notice** only informs, such as a behaviour that changes nothing.
+- A **Notice** only informs, such as a behaviour that changes nothing, or
+  what a [VIA layout](backups.md#import-a-via-layout) you imported kept that
+  plays one of its macros.
 
 What your draft adds stays open. What the keyboard already has folds behind
 **Already on the keyboard** with its count, and what the draft fixes behind
@@ -174,7 +194,10 @@ it and the change is highlighted.
 ### Timing checks
 
 The checks also read your timings. They warn about holds that overlap or can
-never happen, and give advice on very short combo windows. The keyboard
+never happen, and give advice on very short combo windows. The editors refuse
+a Long hold threshold at or before the Tap / hold threshold
+([Behaviours](behaviours.md#timing)), so a warning about the order of those
+two comes only from a profile read from the keyboard or imported. The keyboard
 decides every tap or hold itself, from the presses, so these checks only ever
 rule out what can't happen. They don't promise every gesture is comfortable to
 press.
@@ -262,7 +285,8 @@ while the keyboard is still connected.
 Either way the recovery copy is on the [Backups](backups.md) screen, named
 as that screen lists it: what made it, the keyboard and when. The keyboard's
 own error, for whoever looks into it, is under **Diagnostics** on the
-Keyboard screen.
+Keyboard screen, shown when Ark is opened with `?diagnostics` in its address
+([Connecting](connecting.md#the-keyboard-screen)).
 
 ## When the keyboard stops saving
 

@@ -94,6 +94,56 @@ for (const demo of [false, true]) test(`drop a profile into the real ${demo ? "d
     ownFilesOnly();
 });
 
+test("a dropped VIA layout opens the import review, says what it leaves empty, and comes into the draft as one undoable import", async ({page, context, baseURL}) => {
+    const {keyboard, ownFilesOnly} = await withKeyboard(context, baseURL);
+    const errors = await open(page);
+    await page.locator('.read-placeholder [data-act="choose-keyboard"]').click();
+    await ready(page);
+    await page.locator('[data-screen="profile"]').click();
+    await expect(page.locator("[data-profile-drop]")).toContainText("or a layout saved from VIA");
+    const keys = Array.from({length: 60}, (_, position) => position === 7 ? "NOT_A_KEY" : position === 8 ? "CUSTOM(80)" : "KC_B");
+    const layout = {name: "Charybdis", vendorProductId: 2834831411, macros: ["hi{KC_ENT}", ...Array(15).fill("")], layers: [keys, keys], encoders: []};
+    await dropFiles(page, [{name: "charybdis.layout.json", text: JSON.stringify(layout), type: ""}]);
+    const sheet = page.locator(".import-sheet");
+    await expect(sheet.locator("h2")).toHaveText("Use this VIA layout as your draft?");
+    await expect(sheet).toContainText("charybdis.layout.json");
+    await expect(sheet).toContainText("Its 2 layers replace Base to Layer 1, and every layer above is emptied");
+    await expect(sheet).toContainText("Auto-mouse is turned off: no layer of this file above Base has mouse buttons.");
+    await expect(sheet.locator(".via-left")).toContainText("Left empty: 4 keys Ark cannot bring from this file");
+    await expect(sheet.locator(".via-left li")).toHaveCount(2);
+    await expect(sheet.locator(".via-left")).toContainText("CUSTOM(80) on Base and Layer 1 (2 keys): It was custom key 16 on older firmware");
+    // The draft has behaviours and custom keys; the blank slate starts whole,
+    // and each kind can be kept.
+    await expect(sheet.locator(".via-slate")).toContainText("Start from a blank slate?");
+    const behaviours = sheet.locator('[data-via-clear="behaviors"]');
+    await expect(behaviours).toBeChecked();
+    await expect(sheet.locator('[data-via-clear="customKeys"]')).toBeChecked();
+    await expect(sheet).toContainText("Your draft's behaviours and custom keys are removed. Combos, pointing modes and the rest of lighting and settings stay as they are.");
+    await sheet.locator('label.sw:has([data-via-clear="behaviors"])').click();
+    await expect(behaviours).not.toBeChecked();
+    await expect(sheet).toContainText("Your draft's custom keys are removed. Behaviours, combos, pointing modes and the rest of lighting and settings stay as they are.");
+    await sheet.locator('label.sw:has([data-via-clear="behaviors"])').click();
+    await expect(behaviours).toBeChecked();
+    await expect(sheet.locator(".import-diff")).toContainText("Behaviours");
+    await page.locator('[data-act="restore"]').click();
+    await expect(page.locator(".commit")).toContainText(/\d+ changes?\s+in your draft/);
+    expect(keyboard.mutations).toEqual([]);
+    // The layers the file left empty fold as empty layers (D-L76): nothing of
+    // theirs is left, lighting included, and nothing kept turns them on. The
+    // pointer layer was Layer 4, and this file has no mouse buttons, so
+    // Auto-mouse is off and nothing points at a layer that is gone.
+    await page.locator('[data-screen="keys"]').click();
+    const bar = page.locator(".layerbar-wrap");
+    await expect(bar.locator('[data-empty-layers="layer-bar"]')).toHaveText("14 empty layers");
+    await expect(bar.locator(".layer-tab")).toHaveCount(2);
+    await page.locator('[data-screen="profile"]').click();
+    await page.keyboard.press("Meta+z");
+    await expect(page.locator(".commit", {hasText: /in your draft/})).toHaveCount(0);
+    expect(keyboard.mutations).toEqual([]);
+    expect(errors).toEqual([]);
+    ownFilesOnly();
+});
+
 test("a file that matches the keyboard changes nothing, but still puts a draft with edits back to it", async ({page, context, baseURL}) => {
     const {keyboard} = await withKeyboard(context, baseURL);
     const errors = await open(page);
@@ -185,7 +235,7 @@ test("choose a keyboard, read it, stage an edit, keep a recovery copy, and recon
     const copies = page.locator(".card.recoveries .recovery-row");
     await expect(copies).toHaveCount(1);
     await expect(copies.first().locator(".recovery-name")).toHaveText(/^Before saving a draft · .+ · \d{1,2} \w{3} \d{4}, \d\d:\d\d$/);
-    await expect(copies.first().locator(".recovery-name")).toHaveAttribute("title", /^recovery-.+\.charybdis\.json$/);
+    await expect(copies.first().locator(".recovery-name")).toHaveAttribute("data-tip", /^recovery-.+\.charybdis\.json$/);
     const [recovery] = await Promise.all([page.waitForEvent("download"), copies.first().locator("[data-recovery]").click()]);
     expect(recovery.suggestedFilename()).toMatch(/^recovery-.+\.charybdis\.json$/);
 
@@ -278,6 +328,69 @@ test("the page refuses markup that skips its Trusted Types policy, and draws wit
     expect(errors.filter((text) => !/This document requires 'TrustedHTML' assignment|Creating a TrustedTypePolicy named '(?:x|default|ark-html)' violates/.test(text))).toEqual([]);
 });
 
+// The page's own words (web/index.html) stand in for a shell that never
+// starts, after a moment; an ordinary load replaces them unseen.
+test("a shell that never starts leaves the page's own words, never a blank page", async ({browser, baseURL}) => {
+    const fallback = (page) => page.locator("#root > .page-starting");
+    const context = await browser.newContext({baseURL});
+    try {
+        const page = await context.newPage();
+        await page.route(/\/shell-[A-Z0-9]+\.js$/, (route) => route.fulfill({status: 404, contentType: "text/html", body: "<h1>not found</h1>"}));
+        await page.goto(PAGE);
+        await expect(fallback(page)).toBeHidden();
+        await expect(fallback(page)).toBeVisible({timeout: 5000});
+        await expect(fallback(page)).toContainText("Chrome or Edge on a computer, with JavaScript on");
+        await expect(fallback(page).locator("noscript")).toHaveCount(1);
+    } finally {await context.close();}
+    const off = await browser.newContext({baseURL, javaScriptEnabled: false});
+    try {
+        const page = await off.newPage();
+        await page.goto(PAGE);
+        // Playwright turns scripts off below the parser, which still reads
+        // <noscript> as if they ran: the page's words are what this shows.
+        await expect(fallback(page)).toContainText("with JavaScript on", {timeout: 5000});
+        await expect(fallback(page)).toBeVisible();
+    } finally {await off.close();}
+    const ordinary = await browser.newContext({baseURL});
+    try {
+        await withKeyboard(ordinary, baseURL);
+        const page = await ordinary.newPage();
+        const errors = await open(page);
+        await expect(page.locator(".read-placeholder h2")).toHaveText("Connect your keyboard");
+        await expect(fallback(page)).toHaveCount(0);
+        expect(errors).toEqual([]);
+    } finally {await ordinary.close();}
+});
+
+// A screen whose drawing throws (a stand-in for a renderer's bug: every
+// lookup inside a screen throws while armed) leaves the rail and a
+// statement, never an empty page; a fault nothing caught is a notice.
+test("a fault while a screen is drawn says so and keeps the rail; an uncaught one is a notice", async ({page, context, baseURL}) => {
+    await withKeyboard(context, baseURL);
+    const errors = await open(page);
+    await page.locator('.read-placeholder [data-act="explore-demo"]').click();
+    await ready(page);
+    await page.evaluate(() => {
+        const real = Element.prototype.querySelector;
+        Object.assign(window, {__armed: true});
+        Element.prototype.querySelector = function (...selectors) {
+            if (/** @type {any} */ (window).__armed && this.classList?.contains("main")) throw new TypeError("simulated renderer fault");
+            return real.apply(this, selectors);
+        };
+    });
+    await page.locator('[data-screen="lighting"]').click();
+    const fault = page.locator('.read-placeholder[role="alert"]');
+    await expect(fault.locator("h2")).toHaveText("Ark could not draw this screen");
+    await expect(fault).toContainText("choose another screen from the menu");
+    expect(errors.some((text) => /simulated renderer fault/.test(text))).toBe(true);
+    await page.evaluate(() => Object.assign(window, {__armed: false}));
+    await page.locator('[data-screen="profile"]').click();
+    await expect(page.locator('[data-act="export"]')).toBeVisible();
+
+    await page.evaluate(() => {setTimeout(() => {throw new TypeError("simulated uncaught fault");});});
+    await expect(page.locator(".rail-message")).toContainText("Failed: Ark ran into a problem of its own.");
+});
+
 test("explore the demo: edit on several screens, review with no Apply, export, open a profile file and leave", async ({page, context, baseURL}) => {
     test.setTimeout(90000);
     const {keyboard, ownFilesOnly} = await withKeyboard(context, baseURL);
@@ -291,7 +404,7 @@ test("explore the demo: edit on several screens, review with no Apply, export, o
     // It never looks like a keyboard.
     const banner = page.locator(".demo-banner");
     await expect(banner).toContainText("Demo · no keyboard");
-    await expect(banner).toContainText("No keyboard is connected");
+    await expect(banner).toContainText("Edits stay in this tab");
     await expect(page.locator(".rail-product")).toHaveText("Demo");
     await expect(page.locator(".rail-keyboard .dot.demo")).toHaveCount(1);
     await expect(page.locator(".rail-keyboard")).not.toContainText(/Connected|halves|Recovery/);
@@ -478,13 +591,10 @@ test("literal macro steps stage through the real web shell, export exactly, undo
     // Step history must also work after the real web shell accepts a deletion.
     await page.locator('[data-step-tile="0"]').click(); await page.keyboard.press('Delete');
     await expect(page.locator('.macro-empty')).toBeVisible();
-    await expect(page.locator('.macro-titlebar [data-local-state]')).toHaveText('as read');
     await page.keyboard.press('Control+z');
     await expect(page.locator('[data-step-text]')).toHaveValue(text);
-    await expect(page.locator('.macro-titlebar [data-local-state]')).toHaveText('changed in draft');
     await page.keyboard.press('Control+Shift+z');
     await expect(page.locator('.macro-empty')).toBeVisible();
-    await expect(page.locator('.macro-titlebar [data-local-state]')).toHaveText('as read');
     expect(keyboard.requests).toEqual([]);
     expect(errors).toEqual([]);
     ownFilesOnly();

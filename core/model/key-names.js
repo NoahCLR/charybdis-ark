@@ -15,7 +15,7 @@
 
 const {VOCABULARY} = require("./vocabulary");
 const {PD_MODE_KEYS, pdModeKeyOfCode, pdModeKeyOfName} = require("../data/pd-mode-keys");
-const {CUSTOM_KEY_SLOTS, customKeyCode, customKeyName, customKeyOfCode, layerLockOfCode} = require("../data/user-keycodes");
+const {AUTO_MOUSE_SWITCH_KEYS, BEHAVIOR_SWITCH_KEYS, CUSTOM_KEY_SLOTS, autoMouseSwitchKeyCode, autoMouseSwitchKeyName, behaviorSwitchKeyCode, behaviorSwitchKeyName, customKeyCode, customKeyName, customKeyOfCode, layerLockOfCode} = require("../data/user-keycodes");
 const catalog = require("../data/keycode-catalog");
 const keycodes = require("../schema/keycodes");
 const {LAYER_FORMS, MODS, QK, inBlock, layerFormBase, wrapperOf} = require("../../rules/qmk-keycodes.mjs");
@@ -23,18 +23,23 @@ const {actionName, knownActionAbi} = require("../schema/actions");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {resolveNativeQmkExpression} = require("../schema/compiled-profile-v1");
 const {MACOS} = require("../schema/host-settings");
-const {LAYER_KEY_VERBS: LAYER_VERBS, layerName, macroDefaultName, slotName} = require("./vocabulary");
+const {LAYER_KEY_VERBS: LAYER_VERBS, layerName, customKeyDefaultName, macroDefaultName, slotName} = require("./vocabulary");
 const {hostLayout, US_HOST_LAYOUT} = require("../data/host-layouts");
 const {LAYERS} = require("../data/charybdis-layout");
 const {shortcutPresent, shortcutSends} = require("../schema/settings-domain-v1");
+const {SHORTCUT_JOIN, shortcutLayerWords, shortcutSendWords, shortcutWords} = require("../../rules/shortcut-notation.mjs");
+
+// The keyboard's switch keys, family by family (firmware D-F66): the names
+// and the code of each, behaviours' then auto-mouse's.
+const SWITCH_KEY_FAMILIES = /** @type {const} */ ([[BEHAVIOR_SWITCH_KEYS, behaviorSwitchKeyCode], [AUTO_MOUSE_SWITCH_KEYS, autoMouseSwitchKeyCode]]);
 
 
-// A pointing key by its slot: "Dragscroll · hold", "Slot 6 · lock (empty)",
-// or "Slot 0 · hold" where the keyboard reported no slots.
+// A pointing key by its slot: "Dragscroll · hold", "Pointing mode 6 · lock (empty)",
+// or "Pointing mode 0 · hold" where the keyboard reported no slots.
 /** @param {{id: number, kind: number, name: string} | undefined} slot @param {number} id @param {boolean} locked */
 const pointingKeyLabel = (slot, id, locked) => `${slotName(slot, id)} · ${locked ? "lock" : "hold"}${slot && !slot.kind ? " (empty)" : ""}`;
 
-// LOCK_LAYER(2) → "Lock layer 2", PD_MODE_0 → "Slot 0 · hold".
+// LOCK_LAYER(2) → "Lock layer 2", PD_MODE_0 → "Pointing mode 0 · hold".
 /** @param {string} semantic */
 function semanticLabel(semantic) {
     const pointing = pdModeKeyOfName(semantic);
@@ -121,9 +126,8 @@ function profileKeyNames({hostOs = 0, hostLayout: layoutId = US_HOST_LAYOUT, mac
     const pointing = [];
     /** @type {import("../../contracts/model.js").NamedKey[]} */
     const custom = [];
-    const modifiers = hostKeyVocabulary(hostOs).modifiers;
     for (const entry of catalog.entries()) if (carriesModifiers(entry)) {
-        let label = entry.value >= 0xe0 && entry.value <= 0xe7 ? modifiers[entry.value - 0xe0][1] : hostKeyLabel(entry.label, hostOs);
+        let label = hostKeyLabel(entry.label, hostOs);
         const base = typed.labels[keycodes.resolve(entry.value & 0xff).name];
         if ("kind" in entry && entry.kind === "modified" && base !== undefined) label = label.replace(/\+[^+]+$/, () => `+${base}`);
         labels[entry.name] = label;
@@ -159,11 +163,19 @@ function profileKeyNames({hostOs = 0, hostLayout: layoutId = US_HOST_LAYOUT, mac
     // reads by its number.
     for (let slot = 0; slot < CUSTOM_KEY_SLOTS; slot++) {
         const name = customKeyName(slot), code = customKeyCode(slot);
-        const label = customKeys.find(key => key.slot === slot)?.name || `Custom key ${slot}`;
+        const label = customKeys.find(key => key.slot === slot)?.name || customKeyDefaultName(slot);
         const native = keycodes.resolve(code).name;
         aliases[native] = name;
         labels[native] = labels[name] = label;
         custom.push({name, native, code, label});
+    }
+    // The switch keys for behaviours and for auto-mouse, by the keyboard's
+    // names and their words (VOCABULARY.switchKeys): "Toggle Behaviours",
+    // "Toggle Auto-mouse".
+    for (const [names, codeOf] of SWITCH_KEY_FAMILIES) for (const name of names) {
+        const native = keycodes.resolve(/** @type {number} */ (codeOf(name))).name;
+        aliases[native] = name;
+        labels[native] = labels[name] = VOCABULARY.switchKeys[name];
     }
     // A behaviour row keyed by a semantic target names its keycode only where
     // the catalogue has nothing better than a bare user slot: LOCK_LAYER(2)
@@ -270,7 +282,8 @@ function compactKeyLabels(labels) {
     return short;
 }
 
-// Every modifier control uses these same names as keys and Review. Picker
+// Every modifier control uses these same names, as a modified key and a
+// custom key's shortcut read them (left unmarked, D-L83), and Review. Picker
 // identifiers are stable edit tokens, not display words; derive their labels
 // from the bit vocabulary rather than maintaining another naming table.
 // Built once per host OS and frozen: every model of that host shares them.
@@ -284,7 +297,7 @@ function hostKeyVocabulary(hostOs = 0) {
     const modifiers = VOCABULARY.modifiers.map(/** @returns {[number, string]} */ ([bit, label]) => [bit, hostKeyLabel(label, hostOs)]);
     // The modifiers' QMK bits, in the vocabulary's order: left, then right.
     const wrappers = Object.values(MODS).map(mods => /** @type {string} */ (wrapperOf(mods)));
-    const pickerModifiers = modifiers.map(([bit, label], i) => Object.freeze({bit, value: wrappers[i], label: i < 4 ? label.replace(/^Left /, "") : label}));
+    const pickerModifiers = modifiers.map(([bit, label], i) => Object.freeze({bit, value: wrappers[i], label}));
     // The key a layout's third level is typed with, as the host calls it.
     const thirdLevel = hostOs === MACOS ? "Option" : "AltGr";
     const words = /** @type {HostVocabulary} */ (Object.freeze({modifiers: Object.freeze(modifiers.map((pair) => Object.freeze(pair))), pickerModifiers: Object.freeze(pickerModifiers), thirdLevel}));
@@ -345,47 +358,39 @@ function layerTapWords(names, value) {
     const tap = catalog.lookup(/** @type {string} */ (resolved.tap));
     return tap ? keyLabel(names, tap.value) : resolved.tap;
 }
-// A custom key's shortcut (firmware D-F26) as it reads: its modifiers in the
-// host's words, left before right, then its keys in order, then the layers it turns on
-// by name, lowest first, joined by " + ": "Left Command + Navigation + Extra".
-// Held layers read by name alone; any other kind leads with its layer key's
-// verb: "Left Command + Lock Navigation + Extra". Empty for no shortcut.
+// The host's words for a shortcut's parts, for rules/shortcut-notation.mjs.
+/** @param {Partial<import("../../contracts/model.js").ProfileKeyNames> | null | undefined} names @returns {import("../../rules/shortcut-notation.mjs").ShortcutTerms} */
+const shortcutTerms = (names) => ({modifiers: hostKeyVocabulary(names?.hostOs).modifiers, keyLabel: (/** @type {number} */ code) => keyLabel(names, code),
+    layerName: (/** @type {number} */ layer) => layerName(names?.layers, layer), layerCount: LAYERS, layerKinds: VOCABULARY.customKeys.layerKinds});
+// A custom key's shortcut (firmware D-F26) as it reads, by the one rule the
+// interface writes a shortcut it is picking with (rules/shortcut-notation.mjs):
+// "Command+Lock Navigation+Extra". Empty for no shortcut.
 /** @param {Partial<import("../../contracts/model.js").ProfileKeyNames> | null | undefined} names @param {import("../schema/types.js").CustomKeyShortcut | null | undefined} shortcut */
 function shortcutLabel(names, shortcut) {
-    if (!shortcut) return "";
-    const parts = shortcutKeys(names, shortcut);
-    const layers = shortcutLayerNames(names, shortcut);
-    const verb = shortcut.layerKind ? VOCABULARY.customKeys.layerKinds.find(([kind]) => kind === shortcut.layerKind)?.[1] : "";
-    if (layers.length && verb) layers[0] = `${verb} ${layers[0]}`;
-    return [...parts, ...layers].join(" + ");
+    return shortcut ? shortcutWords(shortcut, shortcutTerms(names)) : "";
 }
 // The layers a shortcut turns on, by name, lowest first.
 /** @param {Partial<import("../../contracts/model.js").ProfileKeyNames> | null | undefined} names @param {{layers?: number} | null | undefined} shortcut @returns {string[]} */
 function shortcutLayerNames(names, shortcut) {
-    const layers = [];
-    for (let layer = 0; layer < LAYERS; layer++) if ((shortcut?.layers ?? 0) & (1 << layer)) layers.push(layerName(names?.layers, layer));
-    return layers;
+    return shortcutLayerWords({layers: shortcut?.layers ?? 0}, shortcutTerms(names));
 }
 // What a shortcut does, after its key's name in a tip: sends its modifiers and
 // keys, its layers named after them by their kind, or, of layers alone, what
-// it does with them ("holds Navigation on", "locks Navigation + Extra"), as
+// it does with them ("holds Navigation on", "locks Navigation+Extra"), as
 // the Custom keys screen says it (webview/view/custom-key.mjs, shortcutAct).
 const LAYER_ACTS = ["holds %s on", "locks %s", "moves to %s", "tap-toggles %s", "turns %s on as a one-shot"];
 /** @param {Partial<import("../../contracts/model.js").ProfileKeyNames> | null | undefined} names @param {import("../schema/types.js").CustomKeyShortcut | null | undefined} shortcut */
 function shortcutAct(names, shortcut) {
     if (!shortcut || !shortcutPresent(shortcut)) return "";
     if (shortcutSends(shortcut)) return `sends ${shortcutLabel(names, shortcut)}`;
-    return (LAYER_ACTS[shortcut.layerKind] || LAYER_ACTS[0]).replace("%s", shortcutLayerNames(names, shortcut).join(" + "));
+    return (LAYER_ACTS[shortcut.layerKind] || LAYER_ACTS[0]).replace("%s", shortcutLayerNames(names, shortcut).join(SHORTCUT_JOIN));
 }
 // What a shortcut sends, one part each: its modifiers in the host's words,
 // left before right, then each key in the order it is pressed. Empty for a
 // shortcut of layers alone.
 /** @param {Partial<import("../../contracts/model.js").ProfileKeyNames> | null | undefined} names @param {import("../schema/types.js").CustomKeyShortcut | null | undefined} shortcut @returns {string[]} */
 function shortcutKeys(names, shortcut) {
-    if (!shortcut) return [];
-    const parts = hostKeyVocabulary(names?.hostOs).modifiers.filter(([bit]) => shortcut.mods & bit).map(([, label]) => label);
-    for (const key of shortcut.keys) parts.push(keyLabel(names, key));
-    return parts;
+    return shortcut ? shortcutSendWords(shortcut, shortcutTerms(names)) : [];
 }
 /** @param {Partial<import("../../contracts/model.js").ProfileKeyNames> | null | undefined} names @param {number} value */
 function keyLabelWithName(names, value) {
@@ -401,8 +406,9 @@ function unnamedKeyCount(layers, capabilities) {
     const ownBlocks = knownActionAbi(capabilities?.actionAbiDigest ?? 0);
     /** @param {{keycode: number, resolved: {known: boolean}}} key */
     const named = ({keycode, resolved}) => resolved.known
-        || ownBlocks && (customKeyOfCode(keycode) !== undefined || layerLockOfCode(keycode) !== undefined || pdModeKeyOfCode(keycode) !== undefined);
+        || ownBlocks && (customKeyOfCode(keycode) !== undefined || layerLockOfCode(keycode) !== undefined || pdModeKeyOfCode(keycode) !== undefined
+            || behaviorSwitchKeyName(keycode) !== undefined || autoMouseSwitchKeyName(keycode) !== undefined);
     return layers.flatMap((entry) => entry.keys).filter((key) => !named(key)).length;
 }
 
-module.exports = {compactKeyLabels, heldModifierWords, hostKeyVocabulary, hostKeyLabel, keyKind, keyLabel, keyLabelWithName, keyLayer, keyLayerForm, layerKeyLabel, layerModWords, layerTapWords, profileKeyNames, shortcutAct, shortcutKeys, shortcutLabel, shortcutLayerNames, unnamedKeyCount};
+module.exports = {SWITCH_KEY_FAMILIES, compactKeyLabels, heldModifierWords, hostKeyVocabulary, hostKeyLabel, keyKind, keyLabel, keyLabelWithName, keyLayer, keyLayerForm, layerKeyLabel, layerModWords, layerTapWords, profileKeyNames, shortcutAct, shortcutKeys, shortcutLabel, shortcutLayerNames, unnamedKeyCount};

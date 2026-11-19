@@ -12,6 +12,9 @@ import {sequenceIssues} from '../../view/macro-sequence.mjs';
 import {keyIdentity} from '../../view/key-identity.mjs';
 import {inspectEdit} from './validation.mjs';
 
+// An empty macro slot's name and protection: what Clear macro leaves.
+/** @type {Readonly<import('../../state.js').MacroSlotFields>} */
+export const EMPTY_MACRO_FIELDS = Object.freeze({name: '', protection: 'auto'});
 /** @param {Slot} slot @param {string} payload @param {Step[] | undefined} steps @returns {Entry} */
 function entry(slot, payload, steps) {
     const form = macroForm(slot.keycode);
@@ -27,13 +30,15 @@ export function ensureMacroHistory(slot, steps) {
     if (!form.stepHistory) setMacroForm(slot.keycode, {stepHistory: createMacroHistory(entry(slot, form.draft ?? slot.payload, form.steps ?? steps))});
     return /** @type {import('../../state.js').MacroHistory} */ (macroForm(slot.keycode).stepHistory);
 }
-/** @param {Slot} slot @param {string} payload @param {Step[]} [steps] @param {string | null} [group] */
-export function rememberMacroEdit(slot, payload, steps, group = null) {
+// `emptied` marks Clear macro's entry with the name and protection it took
+// away, so undoing it puts them back with the steps.
+/** @param {Slot} slot @param {string} payload @param {Step[]} [steps] @param {string | null} [group] @param {import('../../state.js').MacroSlotFields} [emptied] */
+export function rememberMacroEdit(slot, payload, steps, group = null, emptied) {
     if (state.recording) return;
     const form = macroForm(slot.keycode), history = ensureMacroHistory(slot);
     // Selection is navigation rather than a new history item, but follows the edit.
     const before = {...history, present: {...history.present, selectedStep: form.selectedStep ?? null, selectedSteps: selectedStepIds(slot)}};
-    const next = entry(slot, payload, steps);
+    const next = {...entry(slot, payload, steps), ...(emptied ? {emptied} : {})};
     setMacroForm(slot.keycode, {stepHistory: rememberMacroHistory(before, next, group), stepFocus: next.steps ?? form.stepFocus});
 }
 /** @param {Slot} slot */
@@ -46,15 +51,15 @@ export function selectedStepIds(slot) {
     const form = macroForm(slot.keycode);
     return form.selectedSteps ?? (form.selectedStep ? [form.selectedStep] : []);
 }
-/** @param {Slot} slot @param {Entry} snapshot */
-function restore(slot, snapshot) {
+/** @param {Slot} slot @param {Entry} snapshot @param {import('../../state.js').MacroSlotFields} [fields] */
+function restore(slot, snapshot, fields) {
     const model = getModel(), steps = snapshot.steps;
     const encoded = steps ? macroStepsInput(steps) : null;
     const parsed = readMacro(model, slot.keycode, snapshot.payload, 'editor');
     const stepError = encoded?.error || (steps ? parsed.error || sequenceIssues(steps, model, key => keyIdentity(model, key).label).find(Boolean) : '') || '';
     setMacroForm(slot.keycode, {draft: snapshot.payload, steps, stepFocus: steps ?? macroForm(slot.keycode).stepFocus,
         selectedStep: snapshot.selectedStep, selectionAnchor: snapshot.selectedStep, selectedSteps: snapshot.selectedSteps, stepError,
-        validation: undefined, wantsStage: false, cancelBlur: false, moveNotice: ''});
+        validation: undefined, wantsStage: false, cancelBlur: false, moveNotice: '', stageFields: fields});
     inspectEdit(slot, true); render();
     const id = snapshot.selectedStep;
     const tile = id ? document.querySelector(`[data-step-id="${CSS.escape(id)}"]`) : null;
@@ -89,7 +94,9 @@ function macroCommand(slot, action) {
     const current = {...history, present: {...history.present, selectedStep: form.selectedStep ?? null, selectedSteps: selectedStepIds(slot)}};
     const moved = moveMacroHistory(current, action);
     setMacroForm(slot.keycode, {stepHistory: moved});
-    restore(slot, moved.present);
+    // Undoing Clear macro puts the name and protection back; redoing it
+    // empties them again.
+    restore(slot, moved.present, action === 'undo' ? current.present.emptied : moved.present.emptied && EMPTY_MACRO_FIELDS);
 }
 /** @param {KeyboardEvent} event @param {'undo' | 'redo'} action @returns {boolean} */
 export function macroHistoryShortcut(event, action) {

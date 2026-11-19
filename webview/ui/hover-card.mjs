@@ -13,8 +13,8 @@ import {behaviourThresholds, styleDetail} from "../view/behavior-editor.mjs";
 import {keyReach, keyReachAt} from "../view/key-reach.mjs";
 import {stageEnabled} from "../view/lighting.mjs";
 import {currentView, getModel, positionAt} from "../store.mjs";
-import {branchBadge, comboBadge, comboOutputMarked, comboTint, keyNameMarked, layerTagged, macroSteps, marked, sends, sendsKind, tierDot} from "./marks.mjs";
-import {sentence, styleWord, tierName, vocabulary, layerCalled, macroNamed} from "../view/vocabulary.mjs";
+import {branchBadge, comboBadge, comboInputChips, comboOutputMarked, comboTint, keyChips, keyNameMarked, layerMarked, layerTagged, macroSteps, marked, phraseMarked, sends, sendsKind, tierDot} from "./marks.mjs";
+import {phraseSentence, phrasesJoined, sentence, styleWord, tierName, vocabulary, layerCalled, macroNamed} from "../view/vocabulary.mjs";
 import {modifierKey} from "../view/shortcuts.mjs";
 
 // The card for the key at layout `index` on the layer the screen shows, "" for
@@ -28,7 +28,7 @@ export function hoverCard(index) {
     const {position} = reach;
     const own = reachSections(reach.own, position);
     return `<div class="hc-head"><div class="hc-title"><span class="t">${keyNameMarked(model, keyName(position, model), keyMeaning(position))}</span></div>
-        <code class="hc-code">${esc(visibleKeycode(model, position.keycode))}</code>${headline(model, keyMeaning(position))}</div>${own.join("")}${seenThrough(view, reach)}`;
+        <code class="hc-code">${esc(visibleKeycode(model, position.keycode))}${pointingKind(reach.own)}</code>${headline(model, keyMeaning(position))}${pointingEmpty(reach.own)}</div>${own.join("")}${seenThrough(view, reach)}`;
 }
 
 // One card per behaviour the key's combos run, as the key that behaviour
@@ -43,10 +43,11 @@ export function behaviourCards(index) {
     const tint = comboTint(model);
     const cards = runs.slice(0, SIDE_CARDS).map((run) => {
         const target = /** @type {import("../../contracts/panel.js").Position} */ ({keycode: run.output, semantic: run.keycode, layoutIndex: -1});
+        const reach = keyReach(view, layer, target, -1, []);
         return `<div class="hovercard hc-side"${tint ? ` style="--combo:${tint}"` : ""}><div class="hc-head"><div class="hc-eyebrow">Combo behaviour</div><div class="hc-title"><span class="t">${keyNameMarked(model, run.shown, run.keycode)}</span>
             <span class="hc-badges">${run.badges.map((badge) => comboBadge(model, badge)).join("")}</span></div>
-            <code class="hc-code">${esc(visibleKeycode(model, run.output))}</code>${headline(model, run.keycode)}
-            <div class="hc-sub hc-foot">Runs when ${esc(run.badges.join(" or "))} fires.</div></div>${reachSections(keyReach(view, layer, target, -1, []), target, {foot: false}).join("")}</div>`;
+            <code class="hc-code">${esc(visibleKeycode(model, run.output))}${pointingKind(reach)}</code>${headline(model, run.keycode)}${pointingEmpty(reach)}
+            <div class="hc-sub hc-foot">Runs when ${esc(run.badges.join(" or "))} fires.</div></div>${reachSections(reach, target, {foot: false}).join("")}</div>`;
     });
     if (runs.length > SIDE_CARDS) cards.push(`<div class="hc-more">+${runs.length - SIDE_CARDS} more behaviour${runs.length - SIDE_CARDS === 1 ? "" : "s"} run by this key's combos</div>`);
     return cards.join("");
@@ -64,16 +65,17 @@ function seenThrough(view, {answer, through}) {
     const from = answer.layer, position = answer.position;
     const sections = reachSections(through, position);
     return `<div class="hc-through"><div class="hc-sect">
-            <div class="hc-h">Falls through to ${marked(model, {kind: "layer", layer: from.index}, layerCalled(from))}</div>
+            <div class="hc-h">Falls through to ${layerMarked(model, from)}</div>
             <div class="hc-flow"><span class="hc-name">${keyNameMarked(model, keyName(position, model), keyMeaning(position))}</span>
-            <code class="hc-stored">${esc(visibleKeycode(model, position.keycode))}</code></div>${headline(model, keyMeaning(position))}
+            <code class="hc-stored">${esc(visibleKeycode(model, position.keycode))}${pointingKind(through)}</code></div>${headline(model, keyMeaning(position))}${pointingEmpty(through)}
             ${view.previewing ? "" : `<div class="hc-sub hc-foot">With no layer previewed. ${modifierKey()}-click a layer tab to see what answers while it is held.</div>`}</div>
         ${sections.join("")}</div>`;
 }
 
 // What one stored key, `position`, reaches, as webview/view/key-reach.mjs
-// keyReach decides it: its behaviour, macros, pointing mode and combos. Empty
-// when it reaches none of them.
+// keyReach decides it: its behaviour, macros and combos. Empty when it reaches
+// none of them. Its pointing mode is the heading's (pointingKind,
+// pointingEmpty): the key's name already names the mode.
 /** @param {ReturnType<typeof keyReach>} reach @param {import("../../contracts/panel.js").Position} position @param {{foot?: boolean}} [options] */
 function reachSections(reach, position, {foot = true} = {}) {
     const model = getModel();
@@ -89,12 +91,12 @@ function reachSections(reach, position, {foot = true} = {}) {
             <div class="hc-sub">tap / hold ${esc(threshold(lead.term))}</div>
             <div class="hc-act"><span class="hc-stage">Tap</span><span><span class="hc-name">${esc(role.tap)}</span></span></div>
             <div class="hc-act"><span class="hc-stage">Hold</span><span>${hold}</span></div>
-            ${lead.note ? `<div class="hc-sub hc-foot hc-quiet">${esc(lead.note)}</div>` : ""}</div>`);
+            ${lead.note.length ? `<div class="hc-sub hc-foot hc-quiet">${phraseMarked(model, lead.note)}</div>` : ""}</div>`);
     } else if (lead?.kind === "off") {
         // A behaviour a switch keeps off is not there for this key: no
         // branches, no timing, no dots, only what the key sends instead.
         sections.push(`<div class="hc-sect hc-off"><div class="hc-h">Key behaviour not used</div>
-            <div class="hc-sub">${esc(sentence(use.reasons.join("; ")))}.</div>
+            <div class="hc-sub">${phraseMarked(model, phraseSentence(phrasesJoined(use.reasons, "; ")))}.</div>
             <div class="hc-sub hc-foot hc-quiet">${custom ? esc(sentence(customKeyShortcutOnly(custom))) : `Sends ${keyNameMarked(model, keyName(position, model), keyMeaning(position))} directly`}.</div></div>`);
     } else if (lead?.kind === "inert") {
         sections.push(`<div class="hc-sect"><div class="hc-sub hc-quiet">${esc(inertNote)}</div></div>`);
@@ -114,27 +116,19 @@ function reachSections(reach, position, {foot = true} = {}) {
         sections.push(`<div class="hc-sect"><div class="hc-h">Key behaviour</div>
             <div class="hc-sub">${[count ? `${count} branch${count === 1 ? "" : "es"}` : "No branches yet",
                 ...terms.used.map((name) => `${vocabulary(model).thresholds[name]} ${threshold(terms[name])}`),
-                ...(behaviour.keepsAutoMouseAnchored ? ["keeps auto-mouse anchored"] : [])].map(esc).join(" · ")}</div>
+                ...(behaviour.keepsAutoMouseAnchored ? [vocabulary(model).behaviourFields.anchor.toLowerCase()] : [])].map(esc).join(" · ")}</div>
             ${branches}
             ${count && foot ? `<div class="hc-sub hc-foot">${lit
                 ? "Each dot is the colour this key flashes when that tier resolves."
-                : "Key feedback is off, so no tier flashes on the keyboard."}</div>` : ""}</div>`);
+                : "Behaviour feedback is off, so no tier flashes on the keyboard."}</div>` : ""}</div>`);
     }
     if (reach.macros.length) {
         sections.push(`<div class="hc-sect"><div class="hc-h">Macro</div>${reach.macros.map(({keycode, slot}) => {
             if (!slot) return `<div class="hc-sub">${esc(keycode)} · not reported by the keyboard</div>`;
-            if (!slot.payload) return `<div class="hc-sub">${esc(macroNamed(slot, keycode))} · empty</div>`;
-            return macroSteps(model, slot.payload);
+            // Named as the heading names a pointing mode: its mark, its name
+            // and, when it holds no steps, its empty tag; then its steps.
+            return `<div class="hc-flow">${sends(model, keycode) || esc(macroNamed(slot, keycode))}</div>${slot.payload ? macroSteps(model, slot.payload) : ""}`;
         }).join("")}</div>`);
-    }
-    if (reach.pointing) {
-        const {kind, paints} = reach.pointing;
-        sections.push(`<div class="hc-sect"><div class="hc-h">Pointing mode</div>
-            <div class="hc-flow">${sends(model, keyMeaning(position))}
-            ${kind ? `<span class="hc-life">${esc(kind)}</span>` : ""}</div>
-            <div class="hc-sub hc-foot">${kind
-                ? `Its colour paints ${esc(paints)} while the mode runs.`
-                : "This slot is empty, so the key does nothing until it is configured. The keyboard keeps the keycode either way."}</div></div>`);
     }
     if (reach.combos.length) {
         // What a combo sends leads; the keys that press it follow, with this
@@ -148,8 +142,8 @@ function reachSections(reach, position, {foot = true} = {}) {
             return `<div class="hc-combo${use.fires ? "" : " hc-off"}">${comboBadge(getModel(), combo.badge || "C")}
             <span class="hc-sends"><span class="hc-life">→</span>${sent}<span class="hc-life hc-count">${inputs.length} key${inputs.length === 1 ? "" : "s"}</span>${runs ? `<span class="hc-life hc-runs">runs its behaviour</span>`
                 : sendsInstead ? `<span class="hc-life hc-runs">${esc(sendsInstead)}</span>` : ""}</span>
-            <span class="hc-keys">${inputs.map((input, at) => `<span class="hc-key${comboInputIsKey(combo, at, position) ? " here" : ""}">${keyNameMarked(model, combo.inputDisplays?.[at] ?? input, input)}</span>`).join('<span class="hc-life">+</span>')}</span>
-            ${use.fires ? "" : `<span class="hc-sub hc-quiet">Not used: ${esc(use.reasons.join("; "))}.</span>`}</div>`;
+            <span class="hc-keys">${comboInputChips(model, combo, {small: true, here: (at) => comboInputIsKey(combo, at, position)})}</span>
+            ${use.fires ? "" : `<span class="hc-sub hc-quiet">Not used: ${phraseMarked(model, phrasesJoined(use.reasons, "; "))}.</span>`}</div>`;
         }).join("")}</div>`);
     }
     return sections;
@@ -164,12 +158,22 @@ function shortcutSection(model, custom) {
     const layers = shortcutLayerList(custom);
     const rows = [];
     if (keys.length) rows.push(`<div class="hc-act"><span class="hc-stage">Sends</span>
-        <span class="hc-keys">${keys.map((part) => `<span class="hc-key">${esc(part)}</span>`).join('<span class="hc-life">+</span>')}</span></div>`);
+        <span class="hc-keys">${keyChips(keys.map((part) => ({html: esc(part)})), {small: true})}</span></div>`);
     if (layers.length) rows.push(`<div class="hc-act"><span class="hc-stage">Layers</span>
         <span class="hc-layers">${layers.map((at) => layerTagged(model, at, layerCalled(model?.layers?.[at]), [shortcutLayerTag(model, custom)])).join("")}
         ${under(shortcutLayerUnder(custom))}</span></div>`);
     return `<div class="hc-sect"><div class="hc-h">Shortcut</div><div class="hc-sub">${esc(shortcutWhen(custom))}</div>${rows.join("")}</div>`;
 }
+
+// A pointing key's mode, said in the heading after its keycode: what the mode
+// does, in the vocabulary's words. Empty for an empty slot, which
+// pointingEmpty says instead, and for any other key.
+/** @param {ReturnType<typeof keyReach>} reach */
+const pointingKind = ({pointing}) => pointing?.kind ? `<span class="hc-kind"> · ${esc(pointing.kind)}</span>` : "";
+// Under the heading of a key whose pointing slot is empty: it does nothing yet.
+/** @param {ReturnType<typeof keyReach>} reach */
+const pointingEmpty = ({pointing}) => pointing && !pointing.kind
+    ? `<div class="hc-sub hc-foot">This slot is empty, so the key does nothing until it is configured. The keyboard keeps the keycode either way.</div>` : "";
 
 // What the custom key a keycode is sends, in the card's header (firmware
 // D-F26).

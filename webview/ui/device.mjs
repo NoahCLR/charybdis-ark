@@ -1,10 +1,11 @@
 // @ts-check
 // The Keyboard screen: who the keyboard is. Its name is the title (click to
 // rename), then what it is and runs (product, firmware against this Ark,
-// Ark's own version, the two halves, a restart when one is needed), how full
-// its memory is, then folded, what its firmware was built with and the
-// diagnostics of what was read, with each half's flash pauses: read when
-// the fold opens and by its Read keyboard, and only then.
+// Ark's own version, the two halves, a restart when one is needed), with Read
+// keyboard in its heading, then how full its memory is. On a page opened with
+// `?diagnostics` (D-L100), then folded, the diagnostics of what was read,
+// with each half's flash pauses: read when the fold opens, and by Read
+// keyboard while it is open, and only then.
 //
 // In the demo it says what stands in for a keyboard, and that it is not one;
 // reading a keyboard from there leaves the demo, asking first.
@@ -13,6 +14,7 @@
 import * as controls from "../view/controls.mjs";
 import * as edits from "../view/edits.mjs";
 import {DISCLOSURE, el, esc} from "../lib/dom.mjs";
+import {meterFill} from "./meter.mjs";
 import {getModel, post, postLeavingDemo, render, state} from "../store.mjs";
 import {editGate} from "../view/edit-gate.mjs";
 import {demoOf} from "../view/demo.mjs";
@@ -20,10 +22,9 @@ import {halvesWords, phaseWords} from "../view/vocabulary.mjs";
 import {shellOf} from "../view/shell-panel.mjs";
 import {profileUsageView} from "../view/profile-usage.mjs";
 import {flashPausesView} from "../view/flash-pauses.mjs";
-import {FIRMWARE_RELEASES, RESTART_NEEDED, SAVE_IN_PROGRESS, firmwareLine, halvesRows, productName} from "../view/keyboard-view.mjs";
+import {FIRMWARE_RELEASES, RESTART_NEEDED, SAVE_IN_PROGRESS, diagnosticsShown, firmwareLine, halvesRows, productName} from "../view/keyboard-view.mjs";
 import {NAME_MAX_BYTES} from "../view/names.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
-import {firmwareFacts} from "../view/firmware-facts.mjs";
 import {attachTitleName, titleName} from "./title-name.mjs";
 import {themeToggle} from "./frame.mjs";
 import {renameNote} from "../view/edit-mode.mjs";
@@ -58,25 +59,25 @@ export function screenDevice() {
         ...(build?.version ? /** @type {const} */ ([["Ark", esc(`Ark ${build.version}`)]]) : []),
         ["Halves", demo ? "Demo · no keyboard" : `<span class="halves">${halves}</span>`],
     ]);
-    const usage = model?.portable?.available ? profileUsageView(model, model.portable.usage, model?.macroBank) : null;
-    const diagnosticsOpen = (state.settingsOpen || []).includes("diagnostics");
+    const usage = model?.portable?.available ? profileUsageView(model, model.portable.usage, model?.macroBank, model?.autocorrect?.usage) : null;
+    const diagnostics = diagnosticsShown();
+    const diagnosticsOpen = diagnostics && (state.settingsOpen || []).includes("diagnostics");
     // Diagnostics reads each half's flash pauses when it opens, and once for
     // each connection while it stays open: a keyboard reconnected or chosen
     // meanwhile is read too, when nothing else holds it.
     const connection = model?.load?.connectionToken ?? null;
     const askFlashPauses = () => {state.flashPausesAsked = connection; post(controls.readFlashPauses());};
     const unread = diagnosticsOpen && !demo && device?.connected && !device.flashPauses && !health?.busy && connection !== null && state.flashPausesAsked !== connection;
-    const facts = firmwareFacts(model);
     const main = el(`<div class="main">
-        <header class="topbar keyboard-topbar"><div class="keyboard-title"><div class="keyboard-name">${title}${dirty ? draftDot() : ""}</div>
+        <header class="topbar keyboard-topbar"><div class="keyboard-title"><div class="keyboard-name">${title}${dirty ? draftDot(model?.draft) : ""}</div>
             <p class="sub">${esc(sub)}</p><p class="note rename-note">${esc(renameNote(model?.draft))}</p></div>
             <div class="topbar-actions">${themeToggle()}</div></header>
         <div class="content"><div class="pad stack device-pad">
-            <section class="card"><div class="card-h"><h3>This keyboard</h3></div>
+            <section class="card"><div class="card-h"><h3>This keyboard</h3>
+                <span class="right"><button class="btn tiny" data-act="read" ${health?.busy ? "disabled" : ""}>Read keyboard</button></span></div>
                 <div class="card-b stack gap-12">${identity}${restart}${earlier}${saving}</div></section>
             ${usage ? usageCard(usage) : ""}
-            ${facts.length ? builtInCard(facts) : ""}
-            <div class="diagnostics"><details class="card settings-group" data-section="diagnostics" ${diagnosticsOpen ? "open" : ""}>
+            ${diagnostics ? `<details class="card settings-group" data-section="diagnostics" ${diagnosticsOpen ? "open" : ""}>
                 <summary class="card-h">${DISCLOSURE}<h3>Diagnostics</h3></summary>
                 <div class="card-b stack gap-12">${kv([
                     ["Saved profile", esc(device?.summary || "")],
@@ -88,8 +89,7 @@ export function screenDevice() {
                 <div class="list">${(model?.diagnostics || []).map((note) =>
                     `<div class="list-row note-row"><span class="note">${esc(note)}</span></div>`).join("")
                     || `<div class="list-row"><span class="note">Nothing has been read yet.</span></div>`}</div>
-            </details>
-            <button class="btn tiny diagnostics-read" data-act="read" ${health?.busy ? "disabled" : ""}>Read keyboard</button></div>
+            </details>` : ""}
         </div></div></div>`);
     /** @type {NodeListOf<HTMLDetailsElement>} */ (main.querySelectorAll("details[data-section]")).forEach((fold) => fold.addEventListener("toggle", () => {
         const id = /** @type {string} */ (fold.dataset.section);
@@ -101,10 +101,9 @@ export function screenDevice() {
     }));
     if (unread) askFlashPauses();
     const read = /** @type {HTMLButtonElement} */ (main.querySelector('[data-act="read"]'));
-    // The button sits over the fold's title, outside its summary, so it is a
-    // control of its own and pressing it does not fold.
     read.addEventListener("click", () => {
-        const message = controls.readKeyboard(/** @type {HTMLDetailsElement} */ (read.parentElement?.querySelector("details")).open);
+        const fold = /** @type {HTMLDetailsElement | null} */ (main.querySelector('details[data-section="diagnostics"]'));
+        const message = controls.readKeyboard(Boolean(fold?.open));
         if (demo) postLeavingDemo(message);
         else post(message);
     });
@@ -126,21 +125,6 @@ function flashPausesSection(view, demo) {
     return `<div class="flash-pauses-section"><div class="sect-h"><h4>Flash pauses</h4></div><p class="note">${esc(about)}</p>${body}</div>`;
 }
 
-// What this firmware was built with, read-only, folded beside the memory its
-// numbers bound: each fact needs a firmware build to change.
-/** @param {ReturnType<typeof firmwareFacts>} facts */
-function builtInCard(facts) {
-    const open = (state.settingsOpen || []).includes("builtIn");
-    return `<details class="card settings-group" data-section="builtIn" ${open ? "open" : ""}>
-        <summary class="card-h">${DISCLOSURE}<h3>Built into this firmware</h3>
-            <span class="right fold-summary">${facts.length} facts</span></summary>
-        <div class="card-b settings-intro"><p class="note">Changing any of these needs a new firmware build on both halves.</p></div>
-        <div class="rows">${facts.map((fact) => `<div class="setrow ro" data-tip="${esc(fact.hint)}">
-            <div><div class="nm">${esc(fact.label)}</div><div class="hint">${esc(fact.hint)}</div></div>
-            <div class="control"><span class="fact-value">${esc(fact.value)}</span></div></div>`).join("")}</div>
-    </details>`;
-}
-
 // How full the profile is, and how many of each thing are set up against what
 // the keyboard holds: the counts are what an edit runs into first.
 /** @param {NonNullable<ReturnType<typeof profileUsageView>>} usage */
@@ -152,17 +136,21 @@ function usageCard(usage) {
         <div class="card-b stack gap-12">
             <div><div class="sect-h"><h4>Profile</h4>
                 <span class="right note">${esc(bytes(usage.used))} of ${esc(bytes(usage.capacity))} bytes used · ${esc(bytes(usage.free))} free</span></div>
-                <div class="meter ${usage.nearlyFull ? "near" : ""}" data-tip="${Math.round(usage.share * 100)}% used"><i style="width:${usage.share * 100}%"></i></div></div>
-            <p class="note">Behaviours, combos, lighting, pointing modes, custom keys, settings and names are stored together here${usage.nearlyFull ? ". It is nearly full: the next edit may not fit" : ""}.</p>
+                <div class="meter ${usage.nearlyFull ? "near" : ""}" data-tip="${Math.round(usage.share * 100)}% used">${meterFill(usage.share * 100)}</div></div>
+            <p class="note">Behaviours, combos, macros, text replacements, custom keys, pointing modes, lighting, settings and names are stored together here${usage.nearlyFull ? ". It is nearly full: the next edit may not fit" : ""}.</p>
             ${usage.counts.length ? `<table class="t usage-counts"><thead><tr><th>In use</th><th class="count num"></th><th></th><th></th></tr></thead>
                 <tbody>${usage.counts.map((count) => `<tr data-tip="${esc(count.tip)}"><td>${esc(count.label)}</td>
-                    <td class="mono count num">${esc(count.used)} of ${esc(count.limit)}</td>
-                    <td class="bar"><div class="meter"><i style="width:${count.share * 100}%"></i>${count.unavailable
+                    <td class="mono count num">${esc(bytes(count.used))} of ${esc(bytes(count.limit))}</td>
+                    <td class="bar"><div class="meter">${meterFill(count.share * 100)}${count.unavailable
                         ? `<span class="out" style="width:${count.unavailableShare * 100}%"></span>` : ""}</div></td>
                     <td class="note">${esc(count.note)}</td></tr>`).join("")}</tbody></table>` : ""}
             ${usage.macros ? `<div><div class="sect-h"><h4>Macro memory</h4>
                 <span class="right note">${esc(bytes(usage.macros.used))} of ${esc(bytes(usage.macros.capacity))} bytes used</span></div>
-                <div class="meter"><i style="width:${usage.macros.share * 100}%"></i></div>
+                <div class="meter">${meterFill(usage.macros.share * 100)}</div>
                 <p class="note meter-note">Macro steps are part of the profile above, within their own limit, and counted slot by slot on Macros.</p></div>` : ""}
+            ${usage.replacements ? `<div data-usage="replacements"><div class="sect-h"><h4>Text replacement memory</h4>
+                <span class="right note">${esc(bytes(usage.replacements.used))} of ${esc(bytes(usage.replacements.capacity))} bytes of text used</span></div>
+                <div class="meter">${meterFill(usage.replacements.share * 100)}</div>
+                <p class="note meter-note">The text of replacements and their inputs, part of the profile above and listed on Text replacement.</p></div>` : ""}
         </div></div>`;
 }

@@ -46,7 +46,17 @@ test("a key wears its behaviour's dots only where the behaviour runs, judged on 
     assert.deepEqual([throughBase.from, dots(throughBase)], [model.layers[0], []], "answered by Base's C, it marks nothing: C's row does not run on Base");
 });
 
-test("a dot carries the colour its tier flashes, none while key feedback is off", () => {
+test("without glass, as on Lighting, every key and the trackball is solid: the keyboard shows its light the same whichever layer paints it", () => {
+    const transparent = keyOf(model, 2, [], 0, {glass: false});
+    assert.deepEqual([transparent.kind, transparent.glass], ["transparent", false], "a transparent key shown alone");
+    const answered = keyOf(model, 2, [1], 0, {glass: false});
+    assert.deepEqual([answered.from, answered.glass, answered.light], [model.layers[1], false, keyOf(model, 2, [1], 0).light],
+        "a key answered from below keeps that layer's light and legend");
+    assert.equal(boardTrackball(layerView(model, 2)).glass, true, "the trackball is seen through Symbols on Keymap");
+    assert.equal(boardTrackball(layerView(model, 2), {glass: false}).glass, false, "and solid on Lighting");
+});
+
+test("a dot carries the colour its tier flashes, none while behaviour feedback is off", () => {
     assert.notEqual(keyOf(model, 0, [], 1).tiers[0].colour, null);
     const off = modelOf([rgbStages(model.rgb.stageEnableMask, 16, false)]);
     assert.deepEqual(keyOf(off, 0, [], 1).tiers, [{kind: "tap", count: 1, colour: null}]);
@@ -63,21 +73,59 @@ test("a key is named as the board names it, never by its layout index", () => {
     assert.equal(keyOf(model, 0, [], 0).name, "C");
     assert.equal(keyOf(model, 2, [], 0).name, "Transparent", "a transparent key says so");
     assert.equal(keyOf(model, 2, [0], 0).name, "C", "and seen through to Base, names the key that answers");
-    assert.equal(keyOf(model, 0, [], 1, {mode: "leds"}).name, `LED ${keyLed(model, 1)}`, "the LED selector names its LED");
 });
 
-test("the LED selector names each key's LED, and shows no light, marks or second line", () => {
-    const led = keyOf(model, 0, [], 1, {mode: "leds"});
-    assert.deepEqual([led.main, led.sub, led.light, led.tiers, led.badges], [String(keyLed(model, 1)), "", null, [], []]);
+test("every key carries its LED, and the LEDs picked for an accent show in its colour", () => {
+    const key = keyOf(model, 0, [], 1);
+    assert.deepEqual([key.led, key.picked], [keyLed(model, 1), false], "Lighting numbers each key by the LED it carries");
+    const red = {h: 0, s: 255, v: 200};
+    const picked = keyOf(model, 0, [], 1, {accent: {leds: new Set([keyLed(model, 1)]), colour: red}});
+    assert.deepEqual([picked.picked, picked.light], [true, red], "a picked LED wears the accent's colour over the layer's");
+    assert.deepEqual([picked.main, picked.tiers.length], [key.main, key.tiers.length], "and keeps its face and marks");
+    const unpicked = keyOf(model, 0, [], 0, {accent: {leds: new Set([keyLed(model, 1)]), colour: red}});
+    assert.deepEqual([unpicked.picked, unpicked.light], [false, keyOf(model, 0, [], 0).light], "others keep the layer's light");
+    const dark = keyOf(model, 0, [], 1, {accent: {leds: new Set([keyLed(model, 1)]), colour: null}});
+    assert.deepEqual([dark.picked, dark.light], [true, key.light], "an accent that would paint nothing leaves the light as it is, still picked");
     const plain = keyOf(model, 0, [], 1, {faces: false});
     assert.ok(plain.light, "without faces a key is still lit");
     assert.deepEqual([plain.tiers, plain.badges], [[], []], "but wears no marks");
-    assert.equal(keyOf(model, 2, [1], 0, {mode: "leds"}).from, null, "and a selector shows each layer's own key");
 });
 
-test("the trackball shows its light, solid on base, and in the LED selector only its index", () => {
+test("the trackball shows its light, solid on base, and wears an accent's colour while picked", () => {
     const ball = boardTrackball(layerView(model, 0));
-    assert.deepEqual([ball.led, ball.glass], [model.leds.trackball, false]);
+    assert.deepEqual([ball.led, ball.glass, ball.picked], [model.leds.trackball, false, false]);
     assert.ok(ball.light);
-    assert.deepEqual(boardTrackball(layerView(model, 2), {mode: "leds"}), {led: model.leds.trackball, light: null, glass: false});
+    const red = {h: 0, s: 255, v: 200};
+    assert.deepEqual(boardTrackball(layerView(model, 2), {accent: {leds: new Set([model.leds.trackball]), colour: red}}),
+        {led: model.leds.trackball, picked: true, light: red, glass: false});
+});
+
+test("a key wears one icon for each kind of thing it plays, sends or runs, its own first", () => {
+    // D taps macro 1 and holds Volume locked on; F taps Dragscroll and holds
+    // Zoom; E's row runs only on Numbers. Symbols is transparent at the
+    // pointing key.
+    const model = published({
+        keys: {0: {5: "MACRO_0", 6: "CUSTOM_KEY_0", 7: "PD_MODE_0", 8: "KC_D", 9: "KC_E", 10: "MACRO_2", 11: "KC_F"}, 2: {7: "KC_TRANSPARENT"}},
+        behaviours: [
+            {keycode: "KC_D", steps: [{tapCount: 0, tap: {action: "MACRO_1"}, hold: {action: "PD_MODE_1_LOCK", style: "TAP_AT_HOLD_THRESHOLD"}}]},
+            {keycode: "KC_E", allowedLayers: NUMBERS, steps: [{tapCount: 0, tap: {action: "CUSTOM_KEY_1"}}]},
+            {keycode: "MACRO_2", steps: [{tapCount: 0, hold: {action: "MACRO_3", style: "TAP_AT_HOLD_THRESHOLD"}, longHold: {action: "CUSTOM_KEY_1", style: "TAP_AT_HOLD_THRESHOLD"}}]},
+            {keycode: "KC_F", steps: [{tapCount: 0, tap: {action: "PD_MODE_0"}, hold: {action: "PD_MODE_3", style: "TAP_AT_HOLD_THRESHOLD"}}]},
+        ]});
+    /** @param {number} at @param {number} index @param {number[]} [held] @param {Parameters<typeof boardKeys>[1]} [shows] */
+    const icons = (at, index, held = [], shows) => keyOf(model, at, held, index, shows).icons;
+
+    assert.deepEqual(icons(0, 5), ["macro"], "a macro's key");
+    assert.deepEqual(icons(0, 6), ["customKey"], "a custom key");
+    assert.deepEqual(icons(0, 7), ["pointing"], "a pointing key");
+    assert.deepEqual(icons(0, 8), ["macro", "pointing"], "a plain key whose behaviour plays a macro and runs a pointing mode, in tier order");
+    assert.deepEqual(icons(0, 10), ["macro", "customKey"], "its own macro once, then what its behaviour sends");
+    assert.deepEqual(icons(0, 11), ["pointing"], "two pointing modes, one icon");
+    assert.deepEqual(icons(0, 9), [], "a behaviour a switch keeps off marks nothing, as its dots don't");
+    assert.deepEqual(icons(1, 9), [], "Numbers holds no E");
+    assert.deepEqual(icons(0, 0), [], "a plain key has none");
+
+    assert.deepEqual(icons(2, 7), [], "a transparent key shows none of its own");
+    assert.deepEqual(icons(2, 7, [0]), ["pointing"], "seen through to Base, the answering key's");
+    assert.deepEqual(icons(0, 8, [], {faces: false}), [], "no marks, no icons");
 });

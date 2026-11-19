@@ -4,10 +4,10 @@
 // tabs are the stages in the order the firmware paints them.
 
 // Selector assertions refer to elements created by this module's authored markup.
-import {css, isOff} from "../lib/colour.mjs";
+import {css} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
-import {baseColour, feedbackColours, layerColourRow, lightingOff, pdColourRow, pdTrigger, stageEnabled, stageIdle, stageInEffect, trackballLed} from "../view/lighting.mjs";
-import {listed, slotCalled, stageOrder, layerCalled} from "../view/vocabulary.mjs";
+import {baseColour, layerColourRow, lightingOff, pdColourRow, stageIdle, stageInEffect, swatchOf} from "../view/lighting.mjs";
+import {said, stageOrder, vocabulary} from "../view/vocabulary.mjs";
 import {currentLayer, currentView, getModel, post, render, state} from "../store.mjs";
 import {editGate} from "../view/edit-gate.mjs";
 import * as edits from "../view/edits.mjs";
@@ -17,13 +17,16 @@ import {linkTabPanel, rovingTabs} from "../lib/tabs.mjs";
 import {attachLayersControl} from "./layers.mjs";
 import {topbar} from "./frame.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
-import {localityLabel} from "./lighting/common.mjs";
 import {stageBody} from "./lighting/stage-body.mjs";
+import {accentActions, accentPicks, editingOn, glowShown, pickLed} from "./lighting/accents.mjs";
+import {boardShortcuts} from "./lighting/help.mjs";
+import {attachInfoMarks} from "./info-mark.mjs";
+import {holdComboFrom} from "../view/combo-held.mjs";
+import {lightingBoard} from "../view/lighting-board.mjs";
+import {feedbackCase, replacementOwner, replacementRowOf} from "../view/accents.mjs";
 import {durationControl} from "./duration.mjs";
+import {phraseMarked} from "./marks.mjs";
 import {sectionsIn} from "../view/settings-layout.mjs";
-
-/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} id */
-const stageBit = (model, id) => (model?.rgb?.stages || []).find((stage) => stage.id === id)?.bit;
 
 export function screenLighting() {
     const model = getModel();
@@ -32,9 +35,7 @@ export function screenLighting() {
             <div class="content"><div class="pad"><div class="screen-stub"><h3>No lighting read</h3>
             <p class="note">${esc(editGate(model, "lighting").why || "Choose Read keyboard to read this keyboard's lighting.")}</p></div></div></div></div>`);
     }
-    const onGroups = state.stage === "groups";
     const view = currentView();
-    const layer = currentLayer();
     const main = el(`<div class="main">${topbar(
         "Lighting",
         "What the keyboard lights, and when."
@@ -45,40 +46,62 @@ export function screenLighting() {
     const content = el(`<div class="content"><div class="pad keys-pad"></div></div>`);
     const pad = /** @type {HTMLElement} */ (content.firstElementChild);
     // The board, what it is showing and the layer tabs under them are one
-    // card, as on Keys; on LED groups the board is the LED selector instead.
+    // card, as on Keys. Nothing on it is frosted: a key falling through
+    // shows the light the keyboard does, solid. Each key carries its LED's
+    // index (D-L77); while an accent is added or changed, a press or a drag
+    // picks its LEDs and the board shows them in its colour.
     const card = el(`<div class="board-card"></div>`);
-    const preview = state.stage === "pd" && state.pdPreview && stageEnabled(model, "pd")
-        ? pdColourRow(model, state.pointingSlot) : null;
-    const drawn = card.appendChild(board(onGroups ? view.alone : view, {
-        mode: onGroups ? "leds" : "light",
-        faces: !onGroups,
-        picks: state.ledPicks,
-        trackball: state.trackball,
-        pdActive: preview ? {mode: preview.pointingMode, color: preview.color, locality: preview.locality, triggerIndex: pdTrigger(model, layer, state.pointingSlot)?.layoutIndex} : null,
-        onKey: onGroups ? (index) => {
-            state.ledPicks = state.ledPicks.includes(index)
-                ? state.ledPicks.filter((value) => value !== index) : [...state.ledPicks, index];
-            render();
+    // On Pointing modes the board shows the picked mode running, and on
+    // Combo feedback a combo held that fires in this view, its keys ringed
+    // as the Keymap rings them; a ringed key holds its input. On Behaviour
+    // feedback and Replacement feedback it shows the picked case, the key
+    // standing in for the one that shows it ringed solid
+    // (view/lighting-board.mjs).
+    const shows = lightingBoard(view, {stage: state.stage, pointingSlot: state.pointingSlot, comboPreview: state.comboPreview, feedbackRow: state.feedbackRow, replacementRow: state.replacementRow});
+    const held = shows.held;
+    const editing = editingOn(model, state.stage);
+    const stage = state.stage;
+    const drawn = card.appendChild(board(shows.shown, {
+        ledIndex: true,
+        glass: false,
+        card: false,
+        accent: accentPicks(model, stage),
+        pdActive: shows.pdActive,
+        comboActive: shows.comboActive,
+        behaviourActive: shows.behaviourActive,
+        replacementActive: shows.replacementActive,
+        reach: held && !editing ? held.ring : [],
+        holding: editing ? [] : held ? held.held : shows.standIn === undefined ? [] : [shows.standIn],
+        onKey: held && !editing ? (index) => {
+            const next = holdComboFrom(view, state.comboPreview, index);
+            if (next) { state.comboPreview = next; render(); }
         } : undefined,
-        onTrackball: onGroups ? () => { state.trackball = !state.trackball; render(); } : undefined,
+        onLed: editing ? (led, starting) => pickLed(model, stage, led, starting) : undefined,
     }));
-    card.appendChild(el(`<div class="board-foot">
-        <b>${onGroups ? "LED selector" : "Preview"}</b>
-        <span class="board-foot-text">${onGroups
-            ? `Click LEDs to build a group · ${state.ledPicks.length} selected${state.trackball ? " + trackball" : ""}`
-            : `${esc(layerCalled(layer))}${view.held.some((at) => at > 0) && !onGroups
-                ? ` with ${esc(listed(view.held.filter((at) => at > 0).reverse().map((at) => layerCalled(view.stack[at]))))} on`
-                : ""} over the background effect${preview
-                ? ` · ${esc(slotName(model, state.pointingSlot))} held, painting ${esc(localityLabel(preview.locality).toLowerCase())}`
-                : ""}`}</span>
-        ${onGroups ? `<span class="right">
-            <button class="btn tiny ghost" data-act="clearleds">Clear selection</button>
-            <button class="btn tiny ${state.trackball ? "primary" : "ghost"}" data-act="trackball"
-                data-tip="Add or remove the trackball LED, index ${esc(trackballLed(model))}, from this selection.">Trackball LED</button></span>`
-            : ""}
-    </div>`));
-    /** @type {HTMLButtonElement | null} */ (card.querySelector('[data-act="clearleds"]'))?.addEventListener("click", () => { state.ledPicks = []; render(); });
-    /** @type {HTMLButtonElement | null} */ (card.querySelector('[data-act="trackball"]'))?.addEventListener("click", () => { state.trackball = !state.trackball; render(); });
+    if (editing) drawn.classList.add("picking-leds");
+    // The accent clicked in a list keeps its LEDs glowing, however far the
+    // list is scrolled.
+    glowShown(model, drawn);
+    // The caption lies over the board's bottom-left corner, which the drawing
+    // leaves empty, and wraps there, so the card stays as tall as the
+    // Keymap's and the caption is read whole; while LEDs are picked, the
+    // instructions take a row under the board instead, so none of them is cut.
+    const foot = el(`<div class="board-foot">
+        <b>${editing ? "Picking LEDs" : "Preview"}</b>
+        <span class="board-foot-text"${editing ? ` data-tip="${esc(said(shows.caption))}"` : ""}>${editing
+            ? `Click or drag across keys to pick the accent's LEDs, or take them back · ${esc(editing.leds.length)} picked`
+            : phraseMarked(model, shows.caption)}</span>
+    </div>`);
+    if (editing) {
+        // An accent is finished where its LEDs are picked.
+        const actions = accentActions(model, stage);
+        if (actions) foot.append(actions);
+        card.appendChild(foot);
+    } else drawn.appendChild(foot);
+    // The board's shortcuts, on its top-right corner as on the Keymap's.
+    const shortcuts = el(boardShortcuts({picking: Boolean(editing), ringed: Boolean(held?.choice && !editing)}));
+    attachInfoMarks(shortcuts);
+    drawn.appendChild(shortcuts);
     // The same strip as Keys, Rename & Reorder included: a layer is renamed
     // and reordered wherever its tabs are.
     const bar = layerBar();
@@ -90,22 +113,27 @@ export function screenLighting() {
     const marks = draftMarks(model?.draft?.changes);
     // The stage tabs are the paint order: numbered as the firmware paints
     // them, each in the colour it paints now, a stage that is off drawn off.
-    // LED groups is no stage; every stage can draw on them.
+    // All accents is no stage: it lists every stage's accents.
     const stages = stageOrder(model);
-    /** @param {{id: string, label: string}} stage @param {number} index */
+    // A tab's swatch is the colour the stage paints for what it has picked:
+    // hollow while the stage paints nothing, hatched for a passthrough
+    // colour, dark and struck through for one that is off. Its label is the
+    // stage's name, or its short word where the names do not all fit (its
+    // stage bar says the name whole); the numbers give the paint order.
+    /** @param {{id: string, label: string, short?: string}} stage @param {number} index */
     const stageTab = (stage, index) => {
-        const on = stageInEffect(model, stage.id), colour = stageColour(model, stage.id), lit = on && colour && !isOff(colour);
+        const on = stageInEffect(model, stage.id), colour = stageColour(model, stage.id), mark = swatchOf(colour, {stageOn: on});
         const idle = stageIdle(model, stage.id);
-        return `<button role="tab" id="stage-tab-${esc(stage.id)}" class="${on ? "" : "off"}" data-ltab="${esc(stage.id)}" aria-selected="${state.stage === stage.id}"
-            data-tip="Painted ${esc(index + 1)} of ${stages.length}${on ? "" : ` · ${esc(lightingOff(model) ? "All lighting is off, so nothing paints" : idle || "this stage is off")}`}">
-            <span class="n">${esc(index + 1)}</span><i class="swatch ${lit ? "" : "swatch-off"}" style="${lit ? `background:${css(colour)}` : ""}"></i>
-            <span class="tab-label">${esc(stage.label)}</span>${marks.lighting.has(stage.id) ? draftDot() : ""}</button>`;
+        return `<button role="tab" id="stage-tab-${esc(stage.id)}" class="${on ? "" : "off"}" data-ltab="${esc(stage.id)}" aria-selected="${state.stage === stage.id}" aria-label="${esc(stage.label)}"
+            data-tip="${esc(stage.label)} · painted ${esc(index + 1)} of ${stages.length}${on ? "" : ` · ${esc(lightingOff(model) ? "All lighting is off, so nothing paints" : idle || "this stage is off")}`}">
+            <span class="n">${esc(index + 1)}</span><i class="swatch ${mark}" style="${colour && !mark ? `background:${css(colour)}` : ""}"></i>
+            <span class="tab-label"><span class="long" data-text="${esc(stage.label)}">${esc(stage.label)}</span><span class="short" aria-hidden="true" data-text="${esc(stage.short || stage.label)}">${esc(stage.short || stage.label)}</span></span>${marks.lighting.has(stage.id) ? draftDot(model?.draft) : ""}</button>`;
     };
-    const bench = el(`<div class="card bench">
+    const bench = el(`<div class="card bench workbench lighting-bench">
         <div class="bench-tabs"><div class="bench-tablist" role="tablist" aria-label="Lighting stages, in paint order">
-            ${stages.map(stageTab).join(`<span class="tab-step" aria-hidden="true">›</span>`)}
+            ${stages.map(stageTab).join("")}
             <span class="tab-sep" aria-hidden="true"></span>
-            <button role="tab" id="stage-tab-groups" data-ltab="groups" aria-selected="${onGroups}"><span class="tab-label">LED groups</span>${marks.lighting.has("groups") ? draftDot() : ""}</button></div>
+            <button role="tab" id="stage-tab-accents" data-ltab="accents" aria-selected="${state.stage === "accents"}"><span class="tab-label"><span data-text="${esc(vocabulary(model).allAccents)}">${esc(vocabulary(model).allAccents)}</span></span>${marks.lighting.has("accents") ? draftDot(model?.draft) : ""}</button></div>
             <span class="bench-right" id="benchRight"></span>
         </div>
         <div class="bench-body" id="benchBody"></div>
@@ -114,10 +142,8 @@ export function screenLighting() {
         state.stage = /** @type {string} */ (button.dataset.ltab);
         render();
     }));
-    const right = /** @type {HTMLElement} */ (bench.querySelector("#benchRight"));
-    const bit = stageBit(model, state.stage);
-    if (bit !== undefined) right.appendChild(stageSwitch(model, state.stage, bit));
     stageBody(/** @type {HTMLElement} */ (bench.querySelector("#benchBody")));
+    fitStageWords(/** @type {HTMLElement} */ (bench.querySelector(".bench-tablist")));
     keepInView(/** @type {HTMLElement} */ (bench.querySelector(".bench-tablist")));
     rovingTabs(/** @type {HTMLElement} */ (bench.querySelector(".bench-tablist")), /** @type {HTMLElement} */ (bench.querySelector("#benchBody")));
     pad.appendChild(bench);
@@ -126,7 +152,22 @@ export function screenLighting() {
     return main;
 }
 
-const slotName = slotCalled;
+/** The stage tabs read by their names where every name fits the strip, and
+ * by their short words where one would not, in whatever font the system
+ * draws them. The strip is measured with the names, so a wider window brings
+ * them back. It is measured first in the frame keepInView then measures in,
+ * so the strip's arrows see the words that are shown, and again on a resize.
+ * @param {HTMLElement} strip */
+function fitStageWords(strip) {
+    const bar = /** @type {HTMLElement} */ (strip.closest(".bench-tabs"));
+    const fit = () => {
+        if (!strip.isConnected) return;
+        bar.classList.remove("short-words");
+        bar.classList.toggle("short-words", strip.scrollWidth > strip.clientWidth);
+    };
+    requestAnimationFrame(fit);
+    new ResizeObserver(fit).observe(strip);
+}
 
 // All lighting and its idle timeout darken every LED, every stage with them,
 // so they sit above the stages rather than in one. The keyboard keeps them
@@ -141,7 +182,7 @@ function powerControls(model) {
     const editable = editGate(model, "settings").editable;
     const node = el(`<div class="settings-group lighting-power" data-section="${esc(section.id)}">
         <label class="sw" data-tip="${esc([toggle.hint, toggle.tooltip].filter(Boolean).join(" "))}"><input type="checkbox" data-macro="${esc(toggle.macro)}" data-f="setting:${esc(toggle.macro)}" ${toggle.enabled ? "checked" : ""} ${editable && !toggle.readOnly ? "" : "disabled"}>
-            <span class="track"></span><span class="txt">${esc(toggle.label)}${draftMarks(model?.draft?.changes).settings.has(section.id) ? draftDot() : ""}</span></label>
+            <span class="track"></span><span class="txt">${esc(toggle.label)}${draftMarks(model?.draft?.changes).settings.has(section.id) ? draftDot(model?.draft) : ""}</span></label>
         <span class="lighting-timeout" data-tip="${esc(timeout.hint || "")}"><span class="muted">${esc(timeout.label)}</span></span></div>`);
     const submit = () => {
         if (duration.read() === null) { duration.reportValidity(); return; }
@@ -155,21 +196,9 @@ function powerControls(model) {
     return node;
 }
 
-/** @param {import("../../contracts/panel.js").PublishedModel} model @param {string} id @param {number} bit */
-function stageSwitch(model, id, bit) {
-    const on = stageEnabled(model, id);
-    const node = el(`<label class="sw" data-tip="Turn this whole stage off without losing the colours it stores.">
-        <input data-f="lighting:${esc(id)}:enabled" type="checkbox" ${on ? "checked" : ""} ${editGate(model, "lighting").editable ? "" : "disabled"}><span class="track"></span>
-        <span class="txt">${on ? "Stage on" : "Stage off"}</span></label>`);
-    /** @type {HTMLInputElement} */ (node.querySelector("input")).addEventListener("change", (event) => {
-        const mask = model.rgb.stageEnableMask ?? 0;
-        post(edits.rgbStages(mask, bit, /** @type {HTMLInputElement} */ (event.target).checked));
-    });
-    return node;
-}
-
 // The colour a stage paints now, for its tab: the layer shown, the pointing
-// mode picked, the hold colour for key feedback.
+// mode picked, the case picked on behaviour feedback and on replacement
+// feedback.
 /** @param {import("../../contracts/panel.js").PublishedModel} model @param {string} id */
 function stageColour(model, id) {
     return /** @type {Record<string, () => import("../../contracts/edits.js").Colour | null | undefined>} */ ({
@@ -178,6 +207,7 @@ function stageColour(model, id) {
         auto: () => model.rgb.automouseFade?.end_color,
         pd: () => pdColourRow(model, state.pointingSlot)?.color,
         combo: () => model.rgb.comboFeedback?.color,
-        key: () => feedbackColours(model).hold,
+        key: () => feedbackCase(model, state.feedbackRow)?.color ?? feedbackCase(model, "tapCommittedColor")?.color,
+        autocorrect: () => model.rgb.autocorrectFeedback?.[replacementRowOf(model, replacementOwner(model, state.replacementRow))],
     })[id]?.();
 }

@@ -45,3 +45,10 @@ test("a notice is polite, an error assertive, and a save cut short is said once,
     assert.deepEqual(announcements(model({apply}), {applyDismissed: 4, error: `Failed: ${failure.reason}`}).assertive, [`Failed: ${failure.reason}`],
         "dismissed, the bar is gone and the rail says it");
 });
+
+test("a slot tile held for a swap is said politely, once, and let go in silence (D-L81)", async () => {
+    const {HELD_SLOT_WORDS} = await import("../../webview/view/announcements.mjs");
+    assert.deepEqual(announcements(published, {heldSlot: {bank: "macros", key: "MACRO_3"}}).polite, [HELD_SLOT_WORDS]);
+    assert.ok(!HELD_SLOT_WORDS.includes("MACRO_3"), "no key is named as plain text");
+    assert.deepEqual(announcements(published, {heldSlot: null}).polite, []);
+});

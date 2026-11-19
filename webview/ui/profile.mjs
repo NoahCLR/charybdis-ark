@@ -18,7 +18,7 @@ import {categorySummary, statusBesideCount} from "../view/review.mjs";
 import {copyTitle, deleteRecovery, downloadRecovery, shellOf, useRecovery} from "../view/shell-panel.mjs";
 import {DEMO_WORDS, demoOf} from "../view/demo.mjs";
 import {reviewPortableProfile} from "../view/edits.mjs";
-import {PROFILE_FILE_MAX_BYTES, PROFILE_FILE_TOO_LARGE, fitsLine} from "../view/backups.mjs";
+import {PROFILE_FILE_MAX_BYTES, PROFILE_FILE_TOO_LARGE, fitsLine, viaCallout, viaClearChoices, viaLeftOut} from "../view/backups.mjs";
 import {importCallout, importNote} from "../view/edit-mode.mjs";
 import {dialogFoot} from "./dialog-foot.mjs";
 
@@ -52,7 +52,7 @@ export function screenProfile() {
             <div class="card-b">
                 <span class="profile-action-mark"><svg viewBox="0 0 24 24"><path d="M12 3v12M7.5 10.5 12 15l4.5-4.5M4 19h16"/></svg></span>
                 <h3>Import profile</h3>
-                <p class="note">${esc(demo ? "Choose or drop a backup to compare it with the demo first. It replaces the demo's draft; Undo brings it back."
+                <p class="note">${esc(demo ? "Choose or drop a backup, or a layout saved from VIA, to compare it with the demo first. It replaces the demo's draft; Undo brings it back."
                     : importNote(model?.draft))}</p>
                 <p class="note profile-drop-status" role="status" hidden></p>
                 <button class="btn" data-act="import" ${canImport ? "" : "disabled"}>Import profile…</button>
@@ -156,7 +156,7 @@ function recoveriesCard(recoveries) {
     const node = el(`<div class="card recoveries">
         <div class="card-h"><h3>Recovery copies</h3><span class="right note">${recoveries.length} in this browser</span></div>
         ${recoveries.length ? `<div class="list">${recoveries.map((copy) => `<div class="list-row recovery-row">
-            <span class="recovery-name" title="${esc(copy.name)}">${esc(copyTitle(model, copy))}</span>
+            <span class="recovery-name" data-tip="${esc(copy.name)}">${esc(copyTitle(model, copy))}</span>
             ${String(state.recoveryAsk) === String(copy.id)
                 ? `<span class="recovery-ask" role="group" aria-label="Delete this copy?">${dialogFoot(
                     `<button class="btn tiny destructive" data-act="confirm-delete">Delete</button>`,
@@ -196,7 +196,7 @@ function recoveriesCard(recoveries) {
 // an Apply, after a recovery copy (core/session/panel-controls.js).
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {Partial<import("../../contracts/panel.js").PublishedModel["portable"]> & {review: NonNullable<import("../../contracts/panel.js").PublishedModel["portable"]["review"]>}} portable @param {boolean} busy */
 function reviewSheet(model, portable, busy) {
-    const {incoming, current, fileName, differences, fits} = portable.review;
+    const {incoming, current, fileName, differences, fits, via} = portable.review;
     const draft = model?.draft;
     const pending = draft?.dirty ? draft.changes.length : 0;
     const same = differences && !differences.length;
@@ -209,11 +209,15 @@ function reviewSheet(model, portable, busy) {
     const callout = !current
         ? "An interrupted save left an incomplete profile on the keyboard, so this file cannot be compared with it. Saving this backup replaces it, and a recovery copy keeps the interrupted data; keep your original backup as well."
         : draft
-            ? `${pending ? `This replaces your draft and its ${pending} change${pending === 1 ? "" : "s"}; Undo brings ${pending === 1 ? "it" : "them"} back. ` : ""}${importCallout(draft)}`
+            ? `${via ? `${viaCallout(via, incoming.names)} ` : ""}${pending ? `This replaces your draft and its ${pending} change${pending === 1 ? "" : "s"}; Undo brings ${pending === 1 ? "it" : "them"} back. ` : ""}${importCallout(draft)}`
             : "Saving this backup replaces the keyboard's keys, layers, behaviours, combos, custom keys, macros, pointing modes, lighting and settings at once, with no draft to review first. Ark saves a recovery copy of what the keyboard holds first, and checks both halves afterwards.";
     const size = fits ? fitsLine(fits) : null;
-    const node = el(`<div class="scrim import-scrim"><div class="sheet import-sheet" role="dialog" aria-modal="true" aria-label="${draft ? "Use this backup as your draft?" : "Save this backup to the keyboard?"}">
-        <div class="sheet-h"><h2>${draft ? "Use this backup as your draft?" : "Save this backup to the keyboard?"}</h2>
+    const left = via ? viaLeftOut(via) : null;
+    const slate = via ? viaClearChoices(via) : null;
+    // A VIA layout only ever comes into a draft (core/session/panel-controls.js).
+    const title = via ? "Use this VIA layout as your draft?" : draft ? "Use this backup as your draft?" : "Save this backup to the keyboard?";
+    const node = el(`<div class="scrim import-scrim"><div class="sheet import-sheet" role="dialog" aria-modal="true" aria-label="${title}">
+        <div class="sheet-h"><h2>${title}</h2>
             ${fileName ? `<span class="right note mono">${esc(fileName)}</span>` : ""}</div>
         <div class="sheet-b stack gap-12">
             ${size ? `<p class="note import-fits${size.warn ? " warn" : ""}">${esc(size.text)}</p>` : ""}
@@ -223,12 +227,21 @@ function reviewSheet(model, portable, busy) {
             ${summary.length ? `<table class="t import-diff"><thead><tr><th>What this file changes</th><th>Differences</th><th></th></tr></thead>
                 <tbody>${summary.map((group) => `<tr class="cat"><td>${esc(group.category)}</td><td class="mono">${esc(group.count)}</td><td class="note">${esc(group.status)}</td></tr>
                     ${group.rows.map((row) => `<tr class="sub"><td>${esc(row.label)}</td><td class="mono">${esc(row.count)}</td><td></td></tr>`).join("")}`).join("")}</tbody></table>` : ""}
+            ${left ? `<div class="callout warn via-left"><p>${esc(left.heading)}:</p><ul>${left.lines.map((line) => `<li>${esc(line)}</li>`).join("")}${left.more ? `<li class="note">${esc(left.more)}</li>` : ""}</ul></div>` : ""}
+            ${slate ? `<fieldset class="via-slate stack gap-8"><legend class="note">${esc(slate.intro)}</legend>
+                ${slate.choices.map((choice) => `<label class="sw"><input type="checkbox" data-f="import:via-clear:${esc(choice.kind)}" data-via-clear="${esc(choice.kind)}" ${choice.checked ? "checked" : ""} ${busy ? "disabled" : ""}><span class="track"></span><span class="txt">${esc(choice.label)}</span></label>`).join("")}</fieldset>` : ""}
             ${same ? "" : `<div class="callout">${esc(callout)}</div>`}
         </div>
         <div class="sheet-f">${dialogFoot(`<button class="btn primary" data-act="restore" ${busy || changesNothing ? "disabled" : ""}>${draft ? "Use as draft" : "Save to keyboard"}</button>`, {disabled: busy})}</div>
     </div></div>`);
     node.addEventListener("click", (event) => { if (event.target === node && !busy) post(controls.control("cancelPortableReview")); });
     /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="restore"]')).addEventListener("click", () => post(controls.control("restorePortableProfile")));
+    // Each switch asks core to read the file again with that blank slate, so
+    // the counts above stay what Use as draft would do.
+    if (via) /** @type {NodeListOf<HTMLInputElement>} */ (node.querySelectorAll("[data-via-clear]")).forEach((input) => input.addEventListener("change", () => {
+        const kind = /** @type {keyof import("../../contracts/model.js").ViaClears} */ (input.dataset.viaClear);
+        post(controls.viaImportClears({...via.clear, [kind]: input.checked}));
+    }));
     /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="cancel"]')).addEventListener("click", () => post(controls.control("cancelPortableReview")));
     return node;
 }

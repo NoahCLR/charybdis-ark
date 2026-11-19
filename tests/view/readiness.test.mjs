@@ -20,6 +20,17 @@ test("only a ready model releases Configure screens", () => {
     assert.match(readScreen({vocabulary: VOCABULARY, load: {state: "unavailable"}, device: {connected: true}}).detail, /complete profile/);
 });
 
+test("a failed read or firmware Ark cannot edit points at the firmware; a held draft or a missing half does not", () => {
+    const connected = {vocabulary: VOCABULARY, load: {state: "unavailable"}, device: {connected: true}};
+    assert.equal(readScreen(connected).firmware, true, "a complete profile could not be read: the firmware may be missing or old");
+    assert.equal(readScreen({...connected, load: {state: "unavailable", held: "unsupported"}}).firmware, true);
+    for (const held of ["stale", "other-keyboard", "connection-changed"])
+        assert.equal(readScreen({...connected, load: {state: "unavailable", held}}).firmware, undefined, held);
+    assert.equal(readScreen({...connected, device: {connected: true, health: {halves: "alone"}}}).firmware, undefined, "the cable, not the firmware");
+    assert.equal(readScreen({...connected, device: {connected: true, health: {error: "The keyboard stopped."}}}).firmware, undefined);
+    assert.equal(readScreen({load: {state: "ready"}}), null);
+});
+
 test("rail screens follow the read and the capability each screen needs", () => {
     const loading = {load: {state: "loading"}, device: {connected: true}, portable: {available: true}};
     for (const screen of ["keys", "lighting", "profile", "device"]) assert.equal(screenAvailable(loading, screen), false, screen);
@@ -119,7 +130,7 @@ test("a draft that holds editing says why, not that the read failed", () => {
 
 test("only a read that failed says the complete profile could not be read; halves and errors keep their words", () => {
     const failed = readScreen({vocabulary: VOCABULARY, load: {state: "unavailable"}, device: {connected: true, health: {halves: "agree"}}});
-    assert.deepEqual(failed, {state: "unavailable", title: "Keyboard not ready for edits", detail: "A complete profile could not be read. Read the keyboard again to retry."});
+    assert.deepEqual(failed, {state: "unavailable", title: "Keyboard not ready for edits", detail: "A complete profile could not be read. Read the keyboard again to retry.", firmware: true});
     const withHalves = (halves, error = "") => readScreen({vocabulary: VOCABULARY, load: {state: "unavailable", held: "stale"}, device: {connected: true, health: {halves, error}}});
     assert.equal(withHalves("alone").detail, VOCABULARY.halves.alone.detail);
     assert.equal(withHalves("apart").detail, VOCABULARY.halves.apart.detail);

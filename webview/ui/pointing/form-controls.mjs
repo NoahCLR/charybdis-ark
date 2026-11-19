@@ -4,6 +4,20 @@ import {modifierGrid} from "../modifier-grid.mjs";
 import {choiceField, choiceValue} from "../segmented.mjs";
 import {storedChoices} from "../../view/choices.mjs";
 
+// A field that shows a line under itself (Distance's, how far its value is)
+// shows it as the Settings rows show a hint; the line stays outside the
+// label, so the field keeps its name.
+/** @param {HTMLElement} field @param {string} help */
+function explained(field, help) {
+    const block = el(`<div class="field-block"></div>`);
+    block.append(field, el(`<span class="note field-help">${esc(help)}</span>`));
+    return block;
+}
+
+// A field's options with a line under it, in place of a tip.
+/** @param {string} help @param {Omit<import("../surface-types.js").FieldOptions, "tip" | "help">} [rest] @returns {import("../surface-types.js").FieldOptions} */
+export const told = (help, rest = {}) => ({...rest, help});
+
 /** @param {import("../../../contracts/panel.js").PublishedModel} model @param {import("../surface-types.js").PresentedSlot} slot @param {boolean} canEdit */
 export function formControls(model, slot, canEdit) {
     /** @type {import("../surface-types.js").FormReaders} */
@@ -15,7 +29,7 @@ export function formControls(model, slot, canEdit) {
         const node = el(`<label class="field" ${options.tip ? `data-tip="${esc(options.tip)}"` : ""}><span>${esc(label)}</span>
             <span class="affix ${options.unit ? "unit" : ""} ${options.wide ? "wide" : ""}"><input data-f="pointing:${esc(slot.id)}:${esc(key)}" class="input mono num" value="${esc(value ?? "")}" inputmode="numeric" ${disabled}>${options.unit ? `<i>${esc(options.unit)}</i>` : ""}</span></label>`);
         form[key] = () => /** @type {HTMLInputElement} */ (node.querySelector("input")).value;
-        return node;
+        return options.help ? explained(node, options.help) : node;
     };
     // A choice, on show or in a menu as ui/segmented.mjs draws it, holding the
     // stored value even when it is none of the options (storedChoices).

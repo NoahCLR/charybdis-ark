@@ -30,7 +30,7 @@ function buildDeviceModel(state = {}) {
         comboRows: state.combos?.state === "read" ? state.combos.rows : [],
         comboInfo: state.combos ? {...state.combos, rows: undefined} : {state: "unread"},
         baseEffect: baseRgbForView(state.baseRgb, state.settingsView?.brightnessMax),
-        settingsView: state.settingsView, macroView: state.macroView, customKeyView: state.customKeyView,
+        settingsView: state.settingsView, macroView: state.macroView, autocorrectView: state.autocorrectView, customKeyView: state.customKeyView,
         identity: committed ? {source: state.committed?.source, generation: state.committed?.generation, digest: state.committed?.digest, originHalf: state.committed?.originHalf} : null,
     }, state.capabilities, editableDomains(state)), ...deviceSummary(state)};
 }
@@ -61,7 +61,7 @@ function buildSnapshotModel(snapshot, capabilities, binding, deviceState = {}) {
         // reports over USB, so it is known only while that is the case.
         keyboardNameView: keyboardNameView(current, deviceState.storedKeyboardName === "" ? deviceState.device?.product || "" : ""),
         identity: null,
-    }, capabilities, {busy: !editable, behaviors: editable, pointing: editable, combos: editable, macros: editable, settings: editable, customKeys: editable});
+    }, capabilities, {busy: !editable, behaviors: editable, pointing: editable, combos: editable, macros: editable, autocorrect: editable, settings: editable, customKeys: editable});
     model.layers.forEach((layer, index) => {layer.displayName = snapshot.summary.names[index];});
     return {...model, ...deviceSummary(deviceState)};
 }

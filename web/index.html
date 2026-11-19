@@ -19,6 +19,15 @@
 <link rel="modulepreload" href="./{{panel}}">
 </head>
 <body>
-<div id="root"></div>
+<!-- What the page says if the shell never starts: no JavaScript, a file that
+     did not load, an address below the root, a browser too old for it. The
+     shell replaces it as it starts (web/page.mjs); the stylesheet keeps it
+     unseen for a moment first, so an ordinary load never shows it. -->
+<div id="root"><main class="load-failure page-starting">
+<h1>Charybdis Ark</h1>
+<p>Ark edits your Charybdis keyboard from this page. It needs Chrome or Edge on a computer, with JavaScript on.</p>
+<noscript><p>JavaScript is off for this page. Turn it on to use Ark.</p></noscript>
+<p>If this is all you see, Ark did not start. Reload the page, or open <a href="/">Ark's own address</a>.</p>
+</main></div>
 </body>
 </html>

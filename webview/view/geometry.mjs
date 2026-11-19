@@ -28,19 +28,29 @@ const RIGHT_THUMBS = new Set([51, 52, 55]);
 export const isRightHalf = (layoutIndex) =>
     layoutIndex < 48 ? layoutIndex % 12 >= 6 : RIGHT_THUMBS.has(layoutIndex);
 
-// Where an overlay paints. RGB_KEY_HALF and RGB_KEYS_ONLY depend on the key
-// that triggered the mode, so they are answered against that trigger.
-/** @param {number} layoutIndex @param {string} locality @param {number} [triggerIndex] */
-export function inLocality(layoutIndex, locality, triggerIndex) {
+// Where an overlay paints. RGB_KEY_HALF and RGB_KEYS_ONLY depend on the keys
+// that triggered it: a pointing mode's key, or every input of a held combo,
+// whose half is both halves when its keys span them (firmware RGB domain,
+// Values). With no trigger key, as a mode no key holds, the half is both
+// halves and the keys are every key.
+/** @param {number | readonly number[] | undefined} trigger */
+const triggerKeys = (trigger) => trigger === undefined ? [] : typeof trigger === "number" ? [trigger] : trigger;
+/** @param {number} layoutIndex @param {string} locality @param {number | readonly number[]} [trigger] */
+export function inLocality(layoutIndex, locality, trigger) {
+    const keys = triggerKeys(trigger);
     switch (locality) {
         case "RGB_LEFT_HALF": return !isRightHalf(layoutIndex);
         case "RGB_RIGHT_HALF": return isRightHalf(layoutIndex);
-        case "RGB_KEY_HALF":
-            return triggerIndex === undefined ? true : isRightHalf(layoutIndex) === isRightHalf(triggerIndex);
-        case "RGB_KEYS_ONLY": return triggerIndex === undefined ? false : layoutIndex === triggerIndex;
+        case "RGB_KEY_HALF": return !keys.length || keys.some((key) => isRightHalf(key) === isRightHalf(layoutIndex));
+        case "RGB_KEYS_ONLY": return !keys.length || keys.includes(layoutIndex);
         default: return true;
     }
 }
+
+// Whether a locality follows the keys that triggered the light, so what it
+// paints depends on which those are.
+/** @param {string | undefined} locality */
+export const followsTrigger = (locality) => locality === "RGB_KEY_HALF" || locality === "RGB_KEYS_ONLY";
 
 /** @param {number} layoutIndex */
 export function keyVisual(layoutIndex) {
@@ -68,13 +78,14 @@ export function boardOutlineMarkup(className) {
 // The trackball LED answers localities on its own terms: it is soldered on the
 // right half, and no key maps to it, so a locality that names the trigger key
 // never reaches it.
-/** @param {string} locality @param {number} [triggerIndex] */
-export function trackballInLocality(locality, triggerIndex) {
+/** @param {string} locality @param {number | readonly number[]} [trigger] */
+export function trackballInLocality(locality, trigger) {
+    const keys = triggerKeys(trigger);
     switch (locality) {
         case "RGB_LEFT_HALF": return false;
         case "RGB_RIGHT_HALF": return true;
-        case "RGB_KEY_HALF": return triggerIndex === undefined ? true : isRightHalf(triggerIndex);
-        case "RGB_KEYS_ONLY": return false;
+        case "RGB_KEY_HALF": return !keys.length || keys.some(isRightHalf);
+        case "RGB_KEYS_ONLY": return !keys.length;
         default: return true;
     }
 }
@@ -85,8 +96,13 @@ export function trackballInLocality(locality, triggerIndex) {
 // a running offset: how far the legend drops depends on how many rows sit above
 // it, and each case was tuned against the others. Lifted from the app's own
 // board, so the two cannot drift.
-/** @param {number} y @param {{tiers?: boolean, combos?: boolean, sub?: boolean}} [options] */
-export function keyFaceRows(y, {tiers = false, combos = false, sub = false} = {}) {
+// A row of icons (`icons`: the macro, custom key or pointing mode a key
+// reaches) sits under the legend: along the bottom of the cap, or on a key
+// with a line, between its tap and the line, since they belong to what it
+// taps. The rows above, and the line and the hold, keep their places; the
+// legend rises to make room.
+/** @param {number} y @param {{tiers?: boolean, combos?: boolean, sub?: boolean, icons?: boolean}} [options] */
+export function keyFaceRows(y, {tiers = false, combos = false, sub = false, icons = false} = {}) {
     /** @type {Partial<import("./types.js").FaceRows> & {comboHeight: number}} */
     const rows = {comboHeight: 8.2};
     if (tiers && combos) { rows.tierY = y + 6.3; rows.comboY = y + 14.2; }
@@ -94,7 +110,17 @@ export function keyFaceRows(y, {tiers = false, combos = false, sub = false} = {}
     else if (combos) { rows.comboY = y + 7.2; }
 
     const above = (tiers ? 1 : 0) + (combos ? 1 : 0);
-    if (sub) {
+    if (icons && sub) {
+        rows.iconSize = [8.5, 8.5, 7.4][above];
+        rows.iconY = [y + 25.5, y + 29.8, y + 33.8][above];
+        rows.mainY = [y + 17, y + 22.5, y + 28][above];
+        rows.separatorY = [y + 37.4, y + 40.8, y + 43.4][above];
+        rows.subY = [y + 48.8, y + 51.8, y + 53.5][above];
+    } else if (icons) {
+        rows.iconSize = 8.5;
+        rows.iconY = y + GEO.keyH - 3.8 - rows.iconSize;
+        rows.mainY = [y + 23, y + 30.5, y + 35.2][above];
+    } else if (sub) {
         rows.mainY = [y + 24.5, y + 29.3, y + 32.2][above];
         rows.separatorY = [y + 37.4, y + 40.8, y + 43.4][above];
         rows.subY = [y + 48.8, y + 51.8, y + 53.5][above];
@@ -105,8 +131,120 @@ export function keyFaceRows(y, {tiers = false, combos = false, sub = false} = {}
     return /** @type {import("./types.js").FaceRows} */ (rows);
 }
 
-// Roughly how wide a legend runs, so a label can be sized to fit its row rather
-// than bucketed by how many characters it happens to have.
+// Where each of a key's `count` icons stands in its row (keyFaceRows' iconY
+// and iconSize): their left edges, the row centred on the cap's middle `cx`.
+const ICON_GAP = 2;
+/** @param {number} cx @param {number} count @param {number} size */
+export function keyIconsX(cx, count, size) {
+    const left = cx - (count * size + (count - 1) * ICON_GAP) / 2;
+    return Array.from({length: count}, (_, order) => left + order * (size + ICON_GAP));
+}
+
+// ── the legends ─────────────────────────────────────────────────────────
+//
+// A cap's legends are set from one small scale, never sized to their own
+// width, so the board reads as one calm surface on every layer and every
+// screen (D-L78): a single character, as a keycap prints a letter, digit or
+// symbol, large; every name (Esc, Tab, Left Shift, a macro's) at one word
+// size; the hold under a dual-role key's line at one size of its own.
+// `step` is the one size below the word size, for a name that cannot fit it
+// even condensed. Whether a key also carries its LED's number changes
+// nothing: the number sits outside the legends (webview/ui/board.mjs).
+export const LEGEND_SIZES = Object.freeze({glyph: 12, word: 9, step: 7.6, hold: 6.6});
+// How far a line may be condensed at its own size before it steps down:
+// condensing keeps its height, which is what the eye compares across caps.
+export const LEGEND_CONDENSE = 0.86;
+// The weights a legend and a hold are drawn at, as .kc-label and .kc-sub
+// draw them (styles.css --fw-regular, --fw-bold), so each is measured as drawn.
+export const LEGEND_WEIGHTS = Object.freeze({name: 400, hold: 700});
+// Lines of a two-line legend, apart by this much of their size.
+const LINE_GAP = 1.12;
+// The room a legend line has across a cap: a tap over a line sits a little
+// narrower, as the line does.
+const ROOM = GEO.keyW - 10, ROOM_OVER_LINE = GEO.keyW - 12;
+
+/**
+ * How wide `text` runs at `size` in the board's face, at `weight`. The board
+ * measures it in the page; without one (in a test) it is estimated.
+ * @typedef {(text: string, size: number, weight: number) => number} MeasureText
+ */
+
+/**
+ * Where a cap's legends stand and how large they are drawn, for its face rows
+ * (keyFaceRows): the main legend, one line or two, each centred on its y, and
+ * the hold under the line. A line's `squeeze` is the width it is condensed
+ * into, 0 when it runs at its own width.
+ * @param {import("./types.js").FaceRows} rows
+ * @param {{main: string, sub?: string}} key
+ * @param {MeasureText} [measure]
+ * @returns {{size: number, lines: {text: string, squeeze: number, y: number}[], sub: {size: number, squeeze: number, y: number} | null}}
+ */
+export function keyLegends(rows, {main, sub = ""}, measure = estimateWidth) {
+    const tap = setLegend(main, {room: sub ? ROOM_OVER_LINE : ROOM, twoLines: !sub}, measure);
+    const lines = tap.lines.map((line, order) => ({
+        ...line,
+        y: rows.mainY + (order - (tap.lines.length - 1) / 2) * tap.size * LINE_GAP,
+    }));
+    if (!sub) return {size: tap.size, lines, sub: null};
+    // The hold keeps its one size: one too long is condensed into the row.
+    const size = LEGEND_SIZES.hold;
+    return {size: tap.size, lines, sub: {size, squeeze: squeezeInto(measure(sub, size, LEGEND_WEIGHTS.hold), ROOM_OVER_LINE), y: rows.subY ?? 0}};
+}
+
+/**
+ * One legend set on the scale. A single character takes the glyph size; a
+ * name the word size, on two lines when it has two or more words and the cap
+ * leaves room for two (legendBreak), else on one. A line too wide is
+ * condensed, up to LEGEND_CONDENSE, before the whole legend steps down to
+ * `step`; past that it is condensed into the row. Every word is kept, so the
+ * cap, the hover card and the key's label all read the whole name.
+ * @param {string} text @param {{room: number, twoLines: boolean}} where @param {MeasureText} measure
+ * @returns {{size: number, lines: {text: string, squeeze: number}[]}}
+ */
+export function setLegend(text, {room, twoLines}, measure = estimateWidth) {
+    const whole = String(text ?? "");
+    if ([...whole].length === 1) return {size: LEGEND_SIZES.glyph, lines: [{text: whole, squeeze: 0}]};
+    const parts = (twoLines && legendBreak(whole, measure)) || [whole];
+    // Each part's width at the word size; at any other size it scales with it.
+    const widths = parts.map((part) => measure(part, LEGEND_SIZES.word, LEGEND_WEIGHTS.name));
+    const size = Math.max(...widths) <= room / LEGEND_CONDENSE ? LEGEND_SIZES.word : LEGEND_SIZES.step;
+    return {size, lines: parts.map((part, order) => ({text: part, squeeze: squeezeInto(widths[order] * size / LEGEND_SIZES.word, room)}))};
+}
+
+// The width a line is condensed into: its row, when it runs wider; else 0.
+/** @param {number} width @param {number} room */
+const squeezeInto = (width, room) => width > room ? room : 0;
+
+/**
+ * Where a name breaks onto two lines: at a " · ", which parts its halves
+ * ("Pointing mode 6" over "hold (empty)"), the dot dropped since the break says it;
+ * else between words where the longer line comes out shortest. A number is
+ * never left on a line of its own ("Custom" over "key 0", "Macro 0" whole).
+ * Null for a name that does not break: one word, or a word and its number.
+ * @param {string} text @param {MeasureText} [measure]
+ * @returns {[string, string] | null}
+ */
+export function legendBreak(text, measure = estimateWidth) {
+    const words = text.split(" ").filter(Boolean);
+    /** @type {{lines: [string, string], dot: boolean, longest: number}[]} */
+    const breaks = [];
+    for (let at = 1; at < words.length; at++) {
+        const first = words.slice(0, at), second = words.slice(at);
+        const dot = first.at(-1) === "·" || second[0] === "·";
+        if (first.at(-1) === "·") first.pop();
+        if (second[0] === "·") second.shift();
+        if (!first.length || !second.length) continue;
+        const lines = /** @type {[string, string]} */ ([first.join(" "), second.join(" ")]);
+        if (lines.some((line) => /^\d+$/.test(line)) || /^\d+$/.test(second[0])) continue;
+        breaks.push({lines, dot, longest: Math.max(...lines.map((line) => measure(line, 1, LEGEND_WEIGHTS.name)))});
+    }
+    const atDot = breaks.filter((option) => option.dot);
+    const best = (atDot.length ? atDot : breaks).sort((a, b) => a.longest - b.longest)[0];
+    return best ? best.lines : null;
+}
+
+// Roughly how wide a legend runs in the board's face, for where the page
+// cannot measure it.
 /** @param {string} char */
 const charWidth = (char) => {
     if (char === " ") return 0.32;
@@ -117,58 +255,7 @@ const charWidth = (char) => {
     if (/[a-z]/.test(char)) return 0.54;
     return 0.58;
 };
-
-/**
- * The size a legend takes to sit inside `width`, never above `max` and never
- * below `min`. `squeeze` is set when even the smallest size overruns, and is
- * the width to compress the glyphs into rather than let them spill off the cap.
- */
-/** @param {unknown} text @param {{max: number, min: number, width: number}} bounds */
-export function fitText(text, {max, min, width}) {
-    const unit = units(text);
-    const preferred = unit > 0 ? Math.min(max, width / unit) : max;
-    return {size: Math.round(Math.max(min, preferred) * 100) / 100, squeeze: unit * max > width ? width : 0};
-}
-
 /** @param {unknown} text */
 const units = (text) => [...String(text || "")].reduce((total, char) => total + charWidth(char), 0);
-
-// The smallest a legend with a cap to itself is drawn: past it a name stops
-// reading at a laptop's width, so it takes two lines instead.
-export const LEGEND_MIN = 8;
-// Two lines share the cap, so neither is drawn larger than this.
-const TWO_LINE_MAX = 9.5;
-
-/**
- * A legend alone on its cap (no hold under a line): one line while it fits at
- * LEGEND_MIN or more, as `fitText` sizes it; otherwise two, broken between
- * words where the longer line comes out shortest, and a " · " the break falls
- * on dropped, since the break already parts them ("Slot 6" over "hold
- * (empty)"). Each line has its own `squeeze`, set only when a single word
- * overruns the row even at LEGEND_MIN. The words are never cut, so the hover
- * card and the key's label still read the whole name.
- */
-/** @param {unknown} text @param {{max: number, width: number}} bounds @returns {{size: number, lines: {text: string, squeeze: number}[]}} */
-export function fitLegend(text, {max, width}) {
-    const whole = String(text ?? "");
-    const one = () => {
-        const fit = fitText(whole, {max, min: LEGEND_MIN, width});
-        return {size: fit.size, lines: [{text: whole, squeeze: fit.squeeze}]};
-    };
-    if (units(whole) * LEGEND_MIN <= width) return one();
-    const words = whole.split(" ").filter(Boolean);
-    /** @param {string[]} part */
-    const line = (part) => part.join(" ");
-    let best = {first: "", second: "", longest: Infinity};
-    for (let at = 1; at < words.length; at++) {
-        const first = words.slice(0, at), second = words.slice(at);
-        if (first.at(-1) === "·") first.pop();
-        if (second[0] === "·") second.shift();
-        if (!first.length || !second.length) continue;
-        const longest = Math.max(units(line(first)), units(line(second)));
-        if (longest < best.longest) best = {first: line(first), second: line(second), longest};
-    }
-    if (best.longest === Infinity) return one();
-    const size = Math.round(Math.max(LEGEND_MIN, Math.min(TWO_LINE_MAX, max, width / best.longest)) * 100) / 100;
-    return {size, lines: [best.first, best.second].map((part) => ({text: part, squeeze: units(part) * size > width ? width : 0}))};
-}
+/** @type {MeasureText} */
+export const estimateWidth = (text, size, weight) => units(text) * size * (weight >= 600 ? 1.06 : 1);

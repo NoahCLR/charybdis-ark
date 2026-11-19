@@ -13,6 +13,7 @@ export {recoveryFileName} from "../core/session/recovery-copy.js";
 export {VOCABULARY} from "../core/model/vocabulary.js";
 export {WebHidDeviceAdapter} from "../core/transport/webhid-adapter.js";
 export {FILE_MAX_BYTES, FILE_TOO_LARGE} from "../core/model/portable-profile.js";
+export {IMPORT_MAX_BYTES as LIST_FILE_MAX_BYTES, IMPORT_TOO_LARGE as LIST_FILE_TOO_LARGE} from "../core/model/autocorrect-import.js";
 
 // What the build's tests stage a draft and build the panel model with, and
 // the progress they report through it.

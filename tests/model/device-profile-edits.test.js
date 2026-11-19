@@ -28,17 +28,82 @@ test("RGB policies preserve zero and reject missing or malformed values", () => 
     for (const hue of ["", "bad", null, -1, 256]) assert.throws(() => edit(base, {type: "updateLayerColor", layer: "Layer 0", hue, sat: 0, val: 0, mode: "ALL_KEYS"}));
 });
 
-test("LED membership edits preserve references and refuse deleting an assigned group", () => {
-    const next = edit(base, {type: "saveRgbReusableLedGroup", group: {originalName: "Group 1", ledIndices: [0, 1, 57]}});
-    assert.deepEqual(rgb(next).groups.find(group => group.leds.includes(57)).leds, [0, 1, 57]);
-    assert.throws(() => edit(base, {type: "deleteRgbReusableLedGroup", name: "Group 1"}), /assignments/);
-    assert.throws(() => edit(base, {type: "saveRgbReusableLedGroup", group: {originalName: "Group 1", ledIndices: [58]}}));
+// Every accent table, and the groups no accent lights.
+const accents = rgbProfile => [rgbProfile.layerGroupRows, rgbProfile.pdModeGroupRows, rgbProfile.comboGroupRows, rgbProfile.keyGroupRows, rgbProfile.autocorrectGroupRows].flat();
+const unused = rgbProfile => rgbProfile.groups.filter(group => !accents(rgbProfile).some(row => row.groupId === group.id));
+
+test("an accent changed in place keeps its place and the accents around it, and refuses LEDs the keyboard lacks", () => {
+    const before = rgb(base);
+    const index = before.pdModeGroupRows.length - 1;
+    const next = edit(base, {type: "updateRgbLedGroup", target: "pdMode", index, group: {owner: "POINTING_MODE_VOLUME", ledIndices: [0, 1, 57], h: 5, s: 6, v: 7}});
+    const row = rgb(next).pdModeGroupRows[index];
+    assert.equal(rgb(next).pdModeGroupRows.length, before.pdModeGroupRows.length, "changed, not added");
+    assert.deepEqual([rgb(next).groups.find(group => group.id === row.groupId).leds, row.color, row.selector], [[0, 1, 57], {h: 5, s: 6, v: 7}, 1]);
+    assert.deepEqual(rgb(next).keyGroupRows.length, before.keyGroupRows.length, "other tables keep their accents");
+    assert.throws(() => edit(base, {type: "updateRgbLedGroup", target: "pdMode", index, group: {owner: "POINTING_MODE_VOLUME", ledIndices: [58], h: 0, s: 0, v: 0}}));
+    assert.throws(() => edit(base, {type: "updateRgbLedGroup", target: "pdMode", index: index + 1, group: {owner: "POINTING_MODE_VOLUME", ledIndices: [1], h: 0, s: 0, v: 0}}), /Accent/);
 });
 
-test("saving a group refuses one with no LEDs, new or edited", () => {
-    assert.throws(() => edit(base, {type: "saveRgbReusableLedGroup", group: {ledIndices: []}}), /Pick LEDs/);
-    assert.throws(() => edit(base, {type: "saveRgbReusableLedGroup", group: {originalName: "Group 1", ledIndices: []}}), /Pick LEDs/);
-    assert.deepEqual(rgb(base).groups.map(group => group.leds.length).filter(length => !length), []);
+test("an accent lights some LEDs, and every accent edit drops the groups no accent lights", () => {
+    assert.throws(() => edit(base, {type: "addRgbLedGroup", group: {target: "combo", ledIndices: [], h: 0, s: 0, v: 0}}), /Pick LEDs/);
+    assert.throws(() => edit(base, {type: "updateRgbLedGroup", target: "combo", index: 0, group: {ledIndices: [], h: 0, s: 0, v: 0}}), /Pick LEDs/);
+    const added = edit(base, {type: "addRgbLedGroup", group: {target: "combo", ledIndices: [30], h: 1, s: 2, v: 3}});
+    assert.deepEqual(unused(rgb(added)), [], "a group the keyboard kept unlit goes at the next accent edit");
+    const removed = edit(added, {type: "deleteRgbLedGroup", target: "combo", index: rgb(added).comboGroupRows.length - 1});
+    assert.ok(!rgb(removed).groups.some(group => group.leds.join() === "30"), "and so does one whose last accent goes");
+    assert.deepEqual(rgb(removed).groups.map(group => group.id), rgb(removed).groups.map((_, index) => index), "ids stay consecutive from zero");
+    for (const row of accents(rgb(removed))) assert.ok(rgb(removed).groups.some(group => group.id === row.groupId), "every accent still names a group");
+});
+
+test("replacement feedback saves its four cases, a colour and a locality each, as one record, a case off included", () => {
+    const before = rgb(base);
+    const config = {textColor: {h: 1, s: 2, v: 3}, textLocality: "RGB_KEYS_ONLY", macroColor: {h: 0, s: 0, v: 0}, macroLocality: "RGB_BOTH_HALVES",
+        undoColor: {h: "7", s: "8", v: "9"}, undoLocality: "RGB_LEFT_HALF", leadingColor: {h: "170", s: "255", v: "100"}, leadingLocality: "RGB_KEY_HALF"};
+    const edited = edit(base, {type: "updateAutocorrectFeedback", config});
+    assert.deepEqual(rgb(edited).autocorrectFeedback, {textColor: {h: 1, s: 2, v: 3}, textLocality: 4, macroColor: {h: 0, s: 0, v: 0}, macroLocality: 0,
+        undoColor: {h: 7, s: 8, v: 9}, undoLocality: 1, leadingColor: {h: 170, s: 255, v: 100}, leadingLocality: 3});
+    assert.deepEqual({...rgb(edited), autocorrectFeedback: before.autocorrectFeedback}, before, "nothing else in lighting moves");
+    assert.deepEqual(payloads(edited).filter(domain => domain.id !== 0x10), payloads(base).filter(domain => domain.id !== 0x10));
+    assert.throws(() => edit(base, {type: "updateAutocorrectFeedback", config: {...config, macroLocality: "RGB_NOWHERE"}}), /Unknown locality/);
+    assert.throws(() => edit(base, {type: "updateAutocorrectFeedback", config: {...config, leadingLocality: undefined}}), /Unknown locality/);
+    assert.throws(() => edit(base, {type: "updateAutocorrectFeedback", config: {...config, undoColor: {h: 0, s: 0, v: 256}}}), /Brightness/);
+    assert.throws(() => edit(base, {type: "updateAutocorrectFeedback", config: {...config, undoColor: {h: 0, s: 0, v: 201}}}, {limits: {brightnessMax: 200}}), /Brightness must be between 0 and 200/);
+    assert.throws(() => edit(base, {type: "updateAutocorrectFeedback", config: {...config, textColor: {h: "", s: 0, v: 0}}}));
+});
+
+test("the stage switch takes replacement feedback's bit and no bit past it", () => {
+    const mask = rgb(base).stageEnableMask;
+    assert.equal(mask & 32, 32, "on in the keyboard's compiled defaults");
+    assert.equal(rgb(edit(base, {type: "updateRgbStages", stageEnableMask: mask & ~32})).stageEnableMask, mask & ~32);
+    assert.equal(rgb(edit(base, {type: "updateRgbStages", stageEnableMask: 63})).stageEnableMask, 63);
+    assert.throws(() => edit(base, {type: "updateRgbStages", stageEnableMask: 64}), /RGB stage mask must be between 0 and 63/);
+});
+
+test("a replacement feedback accent is added for one case or all, changed where it stands and removed", () => {
+    const before = rgb(base).autocorrectGroupRows;
+    assert.deepEqual(before.map(row => row.semantic), [255], "the compiled accent for every replacement flash");
+    const added = edit(base, {type: "addRgbLedGroup", group: {target: "autocorrect", owner: "AUTOCORRECT_FEEDBACK_GROUP_UNDO", ledIndices: [57], h: 0, s: 255, v: 200}});
+    const row = rgb(added).autocorrectGroupRows.at(-1);
+    assert.equal(rgb(added).autocorrectGroupRows.length, before.length + 1, "at the table's end");
+    assert.deepEqual([rgb(added).groups.find(group => group.id === row.groupId).leds, row.color, row.semantic], [[57], {h: 0, s: 255, v: 200}, 2]);
+    for (const [owner, semantic] of [["AUTOCORRECT_FEEDBACK_GROUP_TEXT", 0], ["AUTOCORRECT_FEEDBACK_GROUP_MACRO", 1], ["AUTOCORRECT_FEEDBACK_GROUP_ALL", 255]]) {
+        const next = edit(added, {type: "updateRgbLedGroup", target: "autocorrect", index: 1, group: {owner, ledIndices: [3, 4], h: 0, s: 0, v: 0}});
+        const changed = rgb(next).autocorrectGroupRows[1];
+        assert.deepEqual([rgb(next).groups.find(group => group.id === changed.groupId).leds, changed.color, changed.semantic], [[3, 4], {h: 0, s: 0, v: 0}, semantic], owner);
+        assert.deepEqual(rgb(next).autocorrectGroupRows[0].semantic, 255, "the accent before it keeps its place");
+        assert.ok(!rgb(next).groups.some(group => group.leds.join() === "57"), "the set it no longer lights is dropped");
+    }
+    const removed = edit(added, {type: "deleteRgbLedGroup", target: "autocorrect", index: 1});
+    const lit = value => accents(value).map(accent => [value.groups.find(group => group.id === accent.groupId).leds.join(), accent.color]);
+    assert.deepEqual(lit(rgb(removed)), lit(rgb(base)), "removing it leaves every other accent lighting what it lit");
+    assert.ok(!rgb(removed).groups.some(group => group.leds.join() === "57"), "and its LED set is dropped");
+    assert.deepEqual(rgb(edit(base, {type: "deleteRgbLedGroup", target: "autocorrect", index: 0})).autocorrectGroupRows, []);
+    assert.deepEqual(rgb(added).keyGroupRows.map(key => key.semantic), rgb(base).keyGroupRows.map(key => key.semantic), "other tables keep their accents");
+    // A behaviour state is no replacement case, nor the other way round.
+    assert.throws(() => edit(base, {type: "addRgbLedGroup", group: {target: "autocorrect", owner: "KEY_FEEDBACK_GROUP_ALL", ledIndices: [1], h: 0, s: 0, v: 0}}), /Unknown replacement case/);
+    assert.throws(() => edit(base, {type: "addRgbLedGroup", group: {target: "keyBehavior", owner: "AUTOCORRECT_FEEDBACK_GROUP_ALL", ledIndices: [1], h: 0, s: 0, v: 0}}), /Unknown behaviour state/);
+    assert.throws(() => edit(base, {type: "addRgbLedGroup", group: {target: "autocorrect", owner: "AUTOCORRECT_FEEDBACK_GROUP_TEXT", ledIndices: [], h: 0, s: 0, v: 0}}), /Pick LEDs/);
+    assert.throws(() => edit(base, {type: "deleteRgbLedGroup", target: "autocorrect", index: 1}), /Accent/);
 });
 
 const {decodeComboPages} = require("../../core/protocol/combo-readback-v1");
@@ -124,5 +189,73 @@ test("auto-mouse save encodes all three policies exactly and keeps the chosen en
         assert.deepEqual(rgb(edited).automouseFade, {mode, endColor: {h: 179, s: 255, v: 199}});
         assert.deepEqual(rgb(edited).layerColors, rgb(base).layerColors);
         assert.deepEqual(rgb(edited).pdModeColors, rgb(base).pdModeColors);
+    }
+});
+
+// A backup can hold a colour brighter than the keyboard's limit: Review
+// blocks it until it is lowered, and Lighting is where it is lowered. An edit
+// holds to the limit the colour it sets, never one it leaves as it stood.
+const {editProfileDomains, validateSnapshot} = require("../../core/model/portable-profile");
+const {profileFindings} = require("../../core/model/profile-checks");
+const limited = {limits: {brightnessMax: 200}};
+const tooBright = editProfileDomains(base, {}, open => {open("rgb").layerColors[1].color.v = 255;});
+const brightBlockers = document => profileFindings(validateSnapshot(document), {brightnessMax: 200}).filter(row => row.kind === "colourBrightnessBlocker");
+const layerColour = (layer, v, mode = "KEYS_MAPPED_ON_THIS_LAYER_ONLY") => ({type: "updateLayerColor", layer: `Layer ${layer}`, h: 85, s: 255, v, mode});
+
+test("a colour past the keyboard's brightness limit lowered to it is taken, and its blocker goes", () => {
+    assert.equal(brightBlockers(tooBright).length, 1, "the backup's colour is a blocker");
+    const lowered = edit(tooBright, layerColour(1, 200), limited);
+    assert.equal(rgb(lowered).layerColors[1].color.v, 200);
+    assert.deepEqual(brightBlockers(lowered), [], "nothing past the limit remains");
+});
+
+test("another colour edited beside one past the limit is taken, and the blocker still names the first", () => {
+    const edited = edit(tooBright, layerColour(2, 120), limited);
+    assert.equal(rgb(edited).layerColors[2].color.v, 120);
+    assert.equal(rgb(edited).layerColors[1].color.v, 255, "the untouched colour is kept as it stood");
+    const [blocker, ...rest] = brightBlockers(edited);
+    assert.deepEqual(rest, []);
+    assert.equal(blocker.count, 1);
+    assert.match(blocker.identity, /^layers:.*=255$/);
+});
+
+test("a colour set past the limit is still refused in place, with the limit named", () => {
+    assert.throws(() => edit(tooBright, layerColour(2, 201), limited), {code: "INVALID_PROFILE_EDIT", message: "Brightness must be between 0 and 200."});
+    assert.throws(() => edit(tooBright, layerColour(1, 254), limited), /Brightness must be between 0 and 200/, "lowered, but not far enough");
+    assert.throws(() => edit(tooBright, {type: "addRgbLedGroup", group: {target: "layer", owner: "Layer 2", ledIndices: [0], h: 0, s: 255, v: 255}}, limited), /Brightness must be between 0 and 200/);
+});
+
+test("edits that set no colour are taken while one past the limit remains", () => {
+    const record = rgb(tooBright);
+    assert.equal(rgb(edit(tooBright, {...layerColour(1, 255), h: record.layerColors[1].color.h, mode: "ALL_KEYS"}, limited)).layerColors[1].mode, 0, "a policy changed beside its colour");
+    assert.equal(rgb(edit(tooBright, {type: "updateRgbStages", stageEnableMask: 0}, limited)).stageEnableMask, 0, "a stage switched off");
+    // A record posted back whole keeps its untouched colour; the one it changes is held to the limit.
+    const feedback = editProfileDomains(base, {}, open => {open("rgb").keyFeedback.tapBranches[0].color.v = 255;});
+    const {RGB_LOCALITIES, RGB_TAP_COMMIT_MODES} = require("../../core/schema/rgb-domain-v1");
+    const named = (names, value) => Object.keys(names).find(name => names[name] === value);
+    const stored = rgb(feedback).keyFeedback;
+    const posted = {tapBranches: stored.tapBranches.map(branch => ({color: branch.color, locality: named(RGB_LOCALITIES, branch.locality)})),
+        tapCommittedColor: stored.tapCommittedColor, tapCommittedLocality: named(RGB_LOCALITIES, stored.tapCommittedLocality),
+        holdActiveColor: {h: 1, s: 2, v: 3}, holdActiveLocality: named(RGB_LOCALITIES, stored.holdActiveLocality),
+        longHoldActiveColor: stored.longHoldActiveColor, longHoldActiveLocality: named(RGB_LOCALITIES, stored.longHoldActiveLocality),
+        tapCommitMode: named(RGB_TAP_COMMIT_MODES, stored.tapCommitMode)};
+    const kept = edit(feedback, {type: "updateKeyBehaviorFeedback", config: posted}, limited);
+    assert.deepEqual([rgb(kept).keyFeedback.holdActiveColor, rgb(kept).keyFeedback.tapBranches[0].color.v], [{h: 1, s: 2, v: 3}, 255]);
+    const raised = {...posted, tapBranches: posted.tapBranches.map((branch, index) => index ? branch : {...branch, color: {...branch.color, v: 250}})};
+    assert.throws(() => edit(feedback, {type: "updateKeyBehaviorFeedback", config: raised}, limited), /Brightness must be between 0 and 200/);
+    // An accent's LEDs moved, its colour as it stood.
+    const accent = editProfileDomains(base, {}, open => {open("rgb").pdModeGroupRows[0].color.v = 255;});
+    const row = rgb(accent).pdModeGroupRows[0];
+    const {RGB_POINTING_MODE_IDS, RGB_EVERY_OWNER} = require("../../core/schema/rgb-domain-v1");
+    const owner = row.selector === 255 ? RGB_EVERY_OWNER.pdMode : named(RGB_POINTING_MODE_IDS, row.selector);
+    const moved = edit(accent, {type: "updateRgbLedGroup", target: "pdMode", index: 0, group: {owner, ledIndices: [7, 8], ...row.color}}, limited);
+    assert.deepEqual(rgb(moved).groups.find(group => group.id === rgb(moved).pdModeGroupRows[0].groupId).leds, [7, 8]);
+    assert.equal(rgb(moved).pdModeGroupRows[0].color.v, 255);
+});
+
+test("an edit within the limit writes the same bytes whatever limit the keyboard reports", () => {
+    for (const message of [layerColour(1, 200), {type: "updateRgbStages", stageEnableMask: 0},
+        {type: "addRgbLedGroup", group: {target: "layer", owner: "Layer 2", ledIndices: [0, 1], h: 5, s: 6, v: 7}}]) {
+        assert.equal(edit(base, message, limited).profile, edit(base, message).profile, message.type);
     }
 });

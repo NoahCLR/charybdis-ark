@@ -48,7 +48,7 @@ test("a layer colour that paints, or an LED override the layer owns, keeps it", 
     assert.deepEqual([...emptyLayers(lit)], UNNAMED.filter((layer) => layer !== 9));
     const black = {...model, rgb: {...model.rgb, layerColors: model.rgb.layerColors.map((row) => row.layerId === 9 ? {...row, color: {h: "10", s: "255", v: "0"}} : row)}};
     assert.deepEqual([...emptyLayers(black)], UNNAMED.filter((layer) => layer !== 9), "black paints the LEDs dark");
-    const overridden = {...model, rgb: {...model.rgb, layerLedGroups: [{index: 0, owner: "x", color: {h: "0", s: "0", v: "0"}, ledGroup: "g", ledGroupKind: "k", ledIndices: [1], ownerLayer: 10}]}};
+    const overridden = {...model, rgb: {...model.rgb, layerAccents: [{index: 0, owner: "x", color: {h: "0", s: "0", v: "0"}, ledGroup: "g", ledGroupKind: "k", ledIndices: [1], ownerLayer: 10}]}};
     assert.deepEqual([...emptyLayers(overridden)], UNNAMED.filter((layer) => layer !== 10));
 });
 

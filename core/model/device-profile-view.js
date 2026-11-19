@@ -4,16 +4,17 @@
 // Presentation of validated device domains. Names here describe wire IDs;
 // configuration values and membership always come from the received domain.
 const {actionName, layerRef} = require("../schema/actions");
-const {VOCABULARY, branchName, failureSentence} = require("./vocabulary");
+const {VOCABULARY, branchName, failureSentence, ledsCalled} = require("./vocabulary");
 const {keyLabel, shortcutLabel} = require("./key-names");
 const keycodes = require("../schema/keycodes");
 const {ALL_LAYERS} = require("../data/charybdis-layout");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {KEY_BEHAVIOR_HOLD_STYLES} = require("../schema/key-behavior-domain-v1");
 const {builtInActions} = require("./built-in-behavior");
+const {emptyCells} = require("./empty-cells");
 const {changesNothing} = require("./inert-behaviors");
 const {
-    RGB_AUTOMOUSE_MODES, RGB_DOMAIN_V1, RGB_KEY_SEMANTICS, RGB_LAYER_MODES,
+    RGB_AUTOCORRECT_SEMANTICS, RGB_AUTOMOUSE_MODES, RGB_DOMAIN_V1, RGB_EVERY_OWNER, RGB_KEY_SEMANTICS, RGB_LAYER_MODES,
     RGB_LOCALITIES, RGB_POINTING_MODE_IDS, RGB_TAP_COMMIT_MODES,
 } = require("../schema/rgb-domain-v1");
 
@@ -53,14 +54,27 @@ function builtInDisplay(action, names, features) {
 // the tiers its row leaves empty (model/built-in-behavior.js). A fallback hold
 // gives way to any authored first-press hold or long hold; `releaseTaps` says
 // a press with only a long hold still taps when released before it.
+// `transparentTap`: the tap is the row's Transparent Single tap, the key
+// below; `tapToggle`: with no row the key counts taps all the same; `cells`:
+// what each empty grid cell does, for the row's steps
+// (core/model/empty-cells.js).
 /** @param {import("../schema/types.js").SemanticAction} target @param {Parameters<typeof builtInActions>[1]} features @param {import("../../contracts/model.js").ProfileKeyNames} [names] @param {Parameters<typeof builtInActions>[2]} [steps] The row's steps, when it has one. @returns {import("../../contracts/panel.js").BuiltIn} */
 function builtInForView(target, features, names, steps) {
-    const {tap, hold, fallback, releaseTaps, fromPress} = builtInActions(target, features, steps);
+    const builtIn = builtInBranches(target, features, names, steps);
+    return {...builtIn, cells: emptyCells(builtIn, steps)};
+}
+
+/** @param {import("../schema/types.js").SemanticAction} target @param {Parameters<typeof builtInActions>[1]} features @param {import("../../contracts/model.js").ProfileKeyNames} [names] @param {Parameters<typeof builtInActions>[2]} [steps] @returns {import("../../contracts/panel.js").BuiltIn} */
+function builtInBranches(target, features, names, steps) {
+    const {tap, hold, fallback, releaseTaps, fromPress, laterHoldWaits, armsOnRelease, transparentTap, tapToggle} = builtInActions(target, features, steps);
     return {
         ...(releaseTaps ? {releaseTaps: true} : {}),
+        ...(transparentTap ? {transparentTap: true} : {}),
+        ...(tapToggle ? {tapToggle: true} : {}),
+        ...(laterHoldWaits ? {laterHoldWaits: true} : {}),
         ...(tap ? {tap: {style: "TAP_SENDS", action: actionName(tap), ...builtInDisplay(tap, names, features)}} : {}),
         ...(hold ? {hold: {style: "PRESS_AND_HOLD_UNTIL_RELEASE", action: actionName(hold), repeatHz: "0", ...builtInDisplay(hold, names, features),
-            ...(fallback ? {fallback: true} : {}), ...(fromPress ? {fromPress: true} : {})}} : {}),
+            ...(fallback ? {fallback: true} : {}), ...(fromPress ? {fromPress: true} : {}), ...(armsOnRelease ? {armsOnRelease: true} : {})}} : {}),
     };
 }
 
@@ -73,24 +87,28 @@ function behaviorRowsForView(domain, features = {}, names) {
         repeatHz: String(branch.repeatHz),
         ...actionDisplay(branch.action, names),
     });
-    return domain.rows.map((row) => ({
-        keycode: actionName(row.target),
-        builtIn: builtInForView(row.target, features, names, row.steps),
-        tapHoldTerm: String(row.tapHoldTerm),
-        longHoldTerm: String(row.longHoldTerm),
-        multiTapTerm: String(row.multiTapTerm),
-        keepsAutoMouseAnchored: row.keepsAutoMouseAnchored,
-        enabled: row.enabled,
-        allowedLayers: row.allowedLayers,
-        changesNothing: changesNothing(row, features.customKeyShortcuts),
-        steps: row.steps.map((step) => ({
+    return domain.rows.map((row) => {
+        /** @type {import("../../contracts/panel.js").BehaviorView["steps"]} */
+        const steps = row.steps.map((step) => ({
             tapCount: step.tapIndex,
             tapCountName: branchName(step.tapIndex + 1),
             ...(step.tap ? {tap: {style: "TAP_SENDS", action: actionName(step.tap), ...actionDisplay(step.tap, names)}} : {}),
             ...(step.hold ? {hold: hold(step.hold)} : {}),
             ...(step.longHold ? {longHold: hold(step.longHold)} : {}),
-        })),
-    }));
+        }));
+        return {
+            keycode: actionName(row.target),
+            builtIn: builtInForView(row.target, features, names, row.steps),
+            tapHoldTerm: String(row.tapHoldTerm),
+            longHoldTerm: String(row.longHoldTerm),
+            multiTapTerm: String(row.multiTapTerm),
+            keepsAutoMouseAnchored: row.keepsAutoMouseAnchored,
+            enabled: row.enabled,
+            allowedLayers: row.allowedLayers,
+            changesNothing: changesNothing(row, features.customKeyShortcuts),
+            steps,
+        };
+    });
 }
 
 /** @param {import("../schema/types.js").Hsv} color */
@@ -99,25 +117,13 @@ const layerName = layerRef;
 
 /** @param {import("../schema/types.js").RgbProfile} domain */
 function rgbForView(domain) {
-    const ledGroups = domain.groups.map((group) => ({
-        name: `Group ${group.id}`,
-        id: group.id,
-        ledIndices: [...group.leds],
-        expression: `LEDs ${group.leds.join(", ")}`,
-        usageCount: 0,
-        usages: /** @type {{target: string, owner: string}[]} */ ([]),
-    }));
-    /** @template {{groupId: number, color: import("../schema/types.js").Hsv}} T @param {T[]} rows @param {string} target @param {(row: T) => string} [ownerFor] */
-    const groupRows = (rows, target, ownerFor) => rows.map((row, index) => {
-        const group = ledGroups.find((entry) => entry.id === row.groupId);
+    // Each accent with the LEDs its group holds; the groups themselves are
+    // Ark's to keep and never reach the interface (D-L77).
+    /** @template {{groupId: number, color: import("../schema/types.js").Hsv}} T @param {T[]} rows @param {(row: T) => string} [ownerFor] */
+    const groupRows = (rows, ownerFor) => rows.map((row, index) => {
+        const group = domain.groups.find((entry) => entry.id === row.groupId);
         if (!group) throw new Error(`Device LED group ${row.groupId} is missing.`);
-        const owner = ownerFor ? ownerFor(row) : "";
-        group.usageCount += 1;
-        group.usages.push({target, owner});
-        return {
-            index, owner, color: colorForView(row.color), ledGroup: group.name,
-            ledGroupKind: "reusable", ledIndices: [...group.ledIndices],
-        };
+        return {index, owner: ownerFor ? ownerFor(row) : "", color: colorForView(row.color), ledIndices: [...group.leds], leds: ledsCalled(group.leds)};
     });
     const all = RGB_DOMAIN_V1.SELECTOR_ALL;
     return {
@@ -125,30 +131,47 @@ function rgbForView(domain) {
         // Stages by id and bit, in the vocabulary's words; the interface finds
         // a stage by its id, never by what it is called.
         stages: VOCABULARY.stages.filter((stage) => stage.bit).map(({id, label, bit}) => ({id, label, bit, enabled: Boolean(domain.stageEnableMask & (bit || 0))})),
-        ledGroups,
         layerColors: domain.layerColors.map((row) => ({
             layer: layerName(row.layerId), layerId: row.layerId,
             color: colorForView(row.color), mode: enumName(RGB_LAYER_MODES, row.mode),
         })),
         // A layer's own group says which layer by number too (ownerLayer).
-        layerLedGroups: groupRows(domain.layerGroupRows, "layer", (row) => row.selector === all ? "RGB_LAYER_GROUP_ALL" : layerName(row.selector))
+        layerAccents: groupRows(domain.layerGroupRows, (row) => row.selector === all ? RGB_EVERY_OWNER.layer : layerName(row.selector))
             .map((group, at) => domain.layerGroupRows[at].selector === all ? group : {...group, ownerLayer: domain.layerGroupRows[at].selector}),
         automouseFade: {mode: enumName(RGB_AUTOMOUSE_MODES, domain.automouseFade.mode), end_color: colorForView(domain.automouseFade.endColor)},
         pdModeColors: domain.pdModeColors.map((row) => ({
             pointingMode: enumName(RGB_POINTING_MODE_IDS, row.pdModeId), color: colorForView(row.color), locality: enumName(RGB_LOCALITIES, row.locality),
         })),
-        pdModeLedGroups: groupRows(domain.pdModeGroupRows, "pdMode", (row) => row.selector === all ? "RGB_POINTING_MODE_GROUP_ALL" : enumName(RGB_POINTING_MODE_IDS, row.selector)),
+        pdModeAccents: groupRows(domain.pdModeGroupRows, (row) => row.selector === all ? RGB_EVERY_OWNER.pdMode : enumName(RGB_POINTING_MODE_IDS, row.selector)),
         comboFeedback: {color: colorForView(domain.comboFeedback.color), locality: enumName(RGB_LOCALITIES, domain.comboFeedback.locality)},
-        comboFeedbackLedGroups: groupRows(domain.comboGroupRows, "combo"),
+        comboAccents: groupRows(domain.comboGroupRows),
+        // Behaviour feedback (firmware D-F73): each case's colour and locality,
+        // a tap branch's together as a pointing slot's are.
         keyBehaviorFeedback: {
-            tapBranchColors: domain.keyFeedback.tapBranchColors.map(colorForView),
+            tapBranches: domain.keyFeedback.tapBranches.map((branch) => ({color: colorForView(branch.color), locality: enumName(RGB_LOCALITIES, branch.locality)})),
             tapCommittedColor: colorForView(domain.keyFeedback.tapCommittedColor),
+            tapCommittedLocality: enumName(RGB_LOCALITIES, domain.keyFeedback.tapCommittedLocality),
             holdActiveColor: colorForView(domain.keyFeedback.holdActiveColor),
+            holdActiveLocality: enumName(RGB_LOCALITIES, domain.keyFeedback.holdActiveLocality),
             longHoldActiveColor: colorForView(domain.keyFeedback.longHoldActiveColor),
+            longHoldActiveLocality: enumName(RGB_LOCALITIES, domain.keyFeedback.longHoldActiveLocality),
             tapCommitMode: enumName(RGB_TAP_COMMIT_MODES, domain.keyFeedback.tapCommitMode),
-            locality: enumName(RGB_LOCALITIES, domain.keyFeedback.locality),
         },
-        keyBehaviorFeedbackLedGroups: groupRows(domain.keyGroupRows, "keyBehavior", (row) => enumName(RGB_KEY_SEMANTICS, row.semantic)),
+        keyFeedbackAccents: groupRows(domain.keyGroupRows, (row) => enumName(RGB_KEY_SEMANTICS, row.semantic)),
+        // Replacement feedback (firmware D-F70, D-F72, D-F73): a colour and a
+        // locality for each case, a colour of saturation and value 0 painting
+        // nothing for its own.
+        autocorrectFeedback: {
+            textColor: colorForView(domain.autocorrectFeedback.textColor),
+            textLocality: enumName(RGB_LOCALITIES, domain.autocorrectFeedback.textLocality),
+            macroColor: colorForView(domain.autocorrectFeedback.macroColor),
+            macroLocality: enumName(RGB_LOCALITIES, domain.autocorrectFeedback.macroLocality),
+            undoColor: colorForView(domain.autocorrectFeedback.undoColor),
+            undoLocality: enumName(RGB_LOCALITIES, domain.autocorrectFeedback.undoLocality),
+            leadingColor: colorForView(domain.autocorrectFeedback.leadingColor),
+            leadingLocality: enumName(RGB_LOCALITIES, domain.autocorrectFeedback.leadingLocality),
+        },
+        autocorrectFeedbackAccents: groupRows(domain.autocorrectGroupRows, (row) => enumName(RGB_AUTOCORRECT_SEMANTICS, row.semantic)),
     };
 }
 
@@ -190,4 +213,4 @@ function comboRowsForView(rows, labels) {
     }));
 }
 
-module.exports = {baseEffectForView, baseRgbForView, comboRowsForView, behaviorRowsForView, builtInForView, rgbForView};
+module.exports = {baseEffectForView, baseRgbForView, comboRowsForView, behaviorRowsForView, builtInForView, builtInBranches, rgbForView};

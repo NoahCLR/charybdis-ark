@@ -13,10 +13,10 @@ const {connectedState, panelModel} = require("../tests/fixtures/published-model"
 test("each Settings screen draws its own sections open, with nothing to fold and no search", async ({page}) => {
     await openControls(page, "keys");
     for (const [screen, title, sections] of [
-        ["behaviours", "Behaviours", ["keyTiming", "behaviorSettings"]],
+        ["behaviours", "Behaviours", ["behaviorSettings", "keyTiming"]],
         ["combos", "Combos", ["comboSettings", "comboReferences"]],
         ["pointer", "Pointer", ["normalPointerSpeed", "sniping", "autoMouse"]],
-        ["host", "Host", ["host", "keyboardOptions"]],
+        ["host", "Typing", ["host", "autocorrect"]],
     ]) {
         await page.locator(`[data-screen="${screen}"]`).click();
         await expect(page.locator(".main > .topbar h1")).toHaveText(title);
@@ -109,7 +109,7 @@ test("a review row for a setting shows it on the screen that holds it", async ({
     }
 });
 
-test("Keyboard: the title renames the keyboard, and memory and diagnostics live here", async ({page}) => {
+test("Keyboard: the title renames the keyboard, memory lives here, and no Diagnostics or Built into this firmware", async ({page}) => {
     await openControls(page, "device");
     const title = page.locator('[data-f="keyboard:name"]');
     await expect(title).toBeEnabled();
@@ -120,37 +120,38 @@ test("Keyboard: the title renames the keyboard, and memory and diagnostics live 
     await title.press("Enter");
     await expect.poll(() => page.evaluate(() => window.__posted)).toEqual([expect.objectContaining({type: "renameKeyboard", name: "Desk 777"})]);
     await expect(page.locator(".card.usage")).toHaveCount(1);
-    await expect(page.locator('[data-section="diagnostics"]')).not.toHaveAttribute("open", "");
+    await expect(page.locator('[data-section="diagnostics"]')).toHaveCount(0);
+    await expect(page.locator('[data-section="builtIn"]')).toHaveCount(0);
     await clearPosts(page);
-    // Read keyboard sits over the fold's title, outside its summary.
-    await page.locator('.diagnostics [data-act="read"]').click();
-    await expect.poll(() => page.evaluate(() => window.__posted)).toEqual([expect.objectContaining({type: "refresh"})]);
-    await expect(page.locator('[data-section="diagnostics"]')).not.toHaveAttribute("open", "");
+    // Read keyboard stays, in This keyboard's heading.
+    await page.locator('.device-pad [data-act="read"]').click();
+    await expect.poll(() => page.evaluate(() => window.__posted)).toEqual([{type: "refresh", draftId: expect.any(String), draftRevision: expect.any(Number)}]);
     await page.locator('[data-screen="host"]').click();
     await expect(page.locator('[data-f="settings:keyboard-name"]')).toHaveCount(0);
 });
 
-test("Keyboard: opening Diagnostics reads the flash pauses once, and its Read keyboard reads them after the keyboard", async ({page}) => {
-    await openControls(page, "device");
+test("Keyboard: ?diagnostics shows Diagnostics; opening it reads the flash pauses once, and Read keyboard reads them after the keyboard while it is open", async ({page}) => {
+    await openControls(page, "device", {}, "dark", "diagnostics");
     const fold = page.locator('[data-section="diagnostics"]');
+    await expect(fold).not.toHaveAttribute("open", "");
     await clearPosts(page);
     await fold.locator("summary h3").click();
     await expect(fold).toHaveAttribute("open", "");
     await expect.poll(() => page.evaluate(() => window.__posted)).toEqual([expect.objectContaining({type: "readFlashPauses"})]);
     await expect(fold.locator(".flash-pauses-section")).toContainText("Not read yet.");
     await clearPosts(page);
-    await page.locator('.diagnostics [data-act="read"]').click();
+    await page.locator('.device-pad [data-act="read"]').click();
     await expect.poll(() => page.evaluate(() => window.__posted)).toEqual([expect.objectContaining({type: "refresh", flashPauses: true})]);
     await expect(fold).toHaveAttribute("open", "");
     await clearPosts(page);
     await fold.locator("summary h3").click();
     await expect(fold).not.toHaveAttribute("open", "");
-    await page.locator('.diagnostics [data-act="read"]').click();
+    await page.locator('.device-pad [data-act="read"]').click();
     await expect.poll(() => page.evaluate(() => window.__posted)).toEqual([{type: "refresh", draftId: expect.any(String), draftRevision: expect.any(Number)}]);
 });
 
 test("Keyboard: an open Diagnostics reads the flash pauses of each connection once, when nothing holds the keyboard", async ({page}) => {
-    await openControls(page, "device");
+    await openControls(page, "device", {}, "dark", "diagnostics");
     await page.locator('[data-section="diagnostics"] summary h3').click();
     // Each model carries a note of its own in the fold's diagnostics: once the
     // page shows it, the page has drawn that model, and posted what drawing
@@ -180,7 +181,7 @@ test("Keyboard: an open Diagnostics reads the flash pauses of each connection on
 });
 
 test("Keyboard: the demo's Diagnostics shows sample flash pauses for both halves and reads nothing", async ({page}) => {
-    await page.goto("/preview/index.html?shell=demo&screen=device");
+    await page.goto("/preview/index.html?shell=demo&screen=device&diagnostics");
     const fold = page.locator('[data-section="diagnostics"]');
     await clearPosts(page);
     await fold.locator("summary h3").click();

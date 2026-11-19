@@ -50,15 +50,25 @@ export const macroShortName = (slot) => `M${macroNumber(slot?.keycode) ?? ""}`;
 export const macroUnit = (index) => `macro:${index}`;
 
 // A macro's limits (rules/macro-payload.mjs): its longest delay in
-// milliseconds, and the keys it holds at once, a chord's included.
-export const MAX_DELAY = MACRO_LIMITS.maxDelayMs, MAX_KEYS = MACRO_LIMITS.maxHeldKeys;
+// milliseconds, the keys it holds at once, a chord's included, and of those
+// the keys besides modifiers, which fill the report's key slots (firmware
+// D-F65).
+export const MAX_DELAY = MACRO_LIMITS.maxDelayMs, MAX_KEYS = MACRO_LIMITS.maxHeldKeys, REPORT_KEYS = MACRO_LIMITS.reportKeys;
+
+// Whether a key is an ordinary key, not a modifier, by the modifier names the
+// model publishes (macroPayloadModifierKeycodes, every alias included). Without
+// them no key is ordinary, and core alone says what an ordinary key may not
+// do. Every interface reader of a macro asks here.
+/** @param {readonly string[] | null | undefined} modifierKeys @returns {(key: unknown) => boolean} */
+export const ordinaryKey = (modifierKeys) => (key) => Boolean(modifierKeys) && !modifierKeys?.includes(/** @type {string} */ (key));
 
 // A macro's steps, as far as they read, and what is wrong in words: the shared
 // grammar read by key name, a key known by its alias's name, and only the keys
 // a macro can send when the model lists them. Text that needs Unicode entry
 // with an ordinary key held is said once the rest reads; without a host
 // layout, that text is anything past ASCII, and without the model's modifier
-// keys no held key counts as ordinary, so core alone says it. A key left
+// keys no held key counts as ordinary, so core alone says it, as it does a
+// step holding more than six ordinary keys at once (firmware D-F65). A key left
 // held is not an error here: the editor names each one (unreleased), as core
 // refuses it.
 /** @param {unknown} payload @param {import("./types.js").MacroOptions} [options] */
@@ -69,7 +79,7 @@ export function parseMacro(payload, options = {}) {
         sendable: (key) => !allowed || allowed.has(key),
         textEntry: options.textEntry,
         needsEntry: (character) => options.layoutChars ? !options.layoutChars.includes(character) : /[^\x00-\x7F]/u.test(character),
-        ordinary: (key) => Boolean(options.modifierKeys) && !options.modifierKeys?.includes(/** @type {string} */ (key)),
+        ordinary: ordinaryKey(options.modifierKeys),
         skipEmptyNames: true,
     });
     /** @type {MacroStep[]} */
@@ -164,15 +174,18 @@ export function unreleased(steps, model) {
     return held;
 }
 
-// Whether a slot answers a search. A macro is found by the name it was given,
-// and by the slot it sits in as the screens label it — "M3", "Macro 3" or its
-// keycode — so an unnamed macro can still be found. Case is ignored.
+// What a search finds a macro by: the name it was given, and the slot it sits
+// in as the screens label it — "M3", "Macro 3" or its keycode — so an unnamed
+// macro can still be found.
+/** @param {{keycode?: string, name?: string, defaultName?: string} | null | undefined} slot */
+export const macroWords = (slot) => [slot?.name, macroShortName(slot), slot?.defaultName, slot?.keycode].map((text) => String(text ?? ""));
+
+// Whether a slot answers a search. Case is ignored.
 /** @param {{keycode?: string, name?: string, defaultName?: string} | null | undefined} slot @param {unknown} query */
 export function macroMatches(slot, query) {
     const needle = String(query ?? "").trim().toLowerCase();
     if (!needle) return true;
-    return [slot?.name, macroShortName(slot), slot?.defaultName, slot?.keycode]
-        .some((text) => String(text ?? "").toLowerCase().includes(needle));
+    return macroWords(slot).some((text) => text.toLowerCase().includes(needle));
 }
 
 // Whether two payloads are the same macro: the same steps once every key name
@@ -188,17 +201,4 @@ export function samePayload(a, b, model) {
     /** @param {MacroStep} step @returns {MacroStep} */
     const canonical = step => step.kind === "text" || step.kind === "delay" ? step : {...step, keys: step.keys.map(key => keyIdentity(model, key).name)};
     return serializeMacro(one.steps.map(canonical)) === serializeMacro(two.steps.map(canonical));
-}
-
-// What a macro card's chip says its editor holds, against the draft and the
-// keyboard: an edit not kept in the draft yet, a macro the draft changed
-// (Review lists it), or the macro as read (in the demo, as the demo profile has
-// it). A playback change the host section caused is not a change to the macro.
-/** @param {readonly Pick<import("../../contracts/model.js").ReviewChange, "unit">[] | undefined} changes @param {string} keycode @param {boolean} local @returns {{state: "local" | "draft" | "read", dot: string, text: string}} */
-export function macroLocalState(changes, keycode, local) {
-    if (local) return {state: "local", dot: "draft", text: "edited here"};
-    const index = macroNumber(keycode);
-    return index !== null && (changes || []).some((change) => change.unit === macroUnit(index))
-        ? {state: "draft", dot: "draft", text: "changed in draft"}
-        : {state: "read", dot: "on", text: "as read"};
 }

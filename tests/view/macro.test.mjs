@@ -150,7 +150,7 @@ test("canonical names and aliases are one key for holds, releases and chord limi
     assert.equal(parsed.error, "");
     assert.deepEqual(unreleased(parsed.steps, model), []);
     assert.equal(serializeMacro(parsed.steps), source, "alias identity checking preserves raw spelling");
-    assert.match(parseMacro("{KC_LGUI,KC_LEFT_GUI}", {model, keys}).error, /distinct/);
+    assert.match(parseMacro("{KC_LGUI,KC_LEFT_GUI}", {model, keys}).error, /each key only once/);
     assert.match(parseMacro("{+KC_LGUI}{KC_LEFT_GUI}{-KC_LGUI}", {model, keys}).error, /already held/);
 });
 
@@ -216,30 +216,6 @@ test("each macro step kind has one name, on its add button and in the step edito
     }
 });
 
-test("a macro's chip tells an unkept edit, a change kept in the draft and the macro as read apart", async () => {
-    const {macroLocalState} = await import("../../webview/view/macro.mjs");
-    const {createRequire} = await import("node:module"), require = createRequire(import.meta.url);
-    const {ProfileDraftSession} = require("../../core/session/profile-draft-session");
-    const portable = require("../../core/model/portable-profile");
-    const {document} = require("../fixtures/portable-profile");
-    const value = document();
-    const {DEMO_CAPABILITIES} = require("../../core/session/demo-session");
-    const draft = new ProfileDraftSession({document: value, fingerprint: portable.fingerprint(value), summary: portable.summary(value)}, "test-device", DEMO_CAPABILITIES);
-    const changes = () => draft.view({selectedDeviceId: "test-device", connected: true}).changes;
-    assert.equal(macroLocalState(changes(), "MACRO_0", false).text, "as read");
-    assert.deepEqual(macroLocalState(changes(), "MACRO_0", true), {state: "local", dot: "draft", text: "edited here"});
-    draft.stage({draftId: draft.id, draftRevision: draft.revision, type: "updateMacro", keycode: "MACRO_0", payload: "Hi"});
-    assert.deepEqual(macroLocalState(changes(), "MACRO_0", false), {state: "draft", dot: "draft", text: "changed in draft"});
-    assert.equal(macroLocalState(changes(), "MACRO_1", false).text, "as read", "another macro is as read");
-    assert.equal(macroLocalState([{unit: "macro:null"}], "KC_A", false).text, "as read", "a keycode that names no slot names no unit");
-    assert.equal(macroLocalState(changes(), "MACRO_0", true).text, "edited here", "an unkept edit over it still says so");
-    draft.jump(draft.revision, 0);
-    assert.equal(macroLocalState(changes(), "MACRO_0", false).text, "as read", "undone, it is as read again");
-    // A playback change Your computer caused is listed under the macro, but it
-    // is not a change to the macro.
-    assert.equal(macroLocalState([{unit: "settings:host"}], "MACRO_0", false).text, "as read");
-});
-
 // The dropdown says Automatic as core does, with whether the macro plays
 // uninterruptibly now; a chosen setting says only its word.
 test("an Uninterruptible playback choice reads in core's words", () => {
@@ -248,4 +224,12 @@ test("an Uninterruptible playback choice reads in core's words", () => {
     assert.deepEqual(choices.map((choice) => protectionChoiceLabel(model, choice, true)), ["Automatic · on", "On", "Off"]);
     assert.equal(protectionChoiceLabel(model, choices[0], false), "Automatic · off");
     assert.equal(protectionChoiceLabel(null, choices[0], true), "Automatic", "without core's words, the choice's own");
+});
+
+test("the step editor's checks hold a macro to six keys at once besides modifiers, once it knows the modifiers (firmware D-F65)", () => {
+    const options = {modifierKeys: ["KC_LGUI", "KC_LSFT"], problems: {reportFull: "too many"}};
+    assert.equal(parseMacro("{KC_E,KC_Y,KC_K,KC_SCLN,KC_P,KC_0,KC_U}", options).error, "too many");
+    assert.equal(parseMacro("{KC_LGUI,KC_LSFT,KC_E,KC_Y,KC_K,KC_SCLN,KC_P,KC_0}", options).error, "");
+    const steps = parseMacro("{KC_E,KC_Y,KC_K,KC_SCLN,KC_P,KC_0,KC_U}").steps;
+    assert.equal(steps.length, 1, "the editor's own reading keeps every step");
 });

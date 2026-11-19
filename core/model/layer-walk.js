@@ -31,8 +31,7 @@ const {macroName} = require("../../rules/qmk-keycodes.mjs");
  * @typedef {import("./types.js").LayerWalk} LayerWalk
  * @typedef {import("./types.js").LayerStateGraph} LayerStateGraph
  */
-const TRANSPARENT = 0x0001;
-const NOTHING = 0x0000;
+const {NOTHING, TRANSPARENT} = require("../../rules/qmk-keycodes.mjs");
 // Enough to name a way in without listing every superset of one trap.
 const MAX_TRAPS = 4;
 // Each layer has independent held and locked bits: sixteen layers cannot be

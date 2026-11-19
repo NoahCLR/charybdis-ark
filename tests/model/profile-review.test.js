@@ -29,7 +29,7 @@ test("Host changes review affected text macros while leaving key steps and ident
     assert.deepEqual(effects.map(row => row.place.index), [0, 3]);
     for (const row of effects) {
         assert.equal(row.unit, "settings:host", "the effect discards the host setting, not the macro");
-        assert.match(row.note, /because of Host settings → Your computer\. Discard it together with that change\./);
+        assert.match(row.note, /because of Typing settings → Your computer\. Discard it together with that change\./);
         const typing = row.fields.find(field => field.label === "Text entry");
         assert.match(typing.before, /layout keys: "é"/);
         assert.match(typing.after, /Unicode entry \(macOS\): "é"/);
@@ -67,7 +67,7 @@ test("a combo's keys read as the screens read them, with no stored name where no
     const base=combos(pdDocument(),()=>comboRows()), before=snapshot(base);
     // LT(3,KC_SLASH) and a pointing-mode key: once "/ / layer 3 (LT(3,KC_SLASH))" and "User 16".
     const after=snapshot(combos(base,rows=>rows.map((row,id)=>id===0?{...row,inputs:[{kind:1,flags:0,operand:0x4338},{kind:1,flags:0,operand:0x7e80}]}:row)));
-    const keys=profileReview(before,after).find(row=>row.unit==="combo:0").fields.find(field=>field.label==="Keys");
+    const keys=profileReview(before,after).find(row=>row.unit==="combo:0").fields.find(field=>field.label==="Inputs");
     assert.equal(keys.after,`/ / ${settings.names[3]} + ${slots[0].name} · hold`,"a layer by its name");
 });
 test("a key changed for another with the same label is still a visible change", () => {
@@ -87,6 +87,13 @@ test("a key changed to a layer key carries that layer's mark, and one changed to
     editLayers(after, layers => layers[0][7]=0x5225); editLayers(after, layers => layers[0][8]=0x4338); editLayers(after, layers => layers[0][9]=0x7e80); editLayers(after, layers => layers[0][10]=0x04); // MO(5), LT(3,KC_SLASH), PD_MODE_0, KC_A
     const marks=profileReview(before,snapshot(after)).filter(row=>row.area==="Keys").map(row=>row.fields[0].afterMark);
     assert.deepEqual(marks,[{kind:"layer",layer:5},{kind:"layer",layer:3},{kind:"pointing",slot:0},undefined]);
+});
+
+test("a key changed to a macro or a custom key carries that kind's mark, which has no colour to name", () => {
+    const before=snapshot(document()), after=structuredClone(before.document);
+    editLayers(after, layers => layers[0][7]=0x7700); editLayers(after, layers => layers[0][8]=0x7f00); // MACRO_0, CUSTOM_KEY_0
+    const marks=profileReview(before,snapshot(after)).filter(row=>row.area==="Keys").map(row=>row.fields[0].afterMark);
+    assert.deepEqual(marks,[{kind:"macro"},{kind:"customKey"}]);
 });
 
 test("a key's participation is named where the key sits, as its layout change is", () => {
@@ -126,7 +133,7 @@ test("a changed default window is one Combo timing change, and the combos that f
     const after=snapshot(combos(base,rows=>rows,{defaultTermMs:70,holdTermMs:250}));
     const items=profileReview(before,after);
     assert.deepEqual(items.map(row=>row.unit),["comboTiming"]);
-    assert.deepEqual(items[0].fields.map(field=>[field.label,field.before,field.after]),[["Default window","50 ms","70 ms"],["Hold threshold","200 ms","250 ms"]]);
+    assert.deepEqual(items[0].fields.map(field=>[field.label,field.before,field.after]),[["Default combo window","50 ms","70 ms"],["Combo hold threshold","200 ms","250 ms"]]);
     assert.deepEqual(items[0].place,{kind:"settings",section:"comboSettings",area:"Settings"});
     // A combo moving between its own window and the default is its change.
     const own=snapshot(combos(base,rows=>rows.map((row,id)=>id===0?{...row,termMs:50}:row)));
@@ -164,7 +171,7 @@ test("a behaviour's allowed layers are named as every screen names them, never b
     const target=validateSnapshot(base).behaviors.rows[0].target, names=validateSnapshot(base).settings.names;
     const after=snapshot(behaviours(base,rows=>rows.map(row=>JSON.stringify(row.target)===JSON.stringify(target)?{...row,allowedLayers:0b1000000000010011}:row)));
     const [item]=profileReview(before,after);
-    const field=item.fields.find(entry=>entry.label==="Allowed layers");
+    const field=item.fields.find(entry=>entry.label==="Layers it runs on");
     const called=index=>names[index]||(index?`Layer ${index}`:"Base");
     assert.equal(field.after,[0,1,4,15].map(called).join(", "));
     assert.ok(field.after.split(", ").every(Boolean),"no layer is a blank name");
@@ -186,7 +193,7 @@ test("a new pointing mode is one added item, however many fields it sets", () =>
     const items=profileReview(before,after);
     assert.equal(items.length,1);
     assert.equal(items[0].status,"added");
-    assert.equal(items[0].title,"Slot 6 · Mode 6");
+    assert.equal(items[0].title,"Pointing mode 6 · Mode 6");
     assert.ok(items[0].fields.length>5,"it lists what it sets");
     assert.deepEqual(items[0].place,{kind:"pointing",slot:6});
 });
@@ -221,9 +228,127 @@ test("a colour travels as a colour, and an off one says what off means there", (
     assert.equal(layer.title,`${names[2]} colour`,"a layer's colour is named by the layer");
     assert.deepEqual(layer.fields[0].afterColour,{h:20,s:200,v:100});
     assert.ok(layer.fields[0].beforeColour,"both sides carry their colour");
-    const override=items.find(entry=>entry.unit==="rgb:groups").fields.find(field=>field.label===`Override · ${names[3]}`);
-    assert.match(override.after,/Group \d+ · 3 LEDs · inherits the stage colour/);
-    assert.deepEqual(override.afterColour,{h:0,s:0,v:0},"drawn as off, as Lighting draws it");
+    const accents=items.find(entry=>entry.unit==="rgb:groups");
+    assert.equal(accents.title,"Accents");
+    const accent=accents.fields.find(field=>field.label===`Accent · ${names[3]}`);
+    assert.equal(accent.after,"LEDs 1–3 · Same as the layer","an accent reads by its LEDs and its colour, as Lighting lists it, never by a group");
+    assert.deepEqual(accent.afterColour,{h:0,s:0,v:0},"drawn as off, as Lighting draws it");
+    assert.ok(!accents.fields.some(field=>/Group/.test(`${field.label} ${field.after} ${field.before}`)),"no group is named");
+});
+test("an owned colour that paints nothing reads passthrough, and one with only brightness at zero reads off, a layer's and a mode's alike (D-L94)", () => {
+    const base=pdDocument(), before=snapshot(base);
+    const colours={0:{h:30,s:200,v:150},2:{h:30,s:0,v:0},3:{h:30,s:200,v:0}};
+    const after=snapshot(lighting(base,rgb=>({...rgb,
+        layerColors:rgb.layerColors.map(row=>colours[row.layerId]?{...row,color:colours[row.layerId]}:row),
+        pdModeColors:rgb.pdModeColors.map(row=>({...row,color:row.pdModeId===1?{h:5,s:255,v:0}:{h:0,s:0,v:0}}))})));
+    const items=profileReview(before,after), field=unit=>items.find(entry=>entry.unit===unit)?.fields[0];
+    assert.equal(field("rgb:layer:0").before,"passthrough","Base too, in the same word");
+    assert.equal(field("rgb:layer:2").after,"passthrough","any hue with no saturation or brightness");
+    assert.equal(field("rgb:layer:3").after,"off","saturation without brightness turns the LEDs off");
+    assert.equal(field("rgb:pd:0").after,"passthrough","a mode's too (firmware D-F74)");
+    assert.equal(field("rgb:pd:1").after,"off");
+    // Two passthrough colours that differ only in hue read apart by their detail.
+    const rehued=snapshot(lighting(after.document,rgb=>({...rgb,layerColors:rgb.layerColors.map(row=>row.layerId===2?{...row,color:{h:90,s:0,v:0}}:row)})));
+    const [hue]=profileReview(after,rehued).find(entry=>entry.unit==="rgb:layer:2").fields;
+    assert.deepEqual([hue.before,hue.after],["passthrough · HSV(30, 0, 0)","passthrough · HSV(90, 0, 0)"]);
+});
+test("replacement feedback reads by its cases as its tab lists them, each with where it paints, a passthrough case as passthrough and an off one as off", () => {
+    const {VOCABULARY: V} = require("../../core/model/vocabulary");
+    const base=pdDocument(), before=snapshot(base);
+    const after=snapshot(lighting(base,rgb=>({...rgb,
+        autocorrectFeedback:{textColor:{h:106,s:255,v:200},textLocality:3,macroColor:{h:234,s:255,v:0},macroLocality:0,undoColor:{h:0,s:255,v:200},undoLocality:3,leadingColor:{h:170,s:255,v:200},leadingLocality:4}})));
+    const item=profileReview(before,after).find(entry=>entry.unit==="rgb:autocorrect");
+    assert.equal(item.title,"Replacement feedback");
+    assert.equal(item.area,"Lighting");
+    assert.deepEqual(item.place,{kind:"lighting",stage:"autocorrect"},"Show opens its tab");
+    assert.deepEqual(item.fields.map(field=>[field.label,field.before,field.after]),[
+        ["Replaced with text","passthrough","HSV(106, 255, 200)"],
+        [`Replaced with text · ${V.lightingFields.locality}`,"All LEDs","The half holding the trigger key"],
+        ["Replaced by a macro","passthrough","off"],
+        ["Replacement undone","passthrough","HSV(0, 255, 200)"],
+        [`Replacement undone · ${V.lightingFields.locality}`,"All LEDs","The half holding the trigger key"],
+        ["Leader waiting","passthrough","HSV(170, 255, 200)"],
+        [`Leader waiting · ${V.lightingFields.locality}`,"All LEDs","Only the trigger key"]],"each case, then where it paints, a locality unchanged not listed");
+    assert.deepEqual(item.fields[0].afterColour,{h:106,s:255,v:200},"a colour travels as a colour");
+    // Any hue with no saturation or brightness paints nothing: the case is passthrough.
+    const dark=snapshot(lighting(after.document,rgb=>({...rgb,autocorrectFeedback:{...rgb.autocorrectFeedback,textColor:{h:40,s:0,v:0}}})));
+    const [off]=profileReview(after,dark);
+    assert.deepEqual(off.fields.map(field=>[field.label,field.before,field.after]),[["Replaced with text","HSV(106, 255, 200)","passthrough"]]);
+    // Its stage switch is named as its tab is.
+    const [stage]=profileReview(before,snapshot(lighting(base,rgb=>({...rgb,stageEnableMask:rgb.stageEnableMask | 32}))));
+    assert.deepEqual(stage.fields,[{label:"Replacement feedback",status:"changed",before:"off",after:"on",beforeMark:{kind:"stage",on:false},afterMark:{kind:"stage",on:true}}]);
+});
+test("a replacement feedback accent reads by the case it lights for, or every replacement flash", () => {
+    const base=pdDocument(), before=snapshot(base);
+    const after=snapshot(lighting(base,rgb=>({...rgb,
+        groups:[...rgb.groups,{id:rgb.groups.length,leds:[7,8]}],
+        autocorrectGroupRows:[{semantic:255,color:{h:0,s:0,v:0},groupId:rgb.groups.length},{semantic:0,color:{h:10,s:255,v:200},groupId:rgb.groups.length},
+            {semantic:1,color:{h:0,s:0,v:0},groupId:rgb.groups.length},{semantic:2,color:{h:0,s:0,v:0},groupId:rgb.groups.length}]})));
+    const accents=profileReview(before,after).find(entry=>entry.unit==="rgb:groups");
+    assert.deepEqual(accents.fields.map(field=>[field.label,field.after]),[
+        ["Accent · Every case","LEDs 7, 8 · Same as the case's colour"],["Accent · Replaced with text","LEDs 7, 8 · HSV(10, 255, 200)"],
+        ["Accent · Replaced by a macro","LEDs 7, 8 · Same as the case's colour"],["Accent · Replacement undone","LEDs 7, 8 · Same as the case's colour"]]);
+    assert.ok(accents.fields.every(field=>field.status==="added"));
+    assert.deepEqual(accents.place,{kind:"lighting",stage:"accents"});
+});
+test("an accent for every layer, mode or behaviour state, and the combo accents, read by who they light for", () => {
+    const base=pdDocument(), before=snapshot(base);
+    const after=snapshot(lighting(base,rgb=>({...rgb,
+        groups:[...rgb.groups,{id:rgb.groups.length,leds:[7,8]}],
+        layerGroupRows:[...rgb.layerGroupRows,{selector:255,color:{h:10,s:255,v:200},groupId:rgb.groups.length}],
+        pdModeGroupRows:[...rgb.pdModeGroupRows,{selector:255,color:{h:0,s:0,v:0},groupId:rgb.groups.length}],
+        comboGroupRows:[...rgb.comboGroupRows,{color:{h:0,s:0,v:0},groupId:rgb.groups.length}]})));
+    const labels=profileReview(before,after).find(entry=>entry.unit==="rgb:groups").fields.map(field=>[field.label,field.after]);
+    assert.deepEqual(labels.filter(([label])=>/Every/.test(label)),[["Accent · Every layer","LEDs 7, 8 · HSV(10, 255, 200)"],["Accent · Every pointing mode","LEDs 7, 8 · Same as the mode"],["Accent · Every combo","LEDs 7, 8 · Same as combo feedback"]]);
+});
+test("every Lighting field reads in the review as its Lighting tab labels it", () => {
+    const {VOCABULARY: V} = require("../../core/model/vocabulary");
+    const {RGB_LAYER_MODES, RGB_LOCALITIES, RGB_AUTOMOUSE_MODES, RGB_TAP_COMMIT_MODES} = require("../../core/schema/rgb-domain-v1");
+    const other = (values, value) => Object.values(values).find(id => id !== value);
+    const hue = colour => ({...colour, h: (colour.h + 1) % 256, v: colour.v || 100});
+    const base=pdDocument(), before=snapshot(base);
+    const after=snapshot(lighting(base,rgb=>({...rgb,
+        layerColors:rgb.layerColors.map(row=>({...row,color:hue(row.color),mode:other(RGB_LAYER_MODES,row.mode)})),
+        pdModeColors:rgb.pdModeColors.map(row=>({...row,color:hue(row.color),locality:other(RGB_LOCALITIES,row.locality)})),
+        automouseFade:{...rgb.automouseFade,mode:other(RGB_AUTOMOUSE_MODES,rgb.automouseFade.mode),endColor:hue(rgb.automouseFade.endColor)},
+        comboFeedback:{...rgb.comboFeedback,color:hue(rgb.comboFeedback.color),locality:other(RGB_LOCALITIES,rgb.comboFeedback.locality)},
+        keyFeedback:{...rgb.keyFeedback,tapCommittedColor:hue(rgb.keyFeedback.tapCommittedColor),holdActiveColor:hue(rgb.keyFeedback.holdActiveColor),
+            longHoldActiveColor:hue(rgb.keyFeedback.longHoldActiveColor),tapBranches:rgb.keyFeedback.tapBranches.map(branch=>({color:hue(branch.color),locality:other(RGB_LOCALITIES,branch.locality)})),
+            tapCommittedLocality:other(RGB_LOCALITIES,rgb.keyFeedback.tapCommittedLocality),holdActiveLocality:other(RGB_LOCALITIES,rgb.keyFeedback.holdActiveLocality),
+            longHoldActiveLocality:other(RGB_LOCALITIES,rgb.keyFeedback.longHoldActiveLocality),tapCommitMode:other(RGB_TAP_COMMIT_MODES,rgb.keyFeedback.tapCommitMode)}})));
+    const items=profileReview(before,after).filter(entry=>/^rgb:(layer|pd|automouse|combo|key)/.test(entry.unit));
+    const cases=[...V.branches,...V.feedbackOwners.map(([,text])=>text)];
+    // A case's locality reads by the case and the Locality field (D-L93).
+    const words=new Set([...Object.values(V.lightingFields),...cases,...cases.map(name=>`${name} · ${V.lightingFields.locality}`),`Tap committed · ${V.lightingFields.doubleTapFlash}`]);
+    for (const entry of items) for (const field of entry.fields) assert.ok(words.has(field.label),`${entry.title}: "${field.label}" is not a Lighting word`);
+    const key=items.find(entry=>entry.unit==="rgb:key");
+    const where=name=>[name,`${name} · ${V.lightingFields.locality}`];
+    assert.deepEqual(key.fields.map(field=>field.label),[...where("Tap committed"),`Tap committed · ${V.lightingFields.doubleTapFlash}`,
+        ...["Hold active","Long hold active",...V.branches.slice(1,5)].flatMap(where)],"listed as the Behaviour feedback tab lists them, each case with where it paints, Tap committed with its double-tap flash");
+    for (const unit of ["rgb:layer","rgb:pd","rgb:automouse","rgb:combo"]) assert.ok(items.some(entry=>entry.unit.startsWith(unit)),`${unit} changed`);
+});
+test("every behaviour, combo and pointing mode field reads in the review as its editor labels it", () => {
+    const {VOCABULARY: V} = require("../../core/model/vocabulary");
+    const {COMBO_TIMING} = require("../../core/model/settings-editor");
+    const P = V.pointing, sentence = text => text.charAt(0).toUpperCase() + text.slice(1);
+    const words = new Set([
+        ...Object.values(V.definitionFields.use), V.definitionFields.allowedLayers, ...Object.values(V.behaviourFields),
+        ...Object.values(V.thresholdNames).map(sentence), ...Object.values(V.comboFields), sentence(V.comboOptions.useOutputBehavior),
+        ...COMBO_TIMING.map(field => field.label),
+        P.movementLabel, P.pointerLayerLabel, P.heldModifiers, ...Object.values(P.fieldLabels), ...Object.values(P.linkLabels),
+        ...[...P.directions, ...P.diagonals, ...P.scrollFields].map(([, text]) => text),
+        ...[P.fieldLabels.horizontal, P.fieldLabels.vertical].flatMap(axis => P.directionStep.map(([, step]) => `${axis} ${step}`)),
+    ]);
+    // A tier reads as the grid heads it: "2× long hold".
+    const tier = new RegExp(`^\\d× (${Object.values(V.tiers).map(name => name.toLowerCase()).join("|")})$`);
+    const full = combos(pdDocument(), () => comboRows().map((row, id) => ({...row, termMs: id ? row.termMs : null, mustHold: id === 1, ordered: id === 2})));
+    const empty = combos(behaviours(withDomain(full,80,decodePdDomain,encodePdDomain,modes=>modes.map(mode=>({...mode,kind:0,name:""}))),()=>[]),()=>[],{defaultTermMs:70,holdTermMs:250});
+    const items = [...profileReview(snapshot(empty), snapshot(full)), ...profileReview(snapshot(full), snapshot(empty))]
+        .filter(entry => /^(pd|behavior|combo)/.test(entry.unit));
+    const labels = new Set(items.flatMap(entry => entry.fields.map(field => field.label)));
+    for (const label of labels) assert.ok(words.has(label) || tier.test(label), `"${label}" is not a word its editor uses`);
+    for (const label of [V.behaviourFields.anchor, V.definitionFields.use.behaviour, V.definitionFields.use.combo, V.comboFields.inputs,
+        COMBO_TIMING[0].label, P.fieldLabels.dpi, P.fieldLabels.name, P.movementLabel]) assert.ok(labels.has(label), `"${label}" is reviewed`);
 });
 test("switching one lighting stage off names that stage, in the Lighting screen's words", () => {
     const base=pdDocument(), before=snapshot(base);
@@ -294,7 +419,7 @@ test("an eight-direction mode reads as eight directions, and lists its diagonals
     const directional=slots.findIndex(slot=>slot.kind===1);
     const after=snapshot(withDomain(base,80,decodePdDomain,encodePdDomain,modes=>modes.map((mode,id)=>id===directional?{...mode,axis:3,thresholdX:mode.thresholdX||60,thresholdY:mode.thresholdY||60}:mode)));
     const [item]=profileReview(before,after);
-    const axis=item.fields.find(field=>field.label==="Axes");
+    const axis=item.fields.find(field=>field.label==="Reads");
     assert.equal(axis.after,"Eight directions","not undefined");
     assert.ok(item.fields.some(field=>field.label==="Up-left"),"the diagonals it now reads are listed");
 });
@@ -395,4 +520,26 @@ test("a shortcut kind that makes its key dual-role lists the threshold its behav
     // A kind change that keeps the key's threshold lists nothing more.
     const lock = snapshot(settings(withRow, shortcut(1)));
     assert.ok(!profileReview(before, lock)[0].fields.some(field => field.label.endsWith(" · Tap / hold threshold")));
+});
+test("each feedback flash's length is reviewed with its own stage, and discarded alone", () => {
+    const {settingsEditorView} = require("../../core/model/settings-editor");
+    const {draftEdit} = require("../fixtures/draft-edit");
+    const {revertUnits} = require("../../core/model/profile-revert");
+    const before = snapshot(document());
+    /** @param {object} from @param {string} sectionId @param {string} macro @param {string} value */
+    const edited = (from, sectionId, macro, value) => {
+        const section = settingsEditorView(from).sections.find(row => row.id === sectionId);
+        return snapshot(draftEdit(from, {type: "updateConfigDefaults", sectionId, fields: section.fields.map(field => ({macro: field.macro, value: field.macro === macro ? value : field.value}))}));
+    };
+    const flash = edited(before, "replacementFeedback", "replacementFlash", "350");
+    const both = edited(flash, "lightingFeedback", "feedbackFlash", "120");
+    const items = profileReview(before, both);
+    const length = items.find(row => row.unit === "settings:replacementFeedback");
+    assert.deepEqual({title: length.title, area: length.area, place: length.place, fields: length.fields.map(field => [field.label, field.before, field.after])},
+        {title: "Replacement feedback flash", area: "Lighting", place: {kind: "settings", area: "Lighting", section: "replacementFeedback", stage: "autocorrect"}, fields: [["Flash length", "200 ms", "350 ms"]]});
+    const interval = items.find(row => row.unit === "settings:lightingFeedback");
+    assert.deepEqual(interval.fields.map(field => [field.label, field.before, field.after]), [["Blink time", "200 ms", "120 ms"]]);
+    // Discarding one puts back that length alone.
+    const kept = validateSnapshot(revertUnits(before, both, new Set(["settings:replacementFeedback"]))).settings.values;
+    assert.deepEqual([kept[15], kept[31]], [120, 200]);
 });

@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {createRequire} from "node:module";
-import {SECTION_ROWS, activeBlockers, categorySummary, changesKept, discardLabel, draftMarks, groupNote, placeState, reviewBlocks, saveOffReason, statusBesideCount, statusSummary, stillShown} from "../../webview/view/review.mjs";
+import {SECTION_ROWS, activeBlockers, categorySummary, changesKept, discardLabel, draftDot, draftMarks, groupNote, placeState, reviewBlocks, saveOffReason, statusBesideCount, statusSummary, stillShown} from "../../webview/view/review.mjs";
+import {LIVE, LIVE_REVIEW} from "../../webview/view/edit-mode.mjs";
+import {SETTINGS_SCREENS} from "../../webview/view/settings-layout.mjs";
 
 const {VOCABULARY} = createRequire(import.meta.url)("../../core/model/vocabulary");
 const words = {vocabulary: VOCABULARY};
@@ -74,8 +76,21 @@ test("Show goes to where each kind of item is edited", () => {
     assert.deepEqual(categorySummary(words, [{place: {kind: "customKey", index: 2, keycode: "CUSTOM_KEY_2"}, status: "changed"}]).map(({category, rows}) => [category, rows]),
         [["Keys", [{label: "Custom keys", count: 1}]]], "names and shortcuts alike");
     assert.equal(placeState({kind: "pointing", slot: 6}).pointingSlot, 6);
+    // A bank's order (D-L81) opens its screen on the lowest slot that moved.
+    assert.deepEqual(placeState({kind: "slots", bank: "macros", keycodes: ["MACRO_2", "MACRO_10"]}), {screen: "macros", macroSlot: "MACRO_2"});
+    assert.deepEqual(placeState({kind: "slots", bank: "customKeys", keycodes: ["CUSTOM_KEY_3", "CUSTOM_KEY_20"]}), {screen: "customKeys", customKey: "CUSTOM_KEY_3"});
+    assert.deepEqual(placeState({kind: "slots", bank: "pdModes", slots: [1, 6]}), {screen: "pointing", pointingSlot: 1, pdKind: null, pdTaps: null});
     assert.equal(placeState({kind: "lighting", stage: "pd"}).stage, "pd");
     assert.equal(placeState(null), null, "the profile fallback has nowhere to go");
+    // Text replacement's switch is a Typing setting; its list is its own screen's, an entry shown by its id.
+    assert.deepEqual(placeState({kind: "settings", section: "autocorrect", area: "Settings"}), {screen: "host", reveal: '.settings-group[data-section="autocorrect"]'});
+    // Show opens the entry in its editor, as a macro's opens the macro: what
+    // was open, being made or searched for gives way to it.
+    assert.deepEqual(placeState({kind: "autocorrect", entry: "the"}), {screen: "autocorrect", autocorrectEntry: "the", autocorrectNew: null, autocorrectEdit: null, autocorrectSearch: "", reveal: '[data-ac-entry="the"]'});
+    assert.equal(placeState({kind: "autocorrect", entry: 'say "hi"'}).reveal, '[data-ac-entry="say \\"hi\\""]', "a replacement's own quotes do not end the selector");
+    assert.ok(draftMarks([{place: {kind: "autocorrect", entry: "the"}, status: "changed"}]).autocorrect.has("the"));
+    assert.deepEqual(categorySummary(words, [{place: {kind: "settings", section: "autocorrect"}, status: "changed"}, {place: {kind: "autocorrect", entry: "the"}, status: "added"}, {place: {kind: "macro", index: 0, keycode: "MACRO_0"}, status: "changed"}])
+        .map(({category, rows}) => [category, rows]), [["Macros", []], ["Text replacement", [{label: "Replacements", count: 1}, {label: "Text replacement switch", count: 1}]]], "its switch is counted with the list, after Macros");
     const combo = placeState({kind: "combo", index: 3});
     assert.equal(combo.pickCombo, 3, "a combo is asked for by id, since its group depends on the layer");
     assert.equal(combo.reveal, '[data-reach][data-picked="true"]');
@@ -88,7 +103,6 @@ test("Show goes to where each kind of item is edited", () => {
     assert.equal(lands("comboSettings").screen, "combos", "the combo timing too, saved with the combos");
     assert.equal(lands("comboReferences").screen, "combos");
     assert.equal(lands("host").screen, "host");
-    assert.equal(lands("keyboardOptions").screen, "host");
     for (const section of ["normalPointerSpeed", "sniping", "autoMouse"]) {
         assert.deepEqual(lands(section, "Pointer"), {screen: "pointer", reveal: `.settings-group[data-section="${section}"]`}, `${section} is a pointer setting`);
     }
@@ -134,14 +148,14 @@ test("a profile file's differences are counted by what they configure, split as 
         at({kind: "settings", section: "automouseFade", area: "Lighting", stage: "auto"}),
         at({kind: "combo", index: 7}, {status: "removed"}), at({kind: "key", layer: 3}), at({kind: "key", layer: 0}), at({kind: "key", layer: 3}),
         at({kind: "settings", section: "keyTiming"}), at({kind: "behaviour"}, {status: "added"}), at({kind: "layers"}, {unit: "layerName:2"}),
-        at({kind: "settings"}, {unit: "settings:otherKeyOptions"}), at({kind: "macro", index: 4, keycode: "MACRO_4"}), at(null, {unit: "profile", title: "Stored profile"}),
+        at({kind: "settings"}, {unit: "settings:otherKeyOptions", title: "Other key options"}), at({kind: "macro", index: 4, keycode: "MACRO_4"}), at(null, {unit: "profile", title: "Stored profile"}),
     ], {names: ["Base", "Numbers", "Symbols", "Navigation"]});
     assert.deepEqual(groups.map((group) => [group.category, group.count]),
         [["Keys", 8], ["Lighting", 7], ["Macros", 1], ["Pointer", 2], ["Pointing modes", 1], ["Other", 1]], "the rail's order");
     const rows = (category) => groups.find((group) => group.category === category).rows.map((row) => `${row.label} ${row.count}`);
-    assert.deepEqual(rows("Keys"), ["Keys on Base 1", "Keys on Navigation 2", "Layer names 1", "Behaviours 1", "Tap & hold timing 1", "Combos 1", "Key swaps & typing 1"],
+    assert.deepEqual(rows("Keys"), ["Keys on Base 1", "Keys on Navigation 2", "Layer names 1", "Behaviours 1", "Tap & hold timing 1", "Combos 1", "Other key options 1"],
         "the board's keys by layer first, then the rest of the Keys screen");
-    assert.deepEqual(rows("Lighting"), ["All lighting 1", "Stages on or off 1", "Background effect 1", "Layer colours 1", "Auto-mouse fade 1", "Key feedback 2"],
+    assert.deepEqual(rows("Lighting"), ["All lighting 1", "Stages on or off 1", "Background effect 1", "Layer colours 1", "Auto-mouse fade 1", "Behaviour feedback 2"],
         "all lighting first, then stages in paint order; a setting edited on a stage counts with it");
     assert.deepEqual(rows("Pointer"), ["Auto-sniping 1", "Auto-mouse 1"], "the pointer's settings are filed with Pointer, the screen that edits them");
     assert.deepEqual(rows("Pointing modes"), [], "the slots are the whole category");
@@ -151,7 +165,7 @@ test("a profile file's differences are counted by what they configure, split as 
 });
 
 // The summary's own words for settings sections, as it has always shown them;
-// three differ from the Settings screens' section labels.
+// four differ from the Settings screens' section labels.
 test("a profile file's settings sections are counted under the vocabulary's words, each in its category", () => {
     assert.deepEqual(Object.keys(SECTION_ROWS).sort(), Object.keys(VOCABULARY.fileSections).sort(), "every section placed has words, and only those");
     const at = (section) => ({status: "changed", place: {kind: "settings", section}});
@@ -159,9 +173,16 @@ test("a profile file's settings sections are counted under the vocabulary's word
         .flatMap((group) => group.rows.map((row) => [row.label, group.category])));
     assert.deepEqual(labels, {
         "Tap & hold timing": "Keys", "Default layers": "Keys", "Behaviour settings": "Keys", "Combo settings": "Keys", "Combo layer matching": "Keys",
-        "Key swaps & typing": "Keys", "All lighting": "Lighting", "Background effect": "Lighting", "Key feedback": "Lighting",
-        "Pointer speed": "Pointer", "Auto-sniping": "Pointer", "Auto-mouse": "Pointer",
+        "All lighting": "Lighting", "Background effect": "Lighting", "Behaviour feedback": "Lighting", "Replacement feedback": "Lighting",
+        "Pointer speed": "Pointer", "Auto-sniping": "Pointer", "Auto-mouse": "Pointer", "Text replacement switch": "Text replacement",
     });
+});
+
+test("a Settings screen's sections are counted in the order the screen draws them", () => {
+    for (const [screen, sections] of Object.entries(SETTINGS_SCREENS)) {
+        const places = sections.filter((id) => Object.hasOwn(SECTION_ROWS, id)).map((id) => SECTION_ROWS[id][1]);
+        assert.deepEqual(places, places.toSorted((a, b) => a - b), screen);
+    }
 });
 
 test("a stale draft says how many changes it keeps, in agreement", () => {
@@ -181,4 +202,27 @@ test("a Save that is off says why beside it, a blocker by its own title", () => 
         "a blocker the draft fixes keeps nothing off");
     assert.deepEqual(activeBlockers([blocker("A"), blocker("C", "fixed")]).map((check) => check.title), ["A"]);
     assert.equal(saveOffReason(words, {...ready, reviewed: false}), "Getting the review ready…");
+});
+
+// The mark says a change in the edit mode's words (edit-mode.mjs editWords):
+// in the draft in Review and save, unsaved in the live modes.
+test("a change's mark says it is in the draft, or in the live modes unsaved", () => {
+    assert.equal(draftDot(null), '<i class="draft-dot " data-tip="Changed in your draft" aria-label="Changed in your draft"></i>');
+    assert.equal(draftDot(/** @type {any} */ ({live: {mode: LIVE_REVIEW}}), "corner"), '<i class="draft-dot corner" data-tip="Unsaved change" aria-label="Unsaved change"></i>');
+    assert.match(draftDot(/** @type {any} */ ({live: {mode: LIVE}}), "", {holds: true}), /data-tip="Holds an unsaved change"/);
+    assert.match(draftDot({live: null}, "", {holds: true}), /data-tip="Holds a change in your draft"/);
+});
+
+test("a swap marks the slots it moved on their screen, a pointing mode's on Lighting's list too, and counts under its bank's order (D-L81)", () => {
+    const macros = draftMarks([{status: "changed", place: {kind: "slots", bank: "macros", keycodes: ["MACRO_2", "MACRO_10"]}}]);
+    assert.deepEqual([...macros.macros], ["MACRO_2", "MACRO_10"]);
+    const keys = draftMarks([{status: "changed", place: {kind: "slots", bank: "customKeys", keycodes: ["CUSTOM_KEY_3"]}}]);
+    assert.deepEqual([...keys.customKeys], ["CUSTOM_KEY_3"]);
+    const pointing = draftMarks([{status: "changed", place: {kind: "slots", bank: "pdModes", slots: [1, 6]}}]);
+    assert.deepEqual([[...pointing.pointing], [...pointing.lightingSlots]], [[1, 6], [1, 6]], "its colour went with it");
+    assert.deepEqual(categorySummary(words, [
+        {place: {kind: "slots", bank: "macros", keycodes: ["MACRO_2", "MACRO_10"]}, status: "changed"},
+        {place: {kind: "slots", bank: "customKeys", keycodes: ["CUSTOM_KEY_3", "CUSTOM_KEY_20"]}, status: "changed"},
+        {place: {kind: "slots", bank: "pdModes", slots: [1, 6]}, status: "changed"},
+    ]).map(({category, rows}) => [category, rows.map((row) => row.label)]), [["Keys", ["Custom key order"]], ["Macros", ["Macro order"]], ["Pointing modes", ["Pointing mode order"]]]);
 });

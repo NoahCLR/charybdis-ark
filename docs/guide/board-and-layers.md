@@ -2,14 +2,17 @@
 
 The **Keymap** screen opens on the board: a drawing of your Charybdis, showing
 the layer you picked in the tabs underneath. Everything on it comes from the
-keyboard, with your draft's edits on top.
+keyboard, with your draft's edits on top. The board takes at most half the
+window's height, so the workbench under it stays in reach without scrolling.
 
 ## Reading the board
 
 Each key is painted with the light the keyboard would show on that layer: the
 background effect, then the layer's own colour. The legend is drawn in black
-or white, whichever reads. The line under the board says what the layer
-paints, or that it has no colour and the background effect shows through.
+or white, whichever reads. A single letter, digit or symbol is drawn large and
+every name smaller, the same size on every key; a name of two or more words
+takes two lines. A name too wide for its key is narrowed first, and only a
+very long one is drawn a size smaller.
 
 On a key face:
 
@@ -27,19 +30,34 @@ On a key face:
 - Badges such as **C0** mark the combos that fire from the key here. A combo
   a switch keeps off, or that can't form because another of its keys can't
   join it, has no badge ([Where combos run](combos.md#where-combos-run)).
-- A frosted key is transparent: it falls through to the layer below.
-- A small dot in the corner marks a key changed in your draft.
+- Small icons under a key's name, above the line on a key that has one,
+  mark a key that reaches a macro (a robot), a custom key (a square with a
+  plus) or a pointing mode (a crosshair): what the key is itself, and
+  whatever its behaviour's taps and holds send. Each shows once, however
+  many macros or pointing modes the key reaches; hover it to see which. A
+  behaviour a switch keeps off on this layer adds no icon, as it adds no
+  dots.
+- A frosted key is transparent: it falls through to the layer below. The
+  Lighting screen frosts nothing, since the keyboard lights a transparent key
+  like any other.
+- A small dot in the corner marks a key changed in your draft. In the live
+  modes the change already runs on the keyboard, so the dot marks an
+  **unsaved change**; in Live edit it goes once the keyboard saves.
 
-The legend under the board explains each mark. Its **Shortcuts** button
-lists what the board takes from the mouse and the keys (below), ⌘-clicking a
-layer tab to [preview layers together](#previewing-layers-together) included;
-Escape or a click elsewhere closes the list.
+The legend under the board explains each mark. Click the **ⓘ** in the
+board's top-right corner, or press Enter on it, to see what the board takes
+from the mouse and the keys (below), ⌘-clicking a layer tab to
+[preview layers together](#previewing-layers-together) included. The list
+stays open until you click the ⓘ again, click or tab elsewhere or press Escape;
+resting the pointer on the ⓘ shows it for as long as it stays.
 
 ## The hover card
 
-Rest the pointer on a key and a card opens with everything it does:
+Rest the pointer on a key of the Keymap and a card opens with everything it
+does:
 
-- its name and the keycode it stores
+- its name and the keycode it stores, and for a pointing key what its mode
+  does (send keys or scroll) or that its slot is still empty
 - for a key that taps one thing and holds another, both, and the tap / hold
   threshold it uses
 - for a custom key, its shortcut: the keys it sends and the layers it turns
@@ -47,17 +65,27 @@ Rest the pointer on a key and a card opens with everything it does:
   whether it runs as the key does or where its behaviour leaves a tap or hold
   empty
 - its behaviour, branch by branch, with the thresholds it runs on
-- the macro it plays, step by step, or the pointing mode it runs
+- the macro it plays, step by step
 - the combos it is part of, what each sends and its other keys
 - for a transparent key, which layer answers it and what that key does
 
 When a behaviour doesn't run on this key, or changes nothing, the card says
 so and what the key sends instead.
 
+Lighting's board opens no card: it shows the light, and the Keymap says what
+a key does.
+
 ## Editing on the board
 
 - Click a key to select it. Double-click to open the keycode picker.
-- Drag one key onto another to swap them.
+- Drag one key onto another to swap them. To swap it with a key on another
+  layer, hold it over that layer's tab until the board shows the layer (the
+  tab glows in the layer's colour and a bar under its name fills), then drop
+  it on the key. Escape, or letting go away from a key, leaves both
+  alone; off the board's canvas the key fades, since letting go there does
+  nothing. While layers are previewed together, a key seen through from below
+  is carried as the transparent key it is, since that is what moves; holding
+  a tab shows that layer on its own.
 - ⌘C copies the selected key and ⌘V pastes it onto the selected key, on any
   layer.
 - Delete or Backspace makes the selected key transparent.
@@ -90,7 +118,7 @@ Most keymaps use a few of the 16 layers. A layer with nothing in it is
 every key on it is transparent or KC_NO, and nothing uses it. Nothing uses it
 when no key, behaviour, combo, pointing mode or custom key turns it on, no
 pointing mode starts from it and it isn't the pointer layer, no layer matches
-its combos on it, it has no colour or LED override of its own, no key on it
+its combos on it, it has no colour or accent of its own, no key on it
 has **Use behaviour** or **Join combos** off, and its switches on the
 Settings screens read as the other empty layers' do.
 
@@ -99,19 +127,24 @@ one line at its end, such as **› 8 empty layers**. Click it, or press Enter
 or Space on it, to show them; again to fold them. In the tabs it sits after
 the last one, and the layers it shows come after the others; a list in stack
 order, such as [This key on every layer](keys.md#the-key-tab) and Rename &
-reorder, shows them in their places. The layer you picked always shows, and so
+reorder, shows them in their places. Lighting's list of layers is a table like
+the Keymap's lists, so there they fold under its last band, **Empty layers**,
+with their count. The layer you picked always shows, and so
 does one whose setting on that screen is on where the others' are off, or the
 other way round. To start using a new layer, show the empty ones and pick it,
 or name it in Rename & reorder. Folding only draws less: Ark stores and sends
 every layer as before.
 
 A key's name that doesn't fit its cap on one line takes two, such as
-**Slot 6** over **hold (empty)**, rather than shrinking out of reading.
+**Pointing mode 6** over **hold (empty)**, rather than shrinking out of reading.
 
-Where Ark names a layer in passing (a key's name, a combo, the review), a
-small drawing of the board in the layer's colour sits before its name. A
+Wherever Ark names a layer in its words (a key's name, a combo, the review,
+what reaches a key, a note, a heading, why a behaviour or combo is not used,
+or the caption under the board), a small drawing of the board in the layer's
+colour sits before its name. A
 pointing mode has the Pointing modes icon in its light. A grey icon means
-that colour, or its lighting, is off. Lists of layers alone, such as these
+that colour, or its lighting, is off. A macro has the robot and a custom key
+the square with a plus, in the colour of the words. Lists of layers alone, such as these
 tabs, show just the colour. A key or combo that acts on a layer or a pointing
 mode reads the same way everywhere, as the behaviour grid draws it: the icon,
 the name and a tag for what it does, such as **HOLD** or **LOCK**. A layer-tap
@@ -143,9 +176,10 @@ folded under the list; show them to name one.
   or put two layers of one link or shortcut on the same layer (with layer keys
   keeping their numbers, Make base can bring two of them together).
 
-Nothing changes until you press **Keep layers in draft**. **Discard** drops
-the moves, and so does closing the list any other way: Escape, or a click
-outside it.
+Nothing changes until you press **Keep layers in draft** (**Send layers to
+keyboard** in the live modes, where the new order takes effect at once).
+**Discard** drops the moves, and so does closing the list any other way:
+Escape, or a click outside it.
 
 Make base swaps the two layers' roles: a key that reached the new base now
 reaches the old one, and so do a pointing mode's link and a custom key's
@@ -158,8 +192,9 @@ behind, such as a layer nothing reaches any more.
 
 ⌘-click more tabs to see layers on together, the way the keyboard resolves
 them. The highest one is where your edits go. Keys answered from a lower layer
-are frosted, with that layer's light and legend. The line under the board
-says which layers are on.
+are frosted, with that layer's light and legend. The line in the board's
+bottom-left corner says which layers are on, wrapping onto more lines when it
+is long. The board keeps its size either way.
 
 ⌘-click a layer again to take it out, or click any tab to go back to one
 layer. The preview carries over to the Lighting screen.
@@ -218,7 +253,8 @@ Under the board, the workbench works on the selected key. Its tabs are:
   **Hold** or **Lock** for routes that send its own keys.
   **Edit** opens one on its own screen.
 
-Each tab counts what it holds for this layer, and a dot marks a draft change.
+Each tab but Key counts what it holds for this layer, and a dot marks a draft
+change (an unsaved change in the live modes).
 
 Behaviours, Combos, Macros, Custom keys and Pointing modes list what they
 hold in one kind of table: a header row per group (on this view, on this

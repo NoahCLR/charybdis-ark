@@ -16,7 +16,7 @@ import {POINTING_MODE_IDS} from "../../webview/view/lighting.mjs";
 import {NAME_MAX_BYTES} from "../../webview/view/names.mjs";
 import {LED_FLAGS} from "../../webview/view/lighting.mjs";
 import {ALL_LAYERS, LAYERS} from "../../webview/view/layout.mjs";
-import {PROFILE_FILE_MAX_BYTES, PROFILE_FILE_TOO_LARGE} from "../../webview/view/backups.mjs";
+import {PROFILE_FILE_MAX_BYTES, PROFILE_FILE_TOO_LARGE, VIA_LEFT_SHOWN} from "../../webview/view/backups.mjs";
 import {LAYER_LOCK_BASE, LAYER_LOCK_SLOTS as LOCK_SLOTS} from "../../webview/view/keycode-expression.mjs";
 import {macroUnit} from "../../webview/view/macro.mjs";
 import {AREAS, LAYER_ORDER_UNIT, OTHER_KEY_OPTIONS_UNIT} from "../../webview/view/review.mjs";
@@ -50,7 +50,7 @@ test("the webview's name limit is the schema's", () => {
 test("the webview's modifier bits and names are the vocabulary's", () => {
     const model = {vocabulary: VOCABULARY};
     assert.equal(modifierBits(model), VOCABULARY.modifiers);
-    assert.deepEqual(modifierNames(model, 0x84), ["Left Alt", "Right GUI"]);
+    assert.deepEqual(modifierNames(model, 0x84), ["Alt", "Right GUI"]);
 });
 
 test("the webview's tiers are the vocabulary's", () => {
@@ -89,6 +89,17 @@ test("the webview's layer count and every-layer set are the layer bank's", () =>
 test("the webview refuses a profile file over core's limit in core's words", () => {
     const {FILE_MAX_BYTES, FILE_TOO_LARGE} = require("../../core/model/portable-profile");
     assert.deepEqual([PROFILE_FILE_MAX_BYTES, PROFILE_FILE_TOO_LARGE], [FILE_MAX_BYTES, FILE_TOO_LARGE]);
+});
+
+test("the import sheet names as many in full as Review does of what a VIA import kept", () => {
+    assert.equal(VIA_LEFT_SHOWN, require("../../core/model/via-layout").KEPT_SHOWN);
+});
+
+test("the webview refuses an autocorrect list file over core's limit in core's words", async () => {
+    // The formats and their names are the vocabulary's (tests/model/vocabulary.test.js): the webview keeps no copy.
+    const {LIST_FILE_MAX_BYTES, LIST_FILE_TOO_LARGE} = await import("../../webview/view/autocorrect.mjs");
+    const {IMPORT_MAX_BYTES, IMPORT_TOO_LARGE} = require("../../core/model/autocorrect-import");
+    assert.deepEqual([LIST_FILE_MAX_BYTES, LIST_FILE_TOO_LARGE], [IMPORT_MAX_BYTES, IMPORT_TOO_LARGE]);
 });
 
 test("the webview's layer-lock block is the keyboard's", () => {

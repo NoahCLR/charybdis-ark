@@ -168,13 +168,27 @@ export type PointingSlotInput = Partial<Omit<PointingSlot, 'directions' | 'diago
 
 export interface Hsv {h: number; s: number; v: number}
 export type RgbGroupRow<K extends 'selector' | 'semantic' = 'selector'> = Record<K, number> & {color: Hsv; groupId: number};
+/** Behaviour feedback (firmware D-F73): each case, a tap branch pending per tap count from 2 and the three tiers, with its own colour and locality; the tap-commit policy is the stage's. */
 export interface RgbKeyFeedback {
-    tapBranchColors: Hsv[];
+    tapBranches: {color: Hsv; locality: number}[];
     tapCommittedColor: Hsv;
+    tapCommittedLocality: number;
     holdActiveColor: Hsv;
+    holdActiveLocality: number;
     longHoldActiveColor: Hsv;
+    longHoldActiveLocality: number;
     tapCommitMode: number;
-    locality: number;
+}
+/** Replacement feedback (firmware D-F70, D-F72, D-F73): a colour and a locality for an input replaced with text, one replaced by its macro, a replacement undone and the leader waiting, each colour painting nothing with saturation and value 0. */
+export interface RgbAutocorrectFeedback {
+    textColor: Hsv;
+    textLocality: number;
+    macroColor: Hsv;
+    macroLocality: number;
+    undoColor: Hsv;
+    undoLocality: number;
+    leadingColor: Hsv;
+    leadingLocality: number;
 }
 export interface RgbProfile {
     formatVersion: number;
@@ -189,8 +203,10 @@ export interface RgbProfile {
     comboGroupRows: {color: Hsv; groupId: number}[];
     keyFeedback: RgbKeyFeedback;
     keyGroupRows: RgbGroupRow<'semantic'>[];
+    autocorrectFeedback: RgbAutocorrectFeedback;
+    autocorrectGroupRows: RgbGroupRow<'semantic'>[];
 }
-export type RgbInput = Partial<Omit<RgbProfile, 'keyFeedback'>> & {keyFeedback?: Partial<RgbKeyFeedback>};
+export type RgbInput = Partial<Omit<RgbProfile, 'keyFeedback' | 'autocorrectFeedback'>> & {keyFeedback?: Partial<RgbKeyFeedback>; autocorrectFeedback?: Partial<RgbAutocorrectFeedback>};
 export interface RgbOptions {
     maxLogicalLayers?: number;
     logicalLayerCount?: number;
@@ -198,4 +214,8 @@ export interface RgbOptions {
     compiledStageMask?: number;
     maximumBrightness?: number;
     tapBranchColorCount?: number;
+    /** The keyboard's reported ceilings (capability pages 1 and 2), within the format's. */
+    maxGroups?: number;
+    maxTableGroupRows?: number;
+    maxGroupRows?: number;
 }

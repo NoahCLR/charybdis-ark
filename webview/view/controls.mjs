@@ -12,7 +12,7 @@ export const applyDraft = (confirmChecks) => ({type: 'applyProfileDraft', ...(co
 export const discardChanges = (group) => ({type: 'discardProfileDraftChanges', group});
 /** @param {number} step @returns {import("../../contracts/messages.js").DraftControl} */
 export const jumpDraft = (step) => ({type: 'jumpProfileDraft', step});
-// Read keyboard; from an open Diagnostics, each half's flash pauses after it.
+// Read keyboard; with Diagnostics open, each half's flash pauses after it.
 /** @param {boolean} [flashPauses] @returns {{type: 'refresh', flashPauses?: true}} */
 export const readKeyboard = (flashPauses) => ({type: 'refresh', ...(flashPauses ? {flashPauses: true} : {})});
 // Diagnostics opened: read each half's flash pauses.
@@ -24,9 +24,27 @@ export const selectDevice = (deviceId) => ({type: 'selectDevice', deviceId});
 export const saveLayers = (names) => ({type: 'savePortableLayers', names});
 /** @param {boolean} keysFollow @param {string[]} names @returns {import("../../contracts/messages.js").LayerEditControl} */
 export const layersFollow = (keysFollow, names) => ({type: 'editPortableLayer', keysFollow, names});
+/** @param {import("../../contracts/model.js").ViaClears} clear @returns {Extract<import("../../contracts/messages.js").PortableControl, {type: 'setViaImportClears'}>} */
+export const viaImportClears = (clear) => ({type: 'setViaImportClears', clear});
 /** One move of a layer: to a slot, one step up or down, or swapped with the base. @typedef {{to: number} | {direction: 1 | -1} | {makeBase: true}} LayerMove */
 /** @param {number} id @param {LayerMove} change @param {string[]} names @returns {import("../../contracts/messages.js").LayerEditControl} */
 export const moveLayer = (id, change, names) => ({type: 'editPortableLayer', id, ...change, names});
+
+// An autocorrect list file (D-L85): a dropped file or the file the shell's
+// chooser picks, read and judged against the draft; and the draft's list
+// saved in one of the three formats.
+/** @param {string} text @param {string} name @param {number} requestId @returns {import("../../contracts/messages.js").ControlsOn<'inspect'>} */
+export const previewAutocorrectFile = (text, name, requestId) => ({type: 'previewAutocorrectImport', text, name, requestId});
+/** @param {number} requestId @returns {import("../../contracts/messages.js").ControlsOn<'inspect'>} */
+export const chooseAutocorrectFile = (requestId) => ({type: 'chooseAutocorrectFile', requestId});
+/** @param {import("../../contracts/messages.js").AutocorrectFileFormat} format @returns {import("../../contracts/messages.js").PortableControl} */
+export const exportAutocorrect = (format) => ({type: 'exportAutocorrect', format});
+
+// Try it: what the keyboard would leave on screen for what was typed into
+// the box (`\b` for Backspace) after the text already in it, under the
+// computer's Caps Lock.
+/** @param {{before: string, typed: string, capsLock: boolean}} tried @param {number} requestId @returns {import("../../contracts/messages.js").ControlsOn<'inspect'>} */
+export const tryAutocorrect = ({before, typed, capsLock}, requestId) => ({type: 'tryAutocorrect', before, typed, capsLock, requestId});
 
 // Live preview + save (firmware D-F32): the keyboard's Save and Revert, the
 // answer to a live edit's trap check, and how edits reach the keyboard.

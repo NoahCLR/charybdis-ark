@@ -16,6 +16,7 @@ const {buildPanelModel, portableLayersView, startLayerEdit} = require("../core/s
 const {followService} = require("../core/session/draft-follow");
 const portable = require("../core/model/portable-profile");
 const keycodes = require("../core/schema/keycodes");
+const {MACRO_DOMAIN_V1} = require("../core/schema/macro-domain-v1");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../core/data/charybdis-layout");
 const {PROFILE_WIRE_KNOWN_MASKS} = require("../core/protocol/profile-wire-v1");
 const {document32} = require("../tests/fixtures/pointing-slots-32");
@@ -55,13 +56,27 @@ function fillPreviewLayer(document) {
     return document;
 }
 
+// The fixture's text replacement list fixes typos only. The preview adds
+// what else a list holds: an abbreviation for a phone number and one for a
+// sign-off of some length, so a long replacement is there to look at.
+/** @param {import("../core/model/types.js").PortableDocument} document */
+function withPreviewReplacements(document) {
+    return portable.editProfileDomains(document, {capabilities}, open => {
+        open("autocorrect").entries.push(
+            {correction: "+31 6 1234 5678", typos: [{typo: "pnumber", match: 0}]},
+            {correction: "Kind regards, Sam Example | sam@example.com | Example Street 12, Amsterdam", typos: [{typo: "sigoff", match: 0}, {typo: "regards", match: 1}]});
+    });
+}
+
 /** @type {Partial<import("../core/session/types.js").DeviceCapabilities> & {brightnessMax: number}} */
 const capabilities = {
-    protocol: {major: 2, minor: 0},
-    schema: {major: 4, minor: 3},
+    protocol: {major: 2, minor: 2},
+    schema: {major: 4, minor: 8},
     compiledLayerCount: 16,
-    supportedDomainMask: 127,
+    supportedDomainMask: 255,
     actionAbiDigest: ACTION_ABI,
+    // The release it was built as (firmware D-F77): v2026.10.27.
+    firmwareVersion: 0x07EA0A1B,
     // Current firmware: everything the flashable pair reports.
     featureFlags: PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES,
     responseVersion: 3,
@@ -74,9 +89,16 @@ const capabilities = {
     maxCombos: 128,
     maxKeysPerCombo: 16,
     maxTapStepsPerBehavior: 5,
-    maxReusableRgbGroups: 16,
-    maxRgbStageGroupRows: 32,
-    macroBytes: 34903,
+    maxReusableRgbGroups: 128,
+    maxRgbTableGroupRows: 255,
+    maxRgbStageGroupRows: 640,
+    macroBytes: MACRO_DOMAIN_V1.MAX_SIZE,
+    maxAutocorrectCorrections: 1024,
+    maxAutocorrectTypos: 1024,
+    autocorrectTextBytes: 20480,
+    autocorrectBytes: 36874,
+    autocorrectTextMax: 32,
+    autocorrectCorrectionMax: 128,
 };
 
 // The web page's shell as the preview stands in for it: what the page offers
@@ -130,7 +152,7 @@ function emptyModel(shell) {
 // review and leaving with edits not exported can be looked at.
 /**
  * @param {import("../core/session/types.js").PanelShell} shell
- * @param {Exclude<import("../contracts/edits.js").PanelEdit, {type: "reviewPortableProfile" | "validateMacro"}>[]} [edits]
+ * @param {Exclude<import("../contracts/edits.js").PanelEdit, {type: "reviewPortableProfile" | "validateMacro" | "validateAutocorrect"}>[]} [edits]
  */
 function demoModel(shell, edits = []) {
     const {openDemo, panelState} = require("../core/session/demo-session");
@@ -166,18 +188,21 @@ const keyboardStatus = (stopped) => ({saving: false, autoSaving: false, savedByK
 
 /** @param {import("../core/session/types.js").PanelShell} [shell] @param {{live?: boolean, mode?: number, stopped?: boolean, held?: boolean, apply?: import("../contracts/model.js").ApplyView}} [options] */
 function buildModel(shell = WEB_SHELL, {live = false, mode = 2, stopped = false, held = false, apply} = {}) {
-    const doc = fillPreviewLayer(document32());
+    const doc = withPreviewReplacements(fillPreviewLayer(document32()));
     const snapshot = {
         document: doc,
         fingerprint: portable.fingerprint(doc),
         summary: portable.summary(doc),
         identity: {generation: 42},
         hostOs: {detected: 1},
+        // The key options current firmware reports, so Text replacement's
+        // switch is there to drive.
+        options: require("../core/session/demo-session").DEMO_OPTIONS,
     };
     const deviceId = "preview-charybdis";
     let liveSnapshot;
     if (live) {
-        const working = editLayers(fillPreviewLayer(document32()), layers => {layers[0][13] = /** @type {number} */ (keycodes.encode("KC_ESC"));});
+        const working = editLayers(withPreviewReplacements(fillPreviewLayer(document32())), layers => {layers[0][13] = /** @type {number} */ (keycodes.encode("KC_ESC"));});
         const bytes = Buffer.from(working.profile, "base64"), saved = Buffer.from(doc.profile, "base64");
         liveSnapshot = {...snapshot, document: working, fingerprint: portable.fingerprint(working), summary: portable.summary(working), saved: snapshot,
             runtime: null, live: {mode, session: 0x5e550001, revision: 1, savedGeneration: 42, savedOrigin: 0, unsaved: true, converged: true, working: bytes, saved, defaults: saved,
@@ -208,7 +233,7 @@ function buildModel(shell = WEB_SHELL, {live = false, mode = 2, stopped = false,
         // How edits reach it, stored on the keyboard: Review and save here,
         // Live preview + save with `live`.
         editMode: {mode: live ? mode : 0, counter: 1, slaveMode: live ? mode : 0, slaveCounter: 1, slaveKnown: true, conflict: false, agreed: true},
-        runtime: live ? {combos: {master: true, override: false}, behaviours: {master: true, override: true},
+        runtime: live ? {combos: {master: true, override: false}, behaviours: {master: true, override: true}, autoMouse: {override: true}, autocorrect: {override: true},
             live: {defaultDpi: 1200, snipingDpi: 400, rgbMode: 1, rgbColor: 0, defaultLayers: 1, keymapOptions: 0}} : null,
         liveApply: apply || null,
     };
@@ -314,6 +339,10 @@ window.acquirePanelApi = () => ({
         console.log("posted", JSON.stringify(message));
         if (message.type === "validateMacro") Promise.all([import("./${macroShell.macroShell}"), import("../webview/store.mjs")])
             .then(([shell, store]) => window.dispatchEvent(new MessageEvent("message", {data: shell.inspect(message, store.getModel())})));
+        // A text replacement edit is checked by the list's own rules too: the
+        // screen posts an edit only once its check has passed.
+        if (message.type === "validateAutocorrect") Promise.all([import("./${macroShell.macroShell}"), import("../webview/store.mjs")])
+            .then(([shell, store]) => window.dispatchEvent(new MessageEvent("message", {data: shell.inspectAutocorrect(message, store.getModel())})));
         if (message.type === "ready" || message.type === "refresh") { wanted = true; publish(); }
         if (message.type === "setTheme" && model?.shell) { model.shell.theme = message.theme; publish(); }
         if (message.type === "openDemo") fetch("./model-demo.json").then((response) => response.json()).then((loaded) => { model = loaded; publish(); });

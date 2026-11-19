@@ -6,7 +6,7 @@
 // the rail item it highlights.
 
 /** @typedef {import("../../contracts/model.js").StatusModel} StatusModel */
-/** @typedef {{screenKeys: () => HTMLElement, screenLighting: () => HTMLElement, screenMacros: () => HTMLElement,
+/** @typedef {{screenKeys: () => HTMLElement, screenLighting: () => HTMLElement, screenMacros: () => HTMLElement, screenAutocorrect: () => HTMLElement,
  * screenCustomKeys: () => HTMLElement, screenPointing: () => HTMLElement, screenBehaviours: () => HTMLElement,
  * screenCombos: () => HTMLElement, screenPointer: () => HTMLElement, screenHost: () => HTMLElement,
  * screenProfile: () => HTMLElement, screenDevice: () => HTMLElement}} ScreenRenderers */
@@ -22,20 +22,34 @@ export const configureReady = (model) => model?.load?.state === "ready";
 const screen = (definition) => Object.freeze(definition);
 
 export const SCREENS = Object.freeze({
+    // A keyboard: a row of keys over a space bar. The keys are filled squares,
+    // as a stroke that short draws nothing.
     keys: screen({
         label: "Keymap", group: "Configure", keepOnPublish: true,
-        icon: '<svg viewBox="0 0 16 16"><rect x="1.5" y="3.5" width="13" height="9" rx="2"/><path d="M4 6.5h.01M6.5 6.5h.01M9 6.5h.01M11.5 6.5h.01M5 9.5h6"/></svg>',
+        icon: '<svg viewBox="0 0 16 16"><rect x="1.5" y="3.5" width="13" height="9" rx="2"/><g fill="currentColor" stroke="none"><rect x="3.6" y="5.6" width="1.5" height="1.5" rx=".35"/><rect x="5.9" y="5.6" width="1.5" height="1.5" rx=".35"/><rect x="8.2" y="5.6" width="1.5" height="1.5" rx=".35"/><rect x="10.5" y="5.6" width="1.5" height="1.5" rx=".35"/></g><path d="M5 9.8h6"/></svg>',
         available: configureReady, render: renderers => renderers.screenKeys(),
     }),
+    // A key backlight: a lit key with five rays fanned 36° apart above it,
+    // mirrored about the centre and centred in the box, round caps included.
     lighting: screen({
         label: "Lighting", group: "Configure", keepOnPublish: true,
-        icon: '<svg viewBox="0 0 16 16"><path d="M8 1.8v1.6M13 3l-1.1 1.1M14.2 8h-1.6M3 13l1.1-1.1M2 8h1.6M3 3l1.1 1.1"/><circle cx="8" cy="8.4" r="3.2"/></svg>',
+        icon: '<svg viewBox="0 0 16 16" stroke-linecap="round"><path d="M4.9 11.5h6.2M12.66 9.99l2-.65M10.88 7.54l1.23-1.7M8 6.6V4.5M5.12 7.54 3.89 5.84M3.34 9.99l-2-.65"/></svg>',
         available: configureReady, render: renderers => renderers.screenLighting(),
     }),
+    // A robot: a macro does the typing for you. Its eyes and antenna tip are
+    // filled, as an outline circle that small closes up.
     macros: screen({
         label: "Macros", group: "Configure", keepOnPublish: true,
-        icon: '<svg viewBox="0 0 16 16"><path d="M2.5 4.5h11M2.5 8h7M2.5 11.5h9"/></svg>',
+        icon: '<svg viewBox="0 0 16 16"><rect x="3" y="5" width="10" height="8.5" rx="2"/><path d="M8 5V2.8M1.5 8v2.5M14.5 8v2.5"/><g fill="currentColor" stroke="none"><circle cx="8" cy="2.2" r="1.1"/><circle cx="6" cy="9" r="1.05"/><circle cx="10" cy="9" r="1.05"/></g></svg>',
         available: configureReady, render: renderers => renderers.screenMacros(),
+    }),
+    // Text replacement (its id stays the keyboard's name for it,
+    // autocorrect). A field of text set right: one closed shape with its
+    // mark inside, as the icons around it are, a dash of text and a tick.
+    autocorrect: screen({
+        label: "Text replacement", group: "Configure", keepOnPublish: true,
+        icon: '<svg viewBox="0 0 16 16"><rect x="1.5" y="4" width="13" height="8" rx="2"/><path d="M4.2 8h3M9 8.1l1.3 1.3 2.3-2.8"/></svg>',
+        available: configureReady, render: renderers => renderers.screenAutocorrect(),
     }),
     customKeys: screen({
         label: "Custom keys", group: "Configure", keepOnPublish: true,
@@ -65,8 +79,8 @@ export const SCREENS = Object.freeze({
         available: configureReady, render: renderers => renderers.screenPointer(),
     }),
     host: screen({
-        label: "Host", group: "Settings", keepOnPublish: true,
-        icon: '<svg viewBox="0 0 16 16"><rect x="1.5" y="2.5" width="13" height="8.5" rx="1.5"/><path d="M5.5 14h5M8 11v3"/></svg>',
+        label: "Typing", group: "Settings", keepOnPublish: true,
+        icon: '<svg viewBox="0 0 16 16" stroke-linecap="round"><path d="M2.5 3.5h7M6 3.5v9"/><path d="M12 6v7M10.75 6h2.5M10.75 13h2.5"/></svg>',
         available: configureReady, render: renderers => renderers.screenHost(),
     }),
     profile: screen({
@@ -81,9 +95,15 @@ export const SCREENS = Object.freeze({
         secondaryLabel: "Keyboard",
         icon: '<svg viewBox="0 0 16 16"><rect x="2.5" y="2.5" width="11" height="11" rx="2.5"/><path d="M6 6.5h4v3H6z"/></svg>',
         available: model => Boolean(model.device?.connected || model.demo?.active), render: renderers => renderers.screenDevice(),
-        unavailable: {title: "Keyboard status unavailable", detail: "Read the keyboard to see its connection and diagnostics."},
+        unavailable: {title: "Keyboard status unavailable", detail: "Read the keyboard to see its firmware, its halves and how full it is."},
     }),
 });
+// Each kind of thing a key reaches (key-identity.mjs reachKind) by its
+// screen's rail icon: what the board draws on a key that reaches one, and a
+// macro's or a custom key's mark wherever one is named.
+/** @type {Readonly<Record<import("./key-identity.mjs").ReachKind, string>>} */
+export const REACH_ICONS = Object.freeze({macro: SCREENS.macros.icon, customKey: SCREENS.customKeys.icon, pointing: SCREENS.pointing.icon});
+
 
 /** @param {unknown} id @returns {id is ScreenId} */
 export const isScreenId = (id) => typeof id === "string" && Object.hasOwn(SCREENS, id);
@@ -111,7 +131,7 @@ export function screenGroups() {
 }
 
 // Unavailable Configure and Settings screens offer the first available
-// keyboard surface; profile backups precede diagnostics, in the same order as
+// keyboard surface; Backups precedes the Keyboard screen, in the same order as
 // the rail.
 /** @param {StatusModel | null | undefined} model @param {unknown} current */
 export function secondaryScreen(model, current) {

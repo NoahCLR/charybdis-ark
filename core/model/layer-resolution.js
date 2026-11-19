@@ -10,8 +10,7 @@
 
 /** @typedef {import("../../contracts/panel.js").LayerAnswer} LayerAnswer */
 const {answeringCandidate} = require("../../rules/layer-answers.mjs");
-
-const TRANSPARENT = 0x0001;
+const {TRANSPARENT} = require("../../rules/qmk-keycodes.mjs");
 
 /** @param {readonly (readonly (number | undefined)[])[]} layers @returns {LayerAnswer[][][]} */
 function compileLayerAnswers(layers) {

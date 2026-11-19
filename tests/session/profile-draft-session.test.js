@@ -5,12 +5,13 @@ const {ProfileDraftSession} = require("../../core/session/profile-draft-session"
 const {document} = require("../fixtures/portable-profile");
 const {options} = require("../fixtures/keyboard-options");
 const {fingerprint, reorderLayers, summary, validateSnapshot} = require("../../core/model/portable-profile");
+const {IDENTITY} = require("../../core/model/draft-order");
 const {macroEditorView} = require("../../core/model/macro-editor");
 const {settingsEditorView} = require("../../core/model/settings-editor");
 const {behaviorRowsForView} = require("../../core/model/device-profile-view");
 function fixture() {
     const value = document(), snapshot = {document:value, fingerprint:fingerprint(value), summary:summary(value), limits:{brightnessMax:200}, options:options()};
-    const caps = {compiledLayerCount:16,supportedDomainMask:127,actionAbiDigest:value.actionAbiDigest};
+    const caps = {compiledLayerCount:16,supportedDomainMask:255,actionAbiDigest:value.actionAbiDigest};
     return {snapshot, caps, draft:new ProfileDraftSession(snapshot, "board", caps)};
 }
 function settings(draft, id, updates) {
@@ -237,13 +238,13 @@ test("bounded history and a new branch retain each step's time, label, document 
     assert.equal(draft.base.fingerprint, snapshot.fingerprint, "trimming does not move the saved keyboard baseline");
     draft.jump(draft.revision, 0);
     assert.equal(draft.current.decoded, oldestDecode, "moving an entry preserves its cached decode");
-    assert.deepEqual(draft.order, order);
+    assert.deepEqual(draft.order.layers, order);
     assert.equal(draft.view({}).redoLabel, "Macro 6");
     clock = 200;
     replaceMacro("branch", "New branch");
     assert.deepEqual(draft.steps().map(step => [step.at, step.label]), [[5, "Macro 5"], [200, "New branch"]]);
     assert.equal(draft.view({}).canRedo, false);
-    assert.deepEqual(draft.order, order, "a new branch carries the retained entry's order");
+    assert.deepEqual(draft.order.layers, order, "a new branch carries the retained entry's order");
     draft.undo(draft.revision);
     assert.equal(draft.current.decoded, oldestDecode);
     draft.redo(draft.revision);
@@ -392,7 +393,7 @@ test("a discard from a current review keeps it current, and discarding the last 
 });
 test("a macro name discarded back leaves no indescribable settings difference", () => {
     const value = require("../fixtures/pd-profile").document();
-    const draft = new ProfileDraftSession({document:value,fingerprint:fingerprint(value),summary:summary(value),limits:{brightnessMax:200}}, "board", {compiledLayerCount:16,supportedDomainMask:127,actionAbiDigest:value.actionAbiDigest});
+    const draft = new ProfileDraftSession({document:value,fingerprint:fingerprint(value),summary:summary(value),limits:{brightnessMax:200}}, "board", {compiledLayerCount:16,supportedDomainMask:255,actionAbiDigest:value.actionAbiDigest});
     stage(draft,{type:"updateMacro",keycode:"MACRO_3",name:"Hello",expectedFingerprint:draft.current.fingerprint});
     draft.discard(draft.revision,groupOf(draft,"macro:3"));
     assert.equal(draft.dirty,false,"discard restores the original settings bytes too");
@@ -531,10 +532,10 @@ test("undo and redo carry the order; a rebase keeps it; an import and a whole di
     draft.observe(external.current,"board"); draft.rebase(draft.revision);
     assert.deepEqual(units(draft),["layerOrder","layout:2:0","macro:9"]);
     const imported = reorderLayers(snapshot.document,SWAP,SWAP.map(slot => snapshot.summary.names[slot]));
-    draft.replace(imported,draft.revision,"edit","Imported a profile",[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]);
+    draft.replace(imported,draft.revision,"edit","Imported a profile",IDENTITY);
     assert.deepEqual(units(draft).filter(unit => unit.startsWith("layer")),["layerName:2","layerName:3"],"an import is compared slot by slot");
     draft.undo(draft.revision); draft.discardAll(draft.revision);
-    assert.equal(draft.dirty,false); assert.deepEqual(draft.order,[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]);
+    assert.equal(draft.dirty,false); assert.deepEqual(draft.order,IDENTITY);
 });
 test("edits link by the layer they touched, so a reorder between them ties nothing new", () => {
     const {draft} = fixture();
@@ -621,7 +622,7 @@ test("undoing and redoing a reorder brings a custom key's shortcut layers back e
     policy.customKeyShortcuts[1] = {mods: 0, keys: [], layers: 0xfffe, layerKind: 1};
     const value = compiled({policy});
     const snapshot = {document: value, fingerprint: fingerprint(value), summary: summary(value), limits: {brightnessMax: 200}, options: options()};
-    const draft = new ProfileDraftSession(snapshot, "board", {compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: value.actionAbiDigest});
+    const draft = new ProfileDraftSession(snapshot, "board", {compiledLayerCount: 16, supportedDomainMask: 255, actionAbiDigest: value.actionAbiDigest});
     const shortcuts = () => validateSnapshot(draft.document).settings.customKeyShortcuts.slice(0, 2);
     const start = shortcuts();
     layers(draft, [0, 3, 1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
@@ -650,17 +651,29 @@ test("an edit past a count the keyboard caps is refused in words, by that count,
     const {failureSentence, PROFILE_FULL_WORDS} = require("../../core/model/vocabulary");
     const {RGB_DOMAIN_V1} = require("../../core/schema/rgb-domain-v1");
     const {validateSnapshot} = require("../../core/model/portable-profile");
-    // Each new LED set is a group of its own, until the keyboard's cap.
-    const groups = refusal(fixture().draft, led => ({type: "saveRgbReusableLedGroup", group: {ledIndices: [led]}}), 58);
+    // The keyboard's own ceilings, read from its capability pages, hold a
+    // draft: here firmware before D-F63, 16 LED sets and 32 accents.
+    const older = () => {
+        const {snapshot, caps} = fixture();
+        return new ProfileDraftSession(snapshot, "board", {...caps, maxReusableRgbGroups: 16, maxRgbTableGroupRows: 32, maxRgbStageGroupRows: 32});
+    };
+    // Each accent lighting LEDs no other accent lights takes a group of its
+    // own, until the keyboard's cap, long before its accents run out.
+    const groups = refusal(older(), led => ({type: "addRgbLedGroup", group: {target: "combo", ledIndices: [led], h: 0, s: 255, v: 100}}), 58);
     assert.equal(groups.code, "PROFILE_FULL");
-    assert.equal(failureSentence(groups), PROFILE_FULL_WORDS.counts.lightingGroups(RGB_DOMAIN_V1.MAX_GROUPS));
-    assert.match(failureSentence(groups), /at most 16 LED groups/, "in the words the usage table counts them in");
+    assert.equal(failureSentence(groups), PROFILE_FULL_WORDS.counts.lightingGroups(16));
+    assert.match(failureSentence(groups), /at most 16 different LED sets/, "in the words the usage table counts them in");
     assert.equal(groups.cause.code, "CAPACITY_EXCEEDED", "the format's own refusal stays beneath, for the diagnostics");
     // Colouring two reused groups on every layer, over and over, adds an LED
     // override each time: removing a behaviour or a macro frees none.
-    const overrides = refusal(fixture().draft, index => ({type: "addRgbLedGroup", group: {target: "layer", owner: "RGB_LAYER_GROUP_ALL", ledIndices: [index % 2], h: 0, s: 255, v: 100}}), 80);
-    assert.equal(failureSentence(overrides), PROFILE_FULL_WORDS.counts.lightingGroupRows(RGB_DOMAIN_V1.MAX_STAGE_GROUP_ROWS));
-    assert.match(failureSentence(overrides), /at most 32 LED overrides/);
+    const overrides = refusal(older(), index => ({type: "addRgbLedGroup", group: {target: "layer", owner: "RGB_LAYER_GROUP_ALL", ledIndices: [index % 2], h: 0, s: 255, v: 100}}), 80);
+    assert.equal(failureSentence(overrides), PROFILE_FULL_WORDS.counts.lightingGroupRows(32));
+    assert.match(failureSentence(overrides), /at most 32 accents/);
+    // Current firmware holds 640 accents but 255 on one stage: the layer
+    // stage fills first, and the refusal names the stage's ceiling.
+    const stageFull = refusal(fixture().draft, index => ({type: "addRgbLedGroup", group: {target: "layer", owner: "RGB_LAYER_GROUP_ALL", ledIndices: [index % 2], h: 0, s: 255, v: 100}}), RGB_DOMAIN_V1.MAX_TABLE_GROUP_ROWS + 1);
+    assert.equal(failureSentence(stageFull), PROFILE_FULL_WORDS.counts.lightingTableGroupRows(RGB_DOMAIN_V1.MAX_TABLE_GROUP_ROWS));
+    assert.match(failureSentence(stageFull), /at most 255 accents on any one of layers/);
     // A behaviour past the keyboard's rows names behaviours alone.
     const {snapshot, caps} = fixture();
     const rows = validateSnapshot(snapshot.document).behaviors.rows.length;
@@ -668,4 +681,138 @@ test("an edit past a count the keyboard caps is refused in words, by that count,
     const behaviours = refusal(new ProfileDraftSession(snapshot, "board", {...caps, maxBehaviorRows: rows + 2}),
         index => ({type: "saveBehavior", behavior: {keycode: keys[index], steps: [{tapCount: 0, tap: {style: "TAP_SENDS", action: "KC_X"}}]}}), keys.length);
     assert.equal(failureSentence(behaviours), PROFILE_FULL_WORDS.counts.behaviours(rows + 2));
+});
+
+// ── slots compared by identity (D-L81) ──────────────────────────────────
+
+const {document: pdDocument} = require("../fixtures/pd-profile");
+const {editProfileDomains} = require("../../core/model/portable-profile");
+const {encodeMacroPayload} = require("../../core/schema/macro-payload");
+// The keyboard holds steps in macros 1 to 3, so a swap among them is a
+// difference the keyboard can tell.
+function slotFixture() {
+    const value = editProfileDomains(pdDocument(), {}, open => { const macros = open("macros"); for (const slot of [1, 2, 3]) macros[slot] = encodeMacroPayload(`m${slot}`); });
+    const snapshot = {document: value, fingerprint: fingerprint(value), summary: summary(value), limits: {brightnessMax: 200}, options: options()};
+    const caps = {compiledLayerCount: 16, supportedDomainMask: 255, actionAbiDigest: value.actionAbiDigest};
+    return {snapshot, caps, draft: new ProfileDraftSession(snapshot, "board", caps)};
+}
+const fieldsOf = row => row.fields.map(field => [field.label, field.before, field.after]);
+test("a macro swap is one item, and the macro's keys and behaviours follow it", () => {
+    const {draft} = slotFixture();
+    stage(draft, {type: "updateMacro", keycode: "MACRO_2", payload: "hello", name: "Greeting"});
+    stage(draft, {type: "swapMacros", keycodes: ["MACRO_2", "MACRO_10"]});
+    assert.equal(draft.view({}).undoLabel, "Swapped Greeting and Macro 10");
+    assert.deepEqual(units(draft), ["macro:10", "macroOrder"], "the edited macro where it is now, and the order");
+    const order = draft.changes().find(row => row.unit === "macroOrder");
+    assert.equal(order.title, "Macro order");
+    assert.equal(order.area, "Macros");
+    assert.deepEqual(fieldsOf(order), [["Macro 2", "slot 10", "slot 2"], ["Greeting", "slot 2", "slot 10"]], "each macro that moved, by where it sat and sits");
+    assert.deepEqual(order.fields.map(field => field.labelMark), [{kind: "macro"}, {kind: "macro"}]);
+    assert.deepEqual(order.place, {kind: "slots", bank: "macros", keycodes: ["MACRO_2", "MACRO_10"]});
+    assert.equal(draft.changes().find(row => row.unit === "macro:10").title, "Macro 10 · Greeting");
+    assert.notEqual(groupOf(draft, "macroOrder"), groupOf(draft, "macro:10"));
+    // The behaviour on 0x806 sent MACRO_10; the macro it sent now sits in slot 2.
+    const sends = decoded => decoded.behaviors.rows.find(row => row.target.operand === 0x806).steps.flatMap(step => [step.tap, step.hold?.action]).filter(a => a?.kind === 6).map(a => a.operand);
+    assert.deepEqual(sends(draft.current.decoded), [2]);
+    assert.ok(!units(draft).some(unit => unit.startsWith("behavior:")), "no behaviour changed: it sends the same macro");
+    assert.deepEqual(draft.steps().at(-1).changes.map(row => row.unit), ["macroOrder"], "the step is the swap alone");
+    draft.discard(draft.revision, groupOf(draft, "macro:10"));
+    assert.deepEqual(units(draft), ["macroOrder"], "the steps go back, the swap stays");
+    draft.undo(draft.revision);
+    draft.discard(draft.revision, groupOf(draft, "macroOrder"));
+    assert.deepEqual(units(draft), ["macro:2"], "the order goes back, the steps stay with their macro");
+    assert.equal(draft.view({}).undoLabel, "Put the macro order back");
+    assert.deepEqual(sends(draft.current.decoded), [10]);
+});
+test("a text replacement that plays a macro follows its swap, and a swap alone is still the order", () => {
+    const {draft} = slotFixture();
+    stage(draft, {type: "updateMacro", keycode: "MACRO_2", payload: "hello", name: "Greeting"});
+    stage(draft, {type: "addAutocorrectTypos", macro: 2, typos: [{typo: "hi"}]});
+    const before = units(draft);
+    stage(draft, {type: "swapMacros", keycodes: ["MACRO_2", "MACRO_10"]});
+    const plays = () => draft.current.decoded.autocorrect.entries.find(entry => entry.typos.some(typo => typo.typo === "hi")).macro;
+    assert.equal(plays(), 10, "typing hi plays Greeting where it is now");
+    assert.deepEqual(draft.steps().at(-1).changes.map(row => row.unit), ["macroOrder"], "the step is the swap alone");
+    assert.equal(units(draft).length, before.length + 1, "the replacement is no change of its own");
+    // The mirror: a replacement added after the swap, then the order put back.
+    stage(draft, {type: "addAutocorrectTypos", macro: 10, typos: [{typo: "hey"}]});
+    draft.discard(draft.revision, groupOf(draft, "macroOrder"));
+    const playsFor = typo => draft.current.decoded.autocorrect.entries.find(entry => entry.typos.some(row => row.typo === typo)).macro;
+    assert.deepEqual([playsFor("hi"), playsFor("hey")], [2, 2], "both still play Greeting, back in slot 2");
+});
+test("swaps compose: three swaps are one order that says where each macro sits now, and discarding it puts every macro back", () => {
+    const {draft, snapshot} = slotFixture();
+    for (const [slot, name] of [[1, "One"], [2, "Two"], [3, "Three"]]) stage(draft, {type: "updateMacro", keycode: `MACRO_${slot}`, name, expectedFingerprint: draft.current.fingerprint});
+    for (const [a, b] of [[1, 2], [2, 3], [2, 1]]) stage(draft, {type: "swapMacros", keycodes: [`MACRO_${a}`, `MACRO_${b}`]});
+    assert.deepEqual(draft.order.macros.slice(0, 4), [0, 3, 2, 1]);
+    assert.deepEqual(units(draft), ["macro:1", "macro:2", "macro:3", "macroOrder"]);
+    assert.deepEqual(fieldsOf(draft.changes().find(row => row.unit === "macroOrder")), [["Three", "slot 3", "slot 1"], ["One", "slot 1", "slot 3"]], "slot 2 is back where it was");
+    assert.deepEqual(draft.changes().filter(row => row.unit.startsWith("macro:")).map(row => [row.title, row.groupTitle]),
+        [["Macro 1 · Three", "Edited a macro"], ["Macro 2 · Two", "Edited a macro"], ["Macro 3 · One", "Edited a macro"]], "each name stays its own change, with the macro it named");
+    assert.deepEqual(draft.steps().slice(-3).map(step => step.label), ["Swapped One and Two", "Swapped One and Three", "Swapped Three and Two"], "each swap names the two as they were called then");
+    assert.deepEqual(draft.steps().at(-1).changes.map(row => [row.unit, ...fieldsOf(row).map(f => f[0])]), [["macroOrder", "Three", "Two"]], "each step is its own swap");
+    draft.discard(draft.revision, groupOf(draft, "macroOrder"));
+    assert.deepEqual(units(draft), ["macro:1", "macro:2", "macro:3"]);
+    assert.deepEqual(draft.current.decoded.settings.macroNames.slice(1, 4), ["One", "Two", "Three"], "every macro is back in its slot, named");
+    assert.deepEqual(draft.order, IDENTITY);
+    draft.undo(draft.revision); draft.undo(draft.revision); draft.undo(draft.revision);
+    assert.deepEqual(draft.order.macros.slice(0, 4), [0, 2, 1, 3], "undo carries the order step by step: back to the first swap");
+    draft.discardAll(draft.revision);
+    assert.equal(draft.current.fingerprint, snapshot.fingerprint);
+});
+test("a pointing mode swap takes its colour, its accents and the keys and behaviours that start it, and adds no check", () => {
+    const {draft} = slotFixture();
+    stage(draft, {type: "swapPdModes", slots: [1, 6]});
+    assert.equal(draft.view({}).undoLabel, "Swapped Volume and Pointing mode 6");
+    assert.deepEqual(units(draft), ["pdOrder"], "Lighting followed: no colour changed");
+    const order = draft.changes()[0];
+    assert.deepEqual([order.title, order.area], ["Pointing mode order", "Pointing modes"]);
+    assert.deepEqual(fieldsOf(order), [["Pointing mode 1", "slot 6", "slot 1"], ["Volume", "slot 1", "slot 6"]]);
+    assert.deepEqual(order.fields.map(field => field.labelMark), [{kind: "pointing", slot: 1}, {kind: "pointing", slot: 6}]);
+    assert.deepEqual(order.place, {kind: "slots", bank: "pdModes", slots: [1, 6]});
+    const {rgb, pdModes, behaviors} = draft.current.decoded, was = draft.completeBase.decoded;
+    assert.deepEqual([pdModes[6].name, rgb.pdModeColors.find(row => row.pdModeId === 6).color], ["Volume", was.rgb.pdModeColors.find(row => row.pdModeId === 1).color]);
+    assert.ok(behaviors.rows.some(row => row.target.kind === 4 && row.target.operand === 6) && !behaviors.rows.some(row => row.target.kind === 4 && row.target.operand === 1));
+    assert.ok(draft.checks().every(check => check.status === "existing"), "the keyboard's own checks, matched slot with slot");
+    stage(draft, {type: "updatePdModeColor", pointingMode: "POINTING_MODE_6", h: 1, s: 2, v: 3, locality: "RGB_RIGHT_HALF"});
+    assert.deepEqual(units(draft), ["pdOrder", "rgb:pd:6"], "a colour edited after the swap is its own change, on the mode where it is");
+    draft.discard(draft.revision, groupOf(draft, "pdOrder"));
+    assert.deepEqual(units(draft), ["rgb:pd:1"], "the colour stays with Volume as it goes home");
+});
+// An imported colour brighter than the keyboard's limit: the draft is
+// repaired in Lighting, and nothing past the limit leaves Ark meanwhile.
+test("a draft holding a colour past the brightness limit still swaps pointing slots, and stays blocked until the colour is lowered", () => {
+    const {checkRestorable} = require("../../core/session/restore-checks");
+    const {draft, snapshot, caps} = slotFixture();
+    const imported = editProfileDomains(draft.current.document, {}, open => {open("rgb").pdModeColors.find(row => row.pdModeId === 1).color.v = 255;});
+    draft.replace(imported, draft.revision, "edit", "Imported a backup");
+    const bright = () => draft.checks().filter(check => check.kind === "colourBrightnessBlocker" && check.status !== "fixed");
+    assert.equal(bright().length, 1, "the import is a blocker");
+    assert.equal(bright()[0].fix, "Lower its brightness to 200 or less in Lighting.");
+    stage(draft, {type: "swapPdModes", slots: [1, 6]});
+    assert.equal(draft.current.decoded.rgb.pdModeColors.find(row => row.pdModeId === 6).color.v, 255, "the colour went with its mode");
+    assert.equal(bright().length, 1, "and is still past the limit");
+    assert.ok(draft.hasBlockers(), "Save is blocked");
+    const facts = {limits: snapshot.limits, options: {effects: [{id: require("../../core/model/settings-editor").baseLighting(draft.current.decoded.settings.values).effect}]}};
+    assert.throws(() => checkRestorable(draft.current.document, facts, caps), {code: "SETTINGS_LIMIT_EXCEEDED", message: /brightness 255; the keyboard accepts at most 200/});
+    stage(draft, {type: "updatePdModeColor", pointingMode: "POINTING_MODE_6", h: 1, s: 2, v: 200, locality: "RGB_RIGHT_HALF"});
+    assert.deepEqual(bright(), [], "lowered, the blocker is gone");
+    assert.ok(!draft.hasBlockers());
+    assert.equal(checkRestorable(draft.current.document, facts, caps), undefined);
+});
+test("a custom key swap takes its name, shortcut and behaviour, and a live proposal's checks are matched through what moved", () => {
+    const {draft} = slotFixture();
+    stage(draft, {type: "updateCustomKey", keycode: "CUSTOM_KEY_3", name: "Thumb", expectedFingerprint: draft.current.fingerprint});
+    const {document, order} = draft.propose({type: "swapCustomKeys", keycodes: ["CUSTOM_KEY_3", "CUSTOM_KEY_20"], draftRevision: draft.revision});
+    assert.deepEqual(draft.checksAdded(document, order), [], "nothing new to confirm before the swap is sent live");
+    stage(draft, {type: "swapCustomKeys", keycodes: ["CUSTOM_KEY_3", "CUSTOM_KEY_20"]});
+    assert.equal(draft.view({}).undoLabel, "Swapped Thumb and Custom key 20");
+    assert.deepEqual(units(draft), ["customKey:20", "customKeyOrder"]);
+    assert.deepEqual(fieldsOf(draft.changes().find(row => row.unit === "customKeyOrder")), [["Custom key 3", "slot 20", "slot 3"], ["Thumb", "slot 3", "slot 20"]]);
+    const rows = draft.current.decoded.behaviors.rows;
+    assert.ok(rows.some(row => row.target.kind === 7 && row.target.operand === 20) && !rows.some(row => row.target.kind === 7 && row.target.operand === 3), "its behaviour row listens to the key where it is");
+    assert.ok(!units(draft).some(unit => unit.startsWith("behavior:")));
+    draft.discard(draft.revision, groupOf(draft, "customKeyOrder"));
+    assert.deepEqual(units(draft), ["customKey:3"], "the key goes home with its name");
+    assert.equal(draft.view({}).undoLabel, "Put the custom key order back");
 });

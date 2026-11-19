@@ -7,6 +7,8 @@ const test = require("node:test");
 const {lastMessage, lastModel, notices, openLoop} = require("../fixtures/panel-loop");
 const {liveKeyboard} = require("../fixtures/live-keyboard");
 const {document} = require("../fixtures/portable-profile");
+const {editDomain} = require("../fixtures/profile-document");
+const {SETTING} = require("../../core/schema/settings-domain-v1");
 const {validateSnapshot} = require("../../core/model/portable-profile");
 const {EDIT_MODE, EDIT_RESULT, PROFILE_EDIT_V1} = require("../../core/protocol/profile-edit-v1");
 const {STARTING} = require("../../core/session/keyboard-starting");
@@ -245,6 +247,25 @@ test("a refused edit is said, and the draft is read again from the keyboard", as
     assert.equal(session.draft.current.fingerprint, shown, "the refused edit is not shown as made");
 });
 
+// Lighting takes an edit beside a colour past the keyboard's brightness
+// limit, so a live draft that holds one is refused before anything is sent,
+// in the blocker's words (profile-checks.js), whatever the edit.
+test("a live draft holding a colour past the brightness limit sends nothing until it is lowered", async t => {
+    const {editProfileDomains} = require("../../core/model/portable-profile");
+    const bright = editProfileDomains(document(), {}, open => {open("rgb").layerColors[1].color.v = 255;});
+    const {keyboard, shell, send, key} = await openLoop(t, {keyboard: liveKeyboard({document: bright, brightnessMax: 200})});
+    const published = () => keyboard.events.filter(event => event === "published").length;
+    await send({type: "updateLayerColor", layer: "Layer 2", h: 85, s: 255, v: 120, mode: "KEYS_MAPPED_ON_THIS_LAYER_ONLY"});
+    // A live draft is what the keyboard runs, so it cannot hold the colour to
+    // lower it: the refusal names the mode whose draft can.
+    assert.match(lastMessage(shell).notice, /Not sent: Layer colours: 1 colour is brighter than this keyboard's limit of 200\. Choose Review and save under Edits in the keyboard menu, use the profile as the draft there, and lower the brightness in Lighting\.$/);
+    await key(0, 4, "KC_Q");
+    assert.match(lastMessage(shell).notice, /Not sent: Layer colours: 1 colour is brighter/, "nor any other edit while it remains");
+    assert.equal(published(), 0);
+    await send({type: "updateLayerColor", layer: "Layer 1", h: 85, s: 255, v: 200, mode: "KEYS_MAPPED_ON_THIS_LAYER_ONLY"});
+    assert.equal(published(), 1, "lowered, it is sent");
+});
+
 test("an edit that finds the keyboard restarted over unsaved edits says so with the read it made, and Read keyboard does not again", async t => {
     const {keyboard, shell, loop, key} = await open(t);
     await key(0, 3, "KC_Z");
@@ -424,8 +445,28 @@ test("going from Review and save to Live preview + save with a draft asks to sen
 
 test("a toggle a key turned off is published beside the stored master, not as a change", async t => {
     const {shell, session} = await open(t, {combosOverride: false});
-    assert.deepEqual(lastModel(shell).runtime, {combosOffByKey: true, behavioursOffByKey: false});
+    assert.deepEqual(lastModel(shell).offByKey, {combo: true, behaviour: false, autoMouse: false, autocorrect: false});
     assert.equal(session.draft.dirty, false);
+});
+
+// BH_OFF or BH_TOGG (firmware D-F66) turned behaviours off over a stored on:
+// runtime page 0 byte 3 reads off while byte 2 reads on.
+test("behaviours a key turned off are published beside the stored master, not as a change", async t => {
+    const {shell, session} = await open(t, {behavioursOverride: false});
+    assert.deepEqual(lastModel(shell).offByKey, {combo: false, behaviour: true, autoMouse: false, autocorrect: false});
+    assert.equal(session.draft.dirty, false);
+});
+
+// AM_OFF or AM_TOGG (firmware D-F66) turned auto-mouse off over a stored on:
+// runtime page 0 byte 24 reads off while settings scalar 4, what the
+// keyboard runs, reads on. With the stored setting off, no key turned it off.
+test("auto-mouse a key turned off is published beside its stored setting, not as a change", async t => {
+    const {shell, session} = await open(t, {autoMouseOverride: false});
+    assert.deepEqual(lastModel(shell).offByKey, {combo: false, behaviour: false, autoMouse: true, autocorrect: false});
+    assert.equal(session.draft.dirty, false);
+    const stored = editDomain(document(), "settings", settings => {settings.values[SETTING.AUTO_MOUSE_ENABLED] = 0;});
+    const off = await openLoop(t, {keyboard: liveKeyboard({document: stored, autoMouseOverride: false})});
+    assert.deepEqual(lastModel(off.shell).offByKey, {combo: false, behaviour: false, autoMouse: false, autocorrect: false}, "a key cannot turn off what is stored off");
 });
 
 test("a live draft out of step with the keyboard is read again, not rebased", async t => {
@@ -653,9 +694,38 @@ test("choosing the same mode again settles halves that stored different modes", 
     assert.match(lastMessage(shell).notice, /same edit mode/);
 });
 
+// AC_OFF or AC_TOGG (firmware D-F66) turned autocorrect off over a stored on:
+// runtime page 1 byte 0 reads off while key option 12, as the keyboard's
+// settings were read, is on. With the stored switch off, no key turned it off.
+test("autocorrect a key turned off is published beside its stored switch, not as a change", async t => {
+    const on = editDomain(document(), "settings", settings => {settings.values[SETTING.KEYMAP_OPTIONS] |= 0x1000;});
+    const {shell, session} = await openLoop(t, {keyboard: liveKeyboard({document: on, autocorrectOverride: false})});
+    assert.deepEqual(lastModel(shell).offByKey, {combo: false, behaviour: false, autoMouse: false, autocorrect: true});
+    assert.equal(session.draft.dirty, false);
+    const allowed = await openLoop(t, {keyboard: liveKeyboard({document: on})});
+    assert.equal(lastModel(allowed.shell).offByKey.autocorrect, false);
+    const stored = editDomain(document(), "settings", settings => {settings.values[SETTING.KEYMAP_OPTIONS] &= ~0x1000;});
+    const off = await openLoop(t, {keyboard: liveKeyboard({document: stored, autocorrectOverride: false})});
+    assert.equal(lastModel(off.shell).offByKey.autocorrect, false, "a key cannot turn off what is stored off");
+    // Whether the keyboard is replacing now, for Try it's note: only what it reports, its stored switch on and no key holding it off.
+    assert.deepEqual([lastModel(shell).autocorrectRunning, lastModel(allowed.shell).autocorrectRunning, lastModel(off.shell).autocorrectRunning], [false, true, false]);
+    const unset = await openLoop(t, {keyboard: liveKeyboard({document: stored})});
+    assert.equal(lastModel(unset.shell).autocorrectRunning, false, "stored off, it replaces nothing, whatever its keys last said");
+});
+
 test("in Apply a toggle a key turned off is shown too", async t => {
     const {shell} = await open(t, {mode: EDIT_MODE.APPLY, combosOverride: false});
-    assert.deepEqual(lastModel(shell).runtime, {combosOffByKey: true, behavioursOffByKey: false});
+    assert.deepEqual(lastModel(shell).offByKey, {combo: true, behaviour: false, autoMouse: false, autocorrect: false});
+});
+
+test("in Apply behaviours a key turned off are shown too", async t => {
+    const {shell} = await open(t, {mode: EDIT_MODE.APPLY, behavioursOverride: false});
+    assert.deepEqual(lastModel(shell).offByKey, {combo: false, behaviour: true, autoMouse: false, autocorrect: false});
+});
+
+test("in Apply auto-mouse a key turned off is shown too", async t => {
+    const {shell} = await open(t, {mode: EDIT_MODE.APPLY, autoMouseOverride: false});
+    assert.deepEqual(lastModel(shell).offByKey, {combo: false, behaviour: false, autoMouse: true, autocorrect: false});
 });
 
 test("Live preview + save into Live edit with unsaved edits asks Save or Revert first, as the keyboard refuses the change otherwise", async t => {

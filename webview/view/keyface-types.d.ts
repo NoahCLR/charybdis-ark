@@ -4,6 +4,7 @@ export type ViewModel = Partial<PublishedModel> | null | undefined;
 export type PointingSlot = PublishedModel['pdModes'][number];
 export type BehaviorStep = BehaviorView['steps'][number];
 import type {Tier} from '../../contracts/edits.js';
+import type {Phrase} from './vocabulary.mjs';
 export type {Tier};
 export type BehaviorRoute = 'view' | 'here' | 'through' | 'combos' | 'belowCombos';
 export interface ResolvedKey {position: Position; layer: Layer; fellThrough: boolean; whileHeld: boolean; reference?: boolean}
@@ -32,7 +33,7 @@ export type ReachRoute =
     | {how: 'behaviour'; below: true; row: BehaviorView; key?: ResolvedKey; layer: Layer; whileHeld: boolean; sends: BranchSend[]}
     | {how: 'combo'; below: boolean; combo: ComboView; keys: ResolvedKey[]; action: string; row: BehaviorView | undefined; sends: BranchSend[]};
 // Whether a combo fires from a key in one view, and the words for why not.
-export interface ComboUse {fires: boolean; reasons: string[]}
+export interface ComboUse {fires: boolean; reasons: Phrase[]}
 // The combos the board marks on each key in one view, by layout index, and whether each fires from it there.
 export interface ComboMarks {keys: Map<number, ComboView[]>; uses: Map<number, Map<ComboView, ComboUse>>}
 export interface BehaviourGroups {here: BehaviorView[]; through: {row: BehaviorView; layer: Layer; whileHeld: boolean}[]; combos: BehaviorCombo[]; combosBelow: BehaviorCombo[]; elsewhere: BehaviorView[]}
@@ -116,9 +117,11 @@ export interface KeyIdentity {
     readonly variant: 'hold' | 'lock';
 }
 export type NamesOf = (keycode: string | undefined) => string[];
-// `times`: sent once per press of that many; `first`: the row's own first tap, not the key's.
-export type InheritedBranch = Branch & {times?: number; first?: boolean};
-export type ImpliedBranch = {meaning: 'continues'; hold: InheritedBranch} | {meaning: 'tapsBeforeLong'; tap: InheritedBranch};
+/** A branch an empty cell shows, as the grid reads it (keyface.mjs inheritedBranch): the cell's reference resolved to the branch, with its `times`, `separate`, `below` and `locks` (contracts/panel.d.ts CellRef). */
+export type InheritedBranch = Branch & {times?: number; separate?: boolean; below?: boolean; locks?: boolean};
+export type HoldTierImplied = {meaning: 'continues'; hold: InheritedBranch} | {meaning: 'tapsBeforeLong'; tap: InheritedBranch} | {meaning: 'tapsOnRelease'; tap: InheritedBranch};
+export type ImpliedBranch = HoldTierImplied | {meaning: 'afterTaps'; tap?: InheritedBranch; hold: InheritedBranch}
+    | {meaning: 'asSingle'; as: {kind: Tier; branch: InheritedBranch} | HoldTierImplied};
 
 export interface KeyFace {main: string; sub: string; kind: 'none' | 'transparent' | 'disabled' | 'layer' | 'key'}
 export type NamedAction =

@@ -10,7 +10,7 @@
 // and fails on any difference. Without it, every file is re-pinned to one
 // revision per repository (default: firmware's local dev, and the BK commit
 // that firmware's qmk-pin.json names), the manifest and QMK version stamp are
-// rewritten, the keycode catalog and host layouts are regenerated, and any
+// rewritten, the keycode catalog, host layouts and autocorrect word characters are regenerated, and any
 // file under upstream/ the manifest no longer lists is removed. Adding, moving
 // or dropping a file is a manifest edit; this tool refreshes what is listed.
 const fs = require("node:fs");
@@ -242,6 +242,7 @@ function refresh(arkRoot, roots, revisions = {}, {catalog = true} = {}) {
     fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
     if (catalog) execFileSync(process.execPath, [path.join(arkRoot, "scripts/generate-keycode-catalog.js")], {cwd: arkRoot, stdio: "inherit"});
     if (catalog) execFileSync(process.execPath, [path.join(arkRoot, "scripts/generate-host-layouts.js")], {cwd: arkRoot, stdio: "inherit"});
+    if (catalog) execFileSync(process.execPath, [path.join(arkRoot, "scripts/generate-autocorrect-words.js")], {cwd: arkRoot, stdio: "inherit"});
     return report;
 }
 

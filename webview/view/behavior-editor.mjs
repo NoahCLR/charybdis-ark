@@ -3,6 +3,7 @@
 import {keyIdentity} from "./key-identity.mjs";
 import {timingInput} from "./timing-input.mjs";
 import {vocabulary} from "./vocabulary.mjs";
+import {holdOrderReason, holdsOutOfOrder} from "../../rules/hold-order.mjs";
 
 // Every key may have a behaviour but a transparent or disabled one, as core
 // says which those are (qmkKeyKinds), however it is spelled.
@@ -25,8 +26,10 @@ export function behaviourEditorRow(/** @type {Model} */ model, /** @type {string
     const {listening: existing, canonical} = keyIdentity(model, keycode);
     const key = existing?.keycode || canonical;
     const defaults = model?.behaviorEditing?.keyDefaults?.[key];
+    // A key with no row shares its empty cells with every key of its kind.
+    const cells = defaults?.cellPattern === undefined ? undefined : model?.behaviorEditing?.cellPatterns?.[defaults.cellPattern];
     return {...(existing || {keycode: key, steps: [], tapHoldTerm: "0", longHoldTerm: "0", multiTapTerm: "0",
-        keepsAutoMouseAnchored: false, builtIn: defaults?.builtIn || {}}),
+        keepsAutoMouseAnchored: false, builtIn: {...defaults?.builtIn, ...(cells ? {cells} : {})}}),
         stored: Boolean(existing), timingDefaults: defaults?.timing || model?.behaviorTimingDefaults || {},
         timingWords: timingWords(model, defaults?.timingSources),
         // Unknown counts as yes, so nothing that might matter is dropped.
@@ -101,6 +104,23 @@ export function styleDetail(/** @type {import("../../contracts/edits.js").Tier} 
     if (branch.style !== "TAP_AT_HOLD_THRESHOLD" && branch.style !== "TAP_ON_RELEASE_AFTER_HOLD") return "";
     const term = terms[kind === "hold" ? "tapHoldTerm" : "longHoldTerm"];
     return term.ms === "" ? "" : `${term.ms} ms`;
+}
+
+// Why the timings a behaviour's fields now hold would be refused: its Long
+// hold threshold at or before its Tap / hold threshold, its own or the
+// default it follows (D-L82, rules/hold-order.mjs); "" when they would not,
+// or a default is unknown. `terms` are the stored values the fields would post.
+export function behaviourTimingProblem(/** @type {Model} */ model, /** @type {TimedBehaviour} */ behaviour, /** @type {Partial<Record<TimingName, string>>} */ terms) {
+    /** @param {TimingName} name */
+    const ms = (name) => {
+        const field = behaviourTimingField({...behaviour, ...terms}, name);
+        const value = field.followsDefault ? field.fallback : field.stored;
+        return /^\d+$/.test(value) ? Number(value) : undefined;
+    };
+    const hold = ms("tapHoldTerm"), long = ms("longHoldTerm");
+    if (hold === undefined || long === undefined || !holdsOutOfOrder(hold, long)) return "";
+    const reason = holdOrderReason({hold, long}, vocabulary(model).thresholdNames, "the");
+    return reason.charAt(0).toUpperCase() + reason.slice(1);
 }
 
 // Leaving a displayed default untouched must keep the stored inheritance zero.

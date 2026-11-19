@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {timingInput} from "../../webview/view/timing-input.mjs";
+import {timingDigits, timingInput} from "../../webview/view/timing-input.mjs";
 
 test("inherited and matching timings show the default as a placeholder", () => {
     assert.deepEqual(timingInput("0", "150", true), {value: "", placeholder: "150 · default"});
@@ -21,4 +21,10 @@ test("the placeholder names the setting its default comes from", () => {
     assert.deepEqual(timingInput("0", "150", true, "behaviour default"), {value: "", placeholder: "150 · behaviour default"});
     assert.deepEqual(timingInput("75", "150", false, "behaviour default"), {value: "75", placeholder: "150 · behaviour default"});
     assert.deepEqual(timingInput("", undefined, false, "dual-role"), {value: "", placeholder: "ms"}, "no default, no source");
+});
+
+test("a timing field is as wide as its placeholder, and never under five digits", () => {
+    assert.equal(timingDigits("50 · default"), 12);
+    assert.equal(timingDigits("200 · dual-role"), 15);
+    assert.equal(timingDigits("ms"), 5);
 });

@@ -33,7 +33,7 @@ test("the board's Shortcuts list names the shortcuts this computer uses", async 
     await page.goto("/preview/index.html");
     await page.locator('[data-screen="keys"]').click();
     await page.locator("[data-key]").first().click();
-    await page.getByRole("button", {name: "Shortcuts"}).click();
+    await page.getByRole("button", {name: "Shortcuts"}).hover();
     const list = page.locator("#board-shortcuts");
     await expect(list).toContainText("Ctrl+C, Ctrl+V");
     await expect(list).toContainText("Copy a key, paste it onto the selected one");
@@ -44,44 +44,93 @@ test("the board's Shortcuts list names the shortcuts this computer uses", async 
     expect(await shownWords(page)).not.toContain("⌘");
 });
 
-// The legend keeps the marks on one line; what the board takes from the mouse
-// and the keys waits behind Shortcuts, which Escape or a press outside closes.
-test("the board's Shortcuts list opens from its button and Escape closes it, focus back on the button", async ({page}) => {
+// The board's shortcuts wait behind an info mark on its top-right corner:
+// hovering it previews them, a press opens them and keeps them open, and
+// the focus alone opens nothing (D-L96).
+test("the board's info mark previews its Shortcuts list on hover, and a press keeps it open until pressed again, Escape or a press elsewhere", async ({page}) => {
     await page.goto("/preview/index.html");
     await page.locator('[data-screen="keys"]').click();
-    const button = page.getByRole("button", {name: "Shortcuts"});
+    const board = page.locator(".keys-pad .board");
+    const mark = board.getByRole("button", {name: "Shortcuts"});
     const list = page.locator("#board-shortcuts");
-    await expect(button).toHaveAttribute("aria-expanded", "false");
-    await expect(list).toHaveCount(0);
-    await expect(page.locator(".board-legend")).not.toContainText("Double-click");
+    await expect(mark).toHaveAttribute("aria-describedby", "board-shortcuts");
+    await expect(list).toBeHidden();
+    await expect(page.locator(".board-legend")).not.toContainText("Shortcuts");
 
-    await button.focus();
-    await page.keyboard.press("Enter");
-    await expect(button).toHaveAttribute("aria-expanded", "true");
-    await expect(button).toHaveAttribute("aria-controls", "board-shortcuts");
+    // On the board's top-right corner.
+    const [markBox, boardBox] = [await mark.boundingBox(), await board.boundingBox()];
+    if (!markBox || !boardBox) throw new Error("no layout");
+    expect(boardBox.x + boardBox.width - (markBox.x + markBox.width)).toBeLessThan(24);
+    expect(markBox.y - boardBox.y).toBeLessThan(24);
+
+    await mark.hover();
     await expect(list).toBeVisible();
     await expect(list).toContainText("Double-click");
     await expect(list).toContainText("Swap the two keys");
+    // Holding over a layer tab is a note on the drag, not a row of its own.
+    await expect(list.locator("dd", {hasText: "Swap the two keys"}).locator(".info-note")).toHaveText("Hold over a layer tab to reach its keys");
+    await expect(list.locator("dt", {hasText: "layer tab"})).toHaveCount(0);
     await expect(list).toContainText("Make the selected key transparent");
-
-    await page.keyboard.press("Escape");
-    await expect(list).toHaveCount(0);
-    await expect(button).toHaveAttribute("aria-expanded", "false");
-    await expect(button).toBeFocused();
-
-    // A press anywhere else closes it too, and still lands where it was.
-    await button.click();
+    // The pointer can cross onto the list without it closing.
+    await list.hover();
     await expect(list).toBeVisible();
-    await page.locator("[data-key]").nth(2).click();
-    await expect(list).toHaveCount(0);
-    await expect(page.locator("[data-key]").nth(2)).toHaveClass(/\bsel\b/);
+    await page.keyboard.press("Escape");
+    await expect(list).toBeHidden();
+    // Leaving and coming back shows it again.
+    await page.locator(".board-legend").hover();
+    await mark.hover();
+    await expect(list).toBeVisible();
+    await page.locator(".board-legend").hover();
+    await expect(list).toBeHidden();
+
+    // Reached by the keyboard, Enter opens it and keeps it open; the focus
+    // alone opens nothing, the list being the mark's description (D-L96).
+    await mark.focus();
+    await page.keyboard.press("Shift+Tab");
+    await page.keyboard.press("Tab");
+    await expect(mark).toBeFocused();
+    await expect(list).toBeHidden();
+    await expect(mark).toHaveAttribute("aria-expanded", "false");
+    await page.keyboard.press("Enter");
+    await expect(list).toBeVisible();
+    await expect(mark).toHaveAttribute("aria-expanded", "true");
+    await page.keyboard.press("Escape");
+    await expect(list).toBeHidden();
+    await expect(mark).toBeFocused();
+    await expect(mark).toHaveAttribute("aria-expanded", "false");
+    // Space opens it as Enter does.
+    await page.keyboard.press(" ");
+    await expect(list).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(list).toBeHidden();
+    // Leaving it by the keyboard is leaving it: the focus moving on closes it.
+    await page.keyboard.press("Enter");
+    await expect(list).toBeVisible();
+    await page.keyboard.press("Tab");
+    await expect(list).toBeHidden();
+    await expect(mark).toHaveAttribute("aria-expanded", "false");
+
+    // A click keeps it open once the pointer leaves, and across a redraw;
+    // a press elsewhere closes it, and so does a second click.
+    await mark.click();
+    await page.locator(".board-legend").hover();
+    await expect(list).toBeVisible();
+    await page.evaluate(async () => (await import("/webview/store.mjs")).render());
+    await expect(list).toBeVisible();
+    await page.locator(".topbar h1").click();
+    await expect(list).toBeHidden();
+    await mark.click();
+    await expect(list).toBeVisible();
+    await mark.click();
+    await expect(list).toBeHidden();
 });
 
 test("while the board takes no edit, the Shortcuts list says only selecting and copying", async ({page}) => {
     await page.goto("/preview/index.html?shell=live-held");
     await page.locator('[data-screen="keys"]').click();
-    await page.getByRole("button", {name: "Shortcuts"}).click();
+    await page.getByRole("button", {name: "Shortcuts"}).hover();
     const list = page.locator("#board-shortcuts");
+    await expect(list).toBeVisible();
     await expect(list).toContainText("Select a key to read it");
     await expect(list).toContainText("Copy the selected key");
     await expect(list).not.toContainText("Double-click");

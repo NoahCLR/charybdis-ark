@@ -1,23 +1,23 @@
 // @ts-check
 // The Settings screens: the keyboard's global policy, exactly as it reports
-// it, a screen per subject (Behaviours, Combos, Pointer, Host).
+// it, a screen per subject (Behaviours, Combos, Pointer, Typing).
 //
 // The sections, fields, hints and limits all come from the device snapshot, so
 // these screens render what the firmware says it has rather than a list this
 // app decided on. A field the firmware cannot report stays visible and
 // read-only with its reason. Which sections each screen draws is
 // view/settings-layout.mjs's; every one is drawn open. Lighting draws its own
-// sections with the same rows.
+// sections with the same rows (sectionCard).
 
 // Selector assertions refer to elements created by this module's authored markup.
 import * as edits from "../view/edits.mjs";
-import {el, esc, html} from "../lib/dom.mjs";
+import {el, esc} from "../lib/dom.mjs";
 import {getModel, layers, post, render, state} from "../store.mjs";
 import {editGate} from "../view/edit-gate.mjs";
 import {layerCalled} from "../view/vocabulary.mjs";
 import {topbar} from "./frame.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
-import {marked} from "./marks.mjs";
+import {layerMarked, marked, phraseMarked} from "./marks.mjs";
 import {githubMark} from "../view/shell-panel.mjs";
 import {keyIdentity} from "../view/key-identity.mjs";
 import {keycodePlacements, reachLine} from "../view/placements.mjs";
@@ -25,22 +25,23 @@ import {durationControl} from "./duration.mjs";
 import {choiceField} from "./segmented.mjs";
 import {settingOptions} from "../view/choices.mjs";
 import {layerSwitchGrid} from "./layer-switches.mjs";
-import {fieldParts, isLayerSwitch, sectionsOn} from "../view/settings-layout.mjs";
+import {isLayerSwitch, sectionsOn, unitlessLabel} from "../view/settings-layout.mjs";
 import {foldEmptyLayers} from "../view/empty-layers.mjs";
 import {emptyLayersButton, emptyLayersShown} from "./empty-layers.mjs";
+import {attachInfoMarks, infoMark} from "./info-mark.mjs";
 
 /** @typedef {import("../../contracts/panel.js").PublishedModel} Model */
 /** @typedef {import("../../contracts/panel.js").PresentedSection} Section */
 /** @typedef {import("../../contracts/panel.js").PresentedField} Field */
 
 export const screenBehaviours = () => settingsScreen("behaviours", "Behaviours",
-    "How a key tells a tap from a hold, and where behaviours run.");
+    "Where behaviours run, and how a key tells a tap from a hold.");
 export const screenCombos = () => settingsScreen("combos", "Combos",
     "Where combos run, how they are timed and how they match.");
 export const screenPointer = () => settingsScreen("pointer", "Pointer",
     "Pointer speed, sniping and the pointer layer.");
-export const screenHost = () => settingsScreen("host", "Host",
-    "The computer you type on, and key swaps for every layer.");
+export const screenHost = () => settingsScreen("host", "Typing",
+    "The computer you type on, and text replacement's switch.");
 
 // One Settings screen: its sections as cards, all open, each saved whole.
 /** @param {string} screen @param {string} title @param {string} subtitle */
@@ -61,8 +62,6 @@ function settingsScreen(screen, title, subtitle) {
     else if (!canEdit && !gate.quiet) {
         pad.appendChild(el(`<div class="unavailable">${esc(gate.why || "These settings cannot be edited right now.")}</div>`));
     }
-    // A section the keyboard has not filled in yet (Key swaps before its
-    // options are read) still shows, to say why it is empty.
     for (const section of sections) {
         if (section.id === "comboSettings") pad.appendChild(combosCard(model, section, canEdit));
         else if (section.id === "comboReferences") pad.appendChild(referenceCard(model, section, canEdit));
@@ -92,9 +91,9 @@ const combosCard = (model, section, canEdit) => sectionCard(model, section, canE
 /** @param {Model | null} model @param {Section} section @param {boolean} canEdit */
 function referenceCard(model, section, canEdit) {
     const node = el(`<section class="card settings-group" data-section="${esc(section.id)}">
-        <div class="card-h"><h3>${esc(section.label)}${draftMarks(model?.draft?.changes).settings.has(section.id) ? draftDot() : ""}</h3></div>
+        <div class="card-h"><h3>${esc(section.label)}${draftMarks(model?.draft?.changes).settings.has(section.id) ? draftDot(model?.draft) : ""}</h3></div>
         ${section.description ? `<div class="card-b settings-intro"><p class="note">${esc(section.description)}</p></div>` : ""}
-        <div class="rows"><div class="setrow layer-switches" data-tip="${esc(section.description || "")}"><div class="layer-grid reference-grid" role="group" aria-label="${esc(section.label)}"></div></div></div>
+        <div class="rows"><div class="setrow layer-switches"><div class="layer-grid reference-grid" role="group" aria-label="${esc(section.label)}"></div></div></div>
     </section>`);
     const grid = /** @type {HTMLElement} */ (node.querySelector(".reference-grid"));
     const submit = () => post(edits.settingsSection(section, (field) => {
@@ -110,7 +109,7 @@ function referenceCard(model, section, canEdit) {
         const layer = layers().find((entry) => entry.index === at);
         const editable = canEdit && !field.readOnly;
         if (field === folded[0]) grid.appendChild(emptyLayersButton("combo-matching", folded.length, "grid-empties"));
-        const cell = el(`<label class="reference-cell" data-tip="${esc([field.tooltip, field.hint].filter(Boolean).join(" "))}" ${folded.includes(field) && !open ? "hidden" : ""}>
+        const cell = el(`<label class="reference-cell" ${folded.includes(field) && !open ? "hidden" : ""}>
             <span class="txt">${layerCell(model, field, layer)}</span>
             <select class="input compact" data-macro="${esc(field.macro)}" data-f="setting:${esc(field.macro)}" aria-label="${esc(field.label)}" ${editable ? "" : "disabled"}>
             ${layers().map((entry) => `<option value="${esc(entry.name)}" ${field.value === entry.name ? "selected" : ""}>${esc(layerCalled(entry))}</option>`).join("")}</select></label>`);
@@ -136,7 +135,7 @@ function comboTimingRow(model, entry) {
     const stored = String(value ?? "");
     const editable = editGate(model, "combos").editable;
     const hint = entry.hint;
-    const row = el(`<div class="setrow" data-tip="${esc(hint)}" data-timing="${esc(entry.id)}">
+    const row = el(`<div class="setrow" data-timing="${esc(entry.id)}">
         <div><div class="nm">${esc(entry.label)}</div>
             <div class="hint">${esc(hint)}</div></div>
         <div class="control"><span class="affix unit"><input class="input mono num" id="${hold ? "comboHoldTerm" : "comboDefaultWindow"}" data-f="settings:combo:${hold ? "hold" : "default"}" inputmode="numeric" value="${esc(stored)}" ${editable ? "" : "disabled"}><i>ms</i></span></div>
@@ -161,7 +160,7 @@ function comboTimingRow(model, entry) {
  */
 function sectionCard(model, section, canEdit, {extra} = {}) {
     const node = el(`<section class="card settings-group" data-section="${esc(section.id)}">
-        <div class="card-h"><h3>${esc(section.label)}${draftMarks(model?.draft?.changes).settings.has(section.id) ? draftDot() : ""}</h3></div>
+        <div class="card-h"><h3>${esc(section.label)}${draftMarks(model?.draft?.changes).settings.has(section.id) ? draftDot(model?.draft) : ""}</h3>${keyboardKeysInfo(section)}</div>
         ${section.description ? `<div class="card-b settings-intro"><p class="note">${esc(section.description)}</p></div>` : ""}
         <div class="rows"></div>
         ${section.warning ? `<div class="card-b"><div class="callout warn" role="note">${esc(section.warning)}</div></div>` : ""}
@@ -190,22 +189,15 @@ function sectionCard(model, section, canEdit, {extra} = {}) {
     // row of layers rather than a row each.
     const grouped = section.layerGroup ? section.fields.filter(isLayerSwitch) : [];
     const slot = section.fields.some((entry) => entry.governs && !grouped.includes(entry));
-    for (const {part, fields} of fieldParts(section.fields)) {
-        if (part) rows.appendChild(el(`<div class="setrow-part">${esc(part)}</div>`));
-        for (const field of fields) {
-            if (grouped.includes(field)) {
-                if (field === grouped[0] && section.layerGroup) rows.appendChild(layerGroupRow(section.layerGroup, grouped, canEdit, submit, `settings:${section.id}`));
-                continue;
-            }
-            rows.appendChild(fieldRow(field, canEdit, submit, slot, durations));
-            if (extra && field.macro === extra.after) rows.append(...extra.nodes);
+    for (const field of section.fields) {
+        if (grouped.includes(field)) {
+            if (field === grouped[0] && section.layerGroup) rows.appendChild(layerGroupRow(section.layerGroup, grouped, canEdit, submit, `settings:${section.id}`));
+            continue;
         }
+        rows.appendChild(fieldRow(field, canEdit, submit, slot, durations));
+        if (extra && field.macro === extra.after) rows.append(...extra.nodes);
     }
-    // A section QMK owns whole says so once, by its title, not on every row.
-    if (section.fields.length > 1 && section.fields.every((field) => field.keyboardKeys)) {
-        node.querySelectorAll(".rows .kk-mark").forEach((mark) => mark.remove());
-        node.querySelector(":scope > .card-h > h3")?.insertAdjacentHTML("afterend", html(keyboardKeysMark(section.fields[0])));
-    }
+    attachInfoMarks(node);
     return node;
 }
 
@@ -213,7 +205,7 @@ function sectionCard(model, section, canEdit, {extra} = {}) {
 // mark, as everywhere a layer is named (D-L31).
 /** @param {Model | null} model @param {Field} field @param {import("../../contracts/panel.js").Layer | undefined} layer */
 const layerCell = (model, field, layer) => layer
-    ? marked(model, {kind: "layer", layer: layer.index}, layerCalled(layer))
+    ? layerMarked(model, layer)
     : marked(model, field.governs, field.label);
 
 // A section's one-per-layer switches as one row of layers (layer-switches.mjs).
@@ -221,13 +213,13 @@ const layerCell = (model, field, layer) => layer
 // its empty layers fold behind the grid's disclosure (D-L76).
 /** @param {{label: string, hint: string}} group @param {Field[]} fields @param {boolean} canEdit @param {() => void} submit @param {string} place */
 function layerGroupRow(group, fields, canEdit, submit, place) {
-    const row = el(`<div class="setrow layer-switches" data-tip="${esc(group.hint)}">
+    const row = el(`<div class="setrow layer-switches">
         <div><div class="nm">${esc(group.label)}${keyboardKeysMark(fields[0])}</div><div class="hint">${esc(group.hint)}</div></div>
     </div>`);
     const grid = layerSwitchGrid(getModel(), group.label, fields.map((field) => ({
         layer: field.governs?.kind === "layer" ? field.governs.layer : -1, label: field.label, macro: field.macro, f: `setting:${field.macro}`,
         checked: Boolean(field.enabled), disabled: !canEdit || Boolean(field.readOnly),
-        tip: [field.tooltip, field.hint, field.readOnly ? "This setting cannot be edited with the connected firmware." : ""].filter(Boolean).join(" "),
+        tip: [field.tooltip, field.hint].filter(Boolean).join(" "),
     })), {place});
     /** @type {NodeListOf<HTMLInputElement>} */ (grid.querySelectorAll("input")).forEach((input) => input.addEventListener("change", submit));
     row.appendChild(grid);
@@ -241,16 +233,17 @@ function fieldRow(field, canEdit, submit, slot, durations) {
     // so the label drops the "(ms)" it carries in the review.
     const affixed = Boolean(field.unit) && !field.readOnly && field.presentation !== "duration"
         && field.kind !== "toggle" && field.kind !== "layer" && !field.choices?.length;
-    const label = affixed ? field.label.replace(new RegExp(`\\s*\\(${field.unit}\\)$`), "") : field.label;
-    const row = el(`<div class="setrow ${field.readOnly ? "ro" : ""}" data-tip="${esc([field.tooltip, field.hint].filter(Boolean).join(" "))}">
+    const label = affixed ? unitlessLabel(field) : field.label;
+    // The row's tip is its tooltip alone: its hint is on screen under its
+    // name, and a read-only row's hint says why (D-L96).
+    const row = el(`<div class="setrow ${field.readOnly ? "ro" : ""}"${field.tooltip ? ` data-tip="${esc(field.tooltip)}"` : ""}>
         <div><div class="nm">${marked(getModel(), field.governs, label, {slot})}${keyboardKeysMark(field)}${offByKeyMark(field)}</div>${field.hint ? `<div class="hint">${esc(field.hint)}</div>` : ""}</div>
         <div class="control"></div>
     </div>`);
     const control = /** @type {HTMLElement} */ (row.querySelector(".control"));
 
     if (field.readOnly) {
-        control.appendChild(el(`<span class="chip"
-            data-tip="${esc([field.tooltip, field.hint, field.notBuilt ? "" : "This setting cannot be edited with the connected firmware."].filter(Boolean).join(" "))}">${field.notBuilt ? "Not in this firmware" : `read-only · ${esc(field.kind === "toggle" ? (field.enabled ? "on" : "off") : field.value)}`}</span>`));
+        control.appendChild(el(`<span class="chip">${field.notBuilt ? "Not in this firmware" : `read-only · ${esc(field.kind === "toggle" ? (field.enabled ? "on" : "off") : field.value)}`}</span>`));
         return row;
     }
     if (field.presentation === "duration") {
@@ -260,8 +253,8 @@ function fieldRow(field, canEdit, submit, slot, durations) {
         return row;
     }
     if (field.kind === "toggle") {
-        const node = el(`<label class="sw"><input type="checkbox" data-macro="${esc(field.macro)}" data-f="setting:${esc(field.macro)}" ${field.enabled ? "checked" : ""} ${editable ? "" : "disabled"}>
-            <span class="track"></span><span class="txt muted">${field.enabled ? "On" : "Off"}</span></label>`);
+        const node = el(`<label class="sw"><input type="checkbox" data-macro="${esc(field.macro)}" data-f="setting:${esc(field.macro)}" aria-label="${esc(label)}" ${field.enabled ? "checked" : ""} ${editable ? "" : "disabled"}>
+            <span class="track"></span></label>`);
         /** @type {HTMLInputElement} */ (node.querySelector("input")).addEventListener("change", submit);
         control.appendChild(node);
         return row;
@@ -287,19 +280,17 @@ function fieldRow(field, canEdit, submit, slot, durations) {
 }
 
 // Sniping is on while a sniping key is held or toggled, and while an
-// auto-sniping layer is on; this says where those keys are, places one, and
-// says what sniping slows.
+// auto-sniping layer is on; these rows, drawn as the card's settings are,
+// say where those keys are and place one, and their tips say what each key
+// does. What sniping slows is Sniping DPI's tip.
 /** @param {Model | null} model @param {boolean} canEdit */
 function snipingKeys(model, canEdit) {
-    const node = el(`<div class="card-b sniping-keys">
-        <div class="sect-h"><h4>Sniping keys</h4></div>
-        <p class="note">Sniping is on while one of these keys is held or toggled.</p></div>`);
-    for (const keycode of ["SNIPING", "SNP_TOG"]) {
+    const node = el(`<div class="rows sniping-keys"><div class="setrow-part">Sniping keys</div></div>`);
+    for (const [keycode, how] of [["SNIPING", "Sniping is on while this key is held."], ["SNP_TOG", "One press turns sniping on, the next turns it off."]]) {
         const words = keyIdentity(model, keycode).label;
-        const row = el(`<div class="row gap-10 sniping-key">
-            <span class="sniping-name">${esc(words)}</span>
-            <span class="note">${esc(reachLine(keycodePlacements(model, [keycode])))}</span>
-            <button class="btn tiny ghost right" data-place="${esc(keycode)}" ${canEdit ? "" : "disabled"}>Place on a key…</button></div>`);
+        const row = el(`<div class="setrow sniping-key" data-tip="${esc(how)}">
+            <div><div class="nm">${esc(words)}</div><div class="hint">${phraseMarked(model, reachLine(keycodePlacements(model, [keycode])))}</div></div>
+            <div class="control"><button class="btn tiny link" data-place="${esc(keycode)}" ${canEdit ? "" : "disabled"}>Place on a key →</button></div></div>`);
         /** @type {HTMLButtonElement} */ (row.querySelector("[data-place]")).addEventListener("click", () => {
             state.placement = {keycode};
             state.screen = "keys";
@@ -308,25 +299,37 @@ function snipingKeys(model, canEdit) {
         });
         node.appendChild(row);
     }
-    node.appendChild(el(`<p class="note">It slows directional pointing modes too, not scrolling ones.</p>`));
     return node;
 }
 
 // QMK keeps the live value of these, so a key on the keyboard (a Magic, DF()
 // or DPI key) changes it too, until the keyboard restarts: the profile is
-// their only saved owner (firmware D-F32), and a combos key is a toggle over
-// it, shown beside the switch rather than as a change.
-const KEYBOARD_KEYS_TIP = "Keys on the keyboard can change this too, until the keyboard restarts; it then comes back to the value set here.";
+// their only saved owner (firmware D-F32), and a switch key (CM_*, BH_*,
+// AM_*, firmware D-F66) sets the keyboard's override over it, shown beside
+// the switch rather than as a change. The marks are short; what they mean is
+// the section's info mark (keyboardKeysInfo, D-L96).
+const KEYBOARD_KEYS = "↺ keyboard keys change this too", OFF_BY_KEY = "turned off by key";
 /** @param {import("../../contracts/panel.js").PresentedField | undefined} field */
-const keyboardKeysMark = (field) => field?.keyboardKeys ? ` <span class="kk-mark" data-tip="${esc(KEYBOARD_KEYS_TIP)}">↺ keyboard keys change this too</span>` : "";
+const keyboardKeysMark = (field) => field?.keyboardKeys ? ` <span class="kk-mark">${esc(KEYBOARD_KEYS)}</span>` : "";
 
-// A toggle key turned this off over a stored "on" (plan answer 10): said
-// beside the switch, never a change in the review.
+// A switch key turned this off over a stored "on" (plan answer 10): said
+// beside the switch, never a change in the review. The field names its
+// switch, and core decides whether a key turned it off.
 /** @param {import("../../contracts/panel.js").PresentedField | undefined} field */
 function offByKeyMark(field) {
-    const runtime = getModel()?.runtime;
-    const off = field?.macro === "combosEnabled" ? runtime?.combosOffByKey : field?.macro === "behaviorsEnabled" ? runtime?.behavioursOffByKey : false;
-    return off ? ` <span class="kk-mark off-by-key" data-tip="${esc("A key on the keyboard turned this off for now. It stays on here; the key turns it back on, and so does unplugging the keyboard. Nothing to save.")}">turned off by key</span>` : "";
+    const off = field?.offSwitch ? getModel()?.offByKey?.[field.offSwitch] : false;
+    return off ? ` <span class="kk-mark off-by-key">${esc(OFF_BY_KEY)}</span>` : "";
+}
+
+// What the marks mean, read once, on a section that can show them: beside
+// its title, whichever of its rows carries one.
+/** @param {Section} section */
+function keyboardKeysInfo(section) {
+    /** @type {import("./info-mark.mjs").InfoRow[]} */
+    const rows = [];
+    if (section.fields.some((field) => field.keyboardKeys)) rows.push({term: KEYBOARD_KEYS, says: "Keys on the keyboard can change this too, until the keyboard restarts; it then comes back to the value set here."});
+    if (section.fields.some((field) => field.offSwitch)) rows.push({term: OFF_BY_KEY, says: "Shown while a key on the keyboard has turned this off. It stays on here: the key turns it back on, and so does unplugging the keyboard. Nothing to save."});
+    return infoMark({id: `settings-info-${section.id}`, label: "What keyboard keys change here", heading: "Keyboard keys", named: `${section.label}: keyboard keys`, rows});
 }
 
 /** @param {string} value */

@@ -115,7 +115,7 @@ test("adopting a profile builds the editors' views of it, and new capabilities b
     writer.keep({capabilities});
     assert.equal(writer.adopt(read), true);
     assert.equal(state.portable, read);
-    const views = () => {const {settingsView, macroView, customKeyView} = state.published(); return {settingsView, macroView, customKeyView};};
+    const views = () => {const {settingsView, macroView, autocorrectView, customKeyView} = state.published(); return {settingsView, macroView, autocorrectView, customKeyView};};
     assert.deepEqual(views(), clone(editorViews(read, capabilities)));
     const unknownAbi = {...capabilities, actionAbiDigest: 0};
     writer.keep({capabilities: unknownAbi});

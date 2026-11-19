@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {GEO, LEGEND_MIN, boardOutlineMarkup, fitLegend, fitText, inLocality, isRightHalf, keyFaceRows, keyVisual, trackballInLocality} from "../../webview/view/geometry.mjs";
+import {createRequire} from "node:module";
+import {GEO, LEGEND_CONDENSE, LEGEND_SIZES, boardOutlineMarkup, estimateWidth, followsTrigger, inLocality, isRightHalf, keyFaceRows, keyLegends, keyVisual, legendBreak, setLegend, trackballInLocality} from "../../webview/view/geometry.mjs";
 
 test("the board splits into halves the way the LED numbering does", () => {
     assert.equal(isRightHalf(0), false, "left home column");
@@ -19,7 +20,22 @@ test("locality answers for the regions the firmware defines", () => {
     assert.equal(inLocality(0, "RGB_KEY_HALF", 7), false);
     assert.equal(inLocality(7, "RGB_KEYS_ONLY", 7), true);
     assert.equal(inLocality(6, "RGB_KEYS_ONLY", 7), false);
-    assert.equal(inLocality(6, "RGB_KEYS_ONLY", undefined), false, "with no trigger, nothing is the trigger key");
+    assert.equal(inLocality(6, "RGB_KEYS_ONLY", undefined), true, "with no trigger key, as a mode no key holds, every key paints");
+    assert.equal(inLocality(0, "RGB_KEY_HALF", undefined), true, "and both halves do");
+    assert.equal(trackballInLocality("RGB_KEYS_ONLY", undefined), true);
+    assert.equal(trackballInLocality("RGB_KEYS_ONLY", 51), false, "with one, the trackball is no key");
+    // A held combo's inputs are all its trigger keys.
+    assert.equal(inLocality(9, "RGB_KEYS_ONLY", [7, 9]), true);
+    assert.equal(inLocality(0, "RGB_KEY_HALF", [7, 9]), false, "both inputs on the right paint the right half");
+    assert.equal(inLocality(0, "RGB_KEY_HALF", [1, 7]), true, "inputs spanning the halves paint both");
+    assert.equal(trackballInLocality("RGB_KEY_HALF", [1, 2]), false, "the trackball sits on the right half");
+    assert.equal(trackballInLocality("RGB_KEY_HALF", [1, 7]), true);
+});
+
+test("two localities follow the keys that triggered the light, as every locality the keyboard stores is told", () => {
+    const {RGB_LOCALITIES} = createRequire(import.meta.url)("../../core/schema/rgb-domain-v1");
+    assert.deepEqual(Object.keys(RGB_LOCALITIES).filter(followsTrigger), ["RGB_KEY_HALF", "RGB_KEYS_ONLY"]);
+    assert.equal(followsTrigger(undefined), false);
 });
 
 test("the trackball is drawn at its own size, clear of the keys around it", () => {
@@ -79,42 +95,92 @@ test("the key face drops its legend by how many rows sit above it", () => {
     assert.ok(dual.subY < GEO.keyH, "and the hold legend stays on the cap");
 });
 
-test("a legend is sized to its row rather than bucketed by length", () => {
-    const row = {max: 12, min: 7, width: 48};
-    assert.deepEqual(fitText("Esc", row), {size: 12, squeeze: 0}, "a short legend takes the full size");
-    assert.deepEqual(fitText("Tab", row).size, 12, "and so does another of the same width");
-
-    const long = fitText("Left Control", row);
-    assert.ok(long.size < 12 && long.size >= 7, "a long one shrinks to fit instead of changing face");
-    assert.equal(long.squeeze, 48, "and is compressed into the row it was given");
-
-    // Wider glyphs shrink further than narrow ones of the same count, which a
-    // rule counting characters cannot tell apart.
-    assert.ok(fitText("MMMMMMMM", row).size < fitText("iiiiiiii", row).size);
-    assert.equal(fitText("", row).size, 12, "an empty legend has nothing to fit");
-    assert.equal(fitText("Left Control", {max: 12, min: 11, width: 48}).size, 11, "the floor holds");
+test("a row of icons sits under the legend, above the line on a key with one, and the legend rises to make room", () => {
+    for (const tiers of [false, true]) for (const combos of [false, true]) for (const sub of [false, true]) {
+        const plain = keyFaceRows(0, {tiers, combos, sub});
+        const rows = keyFaceRows(0, {tiers, combos, sub, icons: true});
+        const what = JSON.stringify({tiers, combos, sub});
+        assert.equal(plain.iconY, undefined, `${what}: no icons, no row for them`);
+        assert.ok(rows.iconY !== undefined && rows.iconY + rows.iconSize < GEO.keyH, `${what}: the icons stay on the cap`);
+        assert.deepEqual([rows.tierY, rows.comboY], [plain.tierY, plain.comboY], `${what}: the rows above stay where they were`);
+        assert.ok(rows.mainY < plain.mainY && rows.mainY < rows.iconY, `${what}: the legend rises, and the icons sit under it`);
+        if (sub) {
+            assert.ok(rows.iconY + rows.iconSize < rows.separatorY && rows.separatorY < rows.subY, `${what}: tap, icons, rule, hold, in that order`);
+            assert.deepEqual([rows.separatorY, rows.subY], [plain.separatorY, plain.subY], `${what}: the rule and the hold stay where they were`);
+        }
+    }
 });
 
-test("a legend alone on its cap never shrinks past the legible floor: a long one takes two lines", () => {
-    const row = {max: 12, width: GEO.keyW - 10};
-    assert.deepEqual(fitLegend("Esc", row), {size: 12, lines: [{text: "Esc", squeeze: 0}]}, "a short legend is one line at full size");
-    const shift = fitLegend("Left Shift", row);
-    assert.equal(shift.lines.length, 1, "one that fits at the floor stays on one line");
-    assert.ok(shift.size >= LEGEND_MIN && shift.size < 12);
+const ROOM = GEO.keyW - 10;
+const texts = (legend) => legend.lines.map((line) => line.text);
 
-    const slot = fitLegend("Slot 6 · hold (empty)", row);
-    assert.deepEqual(slot.lines.map((line) => line.text), ["Slot 6", "hold (empty)"], "broken where the separator was, which the break replaces");
-    assert.ok(slot.size >= LEGEND_MIN, "and drawn no smaller than the floor");
-    assert.deepEqual(fitLegend("Custom key 0", row).lines.map((line) => line.text), ["Custom", "key 0"], "the longer line comes out shortest");
-    for (const name of ["Slot 20 · lock (empty)", "Dragscroll · hold", "Left Command", "Custom key 127"]) {
-        const fit = fitLegend(name, row);
-        assert.ok(fit.size >= LEGEND_MIN, `${name}: at least the floor`);
-        assert.equal(fit.lines.map((line) => line.text).join(" ").replace(/ /g, ""), name.replace(/ · /g, " ").replace(/ /g, ""), `${name}: every word kept`);
+test("a legend is drawn at one of two sizes: a single character large, every name at the word size", () => {
+    for (const glyph of ["A", "1", "/", "▽", ";"]) assert.equal(setLegend(glyph, {room: ROOM, twoLines: true}).size, LEGEND_SIZES.glyph, glyph);
+    for (const name of ["Esc", "Tab", "Del", "F12", "Enter", "Left Shift", "Left Ctrl", "Backspace", "Command+Q", "Macro 0"]) {
+        assert.equal(setLegend(name, {room: ROOM, twoLines: true}).size, LEGEND_SIZES.word, `${name}: a name is a word, however short`);
     }
-    const word = fitLegend("Supercalifragilistic", row);
-    assert.equal(word.lines.length, 1, "a single word has nowhere to break");
-    assert.equal(word.size, LEGEND_MIN);
-    assert.equal(word.lines[0].squeeze, row.width, "so it is compressed into the row at the floor");
+    // Over a line the tap is set the same way.
+    assert.equal(setLegend("F", {room: GEO.keyW - 12, twoLines: false}).size, LEGEND_SIZES.glyph);
+    assert.equal(setLegend("Spacebar", {room: GEO.keyW - 12, twoLines: false}).size, LEGEND_SIZES.word);
+});
+
+test("a name of two or more words takes two lines, so whether a key wraps never depends on its width", () => {
+    // Left and Right of a pair always read alike, as do short and long names.
+    for (const [name, lines] of [["Left Thumb", ["Left", "Thumb"]], ["Right Thumb", ["Right", "Thumb"]], ["Left Ctrl", ["Left", "Ctrl"]],
+        ["Right Option", ["Right", "Option"]], ["OCR Copy", ["OCR", "Copy"]], ["VS Code Run Task", ["VS Code", "Run Task"]]]) {
+        assert.deepEqual(texts(setLegend(name, {room: ROOM, twoLines: true})), lines, name);
+    }
+    assert.deepEqual(texts(setLegend("Backspace", {room: ROOM, twoLines: true})), ["Backspace"], "one word stays one line");
+    assert.deepEqual(legendBreak("Pointing mode 6 · hold (empty)"), ["Pointing mode 6", "hold (empty)"], "a name joined by a · breaks there");
+    assert.deepEqual(legendBreak("Custom key 0"), ["Custom", "key 0"], "a number stays with its word");
+    assert.equal(legendBreak("Macro 0"), null, "a word and its number do not break");
+    assert.deepEqual(legendBreak("Layer 1 Toggle"), ["Layer 1", "Toggle"], "a number is never the start of a line");
+    assert.deepEqual(legendBreak("1 Password Fill"), ["1 Password", "Fill"], "nor a line of its own");
+    assert.deepEqual(legendBreak("Back / Forward · hold · tap"), ["Back / Forward", "hold · tap"], "with several dots it breaks at one, the dot dropped");
+    assert.equal(legendBreak("Spacebar"), null);
+    // A tap over a line keeps one line: the hold has the room under it.
+    assert.deepEqual(texts(setLegend("Left Thumb", {room: GEO.keyW - 12, twoLines: false})), ["Left Thumb"]);
+});
+
+test("a line too wide is condensed at its size before the legend steps down, and every word is kept", () => {
+    // A measure that makes each character exactly as wide as its size.
+    const square = (text, size) => [...text].length * size;
+    const fits = Math.floor(ROOM / LEGEND_SIZES.word);
+    assert.deepEqual(setLegend("x".repeat(fits), {room: ROOM, twoLines: true}, square).lines[0].squeeze, 0, "a line that fits runs at its width");
+    const condensed = setLegend("x".repeat(fits + 1), {room: ROOM, twoLines: true}, square);
+    assert.equal(condensed.size, LEGEND_SIZES.word, "a little too wide keeps the word size");
+    assert.equal(condensed.lines[0].squeeze, ROOM, "and is condensed into the row");
+    const stepped = setLegend("x".repeat(Math.ceil(ROOM / LEGEND_CONDENSE / LEGEND_SIZES.word) + 1), {room: ROOM, twoLines: true}, square);
+    assert.equal(stepped.size, LEGEND_SIZES.step, "past what condensing allows, the legend steps down");
+    const long = setLegend("Supercalifragilisticexpialidocious", {room: ROOM, twoLines: true});
+    assert.equal(long.size, LEGEND_SIZES.step, "one size down is the floor");
+    assert.equal(long.lines[0].squeeze, ROOM, "past it, the line is condensed into the row");
+    assert.deepEqual(texts(long), ["Supercalifragilisticexpialidocious"], "never cut");
+});
+
+test("every legend stays on its cap, between the rows above it and the icons, line or hold below it", () => {
+    const y = 100;
+    const names = ["A", "Esc", "Left Command", "Pointing mode 20 · lock (empty)", "VS Code Preview MD", "Supercalifragilisticexpialidocious"];
+    const sizes = new Set();
+    for (const tiers of [false, true]) for (const combos of [false, true]) for (const icons of [false, true]) for (const sub of ["", "Navigation"]) for (const main of names) {
+        const rows = keyFaceRows(y, {tiers, combos, sub: Boolean(sub), icons});
+        const legend = keyLegends(rows, {main, sub});
+        const what = `${main}${sub ? ` / ${sub}` : ""} (tiers ${tiers}, combos ${combos}, icons ${icons})`;
+        sizes.add(legend.size);
+        const top = Math.max(y, rows.comboY !== undefined ? rows.comboY + rows.comboHeight : rows.tierY !== undefined ? rows.tierY + 3.9 : y);
+        const bottom = Math.min(y + GEO.keyH, rows.iconY ?? Infinity, rows.separatorY ?? Infinity);
+        // A line's letters stand about 0.72 of its size tall about its middle.
+        for (const line of legend.lines) {
+            assert.ok(line.y - legend.size * 0.36 >= top - 0.5 && line.y + legend.size * 0.36 <= bottom + 0.5, `${what}: "${line.text}" stays in its band`);
+            assert.ok((line.squeeze || estimateWidth(line.text, legend.size, 400)) <= GEO.keyW - 10 + 0.01, `${what}: "${line.text}" stays across the cap`);
+        }
+        if (sub) assert.equal(legend.sub?.size, LEGEND_SIZES.hold, `${what}: the hold is one size`);
+        if (sub) assert.equal(legend.sub?.squeeze, 0, `${what}: a hold that fits runs at its width`);
+    }
+    assert.deepEqual([...sizes].sort((a, b) => a - b), [LEGEND_SIZES.step, LEGEND_SIZES.word, LEGEND_SIZES.glyph], "the scale is every size a legend takes");
+    const long = keyLegends(keyFaceRows(y, {sub: true}), {main: "F", sub: "Navigation Extra Media Numbers"});
+    assert.equal(long.sub?.size, LEGEND_SIZES.hold, "a hold too long keeps its size");
+    assert.equal(long.sub?.squeeze, GEO.keyW - 12, "and is condensed into the row under the line");
 });
 
 test("the board outline draws every key and the trackball", () => {

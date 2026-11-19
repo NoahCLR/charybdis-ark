@@ -22,11 +22,11 @@ Apply reaches both halves is the
 A half runs one active profile: its working copy when it has unsaved edits,
 otherwise its saved profile, otherwise its compiled defaults. A client writes
 the profile only through Profile Wire; VIA is not built (D-F31,
-[`0031`](https://github.com/NoahCLR/charybdis-4x6/blob/44d66892f37bf14d9f6b7c25bcc4a2f20c4aa72e/docs/adr/0031-via-is-not-supported.md)).
+[`0031`](https://github.com/NoahCLR/charybdis-4x6/blob/ac42a7231376ac108149a378cb6feae98e3708a2/docs/adr/0031-via-is-not-supported.md)).
 
 At boot a half runs the saved profile [boot selection](#boot-selection)
 chooses; a working copy never survives a replug or a restart (D-F32,
-[`0032`](https://github.com/NoahCLR/charybdis-4x6/blob/44d66892f37bf14d9f6b7c25bcc4a2f20c4aa72e/docs/adr/0032-live-edits-working-copy-and-save.md);
+[`0032`](https://github.com/NoahCLR/charybdis-4x6/blob/ac42a7231376ac108149a378cb6feae98e3708a2/docs/adr/0032-live-edits-working-copy-and-save.md);
 [live edits](profile-wire-v1/live-edits.md#the-working-copy)). The halves then
 compare their saved generations ([split protocol](profile-split-v1.md#authority)).
 
@@ -63,12 +63,14 @@ Held by: `tests/host/run_profile_owner_tests.sh` (`profile_owner_test.c`, `test_
 
 ## Profile domains
 
-A profile is up to seven domains, one per [domain registry](profile-wire-v1/blob-and-digests.md#domain-registry)
-row: lighting, key behaviours, combos, settings, pointing slots, the keymap
-and the macros (D-F30,
-[`0030`](https://github.com/NoahCLR/charybdis-4x6/blob/44d66892f37bf14d9f6b7c25bcc4a2f20c4aa72e/docs/adr/0030-keymap-and-macros-belong-to-the-profile.md)). The
-keymap and macro domains are the only copy of the layout and the macros the
-firmware keeps.
+A profile is up to eight domains, one per [domain registry](profile-wire-v1/blob-and-digests.md#domain-registry)
+row: lighting, key behaviours, combos, settings, pointing slots, the keymap,
+the macros (D-F30,
+[`0030`](https://github.com/NoahCLR/charybdis-4x6/blob/ac42a7231376ac108149a378cb6feae98e3708a2/docs/adr/0030-keymap-and-macros-belong-to-the-profile.md)) and the
+autocorrect list (D-F68,
+[`0068`](https://github.com/NoahCLR/charybdis-4x6/blob/ac42a7231376ac108149a378cb6feae98e3708a2/docs/adr/0068-the-autocorrect-list-is-a-readable-profile-domain.md)).
+The keymap and macro domains are the only copy of the layout and the macros
+the firmware keeps.
 
 A build admits:
 
@@ -87,16 +89,17 @@ means: [lighting](rgb-domain-v1.md),
 [combos](profile-wire-v1/combo-domain.md),
 [settings](profile-wire-v1/settings-domain.md#compiled-defaults),
 [keymap](profile-wire-v1/keymap-domain.md#absent-domain-and-compiled-defaults),
-[macros](profile-wire-v1/macro-domain.md#absent-domain-and-compiled-defaults).
+[macros](profile-wire-v1/macro-domain.md#absent-domain-and-compiled-defaults),
+[autocorrect list](profile-wire-v1/autocorrect-domain.md#absent-domain-and-compiled-defaults).
 
 Held by: `tests/host/run_profile_validator_v1_tests.sh` (`profile_validator_v1_test.c`, `test_identity_capacity_and_masks`), `tests/fixtures/profile_validator_v1.fixture`, `tests/host/run_profile_compiled_defaults_v1_tests.sh` (`profile_compiled_defaults_v1_test.c`, `test_real_authored_profile`, the build's compatibility), `tests/host/run_profile_keymap_macros_runtime_tests.sh` (`profile_keymap_macros_runtime_test.c`, compiled fallback).
 
 ## Current-format admission
 
 The firmware accepts only the formats it writes (D-F10,
-[`0010`](https://github.com/NoahCLR/charybdis-4x6/blob/44d66892f37bf14d9f6b7c25bcc4a2f20c4aa72e/docs/adr/0010-firmware-accepts-only-current-formats.md)): Profile
-Wire 2.0, profile schema 4.3, each domain at its registry version, and store
-format 6 (D-F28, [`0028`](https://github.com/NoahCLR/charybdis-4x6/blob/44d66892f37bf14d9f6b7c25bcc4a2f20c4aa72e/docs/adr/0028-new-base-32-bit-profile-lengths.md)).
+[`0010`](https://github.com/NoahCLR/charybdis-4x6/blob/ac42a7231376ac108149a378cb6feae98e3708a2/docs/adr/0010-firmware-accepts-only-current-formats.md)): Profile
+Wire 2.2, profile schema 4.8, each domain at its registry version, and store
+format 6 (D-F28, [`0028`](https://github.com/NoahCLR/charybdis-4x6/blob/ac42a7231376ac108149a378cb6feae98e3708a2/docs/adr/0028-new-base-32-bit-profile-lengths.md)).
 Nothing in another format is translated:
 
 - a candidate or backup in another schema or domain version is refused
@@ -108,12 +111,12 @@ Nothing in another format is translated:
   the flag clears once a profile is saved.
 
 A saved record is bound to the build that wrote it by its compiled-default
-and action-ABI digests. The action-ABI digest includes the firmware version
-and the layer count ([action-ABI digest](profile-wire-v1/blob-and-digests.md#action-abi-digest)),
+and action-ABI digests. The action-ABI digest includes the schema major and minor and the
+layer count, never the firmware version ([action-ABI digest](profile-wire-v1/blob-and-digests.md#action-abi-digest)),
 and the compiled-default digest every byte of the compiled defaults, so after
 a reflash that changes either, the saved profile is not used and the half
 runs its compiled defaults until a client restores one (D-F12,
-[`0012`](https://github.com/NoahCLR/charybdis-4x6/blob/44d66892f37bf14d9f6b7c25bcc4a2f20c4aa72e/docs/adr/0012-one-complete-compiled-profile.md)). The slots survive a
+[`0012`](https://github.com/NoahCLR/charybdis-4x6/blob/ac42a7231376ac108149a378cb6feae98e3708a2/docs/adr/0012-one-complete-compiled-profile.md)). The slots survive a
 UF2 update, which writes only the firmware image.
 
 Every candidate a client sends, and every live edit, is held to where its
@@ -131,7 +134,7 @@ order, behind an eight-byte blob header. A domain's length is exactly what
 its encoder emits; an encoder that emits nothing leaves its domain out of
 that build's compiled defaults. Each registry row names the module whose
 encoder writes it, so a row without one does not compile (D-F13,
-[`0013`](https://github.com/NoahCLR/charybdis-4x6/blob/44d66892f37bf14d9f6b7c25bcc4a2f20c4aa72e/docs/adr/0013-registry-row-names-its-domain-module.md)). The authored
+[`0013`](https://github.com/NoahCLR/charybdis-4x6/blob/ac42a7231376ac108149a378cb6feae98e3708a2/docs/adr/0013-registry-row-names-its-domain-module.md)). The authored
 macros are already in the macro bank encoding (`authored_macro_bank.h`), so
 writing the compiled defaults compiles no macro.
 
@@ -167,7 +170,7 @@ Held by: `tests/host/run_profile_compiled_defaults_v1_tests.sh` (`profile_compil
 
 Each half keeps its saved profile in two profile slots, A and B, in a fixed
 256 KiB region of its own flash, outside QMK's emulated EEPROM (D-F29,
-[`0029`](https://github.com/NoahCLR/charybdis-4x6/blob/44d66892f37bf14d9f6b7c25bcc4a2f20c4aa72e/docs/adr/0029-profile-slots-in-their-own-flash-region.md)). A slot is
+[`0029`](https://github.com/NoahCLR/charybdis-4x6/blob/ac42a7231376ac108149a378cb6feae98e3708a2/docs/adr/0029-profile-slots-in-their-own-flash-region.md)). A slot is
 read in place through XIP; no RAM copy of a slot exists. The build assumes
 2 MiB of flash.
 
@@ -205,7 +208,7 @@ byte 36. Integers are little-endian.
 
 | Offset | Size | Field |
 | ---: | ---: | --- |
-| 0 | 1 | domain mask, one bit per registry row; bit 7 zero |
+| 0 | 1 | domain mask, one bit per registry row |
 | 1 | 4 | payload length, uint32, `8..130,048` |
 | 5 | 1 | flags: bit 0 origin half, bit 1 override; other bits zero |
 | 6 | 4 | generation, nonzero |
@@ -219,9 +222,11 @@ byte 36. Integers are little-endian.
 The format is keyed into the header, which has no magic: the CRC16 is
 CRC-16/CCITT (polynomial `0x1021`, initial `0xFFFF`, not reflected, no final
 XOR) over the store format byte `6` followed by bytes 0–32. The schema is
-implied by the format: the firmware's own, 4.3. A record an earlier firmware
+implied by the format: the firmware's own, 4.8. A record an earlier firmware
 wrote under format 6 with schema 4.0, 4.1 or 4.2 holds earlier domain versions, so
-its validation refuses it (D-F62, D-F26); the payload digest is not stored and is computed
+its validation refuses it (D-F62, D-F26), and one written with schema 4.3 to
+4.7 says so in its blob header, which is refused `INCOMPATIBLE_SCHEMA` (D-F68,
+D-F70, D-F71, D-F72, D-F73); the payload digest is not stored and is computed
 from the payload whenever it is read whole. The origin half is the physical
 half that made the generation ([split protocol](profile-split-v1.md#physical-origin)).
 
@@ -268,8 +273,8 @@ new one's marker is committed. The store admits a candidate only when:
 - boot selection has run, found no generation conflict, and no final marker
   waits to be confirmed;
 - no other save is open;
-- it is format 6, schema 4.3, `8..130,048` bytes, with only known domain-mask
-  and flag bits and origin 0 or 1;
+- it is format 6, schema 4.8, `8..130,048` bytes, with only known flag bits
+  and origin 0 or 1 (every domain-mask bit names a domain, D-F68);
 - its action-ABI and compiled-default digests are the build's;
 - its generation is strictly greater than the saved one.
 
@@ -418,17 +423,18 @@ Held by: `tests/host/run_qmk_durable_io_tests.sh` (`qmk_durable_io_test.c`, `tes
 
 ## Ceilings and the maximum profile
 
-Every ceiling holds at once (D-F14, [`0014`](https://github.com/NoahCLR/charybdis-4x6/blob/44d66892f37bf14d9f6b7c25bcc4a2f20c4aa72e/docs/adr/0014-bigger-profiles.md)):
+Every ceiling holds at once (D-F14, [`0014`](https://github.com/NoahCLR/charybdis-4x6/blob/ac42a7231376ac108149a378cb6feae98e3708a2/docs/adr/0014-bigger-profiles.md)):
 
 | Surface | Ceiling |
 | --- | ---: |
 | Layers | 16 |
 | Behaviours / branches per behaviour / branches in all | 128 / tap depth `d` (5) / `128 × d` (640) |
 | Combos / inputs per combo | 128 / 2–16 |
-| Macros / macro bank | 128 / 34,903 bytes |
+| Macros / macro bank (D-F76) | 128 / 40,960 bytes |
+| Autocorrect corrections / typos / bytes in one typo / in one text correction / text in all / the domain | 1,024 / 1,024 / 32 / 128 / 20,480 / 36,874 bytes |
 | Custom keys | 128 |
 | Names | 32 bytes of UTF-8 each |
-| Reusable lighting groups / stage-group rows | 16 / 32 |
+| Reusable lighting groups / group rows in one table / in all (D-F63) | 128 / 255 / 640 |
 | Physical LEDs / LED bitmap | 58 / 8 bytes |
 | Pointing slots | 32 |
 | Key-behaviour and lighting domains | 65,535 bytes each (16-bit internal offsets) |
@@ -436,23 +442,26 @@ Every ceiling holds at once (D-F14, [`0014`](https://github.com/NoahCLR/charybdi
 
 `tests/fixtures/maximum_profile_v4.fixture`, written by
 `tests/host/make_maximum_profile.py` from the byte specs, holds every table
-at its ceiling and every name at 32 bytes, in 75,825 bytes:
+at its ceiling and every name at 32 bytes, in 122,840 bytes:
 
 | Domain | Bytes |
 | --- | ---: |
-| Lighting `0x10` | 591 |
+| Lighting `0x10` | 4,661 |
 | Key behaviours `0x20` | 13,828 |
 | Combos `0x30` | 9,736 |
-| Settings `0x40` | 10,693 |
+| Settings `0x40` | 10,701 |
 | Pointing `0x50` | 4,104 |
 | Keymap `0x60` | 1,920 |
-| Macros `0x70` | 34,903 |
-| Blob header and seven envelopes | 50 |
+| Macros `0x70` | 40,960 |
+| Autocorrect list `0x80` | 36,874 |
+| Blob header and eight envelopes | 56 |
 
-The generator reads the payload ceiling from the storage layout and refuses a
-fixture that does not leave 12,288 bytes below it, the reserve for later
-additions. The fixture is the maximum for these encodings, not a separate
-limit: a larger profile is refused by a table's ceiling or the payload
+That leaves 7,208 bytes below the 130,048-byte payload ceiling. The
+generator reads the payload ceiling from the storage layout and refuses a
+fixture that does not leave 7,168 bytes below it, the reserve for later
+additions (D-F76), so 40 bytes remain before a domain's ceiling could be
+raised into that reserve. The fixture is the maximum for these encodings,
+not a separate limit: a larger profile is refused by a table's ceiling or the payload
 ceiling. The firmware saves, boots, publishes and copies it to the other
 half, and refuses over-limit and truncated copies of it.
 

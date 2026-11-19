@@ -4,11 +4,12 @@
 
 import {el, esc} from "../../lib/dom.mjs";
 import {tabReach} from "../../view/tab-reach.mjs";
-import {mappedKeyCount} from "../../view/lighting.mjs";
 import {currentLayer, currentView, getModel, render, selectedPosition, state} from "../../store.mjs";
 import {draftDot, draftMarks} from "../../view/review.mjs";
 import {keepInView} from "../layerbar.mjs";
+import {masterOffBanner, underBanner} from "../participation.mjs";
 import {rovingTabs} from "../../lib/tabs.mjs";
+import {benchHeightWith} from "../../lib/scroll.mjs";
 import {behaviourEditorRow} from "../../view/behavior-editor.mjs";
 import {behaviourEditor} from "./behaviour-editor.mjs";
 import {behaviourKey, selectBehaviourKey} from "./behaviour-selection.mjs";
@@ -32,18 +33,20 @@ const TABS = [
 export function bench() {
     const model = getModel();
     const view = currentView();
-    const layer = currentLayer();
     /** @type {Record<string, string>} */
-    const counts = Object.fromEntries(TABS.map(({id}) => [id, String(id === "key" ? mappedKeyCount(model, layer) : tabReach(view, id).count)]));
+    // The Key tab carries no count: beside the other tabs' counts a number
+    // there read as a key number, and the layer's mapped keys are counted
+    // where layers are listed, in Rename & reorder.
+    const counts = Object.fromEntries(TABS.filter(({id}) => id !== "key").map(({id}) => [id, String(tabReach(view, id).count)]));
     // A tab whose list holds something the draft changed says so.
     const marks = draftMarks(model?.draft?.changes);
     /** @type {Record<string, boolean>} */
     const drafted = {key: Boolean(marks.keys.get(currentLayer()?.index)?.has(state.selected)), behaviours: marks.behaviours.size > 0,
         combos: marks.combos.size > 0, macros: marks.macros.size > 0, customKeys: marks.customKeys.size > 0, pointing: marks.pointing.size > 0};
-    const node = el(`<div class="card bench keys-bench">
+    const node = el(`<div class="card bench keys-bench workbench">
         <div class="bench-tabs"><div class="bench-tablist" role="tablist" aria-label="Workbench">
             ${TABS.map((tab) => `<button role="tab" id="bench-tab-${tab.id}" data-tab="${tab.id}" aria-selected="${state.tab === tab.id}">
-                <span class="tab-label">${tab.label}</span><span class="c">${esc(counts[tab.id])}</span>${drafted[tab.id] ? draftDot() : ""}</button>`).join("")}</div>
+                <span class="tab-label">${tab.label}</span>${tab.id in counts ? `<span class="c">${esc(counts[tab.id])}</span>` : ""}${drafted[tab.id] ? draftDot(model?.draft) : ""}</button>`).join("")}</div>
             <span class="bench-right" id="benchRight"></span>
         </div>
         <div class="bench-body" id="benchBody"></div>
@@ -63,22 +66,18 @@ export function bench() {
 }
 
 // The Behaviours tab sets the workbench's height for every tab, so switching
-// tabs never moves what is under it. Once the screen is on the page, the
-// editor the Behaviours tab would show is laid out unseen behind the open
-// tab, in the same column (styles.css, .bench-sizer); the workbench's height
-// is read and the copy taken away again before anything else runs, so the
-// page never holds a second editor. The workbench keeps that height.
+// tabs never moves what is under it: once the screen is on the page, the
+// workbench takes its height with the editor the Behaviours tab would show
+// (benchHeightWith).
 /** @param {ParentNode} root */
 export function matchBehavioursHeight(root) {
     const bench = /** @type {HTMLElement | null} */ (root.querySelector(".keys-bench"));
-    const body = bench?.querySelector(".bench-body");
-    if (!bench || !body || state.tab === "behaviours") return;
+    if (!bench || state.tab === "behaviours") return;
     const behaviour = behaviourEditorRow(getModel(), state.behaviourRow || behaviourKey(selectedPosition()?.layoutIndex).keycode || "");
     if (!behaviour) return;
-    const sizer = el(`<div class="tab-split reach-split bench-sizer" aria-hidden="true" inert><div></div><div></div></div>`);
+    // Its list is an empty pane: as tall as the editor beside it, or, where
+    // the list stacks over the editor, the pane's own height.
+    const sizer = el(`<div class="tab-split reach-split"><div class="bench-pane"></div><div></div></div>`);
     /** @type {HTMLElement} */ (sizer.lastElementChild).appendChild(behaviourEditor(behaviour));
-    body.appendChild(sizer);
-    const height = bench.getBoundingClientRect().height;
-    sizer.remove();
-    bench.style.minHeight = `${height}px`;
+    bench.style.minHeight = `${benchHeightWith(bench, underBanner(masterOffBanner("behaviour"), sizer))}px`;
 }

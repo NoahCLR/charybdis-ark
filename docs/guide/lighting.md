@@ -2,7 +2,11 @@
 
 The **Lighting** screen sets what the keyboard lights, and when. The board on
 screen is painted the way the keyboard will light up with your draft, for the
-layer you pick under it.
+layer you pick under it, and numbers each key by its LED for
+[accents](#accents). Nothing on it is frosted as on the Keymap: a
+transparent key, or one answered from a layer below, shows the light the
+keyboard does, as solid as any other. The **ⓘ** on its top-right corner lists
+the board's shortcuts on the tab shown, as on the Keymap.
 
 ## All lighting and the idle timeout
 
@@ -16,70 +20,119 @@ Beside the title:
 
 ## Stages
 
-Lighting is painted in six stages, each over the one before it:
+Lighting is painted in seven stages, each over the one before it:
 
 1. **Background effect**
 2. **Layer colours**
 3. **Auto-mouse fade**
 4. **Pointing modes**
 5. **Combo feedback**
-6. **Key feedback**
+6. **Behaviour feedback**
+7. **Replacement feedback**
 
-Each stage's tab shows the colour it paints. Stages 2 to 6 have a **Stage
-on** switch, which turns the whole stage off without losing its colours. A
-stage that paints nothing right now is drawn off and says why.
+Each stage's tab shows the colour it paints for what it has picked: hatched
+when that colour is passthrough, dark and struck through when it is off, and
+hollow while the stage paints nothing. In a narrow window the tabs read by a
+short word (**Background**, **Layers**, **Auto-mouse**, **Pointing**,
+**Combos**, **Behaviours**, **Replacement**).
+
+Every stage is laid out the same way, so switching tabs moves nothing they
+share. Across its top, the **stage bar** holds what is the whole stage's:
+
+- its name, and behind its **ⓘ** what the stage does and what the board
+  shows of it;
+- the settings every item on the stage shares, under **Every behaviour
+  state** or **Every case**, or a line saying what is each item's own;
+- when a switch elsewhere keeps the stage from painting, or All lighting is
+  off, a word saying so, the bar tinted; click it to go to that switch;
+- for stages 2 to 7, the **Stage on** switch at its end, which turns the
+  whole stage off without losing its colours.
+
+Under the bar sits the stage's list, or its own settings, then its colour
+beside **Where it paints**, then its accents. On a stage with a list, the
+item picked heads its colour, where it paints and its accents, which are its
+alone, with a line saying where it paints, or, for a feedback case, when it
+shows. The **ⓘ** beside a heading says
+what that section's choices mean.
 
 ### Colours
 
 Every stage uses the same colour editor: drag in the square and along the
-**Hue** strip, or type **H**, **S** and **V**. Brightness stops at the limit
-the keyboard reports.
+**Hue** strip, or type **Hue**, **Saturation** and **Brightness**. Brightness stops at the limit
+the keyboard reports. A colour brighter than that, such as one in a backup
+from another keyboard, is a blocker in Review naming its stage and colour.
+Lower it in Lighting, where the blocker opens its stage; the rest of the
+profile stays editable meanwhile, and Ark sends nothing to the keyboard until
+every such colour is within the limit. That needs a draft that waits in Ark.
+In **Live edit** and **Live preview + save** every edit goes to the keyboard
+at once, so Ark does not take such a backup as the draft there: it says **Not
+sent**, and to choose **Review and save** under **Edits** first
+([edit modes](review-and-save.md#edit-modes)).
 
-**Turn off** stores HSV(0, 0, 0), and the colour then reads **Off**; what
-that does depends on the stage. A
-layer with no colour paints nothing, so what is underneath shows through, and
-an LED row with none takes its stage's colour. Everywhere else black is
-black: a pointing mode, combo feedback or a key feedback colour turned off
-paints its area black while it runs, and the auto-mouse fade ends on black.
-To paint nothing there, switch the tab's **Stage on** off. A colour with
-brightness at zero but some hue and saturation also paints black, and keeps
-its hue and saturation for when you raise the brightness again.
+A colour a layer, a pointing mode, combo feedback or a feedback case has is
+one of three, chosen beside its value:
+
+- **Colour**: the colour set in the square. From Off it brings back the hue
+  and saturation Off kept; from Passthrough it starts from a fresh one.
+- **Passthrough** stores HSV(0, 0, 0), and the colour reads
+  **Passthrough**: it paints nothing, so what is underneath shows through.
+  The square and fields stay where they are, dimmed under a note saying what
+  shows.
+  The other modes and cases still light, and so do its accents in a colour
+  of their own. Any colour with saturation and brightness at zero is
+  passthrough, whatever its hue, and the lists say **passthrough** beside
+  it.
+- **Off** stores brightness zero with some saturation: its LEDs go dark,
+  covering what is underneath. The lists say **off** beside it. A colour with
+  brightness at zero but some saturation is off, and keeps its hue and
+  saturation, still editable, for when you raise the brightness again.
+
+The auto-mouse fade's end colour is the exception: it is **Colour** or
+**Off**, and Off stores HSV(0, 0, 0), so the fade ends with the LEDs off. The
+background effect has neither; at HSV(0, 0, 0) it offers **Give it a
+colour**.
 
 ### Background effect
 
-QMK's own effect, drawn first, under everything else. A layer with no colour
+QMK's own effect, drawn first, under everything else. A passthrough layer
 shows it.
 
+- **Effect**: the effects this keyboard has, and **Animation speed**, which
+  effects without animation ignore.
 - **Colour**: solid colour shows it as it is; most animated effects build on
   it.
-- **Effect**: the effects this keyboard has.
-- **LEDs**: which LEDs the effect lights: all, none, modifiers, keys, or
-  modifiers and keys. Layer colours and feedback can paint any LED.
-- **Animation speed**: effects without animation ignore it.
+- **Where it paints**: **LEDs**, which LEDs the effect lights: all, none,
+  modifiers, keys, or modifiers and keys. Layer colours and feedback can paint
+  any LED.
 
 ### Layer colours
 
 Pick a layer in the list to give it a colour; the
 [empty layers](board-and-layers.md#empty-layers) are folded at its end, and
-one with a colour is not empty. **Which keys light up**: **Keys
+one with a colour is not empty. Under **Where it paints**, **Which LEDs light
+up**, the layer's own: **Keys
 mapped on this layer only** leaves the keys that are transparent or empty on
-the layer unpainted, so what is beneath shows there; **All keys** paints
-every key. Transparent keys keep their ▽ on the board either way. A layer with
-no colour shows the background effect; **Give it a colour** adds one.
+the layer unpainted, so what is beneath shows there; **All LEDs** paints
+every LED, the trackball's included. Transparent keys keep their ▽ on the board either way. A
+passthrough layer shows the background effect, and the list says
+**passthrough** for it; **Colour** gives it one.
 
 ### Auto-mouse fade
 
 How the pointer layer's light fades when auto-mouse turns it off:
 
 - **Fade mode**: follow the real destination, or fade to an **End colour**
-  where the background effect would show, or on all keys.
+  where the background effect would show, or on all LEDs. Following the real
+  destination uses no end colour, so it is drawn dimmed.
 - **Hold before fading**: how much of the auto-mouse timeout the colour holds
   before it fades. The timeout itself is on
   [Pointer settings](pointing.md#pointer-settings), and changing it keeps this
   share.
 
 The board shows where the fade lands, not the animation. With auto-mouse off,
-this stage paints nothing.
+this stage paints nothing: its tab reads off, and its stage bar says
+**Auto-mouse is off**. Its controls stay editable. Click those words to go to
+the **Auto-mouse** switch.
 
 ### Pointing modes
 
@@ -88,9 +141,12 @@ A mode linked to layers paints beneath the lowest of them that is on instead
 (a layer that starts it or one its key turns on),
 however the mode started: those layers' own colours show over it, and higher
 layers cover both (see [Pointing](pointing.md#3-what-starts-it)). Pick a mode,
-give it a colour, and choose where it paints:
+give it a colour, and choose where it paints. The empty slots are folded at
+the list's end, as the empty layers are in Layer colours: click the **Empty
+slots** band to show them.
 
-- **Both halves**, **Left half** or **Right half**: that area, whichever key
+- **All LEDs**, **Left half** or **Right half**: every LED on the keyboard,
+  the trackball's included, or one half's, whichever key
   started the mode.
 - **The half holding the trigger key**: the whole half the key that started
   the mode is on, that key included; both halves when a combo's keys span
@@ -99,50 +155,252 @@ give it a colour, and choose where it paints:
   of the combo that did.
 
 A mode with no known trigger key paints every key under the last two.
-**Preview it active on the board** shows it as it paints with no linked
-layer on.
+While this tab is open, the board shows the picked mode running, with its
+accents, and when a layer it is linked to is on there, beneath the lowest
+such layer, as the keyboard paints it. When two pointing slots are
+swapped on the Pointing modes screen, each mode's colour and accents go with
+it (see [Pointing modes](pointing.md#pointing-modes)).
 
 ### Combo feedback
 
-The colour a combo's keys wear while you hold them, and where it paints. The
-combo badges on the board take their outline from it.
+The colour a combo's keys wear while you hold them, and where it paints: one
+colour, place and set of accents for every combo, headed **Every combo**. The
+combo badges on the board take their outline from it. While this tab is open,
+the board shows one combo held, with its accents. The list on the left picks
+which combo that is, never what you edit: the one held has a ring round its
+badge. It shows
+the combos that fire on the layer shown, with the layers previewed under it,
+as the Keymap's **Combos** tab lists them **On this view**, in two groups:
+**Combo feedback**, the combos that light this colour, then **Hold a layer**,
+the combos whose output holds a layer (MO, TT, OSL, LM, LT, or a custom key
+whose shortcut holds layers) and so show that layer's light instead.
+The first is held until you pick another. The keys that press it are ringed as on
+the Keymap, and the ones holding it get the solid ring. Where an input is on
+more than one key (two Backspace keys), it is held from the half its other
+keys are on; click another ringed key to hold it from there instead, since
+the half it lights follows the keys you press. A combo whose output holds a
+layer shows no combo light: the board turns that layer on instead, since the
+layer's own light shows the hold. A combo whose output runs a pointing mode
+paints beneath it: the board runs the mode from the combo's keys, and the mode
+covers the combo's colour wherever both paint, unless the mode paints beneath
+a linked layer that is on, when the combo paints over both. Where no combo fires on the
+layer shown, the line under the board says so.
 
-### Key feedback
+With **Enabled** off on Combo settings no combo fires, so this stage paints
+nothing: its tab reads off, and its stage bar says **Combos are off**. Its
+controls stay editable. Click those words to go to that switch.
 
-The colours a key flashes as a behaviour fires: **Tap committed**, **Hold
-active**, **Long hold active**, and one for each tap count from the double tap
-on. **On the board** shows the same colours under the same names. Under
-**When and where**:
+### Behaviour feedback
 
-- **Tap commit**: **Double taps and more** flashes when a double tap or more
-  fires, unless it sends a layer or pointing key, whose own stage shows it;
-  **Off** doesn't flash for taps.
-- **Locality**: where the flash paints, with the same choices as a pointing
-  mode.
-- **Flash interval**: how long each on or off phase lasts.
+The state of a key's behaviour: the colours a key lights in as its
+behaviour fires, steady, blinking or in one flash. Each is a **case** with
+its own colour, its own place to paint and its own accents, in two groups,
+as the behaviour grid has a column per tier and a row per tap count:
 
-These are also the colours of the behaviour dots on the board.
+- **Tiers**:
+  - **Tap committed** is steady while a key is held on a tap with no hold,
+    once the multi tap window has passed, and can flash once after a double
+    tap or more (below).
+  - **Hold active** goes by the hold's style: **held until release** blinks
+    while held, when it sends a key, modifier, macro, custom key or QMK
+    keycode; **repeat while held** blinks while it repeats; **tap on release
+    after Tap / hold threshold** is steady from the threshold until it
+    sends; **tap at Tap / hold threshold** flashes once as it sends. After a
+    run of two or more taps, a hold sent on release flashes once too.
+  - **Long hold active** does the same for the long hold.
+  - A layer or pointing-mode hold shows on its own stage instead. A switch
+    key, Leader, or layer go-to or lock held until release, and a hold the
+    keyboard fills in where the behaviour sets none, show nothing here.
+- **Tap branches**: **Double tap**, **Triple tap**, **Quadruple tap** and
+  **Quintuple tap**, each steady while a run of taps waits on that count;
+  they never blink. A deeper run takes **Quintuple tap**'s.
 
-## LED groups
+The case picked heads its pane with its mark, a tier's dot or a tap
+branch's badge, its name, and a line saying when it shows and how; every tap
+branch has the same line under its own name.
 
-The **LED groups** tab paints single LEDs, over a stage's own colour.
+The list says beside each case where it paints, in a word or two (**trigger's
+half**, **trigger key**), or **passthrough** or **off**. Pick a case to change
+its colour and, under **Where it paints** beside it, its **Locality**, with
+the same choices as a pointing mode; the trigger key is the key showing it,
+or every key of a combo. Changing it changes that case alone.
 
-1. Click LEDs on the board to select them (the trackball's LED is a button
-   beside it).
-2. Under **New row from the selection**, choose which stage's table it goes
-   in, what it belongs to (a layer, a pointing mode or a feedback state, or
-   all of them), and its colour.
-3. **Keep row in draft**.
+**Tap committed**'s pane also has **When it flashes**, with
+**Flash on a double tap or more**: **On**, it also flashes once as a double
+tap or more fires, unless that sends a layer or pointing key, whose own stage
+shows it; **Off**, it shows only while held. A single tap gets no flash
+either way, and the tap branches are not touched by it.
 
-**Make a group from the selection** keeps the selected LEDs as a reusable
-group for other rows; with nothing selected there is nothing to group.
-Groups are numbered by the LEDs they hold, so making or removing one can
-renumber the others; every row keeps its LEDs. **Used by** lists the tables
-and owners whose rows use a group, and a group in use cannot be removed. Rows
-apply in order, so a later row wins on an LED they share. A row whose colour
-is turned off takes its stage's colour.
+On the stage bar, under **Every behaviour state**, one setting for every
+case: **Blink time**, how fast a hold blinks while held until release or
+repeating: on for this long, then off. A single flash, Tap committed's or a
+hold's, lasts one of these. While you change it, a dot after it blinks at
+that pace, in Long hold active's colour while that is picked, else Hold
+active's.
 
-The keyboard holds at most 16 groups and 32 rows across every stage's table
-(the **LED groups** and **LED overrides** under **Memory** on the Keyboard
-screen). Making one more is refused in the draft, saying which is full, before
-the keyboard sees it; remove one first.
+When keys show cases in different places at once, a narrower place paints
+over a wider one, and where they share one the newest key decides.
+
+While this tab is open, the board shows the case picked, with its accents,
+from the first key whose behaviour has it (on the layer shown, then the
+others), ringed when its locality follows the key, and the line under the
+board names that key. When no key has it, the
+keyboard never shows it, so the board shows nothing for it and the line under
+the board says so.
+
+These are also the colours of the behaviour dots on the board and of the
+behaviour grid's branch numbers.
+
+With **Enabled** off on Behaviour settings no behaviour fires, so this stage
+paints nothing: its tab reads off, and its stage bar says **Behaviours are
+off**. Its controls stay editable. Click those words to go to that switch.
+
+### Replacement feedback
+
+One flash when [text replacement](text-replacement.md) changes what you
+typed, and a colour held while the
+[Leader key](text-replacement.md#after-the-leader-key) waits for what you
+type after it, over everything else the keyboard is lighting. It has four
+cases, each with a colour of its own:
+
+- **Replaced with text**: an input replaced with text.
+- **Replaced by a macro**: an input replaced by its macro. The flash comes
+  as the input is erased, before the macro plays.
+- **Replacement undone**: Backspace straight after a replacement put the
+  word back.
+- **Leader waiting**: from the moment you press Leader until the leader
+  sends or gives up, however long it waits. It is no flash: it stays on
+  through Leader again and through a Backspace that leaves characters
+  typed.
+
+Pick a case in the list to change its colour and, under **Where it paints**,
+its own **Locality**; under its name the tab says in one line when it shows,
+and the Locality's note says which key it follows. The list says beside each case
+where it paints, or **passthrough** or **off**. A passthrough case does
+not light, and the other cases still do. A word left as you typed it never
+flashes, whatever the reason.
+
+What the Leader key sends flashes as a replacement does, in the **Replaced
+with text** or **Replaced by a macro** colour, taking **Leader waiting**'s
+place at once: that flash is how you know it went. When the leader sends
+nothing, **Leader waiting** just goes, with no flash. Since the leader works
+with text replacement off, this tab still lights **Leader waiting** and a
+leader's sends while text replacement is off and a replacement on your list
+fires after Leader; its stage bar's words say so in their tip.
+
+Under **Where it paints**:
+
+- **Locality**: where the picked case paints, with the same choices as a
+  pointing mode. Here the trigger key is the key that ended the word (Space, Enter, a
+  punctuation key), or the Backspace that undid the replacement; for what
+  the Leader key sends, the key that sent it, the last character or Enter,
+  or the Leader key when the wait sent it. For a combo, every key of it.
+  When the keyboard cannot tell which key it was, the last two choices paint
+  every key. For **Leader waiting** the trigger key is the Leader key you pressed;
+  on the board the first key that sends Leader stands in for it, ringed.
+
+On the stage bar, under **Every case**, one setting for every case:
+
+- **Flash length**: how long one flash lasts, in milliseconds. The flash
+  begins as the replacement starts to be typed. **Leader waiting** is no
+  flash: it holds for as long as the leader waits, which **Leader waits**
+  sets on [Typing settings](text-replacement.md#turning-it-on-and-off); the
+  **Leader waits →** link beside it goes there.
+
+One flash shows at a time: an undo straight after a replacement takes its
+place.
+
+While this tab is open, the board shows the flash of the case picked, with
+its accents. It can't know which key will end a word, so the first key that
+sends Space stands in for it, and the first that sends Backspace for
+**Replacement undone**: with a locality that follows the trigger key that key
+is ringed, and the line under the board names it. **Leader waiting** follows
+the first key that sends Leader; with none, no key is ringed and it shows on
+every key of the halves it paints. A passthrough case shows no colour, and
+the line says so. The board shows where each case lands, not the flash
+itself.
+
+With **Enabled** off under **Text replacement** on
+[Typing settings](text-replacement.md#turning-it-on-and-off) nothing is replaced, so this
+stage paints nothing: its tab reads off, and its stage bar says **Text
+replacement is off**. Its controls stay editable. Click those words to go to
+that switch. With a leader input on your list the tab stays live instead,
+since **Leader waiting** and the leader's sends still light, and the words'
+tip says that.
+
+## Accents
+
+An **accent** lights some LEDs in a colour of their own while a layer is on,
+a pointing mode runs, a combo's inputs are held, a key shows a behaviour
+state, or the keyboard flashes for a replacement or waits after Leader.
+**Layer colours**,
+**Pointing modes**, **Combo feedback**, **Behaviour feedback** and
+**Replacement feedback** each end with an **Accents** list for what the tab
+has picked: the layer shown, the pointing mode, the behaviour feedback case
+(each tap branch its own), or the replacement case. The list is grouped by
+whom each accent lights for: **For** the item picked, then **For every tap
+branch**, **For every layer**, **For every pointing mode**, **For every
+behaviour state** or **For every case**, which you change or remove from any
+of their lists; **Change** and **Remove** on one of those say they change it
+for all of them. **For** names the item picked by its mark, as its pane's
+head does: a layer's or mode's icon, a tier's dot, or a tap branch's badge.
+On **All accents**, **Every tap branch** carries the badge of every tap
+count. Combo accents light for every combo. The background effect
+and the auto-mouse fade have none. The **ⓘ** on the Accents heading says how
+they work.
+
+Every key on the board carries its LED's number on a small label over its
+top-left corner, and the trackball in its middle; the keys' legends stay as
+they are on the Keymap. Accents name their LEDs by those numbers: **LEDs
+24–28, 53–55**.
+Point at an accent in a list and its LEDs glow on the board. Click it to keep
+them glowing while you scroll the list or point at others; click it again to
+let go.
+
+1. **Add accent**, which brings the board into view, then click keys on the
+   board to pick their LEDs, or drag across keys to pick each one the drag
+   crosses. Clicking a picked key takes it back. The board shows the picked
+   LEDs in the accent's colour, ringed.
+2. **Colour**: **Its own**, set with the colour editor, or the stage's (**Same
+   as the layer**, the mode, combo feedback, the feedback colour or the
+   flash colour), useful to keep keys lit where a layer paints only its
+   mapped keys. An accent that takes the colour of a passthrough layer, mode
+   or case stays dark with it. Beside **Same as …** the list shows the
+   colour that is.
+3. **Lights for**: just what the tab picked, or all of them. On a tap
+   branch of Behaviour feedback there is a third choice, **Every tap
+   branch**: one accent for all four, which lights while a run of taps waits
+   on any count and not for a tap, hold or long hold. With **Same as the
+   feedback colour** it takes the colour of the branch showing.
+4. **Keep accent in draft** (**Send accent to keyboard** in the live modes,
+   where it takes effect at once), under the board while you pick LEDs or at
+   the editor's foot. **Cancel** drops it.
+
+**Change** reopens an accent with its LEDs picked; keeping it changes it where
+it stands, so it keeps its place in the order the keyboard paints them, a later
+accent repainting an earlier one where they share LEDs. **Remove** takes it
+away.
+
+On a layer above Base, the list also shows Base's accents, which stay lit over
+the layers above it; **Go to Base** is where they're changed. One exception:
+while a pointing mode linked to a layer above Base runs, it paints over Base
+and its accents, beneath that layer.
+
+An accent of a combo, a behaviour state or a replacement case lights the same
+LEDs whichever combo or key caused it, or none, as for **Leader waiting**. On Behaviour feedback and Replacement
+feedback, the accents for every behaviour state or every case
+paint before those for one state or case, whatever their place in the list,
+so the one for the state or case wins an LED they share.
+
+**All accents**, after the stages, lists every accent by the stage that paints
+it and who it lights for; click a line to keep its LEDs glowing on the board,
+and **Open** goes to it on its stage's tab, its LEDs glowing there.
+
+The keyboard holds at most 640 accents, 255 on any one stage, and 128
+different LED sets across every stage (Ark uses whatever the connected
+keyboard reports): accents that light the same LEDs share one set, and a set no accent
+lights any more is freed. Each list shows how many the keyboard uses, **On
+the keyboard** (also **Accents** and **LED sets** under **Memory** on the
+Keyboard screen). Adding one more is
+refused in the draft, saying which is full, before the keyboard sees it;
+remove one first.

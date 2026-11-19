@@ -14,3 +14,8 @@ export function timingInput(value, fallback, followsDefault = false, source = ""
         placeholder: defaultValue === "" ? "ms" : `${defaultValue} · ${source || "default"}`,
     };
 }
+
+// A timing field is as wide as its placeholder, so "200 · dual-role" shows
+// whole, and never narrower than the five digits every number field takes.
+/** @param {string} placeholder */
+export const timingDigits = (placeholder) => Math.max(5, placeholder.length);

@@ -16,6 +16,7 @@ const {decodePdDomain, encodePdDomain} = require("../../core/schema/pd-mode-doma
 // Each domain's own codec, which must write back exactly what it read.
 const {decodeKeymapDomain, encodeKeymapDomain} = require("../../core/schema/keymap-domain-v1");
 const {decodeMacroDomain, encodeMacroDomain} = require("../../core/schema/macro-domain-v1");
+const {decodeAutocorrectDomain, encodeAutocorrectDomain} = require("../../core/schema/autocorrect-domain-v1");
 const CODECS = new Map([
     [0x10, payload => encodeRgbDomainV1(decodeRgbDomainV1(payload))],
     [0x20, payload => encodeKeyBehaviorDomain(decodeKeyBehaviorDomain(payload))],
@@ -30,6 +31,7 @@ const CODECS = new Map([
         assert.deepEqual(canonical, payload.subarray(0, canonical.length));
         return Buffer.concat([canonical, payload.subarray(canonical.length)]);
     }],
+    [0x80, payload => encodeAutocorrectDomain(decodeAutocorrectDomain(payload))],
 ]);
 
 /** @param {string} name */
@@ -58,3 +60,19 @@ for (const name of ["maximum_profile_v4.fixture", "populated_profile_v4.fixture"
         assert.deepEqual(encodeProfileBlob({domains: decoded.domains}), bytes);
     });
 }
+
+// Settings version 12 (firmware D-F70): the replacement flash's length is
+// scalar 31, apart from the behaviour flash's interval, scalar 15. The keymap
+// authors both at 200 ms; the maximum profile holds scalar 31 at its ceiling.
+test("the firmware's profiles carry each flash's own length, the replacement flash's in scalar 31", () => {
+    const {SETTING, SETTINGS} = require("../../core/schema/settings-domain-v1");
+    /** @param {string} name */
+    const settings = name => {
+        const domain = decodeProfileBlob(Buffer.from(fixture(name).get("profile.hex"), "hex")).domains.find(entry => entry.id === 0x40);
+        return {length: domain.payload.length, values: decodeSettings(domain.payload).values};
+    };
+    const populated = settings("populated_profile_v4.fixture"), maximum = settings("maximum_profile_v4.fixture");
+    assert.deepEqual([populated.values[SETTING.FEEDBACK_PERIOD], populated.values[SETTING.AUTOCORRECT_FEEDBACK_PERIOD]], [200, 200]);
+    assert.equal(maximum.values[SETTING.AUTOCORRECT_FEEDBACK_PERIOD], 65535);
+    assert.equal(maximum.length, SETTINGS.MAX_SIZE, "every name at 32 bytes: 10,697 bytes");
+});

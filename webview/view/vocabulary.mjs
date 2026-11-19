@@ -10,17 +10,28 @@
 /** @typedef {{vocabulary?: Vocabulary, pdModes?: {id: number, displayName: string, name?: string}[]}} VocabularyModel */
 
 /** @type {Vocabulary} */
-const NONE = {phases: /** @type {Vocabulary["phases"]} */ ({}), readSteps: /** @type {Vocabulary["readSteps"]} */ ({}), editModes: /** @type {Vocabulary["editModes"]} */ ({}), halves: /** @type {Vocabulary["halves"]} */ ({}), firmwareUpdate: "", draftBlocks: {}, hostOs: [], physicalHalves: [], macroProtection: [], macroUninterruptible: {label: "", automatic: {on: "", off: ""}}, macroSteps: [], macroStepTiles: {text: "", key: "", chord: "", delay: "", press: "", release: ""}, macroProblems: {}, hostLayouts: [], unicodeEntry: [], unicodeEntryOff: [], tapSends: "", holdFromPress: "", timingSources: {tappingTerm: "", tapHoldTerm: "", longHoldTerm: "", multiTapTerm: ""}, thresholds: {tapHoldTerm: "", longHoldTerm: "", multiTapTerm: ""}, thresholdNames: {tapHoldTerm: "", longHoldTerm: "", multiTapTerm: ""}, thresholdTips: {tapHoldTerm: "", longHoldTerm: "", multiTapTerm: ""}, holdStyles: {hold: [], long: []}, holdWithoutLongHold: [], tiers: /** @type {Vocabulary["tiers"]} */ ({}), branches: [], localities: [], paintModes: [], fadeModes: [], tapCommit: [],
-    colourOff: {}, feedbackOwners: [], feedbackTiers: {}, ledTables: [], stages: [], customKeys: {alwaysOn: {base: "", default: ""}, layerKinds: []},
-    keyCapLayerVerbs: {}, layerKeyVerbs: {}, checkLevels: /** @type {Vocabulary["checkLevels"]} */ ({}), checkStatuses: /** @type {Vocabulary["checkStatuses"]} */ ({}), recoveryCauses: /** @type {Vocabulary["recoveryCauses"]} */ ({}), settingsSections: {}, fileSections: {}, usageCounts: /** @type {Vocabulary["usageCounts"]} */ ({}), participationReasons: /** @type {Vocabulary["participationReasons"]} */ ({}), participationPlaces: {key: "", layer: "", keyOn: ""}, settingsScreens: {behaviours: "", combos: "", pointer: "", host: ""},
+const NONE = {phases: /** @type {Vocabulary["phases"]} */ ({}), readSteps: /** @type {Vocabulary["readSteps"]} */ ({}), editModes: /** @type {Vocabulary["editModes"]} */ ({}), halves: /** @type {Vocabulary["halves"]} */ ({}), firmwareUpdate: "", draftBlocks: {}, hostOs: [], physicalHalves: [], macroProtection: [], macroUninterruptible: {label: "", automatic: {on: "", off: ""}, plays: "", means: []}, macroSteps: [], replacementKinds: [], inputModes: [], inputModesMean: [], leaderKey: "", listFileFormats: [], macroStepTiles: {text: "", key: "", chord: "", delay: "", press: "", release: ""}, macroProblems: {}, hostLayouts: [], unicodeEntry: [], unicodeEntryOff: [], tapSends: "", holdFromPress: "", timingSources: {tappingTerm: "", tapHoldTerm: "", longHoldTerm: "", multiTapTerm: ""}, thresholds: {tapHoldTerm: "", longHoldTerm: "", multiTapTerm: ""}, thresholdNames: {tapHoldTerm: "", longHoldTerm: "", multiTapTerm: ""}, thresholdTips: {tapHoldTerm: "", longHoldTerm: "", multiTapTerm: ""}, holdStyles: {hold: [], long: []}, holdWithoutLongHold: [], tiers: /** @type {Vocabulary["tiers"]} */ ({}), tierTips: /** @type {Vocabulary["tierTips"]} */ ({}), branches: [], localities: [], paintModes: [], paintModesBrief: [], localitiesBrief: [], fadeModes: [], tapCommit: [],
+    lightingFields: {colour: "", locality: "", paintMode: "", fadeMode: "", endColour: "", doubleTapFlash: ""}, colourChoice: {colour: "", off: ""},
+    colourOff: {}, feedbackOwners: [], feedbackTiers: {}, replacementOwners: [], replacementWhen: {}, feedbackWhen: {tapCommitted: "", tapCommittedFlashes: "", hold: "", tapBranch: ""}, replacementColourOwners: /** @type {Vocabulary["replacementColourOwners"]} */ ({}), accents: /** @type {Vocabulary["accents"]} */ ({}),
+    accentFields: {lightsFor: "", ownColour: ""}, feedbackColourOwners: /** @type {Vocabulary["feedbackColourOwners"]} */ ({}),
+    lightingLists: {inUse: "", tiers: {title: ""}, tapBranches: {title: ""}, replacements: {title: ""}, comboFeedback: {title: "", empty: ""}, holdLayer: {title: "", empty: ""}}, stages: [], allAccents: "", customKeys: {alwaysOn: {base: "", default: ""}, layerKinds: []},
+    keyCapLayerVerbs: {}, layerKeyVerbs: {}, switchKeys: {}, checkLevels: /** @type {Vocabulary["checkLevels"]} */ ({}), checkStatuses: /** @type {Vocabulary["checkStatuses"]} */ ({}), recoveryCauses: /** @type {Vocabulary["recoveryCauses"]} */ ({}), settingsSections: {}, fileSections: {}, usageCounts: /** @type {Vocabulary["usageCounts"]} */ ({}), participationReasons: /** @type {Vocabulary["participationReasons"]} */ ({}), participationPlaces: {key: "", layer: "", keyOn: ""}, settingsScreens: {behaviours: "", combos: "", pointer: "", host: ""},
     pointing: {kinds: [], directions: [], diagonals: [], axes: [], invert: [], pointerLayer: [], linkLabels: {startsOther: "", linkedLayers: "", linkTurnsOn: "", linkEnds: "", startedBy: "", endsWhen: "", keyTurnsOnShort: "", ignored: "", started: ""}, linkEnds: [], linkInert: {default: "", pointer: ""},
-        emptyDirection: [], directionOutput: [], directionStep: [], scrollAxes: [], modifierPolicy: [], kindsDo: [], movementLabel: "", scrollFields: [], heldModifiers: "", tips: {}, pointerLayerLabel: ""}, modifiers: [], comboOptions: {}};
+        emptyDirection: [], directionOutput: [], directionStep: [], scrollAxes: [], modifierPolicy: [], kindsDo: [], movementLabel: "", scrollFields: [], heldModifiers: "", tips: {}, choicesMean: {emptyDirection: {rows: []}, directionOutput: {rows: []}, linkEnds: {rows: []}, pointerLayer: {rows: []}}, pointerLayerLabel: "",
+        fieldLabels: {name: "", dpi: "", axis: "", emptyDirection: "", directionOutput: "", scrollAxes: "", invert: "", horizontal: "", vertical: ""}},
+    modifiers: [], comboOptions: {}, definitionFields: {use: {behaviour: "", combo: ""}, allowedLayers: "", offInSettings: {behaviour: "", combo: ""}, onceOn: {behaviour: "", combo: ""}}, settingOff: {switches: {behaviour: {off: "", fix: ""}, combo: {off: "", fix: ""}, autoMouse: {off: "", fix: ""}, autocorrect: {off: "", fix: ""}}, stage: "", leading: {list: "", stage: ""}}, behaviourFields: {anchor: "", timings: ""},
+    comboFields: {inputs: "", sends: "", window: "", conditions: ""}};
 
 /** @param {VocabularyModel | null | undefined} model */
 export const vocabulary = (model) => model?.vocabulary || NONE;
 
 /** @param {import("../../contracts/model.js").WordList<unknown> | null | undefined} list @param {unknown} key @returns {string} */
 export const word = (list, key) => ((list || []).find(([id]) => id === key)?.[1] ?? String(key ?? ""));
+
+// A locality as a sentence or a list says it, its first letter lowercase so
+// "All LEDs" reads "all LEDs" and "Left half" "left half".
+/** @param {VocabularyModel | null | undefined} model @param {string | undefined} locality */
+export const localityInText = (model, locality) => { const words = word(vocabulary(model).localities, locality); return words.charAt(0).toLowerCase() + words.slice(1); };
 
 // A branch by how many taps start it: "Double tap".
 /** @param {VocabularyModel | null | undefined} model @param {number} count */
@@ -29,9 +40,13 @@ export const branchName = (model, count) => vocabulary(model).branches[count - 1
 // The lighting stages in paint order, each with its id, words and bit.
 /** @param {VocabularyModel | null | undefined} model */
 export const stageOrder = (model) => vocabulary(model).stages;
+// What a Lighting tab is called, by its id: a stage's name, or All
+// accents, the tab that is no stage; "" for an id that is neither.
+/** @param {VocabularyModel | null | undefined} model @param {string} id */
+export const stageCalled = (model, id) => id === "accents" ? vocabulary(model).allAccents : stageOrder(model).find((stage) => stage.id === id)?.label || "";
 
 // A pointing slot's name as the core gives it: its own, or core's words for
-// one that holds nothing ("Slot 6"), which core publishes on every slot as
+// one that holds nothing ("Pointing mode 6"), which core publishes on every slot as
 // its displayName. A slot published without one reads by the name it
 // stores, the one place a name is made up for it here.
 /** @param {{displayName?: string, name?: string} | null | undefined} slot */
@@ -52,9 +67,34 @@ export const macroNamed = (slot, keycode = "") => slot?.name || slot?.defaultNam
 // the one place a name is made up for it here.
 /** @param {{displayName?: string, name?: string} | null | undefined} layer */
 export const layerCalled = (layer) => layer?.displayName || layer?.name || "";
-// The same for the layer with this index.
-/** @param {{layers?: readonly {index: number, displayName?: string, name?: string}[]} | null | undefined} model @param {number} index */
-export const layerCalledAt = (model, index) => layerCalled((model?.layers || []).find((layer) => layer.index === index));
+/** @typedef {{index: number, displayName?: string, name?: string}} NamedLayer */
+// The layer with this index, or undefined.
+/** @template {NamedLayer} L @param {{layers?: readonly L[]} | null | undefined} model @param {number} index @returns {L | undefined} */
+export const layerAt = (model, index) => (model?.layers || []).find((layer) => layer.index === index);
+// The same layer's name.
+/** @param {{layers?: readonly NamedLayer[]} | null | undefined} model @param {number} index */
+export const layerCalledAt = (model, index) => layerCalled(layerAt(model, index));
+
+// Words that name layers: text, with each layer kept in its place, so a screen
+// draws each by its mark (ui/marks.mjs, phraseMarked) while a tip, a cached
+// word or a test reads the phrase as plain words (said). Marks are the
+// interface's, so the view writes phrases and never markup.
+/** @typedef {(string | {layer: NamedLayer | null | undefined})[]} Phrase */
+// How a phrase is said: its layers and its other words.
+/** @typedef {{layer: (layer: NamedLayer | null | undefined) => string, text: (words: string) => string}} Saying */
+/** @type {Saying} */
+export const PLAIN = {layer: layerCalled, text: (words) => words};
+/** @param {Phrase} phrase @param {Saying} [say] */
+export const said = (phrase, say = PLAIN) => phrase.map((part) => typeof part === "string" ? say.text(part) : say.layer(part.layer)).join("");
+// Phrases one after another, `between` each.
+/** @param {readonly Phrase[]} phrases @param {string} between @returns {Phrase} */
+export const phrasesJoined = (phrases, between) => phrases.flatMap((phrase, at) => at ? [between, ...phrase] : phrase);
+// Phrases in a run of prose, as listed() runs names: "A, B and C".
+/** @param {readonly Phrase[]} phrases @returns {Phrase} */
+export const phrasesListed = (phrases) => phrases.flatMap((phrase, at) => at ? [at === phrases.length - 1 ? " and " : ", ", ...phrase] : phrase);
+// A phrase starting a sentence: its first word capitalised.
+/** @param {Phrase} phrase @returns {Phrase} */
+export const phraseSentence = (phrase) => typeof phrase[0] === "string" ? [sentence(phrase[0]), ...phrase.slice(1)] : phrase;
 
 // How a tier runs, in the editor's words: a tap tier only sends, and a hold
 // style names its own tier's threshold.
@@ -102,6 +142,18 @@ export const editModeWords = (model, mode) => /** @type {Readonly<Partial<Record
 // Names in a run of prose: "A", "A and B", "A, B and C".
 /** @param {readonly string[]} names */
 export const listed = (names) => names.length < 3 ? names.join(" and ") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+
+// The layers a board shows, top first, as Keymap and Lighting both caption
+// them: the layer on top, then those previewed under it, down to the base:
+// "Function on top of Pointing, Number and Base", or "Base" alone.
+/** @param {Pick<import("./keyface-types.js").LayerView, "layer" | "held" | "stack">} view @returns {Phrase} */
+export function layersOnTop({layer, held, stack}) {
+    const base = stack[0];
+    /** @type {Phrase[]} */
+    const under = held.filter((at) => at > 0).reverse().map((at) => [{layer: stack[at]}]);
+    if (base && layer !== base) under.push([{layer: base}]);
+    return [{layer}, ...(under.length ? [" on top of ", ...phrasesListed(under)] : [])];
+}
 
 // Words written mid-sentence, starting one: the first letter capitalised.
 /** @param {string} text */

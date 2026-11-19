@@ -17,7 +17,7 @@
 const {FakeDeviceAdapter} = require("../../core/transport/fake-device-adapter");
 const {RAW_HID_REPORT_SIZE} = require("../../core/transport/device-adapter");
 const {RAW_HID_UNHANDLED} = require("../../core/protocol/raw-hid-unhandled");
-const {PROFILE_ACTIVE_KIND, PROFILE_STATE_FLAGS, PROFILE_WIRE_KNOWN_MASKS, PROFILE_WIRE_V1} = require("../../core/protocol/profile-wire-v1");
+const {PROFILE_ACTIVE_KIND, PROFILE_STATE_FLAGS, PROFILE_WIRE_KNOWN_MASKS, PROFILE_WIRE_STATUS, PROFILE_WIRE_V1} = require("../../core/protocol/profile-wire-v1");
 const {PROFILE_PAYLOAD_V1} = require("../../core/protocol/profile-payload-v1");
 const {COMBO_READBACK_V1} = require("../../core/protocol/combo-readback-v1");
 const {FLASH_PAUSES_V1} = require("../../core/protocol/flash-pauses-v1");
@@ -41,40 +41,49 @@ const MUTATING_COMMANDS = new Set([0x03, 0x05, 0x06, 0x07, 0x09, 0x0a, 0x0b, 0x0
 const FEATURES = PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES;
 
 // The domain versions current firmware stores, and refuses any other.
-const CURRENT_DOMAINS = "16:4,32:2,48:3,64:11,80:4,96:1,112:1";
+const CURRENT_DOMAINS = "16:7,32:2,48:3,64:13,80:4,96:1,112:1,128:2";
 
 // `compiled` is the profile it was built with, which GET 0x05 serves: the
 // document's own unless given (current firmware's carries every domain, with
 // its authored combos and factory settings). `compiledOnly` runs those
 // defaults, with nothing committed; the live combo and settings readbacks
 // still answer from the document. `settingsVersion` is the version its
-// settings readback reports: any but 11 is firmware Ark does not read.
+// settings readback reports: any but 13 is firmware Ark does not read.
+// `capabilityPageCount` is how many capability pages it has: 3 answers as the
+// released firmware does, its page 0 counting three and a fourth refused as
+// an unknown page.
 /** @param {import("./types.js").FakeKeyboardOptions} options @returns {import("./types.js").FakeKeyboard} */
-function fakeKeyboard({document, compiled, settingsVersion = 11, compiledOnly = false, slaveKnown = true, generation = 42, firmwareVersion = 0x00010000, brightnessMax = 255, options = keyboardOptions.wire()}) {
+function fakeKeyboard({document, compiled, settingsVersion = 13, compiledOnly = false, slaveKnown = true, generation = 42, firmwareVersion = 0x07EA0A1B, brightnessMax = 255, capabilityPageCount = PROFILE_WIRE_V1.CAPABILITY_PAGE_COUNT, options = keyboardOptions.wire()}) {
     const held = validateSnapshot(document);
     if (document.version !== 5 || held.layers.length !== 16) throw new Error("The fake keyboard runs current firmware: a schema-4, sixteen-layer document.");
     /** @param {Buffer} blob */
     const versions = blob => decodeProfileBlob(blob).domains.map(domain => `${domain.id}:${domain.version}`).join();
-    if (versions(held.candidate) !== CURRENT_DOMAINS || (compiled && versions(compiled) !== CURRENT_DOMAINS)) throw new Error("The fake keyboard runs current firmware: RGB 4, key behaviours 2, combos 3, settings 10, PD 4, keymap 1 and macros 1.");
+    if (versions(held.candidate) !== CURRENT_DOMAINS || (compiled && versions(compiled) !== CURRENT_DOMAINS)) throw new Error("The fake keyboard runs current firmware: RGB 7, key behaviours 2, combos 3, settings 13, PD 4, keymap 1, macros 1 and autocorrect 2.");
     const profile = held.candidate, digest = fnv1a32(profile), defaults = compiled || profile;
     const settingsDomain = decodeProfileBlob(profile).domains.find(domain => domain.id === PROFILE_DOMAIN_IDS.SETTINGS);
     if (!settingsDomain) throw new Error("The fake keyboard fixture must contain settings.");
     const settings = settingsDomain.payload;
 
     const capabilities = [page(25, (p) => {
-        p.set([PROFILE_WIRE_V1.CAPABILITY_LAYOUT, 3, PROFILE_WIRE_V1.PROTOCOL_MAJOR, PROFILE_WIRE_V1.PROTOCOL_MINOR, PROFILE_BLOB_V1.SCHEMA_MAJOR, PROFILE_BLOB_V1.SCHEMA_MINOR, RAW_HID_REPORT_SIZE, PROFILE_CANDIDATE_V1.CHUNK_MAX, PROFILE_WIRE_V1.STATUS_PAGE_COUNT]);
+        p.set([PROFILE_WIRE_V1.CAPABILITY_LAYOUT, capabilityPageCount, PROFILE_WIRE_V1.PROTOCOL_MAJOR, PROFILE_WIRE_V1.PROTOCOL_MINOR, PROFILE_BLOB_V1.SCHEMA_MAJOR, PROFILE_BLOB_V1.SCHEMA_MINOR, RAW_HID_REPORT_SIZE, PROFILE_CANDIDATE_V1.CHUNK_MAX, PROFILE_WIRE_V1.STATUS_PAGE_COUNT]);
         p.writeUInt32LE(FEATURES, 9); p.writeUInt32LE(document.actionAbiDigest, 13);
         p.writeUInt32LE(firmwareVersion, 17); p.writeUInt32LE(fnv1a32(defaults), 21);
     }), page(25, (p) => {
-        // Layers, behaviour rows, tap depth, combos, keys per combo, RGB
-        // groups, stage rows, LEDs, LED bitmap, custom keys, macros, domain
-        // mask, name bytes, mask bits, positions.
-        p.set([16, 16, 128, 5, 128, 16, 16, 32, 58, 8, 128, 128, 127, 32, 32, 60]);
+        // Layers, behaviour rows, tap depth, combos, keys per combo, LED
+        // sets, accents in one lighting table, LEDs, LED bitmap, custom keys,
+        // macros, domain mask, name bytes, mask bits, positions.
+        p.set([16, 16, 128, 5, 128, 16, 128, 255, 58, 8, 128, 128, 255, 32, 32, 60]);
     }), page(25, (p) => {
-        // Populated steps, slot size, profile payload, slot payload, macro bank.
+        // Populated steps, slot size, profile payload, slot payload, macro
+        // bank, accents in all (firmware D-F63).
         p.writeUInt16LE(640, 0); p.writeUInt32LE(131072, 2); p.writeUInt32LE(130048, 6);
-        p.writeUInt32LE(130048, 10); p.writeUInt32LE(34903, 14);
-    })];
+        p.writeUInt32LE(130048, 10); p.writeUInt32LE(40960, 14); p.writeUInt16LE(640, 18);
+    }), page(25, (p) => {
+        // The autocorrect list's ceilings (firmware D-F68): corrections,
+        // typos, text bytes, the domain, bytes in one typo and in one text
+        // correction.
+        p.writeUInt16LE(1024, 0); p.writeUInt16LE(1024, 2); p.writeUInt16LE(20480, 4); p.writeUInt32LE(36874, 6); p[10] = 32; p[11] = 128;
+    })].slice(0, capabilityPageCount);
     // Committed (or running its defaults), converged with the slave half,
     // nothing pending.
     const status = [page(25, (p) => {
@@ -127,7 +136,15 @@ function fakeKeyboard({document, compiled, settingsVersion = 11, compiledOnly = 
             case PROFILE_WIRE_V1.COMMAND_GET:
                 if (request[1] !== PROFILE_WIRE_V1.CHANNEL) return undefined;
                 if (request[2] === FLASH_PAUSES_V1.VALUE) return pauses.answer(request, reply);
-                return profileValue(values[request[2]]?.[request[4] | (request[5] << 8)], reply);
+                {
+                    const pages = values[request[2]], at = request[4] | (request[5] << 8);
+                    // A payload readback page past the end answers status 2
+                    // (Profile Wire, "Payload readback"), and so does a
+                    // capability page past the ones this keyboard has, as
+                    // firmware answers it.
+                    if (pages && !pages[at] && (request[2] === VALUE.COMMITTED || request[2] === VALUE.COMPILED || request[2] === VALUE.CAPABILITIES)) return pastTheEnd(reply);
+                    return profileValue(pages?.[at], reply);
+                }
             default: return undefined;
         }
     }
@@ -173,6 +190,11 @@ function status(reply, code) {
 function profileValue(payload, reply) {
     if (!payload) return undefined;
     reply.fill(0, 5); reply[6] = payload.length; payload.copy(reply, PROFILE_WIRE_V1.PAYLOAD_OFFSET);
+    return reply;
+}
+/** @param {Buffer} reply */
+function pastTheEnd(reply) {
+    reply.fill(0, 5); reply[5] = PROFILE_WIRE_STATUS.UNKNOWN_PAGE;
     return reply;
 }
 /** @param {number} length @param {(bytes: Buffer) => unknown} fill */

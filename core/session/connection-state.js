@@ -221,6 +221,7 @@ class Held {
             portableProgress: facts.portableProgress || "",
             settingsView: views?.settingsView ? clone(views.settingsView) : null,
             macroView: views?.macroView ? clone(views.macroView) : null,
+            autocorrectView: views?.autocorrectView ? clone(views.autocorrectView) : null,
             customKeyView: views?.customKeyView ? clone(views.customKeyView) : null,
             liveApply: publishedLiveApply(this.liveApply),
             layout: facts.layout ? clone(facts.layout) : null,

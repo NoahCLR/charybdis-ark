@@ -225,7 +225,7 @@ test("history, rename and import words follow the edit mode", async () => {
 
     assert.equal(historyFooter(apply), "Going to a step changes only the draft. The keyboard is not touched until you save.");
     assert.equal(renameNote(apply), "Your computer and Chrome show this name once you save; the keyboard reconnects for a moment to take it.");
-    assert.equal(importNote(apply), "Choose or drop a backup to compare it first. It replaces your draft; nothing reaches the keyboard until you review and save it.");
+    assert.equal(importNote(apply), "Choose or drop a backup, or a layout saved from VIA, to compare it first. It replaces your draft; nothing reaches the keyboard until you review and save it.");
     assert.equal(importCallout(apply), "Nothing reaches the keyboard until you review and save; the review shows every change field by field.");
     assert.equal(historyFooter(null), historyFooter(apply), "no draft reads as Review and save");
 
@@ -245,4 +245,33 @@ test("history, rename and import words follow the edit mode", async () => {
     assert.match(importCallout(live), /which the keyboard saves by itself/);
     assert.match(historyFooter(live), /the keyboard then saves by itself/);
     assert.match(historyFooter(review), /unsaved edit/);
+});
+
+// In Review and save an edit waits in the draft until a save. In the live
+// modes Ark opens its draft on the keyboard's working copy, so an edit runs
+// there at once and a change it marks is one not saved yet (D-L65).
+test("the editors say where an edit goes, and what a change is, in each edit mode", async () => {
+    const {editWords} = await import("../../webview/view/edit-mode.mjs");
+    const review = editWords({live: null});
+    assert.equal(editWords(null), review, "no draft reads as Review and save");
+    assert.equal(review.keep("combo"), "Keep combo in draft");
+    assert.equal(review.keep("layers"), "Keep layers in draft");
+    assert.equal(review.keepVerb, "keep");
+    assert.equal(review.cellNote, "Changes are kept in the draft automatically.");
+    assert.equal(review.macroNotIn, "This edit is not in your draft.");
+    assert.deepEqual([review.mark, review.holds, review.after], ["Changed in your draft", "Holds a change in your draft", "changed in your draft"]);
+    for (const mode of [LIVE, LIVE_REVIEW]) {
+        const live = editWords(/** @type {any} */ ({live: {mode}}));
+        assert.equal(live.keep("combo"), "Send combo to keyboard");
+        assert.equal(live.keep("row"), "Send row to keyboard");
+        assert.equal(live.keepVerb, "send");
+        assert.equal(live.cellNote, "Changes reach the keyboard as you make them.");
+        assert.equal(live.macroFixFirst, "Fix this edit before it can be sent to the keyboard.");
+        assert.equal(live.macroNotIn, "This edit has not reached the keyboard.");
+        assert.deepEqual([live.mark, live.holds, live.after], ["Unsaved change", "Holds an unsaved change", "unsaved change"]);
+        // Nothing in the live words says an edit waits in, or is kept in, the draft.
+        for (const [field, words] of Object.entries(live)) {
+            if (typeof words === "string") assert.doesNotMatch(words, /draft|\bkept\b|staged/i, field);
+        }
+    }
 });

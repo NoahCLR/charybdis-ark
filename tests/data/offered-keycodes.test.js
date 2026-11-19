@@ -7,8 +7,15 @@ test("keycodes for QMK features this firmware does not build are offered nowhere
     const built = [
         {name: "QK_RGB_MATRIX_TOGGLE", group: "rgb_matrix"}, {name: "QK_MAGIC_TOGGLE_NKRO", group: "magic"},
         {name: "QK_BOOTLOADER", group: "quantum"}, {name: "QK_GRAVE_ESCAPE", group: "quantum"},
-        {name: "QK_COMBO_TOGGLE", group: "quantum"}, {name: "QK_SPACE_CADET_LEFT_SHIFT_PARENTHESIS_OPEN", group: "quantum"},
+        {name: "QK_COMBO_TOGGLE", group: "quantum"},
+        // QMK's switch keys for autocorrect, which the firmware's own engine runs (firmware D-F69).
+        {name: "QK_AUTOCORRECT_ON", group: "quantum"}, {name: "QK_AUTOCORRECT_OFF", group: "quantum"}, {name: "QK_AUTOCORRECT_TOGGLE", group: "quantum"},
+        {name: "QK_SPACE_CADET_LEFT_SHIFT_PARENTHESIS_OPEN", group: "quantum"},
         {name: "KC_SYSTEM_SLEEP", group: "system"}, {name: "KC_AUDIO_MUTE", group: "media"}, {name: "DPI_MOD", group: "kb"},
+        // The keyboard's switch keys for behaviours and auto-mouse, in core's
+        // group for them.
+        {name: "BH_ON", group: "Switch keys"}, {name: "BH_OFF", group: "Switch keys"}, {name: "BH_TOGG", group: "Switch keys"},
+        {name: "AM_ON", group: "Switch keys"}, {name: "AM_OFF", group: "Switch keys"}, {name: "AM_TOGG", group: "Switch keys"},
     ];
     const unbuilt = [
         {name: "QK_MIDI_ON", group: "midi"}, {name: "QK_JOYSTICK_BUTTON_0", group: "joystick"},

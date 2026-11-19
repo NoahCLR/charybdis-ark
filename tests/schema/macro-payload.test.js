@@ -82,4 +82,30 @@ test("a key a macro cannot send is refused by name, never mistaken for another k
         assert.throws(() => read(payload), (error) => error.problem?.code === "unknown" && error.problem.key === key, payload);
     }
     assert.throws(() => read("{KC_A,KC_A}"), (error) => error.problem?.code === "chord", "the same key twice is still one chord key twice");
+    // A macro step takes basic keycodes only, so no switch key: neither QMK's
+    // for combos nor the keyboard's for behaviours and auto-mouse (firmware
+    // D-F66).
+    for (const key of ["CM_TOGG", "QK_COMBO_ON", "AC_TOGG", "QK_AUTOCORRECT_OFF", "BH_ON", "BH_TOGG", "AM_ON", "AM_TOGG"]) {
+        assert.throws(() => read(`{${key}}`), (error) => error.problem?.code === "unknown" && error.problem.key === key, key);
+        assert.ok(!macroKeycodes().includes(key), key);
+    }
+});
+
+// The keyboard report has six key slots whatever the build (firmware D-F65).
+test("a macro holds at most six keys at once besides modifiers, edited or stored", () => {
+    const seven = "{KC_E,KC_Y,KC_K,KC_SEMICOLON,KC_P,KC_0,KC_U}";
+    assert.throws(() => encodeMacroPayload(seven), error => error.code === "INVALID_MACRO" && error.problem?.code === "reportFull");
+    assert.doesNotThrow(() => encodeMacroPayload("{KC_LGUI,KC_LALT,KC_LCTL,KC_LSFT,KC_E,KC_Y,KC_K,KC_SEMICOLON,KC_P,KC_0}"));
+    const keys = [0x08, 0x1c, 0x0e, 0x33, 0x13, 0x27, 0x18];
+    const stored = Buffer.from([...keys.slice(0, -1).flatMap(key => [1, 2, key]), 1, 1, keys.at(-1), ...keys.slice(0, -1).reverse().flatMap(key => [1, 3, key])]);
+    assert.throws(() => decodeMacroPayload(stored), error => error.problem?.code === "reportFull");
+});
+
+// Core counts every key but a modifier as taking a report slot. That is the
+// firmware's set (keyboard keys, IS_BASIC_KEYCODE) only because a macro sends
+// nothing else: no system, consumer (media) or mouse key.
+test("a macro sends keyboard keys and modifiers only, so every key but a modifier takes a report slot", () => {
+    const {encode} = require("../../core/schema/keycodes");
+    const values = macroKeycodes().map(name => encode(name));
+    assert.ok(values.every(value => (value >= 0x04 && value <= 0xa4) || (value >= 0xe0 && value <= 0xe7)));
 });

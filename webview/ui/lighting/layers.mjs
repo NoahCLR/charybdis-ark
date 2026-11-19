@@ -1,63 +1,65 @@
 // @ts-check
 import {choiceField} from "../segmented.mjs";
 import {el, esc} from "../../lib/dom.mjs";
-import {css, isOff} from "../../lib/colour.mjs";
+import {css} from "../../lib/colour.mjs";
 import {currentLayer, layers, post, render, showLayer, state} from "../../store.mjs";
 import {editGate} from "../../view/edit-gate.mjs";
-import {layerColourRow, layerPaints, offWording} from "../../view/lighting.mjs";
+import {colourPaints, isOff, isPassthrough, layerColourRow, offWording, swatchOf} from "../../view/lighting.mjs";
 import {vocabulary, word, layerCalled} from "../../view/vocabulary.mjs";
 import {draftDot, draftMarks} from "../../view/review.mjs";
 import * as edits from "../../view/edits.mjs";
-import {colourControl, section, stack} from "./common.mjs";
-import {groupRowsTable} from "./led-rows.mjs";
+import {colourControl, itemHead, lightingGroup, paintsLine, section, stack, stageSurface} from "./common.mjs";
+import {sectionInfo} from "./help.mjs";
+import {accentsSection} from "./accents.mjs";
+import {layerMarked} from "../marks.mjs";
 import {foldEmptyLayers} from "../../view/empty-layers.mjs";
-import {emptyLayersButton, emptyLayersShown} from "../empty-layers.mjs";
+import {emptyLayersShown, toggleEmptyLayers} from "../empty-layers.mjs";
+import {EMPTY_LAYERS_TIP, EMPTY_LAYERS_TITLE} from "../../view/empty-layers.mjs";
+import {attachPickRows, groupedTable, pickButton, pickableRow} from "../groups.mjs";
 
 /** @param {import("../../../contracts/panel.js").PublishedModel} model */
 export function stageLayers(model) {
-    const node = el(`<div></div>`);
     const canEdit = editGate(model, "lighting").editable;
     const marks = draftMarks(model?.draft?.changes);
 
-    node.className = "tab-split";
-    // Past eight layers the list scrolls on its own beside the editor, as the
-    // pointing modes' list does. Empty layers fold behind the disclosure at
-    // its end (D-L76), the picked one apart.
+    // The layers, in the Keymap's grouped table (ui/groups.mjs), scrolling
+    // on their own beside the editor. Empty layers fold under the table's
+    // last band (D-L76), the picked one apart.
     const {shown, folded} = foldEmptyLayers(model, layers(), (layer) => layer.index, (layer) => layer.index === state.layer);
-    const listed = emptyLayersShown("lighting-layers") ? [...shown, ...folded] : shown;
-    const list = el(`<aside class="rowlist ${listed.length > 8 ? "many" : ""}" data-scroll-list="layers"><div class="rowlist-h">Layers</div></aside>`);
-    listed.forEach((layer) => {
+    const open = emptyLayersShown("lighting-layers");
+    /** @param {import("../../../contracts/panel.js").Layer} layer */
+    const layerRow = (layer) => {
         const index = layer.index;
-        if (layer === folded[0]) list.append(emptyLayersButton("lighting-layers", folded.length, "rowlist-empties"));
-        const row = layerColourRow(model, layer.index);
-        const lit = row && !isOff(row.color);
-        const item = el(`<button class="rowitem ${index === state.layer ? "on" : ""}" data-layer="${esc(index)}">
-            <span class="t"><span class="mk-swatch lead ${lit ? "" : "swatch-off"}" style="${lit ? `background:${css(row.color)}` : ""}"></span>${esc(layerCalled(layer))}${marks.lightingLayers.has(layer.index) ? draftDot() : ""}</span>
-            <span class="m">${esc(!row ? "not reported" : !layerPaints(row.color) ? "no colour" : `${lit ? "" : "black · "}${word(vocabulary(model).paintModes, row.mode).toLowerCase()}`)}</span></button>`);
-        item.addEventListener("click", () => { showLayer(index); render(); });
-        list.append(item);
-    });
-    if (folded.length && listed === shown) list.append(emptyLayersButton("lighting-layers", folded.length, "rowlist-empties"));
+        const row = layerColourRow(model, index);
+        const lit = row && !isPassthrough(row.color) && !isOff(row.color);
+        return pickableRow(`${index}`, index === state.layer, [
+            pickButton(`lighting-layers:${index}`, index === state.layer, `<span class="mk-swatch lead ${swatchOf(row?.color)}" style="${lit ? `background:${css(row.color)}` : ""}"></span>${esc(layerCalled(layer))}${marks.lightingLayers.has(index) ? draftDot(model?.draft) : ""}`),
+            `<span class="muted">${esc(!row ? "not reported" : !colourPaints(row.color) ? "passthrough" : `${lit ? "" : "off · "}${word(vocabulary(model).paintModesBrief, row.mode)}`)}</span>`,
+        ], {data: {layer: index}});
+    };
+    const list = groupedTable({scroll: "layers", draft: model?.draft, columns: [["Layer", "52%"], ["Paints", "48%"]], groups: [
+        {id: "inUse", title: vocabulary(model).lightingLists.inUse, ...lightingGroup("layers:inUse"), rows: shown.map(layerRow)},
+        ...(folded.length ? [{id: "empty", title: EMPTY_LAYERS_TITLE, tip: EMPTY_LAYERS_TIP, open, rows: folded.map(layerRow), toggle: () => { toggleEmptyLayers("lighting-layers"); render(); }}] : []),
+    ]});
+    attachPickRows(list, (index) => { showLayer(Number(index)); render(); });
     const layer = currentLayer();
     const row = layerColourRow(model, layer?.index);
-    const main = el(`<div class="tab-grid two stage-detail"></div>`);
-    const colour = section(`${layerCalled(layer)} colour`);
+    const brief = word(vocabulary(model).paintModesBrief, row?.mode);
+    const head = itemHead(layerMarked(model, layer), row ? paintsLine(model, "layers", row.color, brief) : "Not reported");
+    const colour = section(vocabulary(model).lightingFields.colour);
     colour.append(colourControl(model, {
         colour: row?.color, canEdit, title: `${layerCalled(layer)} layer`,
         ...offWording(model, "layers"),
         onChange: (next) => { if (row) post(edits.layerColour(row.layer, row.mode, next)); },
     }));
-    const where = section("Where it paints");
-    const mode = el(choiceField({label: "Which keys light up", f: `lighting:layer:${layer?.index}:mode`, choices: vocabulary(model).paintModes,
+    // Which LEDs the layer lights is its own; what each choice means is on
+    // the section's info mark.
+    const where = section("Where it paints", sectionInfo(model, "layers:mode"));
+    const mode = el(choiceField({label: vocabulary(model).lightingFields.paintMode, f: `lighting:layer:${layer?.index}:mode`, choices: vocabulary(model).paintModes,
         current: row?.mode || "KEYS_MAPPED_ON_THIS_LAYER_ONLY", disabled: !canEdit}));
     mode.addEventListener("change", (event) =>
         { if (row) post(edits.layerColour(row.layer, /** @type {HTMLInputElement} */ (event.target).value, row.color)); });
-    where.append(stack(mode, el(`<p class="note">Keys mapped on this layer only leaves its transparent and empty keys unpainted, so what is beneath shows. All keys paints every key.</p>`)));
-    const overrides = section("LED overrides on this layer", `<span class="right"><button class="btn tiny ghost" data-act="groups">Edit groups</button></span>`);
-    overrides.className = "span";
-    overrides.append(groupRowsTable(model.rgb.layerLedGroups, "layer"));
-    /** @type {HTMLButtonElement} */ (overrides.querySelector('[data-act="groups"]')).addEventListener("click", () => { state.stage = "groups"; render(); });
-    main.append(colour, where, overrides);
-    node.append(list, main);
-    return node;
+    where.append(stack(mode));
+    return stageSurface(model, {id: "layers", first: list, head, colour, side: where, accents: accentsSection(model, "layers"),
+        note: "Each layer's colour, LEDs and accents are its own."});
 }

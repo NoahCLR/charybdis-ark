@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {createRequire} from "node:module";
-import {SETTINGS_SCREENS, fieldParts, screenOfSection, sectionPath, sectionsIn, sectionsOn} from "../../webview/view/settings-layout.mjs";
+import {SETTINGS_SCREENS, screenOfSection, sectionPath, sectionsIn, sectionsOn, settingField, settingGoverns, unitlessLabel} from "../../webview/view/settings-layout.mjs";
 
 const require = createRequire(import.meta.url);
 const {publishedModel} = require("../fixtures/published-model");
@@ -15,10 +15,10 @@ const ids = (screen) => sectionsOn(sections, screen).map((section) => section.id
 
 test("each Settings screen draws its sections in the order a person reads them", () => {
     assert.deepEqual(Object.keys(SETTINGS_SCREENS), ["behaviours", "combos", "pointer", "host"]);
-    assert.deepEqual(ids("behaviours"), ["keyTiming", "behaviorSettings"], "Tap & hold timing, then where behaviours run");
+    assert.deepEqual(ids("behaviours"), ["behaviorSettings", "keyTiming"], "where behaviours run, then Tap & hold timing");
     assert.deepEqual(ids("combos"), ["comboSettings", "comboReferences"], "Combos, then Combo layer matching");
     assert.deepEqual(ids("pointer"), ["normalPointerSpeed", "sniping", "autoMouse"], "everything filed under Pointer");
-    assert.deepEqual(ids("host"), ["host", "keyboardOptions"], "Your computer, then Key swaps & typing");
+    assert.deepEqual(ids("host"), ["host", "autocorrect"], "Your computer, then Text replacement, which types through its layout");
     assert.deepEqual(sectionsOn(sections, "keys"), [], "a screen that is not a Settings one draws none");
 });
 
@@ -29,6 +29,30 @@ test("every section the keyboard's model files under Settings or Pointer is on o
     assert.deepEqual(filed.filter((id) => !drawn.includes(id)), ["startupLayers"], "moving the base layer stands in for a Default layers editor");
     assert.ok(byId("startupLayers"), "the stored value is still published, for the review and checks");
     assert.ok(!drawn.some((id) => byId(id).area === "Lighting"), "lighting is set on Lighting");
+});
+
+test("a behaviour's own timing wears the mark of the default it replaces, as core marks that setting", () => {
+    // The two thresholds their tier's dot, the Multi tap window every tap
+    // count at once (D-L31); the behaviour editor reads them by the setting's
+    // name, which is also the timing's.
+    assert.deepEqual(settingGoverns(model, "tapHoldTerm"), {kind: "tier", tier: "hold"});
+    assert.deepEqual(settingGoverns(model, "longHoldTerm"), {kind: "tier", tier: "long"});
+    assert.deepEqual(settingGoverns(model, "multiTapTerm"), {kind: "branches"});
+    assert.equal(settingGoverns(model, "noSuchSetting"), null, "a setting the keyboard has not reported marks nothing");
+    assert.equal(settingGoverns(null, "tapHoldTerm"), null, "nor does one with no model yet");
+});
+
+test("a setting is found by its name wherever it is filed, and named without the unit its value shows", () => {
+    // Core writes the unit after a label for the review; a control that
+    // shows the unit beside its value, or a sentence naming the setting,
+    // reads the label alone.
+    assert.equal(settingField(model, "feedbackFlash")?.label, "Blink time (ms)");
+    assert.equal(unitlessLabel(settingField(model, "feedbackFlash")), "Blink time");
+    assert.equal(unitlessLabel(settingField(model, "leaderTimeout")), "Leader waits");
+    assert.equal(unitlessLabel(settingField(model, "effectSpeed")), "Animation speed", "a label with no unit is kept whole");
+    assert.equal(unitlessLabel({label: "Hold (ms) delay", unit: "ms"}), "Hold (ms) delay", "only a unit at the end is the unit");
+    assert.equal(settingField(model, "noSuchSetting"), undefined);
+    assert.equal(unitlessLabel(undefined), "");
 });
 
 test("Lighting draws the sections the model files under it, in the model's order", () => {
@@ -43,15 +67,13 @@ test("a section is edited on the screen that draws it", () => {
     assert.equal(screenOfSection("keyTiming"), "behaviours");
     assert.equal(screenOfSection("comboReferences"), "combos");
     assert.equal(screenOfSection("autoMouse"), "pointer");
-    assert.equal(screenOfSection("keyboardOptions"), "host");
     assert.equal(screenOfSection("startupLayers"), null, "Default layers has no editor");
     assert.equal(screenOfSection("lightingPower"), null, "Lighting draws its own");
     assert.equal(screenOfSection(undefined), null);
-});
-
-test("Key swaps & typing lists its fields under what they change", () => {
-    assert.deepEqual(fieldParts(byId("keyboardOptions").fields).map(({part, fields}) => [part, fields.length]), [["Modifiers", 7], ["Keys", 3], ["Typing", 3]]);
-    assert.deepEqual(fieldParts(byId("keyTiming").fields).map(({part}) => part), [""], "a section without parts is one");
+    // Text replacement's switch is a Typing setting, as every switch is a
+    // Settings screen's (D-L87): no section is edited anywhere else.
+    assert.equal(screenOfSection("autocorrect"), "host");
+    assert.equal(byId("autocorrect").area, "Settings", "core files it under Settings by the same id");
 });
 
 // The behaviour editor's timing note names where the defaults are edited,
@@ -70,5 +92,5 @@ test("core names a section's place as the interface's path does", () => {
     for (const [screen, ids] of Object.entries(SETTINGS_SCREENS)) {
         for (const id of ids) assert.equal(settingsPath(screen, id), sectionPath(model, id), id);
     }
-    assert.equal(sectionPath(model, "host"), "Host settings → Your computer");
+    assert.equal(sectionPath(model, "host"), "Typing settings → Your computer");
 });

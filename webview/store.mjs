@@ -21,8 +21,8 @@ const panelApi = acquirePanelApi();
 // the forms (undo, redo, a jump, discard, rebase, Apply, an import, another
 // keyboard or the demo), `resets` and `resetsTo` start a form again from the
 // model; `kept` survives. This preserves the existing reset policy, including
-// pending hold-style choices for empty cells and the LED group builder. A new
-// field takes one of the three here rather than joining a separate reset list.
+// pending hold-style choices for empty cells. A new field takes one of the
+// three here rather than joining a separate reset list.
 /** @type {import("./view/state-fields.mjs").StateFields<PanelState>} */
 export const STATE_FIELDS = {
     screen: kept("keys"),
@@ -47,19 +47,28 @@ export const STATE_FIELDS = {
     cellRow: kept(null),
     reveal: kept(null),        // a selector the next render scrolls into view and marks, then forgets
     pickCombo: kept(null),     // a combo id to pick in the Combos tab, wherever this layer lists it
+    comboPreview: kept(null),  // {id, keys}: the combo Combo feedback holds on the board and the keys picked to hold it from (view/combo-held.mjs)
+    lightingGroupsShut: kept([]), // the groups of Lighting's lists folded shut, as "stage:group" ("layers:inUse", "key:tiers", "combo:layer")
     settingsOpen: kept([]),    // the Keyboard screen's folds opened by hand, so a render keeps them open
     flashPausesAsked: kept(null), // the connection whose flash pauses an open Diagnostics last asked for
-    keyDetailsOpen: kept(false), // the Key tab's folded position details, open on every key once opened
-    stackOpen: kept(false),    // the Key tab's runs of transparent layers, shown in full once asked
+    // The folds opened by hand and kept open across renders, wherever they
+    // appear next, by fold id (ui/disclosure.mjs keepFold): the Key tab's
+    // Where it is stored and its runs of transparent layers, Lighting's What
+    // this stage does, a behaviour's or combo's Layers it runs on.
+    foldsOpen: kept([]),
     emptyLayersShown: kept([]), // the places showing their empty layers (ui/empty-layers.mjs)
     allSlotsShown: kept([]),   // the slot banks showing their unused slots (ui/slot-bank.mjs)
-    definitionLayersOpen: kept(false), // a behaviour's or combo's Layers it runs on, open on every one once opened, so a render keeps it
     checkGroupsOpen: kept(null), // {revision, open}: the review's check groups opened or folded by hand, for that revision of the draft
     settingsDurationUnits: kept({}), // display preferences; stored settings remain milliseconds
     // {cell, keycode, style, repeatHz}: how the open empty cell runs, chosen
     // before it sends anything. Historically kept across draft replacement;
     // it shows only while the matching behaviour cell is empty.
     cellHow: kept(null),
+    // {keycode, term, terms, problem}: timings the behaviour editor refused
+    // (D-L82), kept in their fields, marked, through the redraw core's refusal
+    // brings, until a timing mends them or Timings closes; a replaced draft
+    // drops them.
+    timingRefusal: resets(null),
     // The combo builder, opened and closed as one (openComboBuilder):
     //   inputs      the input names the combo stores, in stored order — never
     //               board positions, which mean another key on every layer
@@ -80,19 +89,34 @@ export const STATE_FIELDS = {
     keyClipboard: kept(null),  // {keycode, label}: the key ⌘C copied, for ⌘V onto the selected key
     stage: kept("layers"),
     railMenu: kept(false),    // the keyboard menu under the rail's mark
-    boardShortcuts: kept(false), // the Shortcuts list in the board's legend
     layersOpen: kept(false),  // the layer-stack panel on the layer row
     layersAsked: kept(false), // its stack is requested once per opening
     pointingSlot: kept(0),
+    pointingSearch: kept(""),
     pdKind: resets(null),      // movement selection while the rebuilt form catches up: {slot, kind}
     pdTaps: resets(null),      // {slot, rows: {"dir:up": tap}}: direction shortcuts set to ignore modifiers before any is chosen
     pdAdvanced: kept(false),  // Advanced open on the pointing editor, whichever slot is shown
     applyDismissed: kept(0),  // the failed Apply (by id) the person closed, so it stays closed
     recoveryAsk: kept(null),  // the recovery copy (by id) whose Delete is asking "Delete this copy?"
-    pdPreview: kept(false),
     feedbackRow: kept("hold"),
+    replacementRow: kept("textColor"), // the case picked on Lighting's Replacement feedback tab, by its colour's field
     macroSlot: kept(null),
     macroSearch: kept(""),
+    // The Text replacement screen: its search, the entry open in its editor,
+    // the replacement being made, what is open in the editor, and the core's
+    // answer to the edit being typed. The forms start again when the draft
+    // is replaced.
+    autocorrectSearch: kept(""),
+    autocorrectEntry: kept(null),
+    autocorrectNew: resets(null),
+    autocorrectEdit: resets(null),
+    autocorrectExport: kept(false),
+    autocorrectCheck: resets(null),
+    autocorrectImport: resets(null),
+    // What was typed into Try it stays through a draft change: it is tried
+    // again against the list as it then stands.
+    autocorrectTry: kept({before: "", typed: "", capsLock: false, text: "", shown: "", fired: [], marks: [], undone: false, error: "", requestId: 0, draft: ""}),
+    heldSlot: resets(null),    // {bank, key}: the tile held for a keyboard swap, let go when the draft is replaced
     customKey: kept(null),
     customKeySearch: kept(""),
     // keycode → one macro slot's local steps, raw input and validation. A take
@@ -107,16 +131,17 @@ export const STATE_FIELDS = {
     recordDelays: kept(true),
     recordPreserveHoldTiming: kept(false),
     recordDelayThreshold: kept(30),
-    recordDelayRound: kept(10),
-    // The LED group row being built on LED groups: the LEDs picked on the
-    // board, the trackball LED, the row's colour, and its table, owner and
-    // source. Historically kept across draft replacement despite holding
-    // unstaged choices. Drawing drops a missing source group and repairs the
-    // owner; changing the reset policy is a separate behavior decision.
-    ledPicks: kept([]),
-    trackball: kept(false),
-    rowColour: kept({h: "0", s: "0", v: "0"}),
-    ledRow: kept({target: "layer", owner: "", source: ""}),
+    // The accent being added or changed on a Lighting stage (D-L77): its
+    // table, whether it lights for all of its owners, its place (null for a
+    // new one), the LEDs picked on the board, its colour and whether it takes
+    // its stage's instead. It names a row by its place, so a draft replaced
+    // under it drops it unkept.
+    accent: resets(null),
+    // The accent clicked in a Lighting list, its LEDs glowing on the board
+    // until it is clicked again: {stage, key}, a stage's tab naming it by its
+    // table and place, All accents an owner's by its table and name. A place
+    // a replaced draft may move, it starts again.
+    accentShown: resets(null),
     overlay: kept(null),
     leaveDemo: kept(null),     // {ask, message}: leaving the demo (or replacing its file) waiting on its question
     modeAsk: kept(null),       // {mode, question}: a switch of edit mode waiting on Save/Revert or Send/Discard
@@ -152,6 +177,37 @@ export function openComboBuilder(combo = null, defaultTermMs = "") {
 }
 export function closeComboBuilder() {
     state.combo = closedComboBuilder();
+}
+
+// Two slots of a bank traded places (D-L81): core moves every reference the
+// draft holds, but a form or pick not yet posted holds its own, and survives
+// a change of screen. The combo builder closes, as a draft change closes it:
+// Keep posts its inputs and output whole, checked against no draft. A key
+// waiting to be placed, a new replacement's macro, and a custom key's pending
+// cell choice or refused timings follow their thing, as the swapped screen's
+// own editor does (each screen's swap handler, which calls this).
+/** @param {"macros" | "customKeys" | "pointing"} bank @param {string} from @param {string} to */
+export function followSlotSwap(bank, from, to) {
+    closeComboBuilder();
+    /** @type {Map<string, string>} */
+    const names = new Map();
+    const trade = (/** @type {string} */ a, /** @type {string} */ b) => { if (a && b) names.set(a, b).set(b, a); };
+    if (bank === "pointing") {
+        const keysOf = (/** @type {string} */ slot) => model?.pdModes?.find((mode) => mode.id === Number(slot))?.keys;
+        const [a, b] = [keysOf(from), keysOf(to)];
+        trade(a?.hold || "", b?.hold || ""); trade(a?.lock || "", b?.lock || "");
+    } else trade(from, to);
+    /** @param {string} keycode */
+    const follows = (keycode) => names.get(keycode) ?? keycode;
+    if (state.placement) state.placement = {keycode: follows(state.placement.keycode)};
+    if (state.cellHow) state.cellHow = {...state.cellHow, keycode: follows(state.cellHow.keycode)};
+    if (state.timingRefusal) state.timingRefusal = {...state.timingRefusal, keycode: follows(state.timingRefusal.keycode)};
+    const fresh = state.autocorrectNew, macros = model?.macros || [];
+    if (bank === "macros" && fresh?.macro != null && names.has(macros[fresh.macro]?.keycode)) {
+        const macro = macros.findIndex((slot) => slot.keycode === follows(macros[/** @type {number} */ (fresh.macro)].keycode));
+        state.autocorrectNew = {...fresh, macro, joins: null, label: undefined};
+        state.autocorrectCheck = null;
+    }
 }
 
 // One macro slot's editor state, and a change to part of it.
@@ -214,7 +270,7 @@ export function toggleLayerOn(index) {
     state.layersOn = next.on;
     const row = behaviourRowAfterPreview(state.behaviourRow, before, selectedKey());
     if (row === state.behaviourRow) return;
-    Object.assign(state, {behaviourRow: row, behaviourRoute: {row, group: "view"}, cell: null, cellHow: null});
+    Object.assign(state, {behaviourRow: row, behaviourRoute: {row, group: "view"}, cell: null, cellHow: null, timingRefusal: null});
 }
 /** @param {import("../contracts/panel.js").Layer | null | undefined} layer @param {number | undefined} index */
 export const positionAt = (layer, index) =>

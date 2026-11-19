@@ -5,9 +5,8 @@
 import {keyMeaning} from "./keyface.mjs";
 import {keyIdentity, slotKeycodeNames, slotKeycodes} from "./key-identity.mjs";
 import {viewLayers} from "./layer-resolution.mjs";
-import {reachGroups, reachInView} from "./reach.mjs";
+import {placementsBy, reachGroups, reachInView} from "./reach.mjs";
 import {comboOutput} from "./combo-reach.mjs";
-import {layerCalled} from "./vocabulary.mjs";
 import {linkStartHolds} from "../../rules/pointing-link-starts.mjs";
 /** @typedef {import("../../contracts/panel.js").Layer} Layer */
 /** @typedef {import("./keyface-types.js").PointingSlot} PointingSlot */
@@ -21,12 +20,12 @@ import {linkStartHolds} from "../../rules/pointing-link-starts.mjs";
  * (its link, firmware D-F62) reaches it by turning on: On this layer, with no
  * key at all, and wherever a route turns that layer on (startedRoutes).
  */
-/** @param {import("./keyface-types.js").LayerView} view @returns {import("./keyface-types.js").ReachGroup} */
-export const pointingReach = (view) => {
+// `all` names the slots to look for: by default every slot with a mode, since
+// a slot with no movement cannot be activated, so it is not a mode this layer
+// is missing either.
+/** @param {import("./keyface-types.js").LayerView} view @param {string[]} [all] @returns {import("./keyface-types.js").ReachGroup} */
+export const pointingReach = (view, all = (view.model?.pdModes || []).filter((slot) => slot.kind).map((slot) => String(slot.id))) => {
     const {model, stack, at} = view;
-    // A slot with no movement cannot be activated, so it is not a mode this
-    // layer is missing either.
-    const all = (model?.pdModes || []).filter((slot) => slot.kind).map((slot) => String(slot.id));
     const reach = reachGroups(view, pointingNamesOf(model), all);
     const layer = stack[at]?.index ?? at, on = 2 ** layer;
     /** @param {ReachEntry[]} entries */
@@ -139,13 +138,13 @@ export function whatReachesSlot(model, slot) {
         if (values.has(entry.keycode)) [entry.value, ...(entry.aliases || [])].forEach((name) => names.add(name));
     }
     const keys = [];
-    /** @type {Set<string>} */
+    /** @type {Set<import("../../contracts/panel.js").Layer>} */
     const layers = new Set();
     for (const layer of model?.layers || []) {
         for (const position of layer.positions || []) {
             if (!names.has(position.keycode) && !(position.value !== undefined && values.has(position.value))) continue;
             keys.push({layer, position});
-            layers.add(layerCalled(layer));
+            layers.add(layer);
         }
     }
     const behaviours = (model?.keyBehaviors || []).filter((row) => (row.steps || []).some((step) =>
@@ -153,6 +152,15 @@ export function whatReachesSlot(model, slot) {
     const combos = (model?.combos || []).filter((row) => names.has(comboOutput(model, row)));
     return {keys, behaviours, combos, layers: [...layers]};
 }
+
+// The layers a pointing mode is started from, as placementsOf has them for a
+// macro or custom key, by the rows of the Keymap screen's Pointing tab: a key
+// holding or locking it, a behaviour or combo sending it, a key turning on a
+// layer that starts it, or the layer itself starting it (an entry's `starts`).
+// An empty slot's keys are found too, as whatReachesSlot finds them: they do
+// nothing until it holds a mode.
+/** @param {ViewModel} model @param {PointingSlot} slot */
+export const pointingPlacements = (model, slot) => placementsBy(model, (view) => pointingReach(view, [String(slot.id)]), String(slot.id));
 
 // The keycode name that holds a slot's mode.
 /** @param {PointingSlot} slot */

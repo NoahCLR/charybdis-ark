@@ -78,6 +78,42 @@ test('clear, additions and reorders undo independently; a new edit drops redo', 
     expect(await draftHistory(page)).toEqual([]);
 });
 
+test('Clear macro empties the name and protection with the steps, and its undo puts all three back', async ({page}) => {
+    await openMacro(page);
+    // The slot as the core publishes it after each accepted edit.
+    const publishSlot = fields => page.evaluate(async fields => {
+        const store = await import('/webview/store.mjs'), model = structuredClone(store.getModel());
+        Object.assign(model.macros[17], fields, {empty: !fields.payload});
+        model.draft.revision++;
+        window.dispatchEvent(new MessageEvent('message', {data: {type: 'model', model,
+            acceptedEdit: {message: {type: 'updateMacro'}, previousFingerprint: 'before', fingerprint: 'after'}}}));
+    }, fields);
+    await publishSlot({payload: '{KC_A}{KC_C}', name: 'Greeting', protection: 'on'});
+    await expect(page.locator('[data-f="macro:MACRO_17:name"]')).toHaveValue('Greeting');
+    await page.locator('[data-act="clear"]').click();
+    await expect(page.locator('.macro-empty')).toBeVisible();
+    await expect.poll(() => updates(page).then(rows => rows.at(-1))).toMatchObject({keycode: 'MACRO_17', payload: '', name: '', protection: 'auto'});
+    expect(await updates(page), 'one edit, so one draft undo takes it back').toHaveLength(1);
+    await publishSlot({payload: '', name: '', protection: 'auto'});
+    await expect(page.locator('[data-f="macro:MACRO_17:name"]')).toHaveValue('');
+
+    await command(page, 'undo');
+    await expect(page.locator('[data-step-tile]')).toHaveCount(2);
+    await expect.poll(() => updates(page).then(rows => rows.at(-1))).toMatchObject({payload: '{KC_A}{KC_C}', name: 'Greeting', protection: 'on'});
+    await publishSlot({payload: '{KC_A}{KC_C}', name: 'Greeting', protection: 'on'});
+    await command(page, 'redo');
+    await expect(page.locator('.macro-empty')).toBeVisible();
+    await expect.poll(() => updates(page).then(rows => rows.at(-1))).toMatchObject({payload: '', name: '', protection: 'auto'});
+    expect(await draftHistory(page)).toEqual([]);
+});
+
+test('Clear macro on a slot with no name or protection posts its steps alone', async ({page}) => {
+    await openMacro(page);
+    await page.locator('[data-act="clear"]').click();
+    await expect.poll(() => updates(page).then(rows => rows.at(-1)?.payload)).toBe('');
+    expect(Object.keys((await updates(page)).at(-1))).not.toContain('name');
+});
+
 test('field edits coalesce, invalid delay redo stays local, and a valid correction still posts', async ({page}) => {
     await openMacro(page, '{120}{KC_C}');
     await page.locator('[data-step-tile="0"]').click();
@@ -91,7 +127,7 @@ test('field edits coalesce, invalid delay redo stays local, and a valid correcti
     await expect(page.locator('[data-macro-feedback]')).toBeHidden();
     await command(page, 'redo');
     await expect(delay).toHaveValue('65536');
-    await expect(page.locator('[data-macro-feedback]')).toContainText('not staged');
+    await expect(page.locator('[data-macro-feedback]')).toContainText('not in your draft');
     expect(await updates(page)).toEqual([]);
     await delay.fill('250'); await delay.press('Tab');
     await expect.poll(() => updates(page).then(rows => rows.at(-1)?.payload)).toBe('{250}{KC_C}');
@@ -197,7 +233,7 @@ test('text fields keep native undo and clipboard while typing; renames/protectio
 test('during recording editor shortcuts are captured as chords, and the whole take is one step undo', async ({page}) => {
     await openMacro(page);
     await page.locator('[data-step-tile="0"]').click(); await page.keyboard.press('Control+c');
-    await page.getByText('Record delays', {exact: true}).click();
+    await page.locator('.record-opts').getByText('Record delays', {exact: true}).click();
     await page.locator('[data-act="record"]').click();
     await expect(page.locator('[data-macro-command]')).toHaveCount(0);
     for (const key of ['c', 'v', 'z', 'y']) await page.keyboard.press(`Meta+${key}`);
@@ -254,7 +290,7 @@ test('pasting an unsupported key stays local, and a finished take followed by Cl
         store.render(); window.__posted.length = 0;
     });
     await command(page, 'paste');
-    await expect(page.locator('[data-macro-feedback]')).toContainText('not staged');
+    await expect(page.locator('[data-macro-feedback]')).toContainText('not in your draft');
     expect(await updates(page)).toEqual([]);
     await page.keyboard.press('Control+z');
     await page.locator('[data-act="record"]').click(); await page.keyboard.press('b'); await page.locator('[data-act="record"]').click();

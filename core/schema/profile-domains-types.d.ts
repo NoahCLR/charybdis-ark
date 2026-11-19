@@ -1,6 +1,6 @@
 import type {RgbProfile, RgbOptions, BehaviorOptions, BehaviorRow, SettingsDomain, PointingSlot, SemanticAction} from './types.js';
 
-export interface DomainOptions {rgb?: RgbOptions; behaviors?: BehaviorOptions}
+export interface DomainOptions {rgb?: RgbOptions; behaviors?: BehaviorOptions; autocorrect?: import('./autocorrect-domain-v1.js').Ceilings}
 export interface DomainModels {
     rgb: RgbProfile;
     behaviors: {rows: (BehaviorRow & {target: SemanticAction & {flags: 0}})[]; rowCount: number; populatedStepCount: number; byteLength: number};
@@ -9,6 +9,7 @@ export interface DomainModels {
     pdModes: PointingSlot[];
     keymap: number[][];
     macros: Buffer[];
+    autocorrect: import('./autocorrect-domain-v1.js').AutocorrectList;
 }
 export type DomainKey = keyof DomainModels;
 export interface DomainCodec<K extends DomainKey> {

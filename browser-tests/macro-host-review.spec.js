@@ -9,7 +9,7 @@ const {ProfileDraftSession} = require("../core/session/profile-draft-session");
 const {connectedState, panelModel} = require("../tests/fixtures/published-model");
 
 for (const theme of ["dark", "light"]) {
-    test(`changing Host updates stored macros and reviews the effect (${theme})`, async ({page}) => {
+    test(`changing Your computer updates stored macros and reviews the effect (${theme})`, async ({page}) => {
         const {snapshot, capabilities} = hostMacros(1 | (2 << 16), ["café", "{+KC_A}é{-KC_A}", "hello", "{KC_A}"]);
         const draft = new ProfileDraftSession(snapshot, "board", capabilities);
         const state = connectedState(capabilities);
@@ -38,13 +38,13 @@ for (const theme of ["dark", "light"]) {
         await expect(page.locator('[data-slot="MACRO_1"]')).toContainText("blocked");
         await expect(page.locator('[data-macro-feedback]')).toContainText("Release ordinary keys");
         await expect(page.locator('[data-macro-feedback]')).toContainText("stored macro cannot play");
-        await expect(page.locator('[data-macro-feedback]')).not.toContainText("This edit is not staged");
+        await expect(page.locator('[data-macro-feedback]')).not.toContainText("This edit is not in your draft");
         await page.evaluate(async () => {
             const store = await import("/webview/store.mjs");
             store.state.overlay = "review"; store.render();
         });
         const review = page.getByRole("dialog", {name: "Review changes"});
-        await expect(review).toContainText("Playback changes because of Host settings → Your computer");
+        await expect(review).toContainText("Playback changes because of Typing settings → Your computer");
         await expect(review).toContainText('layout keys: "é"');
         await expect(review).toContainText('Unicode entry (macOS): "é"');
         await expect(review).toContainText("Macro 1 cannot play with the settings in Your computer");

@@ -3,9 +3,11 @@ import test from "node:test";
 import {createRequire} from "node:module";
 import {keyMeaning} from "../../webview/view/keyface.mjs";
 import {tabReach} from "../../webview/view/tab-reach.mjs";
-import {holdKeyName, whatReachesSlot} from "../../webview/view/pointing-reach.mjs";
+import {holdKeyName, pointingPlacements, whatReachesSlot} from "../../webview/view/pointing-reach.mjs";
+import {placementChips} from "../../webview/view/reach-groups.mjs";
 import {customKeyShortcutMessage} from "../../webview/view/edits.mjs";
 import {layerView} from "../../webview/view/layer-view.mjs";
+import {layerCalled} from "../../webview/view/vocabulary.mjs";
 import {published} from "../fixtures/published-behaviours.mjs";
 
 const require = createRequire(import.meta.url);
@@ -39,7 +41,7 @@ test("what still reaches a pointing slot is listed, so an inert key can be named
         ]});
     const found = whatReachesSlot(model, model.pdModes[0]);
     assert.equal(found.keys.length, 2, "both the hold and the lock keycode count");
-    assert.deepEqual(found.layers, ["Base", "Navigation"]);
+    assert.deepEqual(found.layers.map(layerCalled), ["Base", "Navigation"], "the layers it is on, each once");
     assert.deepEqual(found.behaviours.map((row) => row.keycode), ["CUSTOM_KEY_0"]);
     assert.equal(holdKeyName(model.pdModes[6]), "PD_MODE_6", "slots past the named six use their number");
     assert.deepEqual(whatReachesSlot(model, undefined).keys, []);
@@ -103,6 +105,18 @@ const linkedMode = (id, name, link) => (/** @type {any[]} */ records) => {
 const slotsOf = (ids, ...modes) => (/** @type {any[]} */ records) => { modes.forEach((mode) => mode(records)); onlySlots(ids)(records); };
 // A custom key that turns on these layers, held.
 const turningOn = (/** @type {string} */ keycode, /** @type {number} */ layers) => customKeyShortcutMessage(keycode, {layers, layerKind: SHORTCUT_LAYER_KINDS.HOLD});
+
+test("a pointing mode's editor chips each layer that reaches it, a layer that starts it with no key saying so", () => {
+    const model = published({keys: {1: {0: "PD_MODE_6"}, 3: {0: "PD_MODE_6", 1: "PD_MODE_6_LOCK"}},
+        slots: slotsOf([4, 6], linkedMode(4, "Arrow", {linkedLayers: 1 << 3}), linkedMode(6, "Scroll", {linkedLayers: (1 << 1) | (1 << 2)}))});
+    const chips = (/** @type {number} */ id) => placementChips(pointingPlacements(model, model.pdModes[id])).map(({layer, how}) => [layer.index, how]);
+    assert.deepEqual(chips(6), [[1, "key"], [2, "starts it"], [3, "key ×2"]], "its hold and lock keys both count");
+    assert.deepEqual(chips(4), [[3, "starts it"]]);
+    assert.deepEqual(chips(5), [], "an empty slot no key names is placed nowhere");
+    const inert = published({keys: {2: {0: "PD_MODE_5"}}, slots: slotsOf([4])});
+    assert.deepEqual(placementChips(pointingPlacements(inert, inert.pdModes[5])).map(({layer, how}) => [layer.index, how]), [[2, "key"]],
+        "an empty slot's keys still show, as its card says they do nothing");
+});
 
 test("a layer that starts a pointing mode reaches it on that layer, with no key", () => {
     // A slot's starting layers start its mode whenever one turns on (firmware

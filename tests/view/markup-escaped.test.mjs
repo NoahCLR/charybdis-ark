@@ -31,6 +31,7 @@ import {fileURLToPath} from "node:url";
 // check cannot see it from their returns.
 const SAFE_HELPERS = {
     css: "a CSS colour, rgb() of three numbers (lib/colour.mjs)",
+    phraseMarked: "a Phrase as markup: each layer by layerMarked, every other word through esc (ui/marks.mjs)",
 };
 
 // Interpolations that pass for a reason the check cannot see, per module.
@@ -38,23 +39,28 @@ const SAFE_HELPERS = {
 const PASSES_ON_PURPOSE = [
     ["webview/lib/dom.mjs", ["html(String(markup).trim())"], "el() itself: what callers hand it is judged at each call"],
     ["webview/ui/checks.mjs", ["show(check)", "source(check)"], "the Show and source buttons the review overlay passes in, built from escaped templates there"],
-    ["webview/ui/custom-keys.mjs", ['keyFields(model, key).join("")'], "an empty slot and placedOn()'s layer chips, both markup templates"],
     ["webview/ui/device.mjs", ["value"], "kv() rows hold markup their callers escaped, as its @param says"],
-    ["webview/ui/groups.mjs", ['group.rows.join("")'], "each tab's table rows, markup templates built by that tab"],
+    ["webview/ui/groups.mjs", ['group.rows.join("")'], "each list's table rows, markup templates built by the tab or stage that lists them"],
     ["webview/ui/groups.mjs", ["detail"], "a group's detail, markup its tab built: the Combos tab's selected key, named through keyNameMarked"],
-    ["webview/ui/hover-card.mjs", ['own.join("")', 'reachSections(keyReach(view, layer, target, -1, []), target, {foot: false}).join("")', 'sections.join("")'], "reachSections() returns the hover card's sections, markup templates it pushes"],
-    ["webview/ui/keys/behaviours-tab.mjs", ["note"], "viewBehaviourNote() and comboNote(): escaped layer names and marked combo keys"],
-    ["webview/ui/keys/combos-tab.mjs", ["reachedBy"], "keysReach() and reachText(): marked key names and escaped layer names"],
-    ["webview/ui/keys/macros-tab.mjs", ["reachedBy"], "reachLabel(): marked key names and escaped layer names"],
-    ["webview/ui/keys/custom-keys-tab.mjs", ["reachedBy"], "reachLabel(): marked key names and escaped layer names"],
-    ["webview/ui/keys/pointing-tab.mjs", ["line"], "pointingReachLines(): keysReach(), branchReach(), comboReach() and layersNamed(), marked key names and escaped layer names"],
+    ["webview/ui/hover-card.mjs", ['own.join("")', 'reachSections(reach, target, {foot: false}).join("")', 'sections.join("")'], "reachSections() returns the hover card's sections, markup templates it pushes"],
+    ["webview/ui/keys/behaviours-tab.mjs", ["note"], "viewBehaviourNote() and comboNote(): marked layer names (layerMarked) and marked combo keys"],
+    ["webview/ui/keys/combos-tab.mjs", ["reachedBy"], "keysReach() and reachText(): marked key names and marked layer names (layerMarked)"],
+    ["webview/ui/keys/macros-tab.mjs", ["reachedBy"], "reachLabel(): marked key names and marked layer names (layerMarked)"],
+    ["webview/ui/keys/custom-keys-tab.mjs", ["reachedBy"], "reachLabel(): marked key names and marked layer names (layerMarked)"],
+    ["webview/ui/keys/pointing-tab.mjs", ["line"], "pointingReachLines(): keysReach(), branchReach(), comboReach() and layersNamed(), marked key names and marked layer names (layerMarked)"],
     ["webview/ui/keys/key-tab.mjs", ["stackRows(model, layer, position)"], "the layer stack's rows, markup templates joined"],
-    ["webview/ui/layerbar.mjs", ["tint"], "a style attribute holding layerSwatch()'s css() colour"],
-    ["webview/ui/pointing/empty-slot.mjs", ["listed(parts)"], "the ways still reaching an empty slot, joined in prose (view/vocabulary.mjs listed): each a template of counts, escaped layer names and marked actions"],
+    ["webview/ui/pointing/link.mjs", ["names"], "the layers the pointer layer covers, each by layerMarked, joined in prose by listed()"],
+    ["webview/ui/keys/behaviour-editor.mjs", ["name"], "a dashed cell's name, which inheritedShown(), holdTierShown() and impliedShown() build with actionNamed() or esc()"],
+    ["webview/ui/layerbar.mjs", ["light"], "a style attribute holding layerSwatch()'s css() colour, as the tab's light and, while it is on, its tint"],
+    ["webview/ui/pointing/empty-slot.mjs", ["listed(parts)"], "the ways still reaching an empty slot, joined in prose (view/vocabulary.mjs listed): each a template of counts, marked layer names and marked actions"],
     ["webview/ui/review-items.mjs", ['head.map(row).join("")', 'rest.map(row).join("")', "show", "discard"], "field rows from field(), and the Show and Discard buttons the review overlay builds"],
-    ["webview/ui/marks.mjs", ["SCREENS.pointing.icon", "look"], "the Pointing modes screen's authored SVG icon (view/screens.mjs), and a style attribute holding a css() colour: a layer swatch's or a pointing slot's light"],
+    ["webview/ui/marks.mjs", ["REACH_ICONS.pointing", "PLAIN_ICONS[kind]", "look"], "the Pointing modes, Macros, Custom keys and Text replacement screens' authored SVG icons (view/screens.mjs REACH_ICONS and SCREENS), and a style attribute holding a css() colour: a layer swatch's or a pointing slot's light"],
+    ["webview/ui/marks.mjs", ["html"], "keyChips() keys, markup their callers built: keyNameMarked() names, or esc() text"],
     ["webview/ui/frame.mjs", ["definition.icon"], "a screen's authored SVG icon (view/screens.mjs)"],
+    ["webview/ui/keys/board-card.mjs", ['Object.values(REACH_ICONS).join("")'], "the Macros, Custom keys and Pointing modes screens' authored SVG icons (view/screens.mjs REACH_ICONS), in the board's legend"],
+    ["webview/ui/board.mjs", ["REACH_ICONS[kind]"], "the Macros, Custom keys or Pointing modes screen's authored SVG icon (view/screens.mjs REACH_ICONS), on a key that reaches one"],
     ["webview/view/geometry.mjs", ['keys.join("")'], "the outline's key rectangles, templates of GEO numbers"],
+    ["webview/view/review.mjs", ["tip"], "a change mark's tip, an authored literal from the frozen word tables editWords returns (view/edit-mode.mjs)"],
 ];
 
 const ROOT = fileURLToPath(new URL("../../", import.meta.url));

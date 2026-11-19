@@ -1,15 +1,17 @@
 // @ts-check
 "use strict";
 
-// Which keyboard layer each slot of a draft holds.
+// Which keyboard layer each slot of a draft holds, as one bank of the draft's
+// order (draft-order.js), and the arithmetic of one bank's order.
 //
 // A layer is neither its name, which a rename changes, nor its slot, which a
-// reorder changes. A draft keeps an order beside each history entry —
-// `order[slot]` is the keyboard layer that slot now holds — set from what
-// Rename & Reorder saved, never inferred from names or contents. The keyboard's
-// profile rearranged into that order, every layer reference following, is the
-// *reference* the review compares the draft with: a reorder is then one item,
-// and everything else is compared layer with layer.
+// reorder changes. `order[slot]` is the keyboard layer that slot now holds,
+// set from what Rename & Reorder saved, never inferred from names or
+// contents. The keyboard's profile rearranged into that order, every layer
+// reference following, is the *reference* the review compares the draft
+// with: a reorder is then one item, and everything else is compared layer
+// with layer. The macro, custom key and pointing banks keep theirs the same
+// way (slot-order.js).
 
 const {reorderLayers, validateSnapshot} = require("./portable-profile");
 

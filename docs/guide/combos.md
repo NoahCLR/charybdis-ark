@@ -17,20 +17,23 @@ Click a row to see its keys ringed on the board and open it for editing, with
 
 ## Making a combo
 
-**New combo** opens the builder for a new combo.
+**New combo**, at the top of the column beside the list, opens the builder for a
+new combo. It stays off while that builder is open.
 
 1. **Sends**: what the combo sends, with **Pick…**. A combo can't send a
    layer's **Tap-hold**, which decides tap or hold on a key of its own, so
    the picker doesn't offer it.
 2. **Inputs**: **Pick on board** and click the keys on the board, then
    **Done**. Click a picked key again to drop it.
-3. **Keep combo in draft**.
+3. **Keep combo in draft**. In the live modes the button is **Send combo
+   to keyboard**, and the combo takes effect at once.
 
-Keep stays off until the combo has what it sends and at least two keys, and
-the note beside it says which is missing. At 16 keys the note says so and
-**Pick on board** takes no more. Until you keep it, the builder holds
+The button stays off until the combo has what it sends and at least two
+keys, and the note beside it says which is missing. At 16 keys the note says
+so and **Pick on board** takes no more. Until you press it, the builder holds
 the combo on its own; **Cancel**, or Escape, drops it and closes the
-builder.
+builder. The ⓘ beside the builder's title sums this up, with what **Use
+output behaviour** off does.
 
 Each combo also has:
 
@@ -41,7 +44,11 @@ Each combo also has:
 - **Tap only**: fires only if its keys are let go before the combo hold
   threshold. Held longer, the keys type themselves.
 - **Keys in order**: fires only if its keys are pressed in the order listed.
-- **Use this combo** and **Layers it runs on**, like a behaviour's.
+- **Use this combo** and **Layers it runs on**, like a behaviour's. A layer
+  that **Combo settings** keeps combos off says *off in Combo settings* in its
+  row, and while **Enabled** there is off, an amber banner at the top of the
+  Combos tab says so. Everything stays editable. Click the banner to go to that
+  switch.
 - **Use output behaviour**: if what the combo sends has a behaviour, run it.
   Off, the combo sends its plain output.
 
@@ -49,15 +56,18 @@ Must be held and Tap only exclude each other.
 
 A combo can send a custom key. With its output behaviour off, or with no
 behaviour, it sends that key's shortcut, or nothing if it has none; the
-builder says which.
+line under **Use output behaviour** says which, for the key it sends.
 
 ## Combo settings
 
 **Combo settings** (**Combos** under Settings in the rail) shows two cards,
 both open. **How combos run**:
 
-- **Enabled**: every combo on or off. A key on the keyboard can change it
-  too.
+- **Enabled**: every combo on or off. A [switch key](behaviours.md#switch-keys)
+  on the keyboard can change it too: QMK's **Combo On**, **Combo Off** and
+  **Toggle Combo** (`CM_ON`, `CM_OFF`, `CM_TOGG`), until the keyboard
+  restarts. They work on a key, in a behaviour's tap or hold, and as a
+  combo's output.
 - **Default combo window**: for every combo without its own. New combos start
   on it, and the combos that follow it change with it.
 - **Combo hold threshold**: how long a combo that must be held, or is tap

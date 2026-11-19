@@ -3,22 +3,33 @@
 
 const {CHARYBDIS_4X6_LAYOUT_MATRIX, matrixPosition} = require("../data/charybdis-layout");
 const {layerOfRef, nativeCode, pointingSlotOfCode} = require("../schema/actions");
-const {hostKeyLabel, keyLabel, keyLabelWithName, keyLayer, profileKeyNames, shortcutLabel} = require("./key-names");
+const {hostKeyLabel, keyKind, keyLabel, keyLabelWithName, keyLayer, profileKeyNames, shortcutLabel} = require("./key-names");
 const {hostSettings, HOST_SETTING} = require("../schema/host-settings");
 const {SETTING, shortcutIdentity, shortcutPresent} = require("../schema/settings-domain-v1");
 const {decodedOf} = require("./portable-profile");
-const {settingsEditorView} = require("./settings-editor");
+const {settingsEditorView, ownedKeyOptions, COMBO_TIMING} = require("./settings-editor");
 const {macroEditorView} = require("./macro-editor");
+const {TRIGGER_NAMES, heldTypo, pairEntries, replacementCalled, replacementSaid, inputForm} = require("./autocorrect-list");
+const {entryKey, triggerOf} = require("../schema/autocorrect-domain-v1");
 const {inspectMacroPlayback} = require("./macro-input");
 const {hostLayout} = require("../data/host-layouts");
 const rgbEnums = require("../schema/rgb-domain-v1");
 const {KEY_BEHAVIOR_HOLD_STYLES, KEY_BEHAVIOR_TIER_FIELDS} = require("../schema/key-behavior-domain-v1");
 const {PD_AXIS, PD_KIND} = require("../schema/pd-mode-domain-v1");
 const {effectiveTimings} = require("./gesture-timing");
-const {REVIEW_AREAS: AREA, VOCABULARY, word, layerName: layerCalled, macroDefaultName, slotName, modifierNames, protectionWords, settingsPath} = require("./vocabulary");
+const {REVIEW_AREAS: AREA, VOCABULARY, word, layerName: layerCalled, macroDefaultName, customKeyDefaultName, pointingDefaultName, slotName, ledsCalled, modifierNames, protectionWords, settingsPath} = require("./vocabulary");
 const {macroName} = require("../../rules/qmk-keycodes.mjs");
+const {SHORTCUT_JOIN} = require("../../rules/shortcut-notation.mjs");
+const {colourPaints} = require("../../rules/led-light.mjs");
 const {customKeyName} = require("../data/user-keycodes");
-const {UNIT, parseUnit} = require("./review-units");
+const {ORDER_UNITS, UNIT, parseUnit} = require("./review-units");
+const {movedBanks} = require("./draft-order");
+
+// Field labels are the editors' own words, from the vocabulary (D: what a
+// behaviour and a combo share; T: the behaviour thresholds).
+const D = VOCABULARY.definitionFields, T = VOCABULARY.thresholdNames;
+/** @param {string} text */
+const sentence = text => text.charAt(0).toUpperCase() + text.slice(1);
 
 /**
  * @typedef {import("../schema/types.js").SemanticAction} Action
@@ -70,16 +81,19 @@ const layerSet = (mask, names, none) => {
 /** @param {number} mask @param {Names} names */
 const allowedLayers = (mask, names) => layerSet(mask, names, "none");
 // The mark a stored keycode carries: the layer it acts on (model/key-names.js
-// keyLayer, as the screens mark it), or the pointing mode it runs.
+// keyLayer, as the screens mark it), the pointing mode it runs, or the macro
+// or custom key it is (keyKind), which have a mark but no colour (D-L31).
 /** @param {number} code @returns {Mark | undefined} */
 const keyMark = code => {
     const slot = pointingSlotOfCode(code);
     if (slot !== undefined) return {kind: "pointing", slot};
     const layer = keyLayer(code);
-    return layer === undefined ? undefined : {kind: "layer", layer};
+    if (layer !== undefined) return {kind: "layer", layer};
+    const kind = keyKind(code);
+    return kind === "macro" || kind === "customKey" ? {kind} : undefined;
 };
-// The mark an action carries: what it reaches, when that has a colour of its
-// own — a pointing mode's light, a layer's colour.
+// The mark an action carries: what it reaches — a pointing mode's light, a
+// layer's colour, a macro or a custom key.
 /** @param {Action | undefined} value @returns {Mark | undefined} */
 const actionMark = value => {
     if (!value) return undefined;
@@ -91,17 +105,17 @@ const actionMark = value => {
 // A pointing slot as fields, in the Pointing modes editor's words.
 /** @param {import("../schema/types.js").PointingSlot | undefined} slot @param {Names} names @returns {Fields} */
 function pointingFields(slot, names) {
-    const P = VOCABULARY.pointing;
+    const P = VOCABULARY.pointing, labels = P.fieldLabels;
     /** @type {Fields} */
-    const result = new Map([["Movement", word(P.kinds, slot?.kind || 0)], ["Name", slot?.name || "Empty"]]);
+    const result = new Map([[P.movementLabel, word(P.kinds, slot?.kind || 0)], [labels.name, slot?.name || "Empty"]]);
     if (!slot?.kind) return result;
     /** @param {number} mask */
-    const mods = mask => modifierNames(mask).map(label => hostKeyLabel(label, names.keys?.hostOs)).join(" + ") || "None";
+    const mods = mask => modifierNames(mask).map(label => hostKeyLabel(label, names.keys?.hostOs)).join(SHORTCUT_JOIN) || "None";
     /** @param {import("../schema/types.js").PdTap | undefined} output */
     const tap = output => !output?.keycode ? "None"
         : `${keyLabel(names.keys, output.keycode)} · ${output.modifierPolicy === 1 ? `${word(P.modifierPolicy, 1)} ${mods(output.mask)}` : word(P.modifierPolicy, output.modifierPolicy)}`;
-    result.set("DPI", slot.dpi || "Normal pointer speed");
-    result.set("Pointer layer", word(P.pointerLayer, slot.pointerLayer));
+    result.set(labels.dpi, slot.dpi || "Normal pointer speed");
+    result.set(P.pointerLayerLabel, word(P.pointerLayer, slot.pointerLayer));
     // The link: each set of layers by name with its marks, compared by what
     // is stored; what ends it only beside layers that start it.
     const L = P.linkLabels;
@@ -109,20 +123,22 @@ function pointingFields(slot, names) {
     result.set(L.linkTurnsOn, layerSet(slot.linkTurnsOn, names, "None"));
     if (slot.linkedLayers) result.set(L.linkEnds, word(P.linkEnds, slot.linkEnds));
     if (slot.kind === PD_KIND.DIRECTIONAL) {
-        result.set("Axes", word(P.axes, slot.axis));
-        result.set("Horizontal movement per tap", slot.thresholdX);
-        result.set("Vertical movement per tap", slot.thresholdY);
+        result.set(labels.axis, word(P.axes, slot.axis));
+        // Named by what the threshold measures, as the editor names it.
+        const per = word(P.directionStep, slot.directionOutput ?? 0);
+        result.set(`${labels.horizontal} ${per}`, slot.thresholdX);
+        result.set(`${labels.vertical} ${per}`, slot.thresholdY);
         for (const [direction, name] of P.directions) result.set(name, tap(slot.directions[direction]));
         if (slot.axis === PD_AXIS.EIGHT) for (const [diagonal, name] of P.diagonals) {
             result.set(name, tap(slot.diagonals?.[diagonal]));
         }
-        result.set("When a direction is empty", word(P.emptyDirection, slot.emptyDirection ?? 0));
-        result.set("How often it sends", word(P.directionOutput, slot.directionOutput ?? 0));
+        result.set(labels.emptyDirection, word(P.emptyDirection, slot.emptyDirection ?? 0));
+        result.set(labels.directionOutput, word(P.directionOutput, slot.directionOutput ?? 0));
     } else {
-        result.set("Scrolls", word(P.scrollAxes, slot.axis ?? 0));
+        result.set(labels.scrollAxes, word(P.scrollAxes, slot.axis ?? 0));
         result.set(P.heldModifiers, mods(slot.heldModifiers));
         for (const [field, label] of P.scrollFields) result.set(label, slot.scroll[field]);
-        result.set("Reverse scrolling", word(P.invert, slot.scroll.invert));
+        result.set(labels.invert, word(P.invert, slot.scroll.invert));
     }
     return result;
 }
@@ -177,12 +193,12 @@ function behaviourFields(row, defaults, names, shortcuts) {
     const inherited = effectiveTimings({...row, tapHoldTerm: 0, longHoldTerm: 0, multiTapTerm: 0}, defaults, shortcuts);
     /** @type {Fields} */
     const fields = new Map([
-        ["Multi tap window", timing(row.multiTapTerm, defaults[3], {kind: "branches"})],
-        ["Tap / hold threshold", timing(row.tapHoldTerm, inherited.hold, {kind: "tier", tier: "hold"})],
-        ["Long hold threshold", timing(row.longHoldTerm, defaults[2], {kind: "tier", tier: "long"})],
-        ["Keeps auto-mouse anchored", row.keepsAutoMouseAnchored ? "yes" : "no"],
-        ["Enabled", row.enabled ? "on" : "off"],
-        ["Allowed layers", allowedLayers(row.allowedLayers, names)],
+        [sentence(T.multiTapTerm), timing(row.multiTapTerm, defaults[3], {kind: "branches"})],
+        [sentence(T.tapHoldTerm), timing(row.tapHoldTerm, inherited.hold, {kind: "tier", tier: "hold"})],
+        [sentence(T.longHoldTerm), timing(row.longHoldTerm, defaults[2], {kind: "tier", tier: "long"})],
+        [VOCABULARY.behaviourFields.anchor, row.keepsAutoMouseAnchored ? "yes" : "no"],
+        [D.use.behaviour, row.enabled ? "on" : "off"],
+        [D.allowedLayers, allowedLayers(row.allowedLayers, names)],
     ]);
     for (const step of row.steps) for (const [name, tier] of TIERS) {
         const branch = step[tier];
@@ -206,7 +222,7 @@ function behaviourFields(row, defaults, names, shortcuts) {
 /** @type {Set<Scalar>} */
 const EMPTY = new Set(["no", "none", "no name", "empty"]);
 /** @param {string} label @param {Scalar | undefined} value */
-const holds = (label, value) => value !== undefined && !EMPTY.has(value) && !/^default · /.test(String(value)) && !(label === "Movement" && value === "Empty");
+const holds = (label, value) => value !== undefined && !EMPTY.has(value) && !/^default · /.test(String(value)) && !(label === VOCABULARY.pointing.movementLabel && value === "Empty");
 
 // A field is shown by its text and compared by its key; most fields are plain
 // text and are both. A field may also carry its own label, when the map key is
@@ -230,17 +246,21 @@ function comboFields(row, table, names) {
     if (!row) return new Map();
     const options = (/** @type {const} */ (["mustHold", "mustTap", "ordered"])).filter(flag => row[flag]).map(flag => VOCABULARY.comboOptions[flag]).join(", ");
     const window = row.termMs === null ? {text: `default · ${table.defaultTermMs} ms`, key: "default"} : {text: `${row.termMs} ms`, key: row.termMs};
-    return new Map(/** @type {[string, Field][]} */ ([["Keys", {text: row.inputs.map(input => action(input, names)).join(" + "),
+    const C = VOCABULARY.comboFields;
+    return new Map(/** @type {[string, Field][]} */ ([[C.inputs, {text: row.inputs.map(input => action(input, names)).join(" + "),
         detail: row.inputs.map(input => action(input, names, true)).join(" + "), key: JSON.stringify(row.inputs)}],
-        ["Sends", actionField(row.output, names, {mark: actionMark(row.output)})], ["Window", window], ["Conditions", options || "none"],
-        ["Enabled", row.enabled ? "on" : "off"], ["Use output behaviour", row.useOutputBehavior ? "on" : "off"],
-        ["Allowed layers", allowedLayers(row.allowedLayers, names)]]));
+        [C.sends, actionField(row.output, names, {mark: actionMark(row.output)})], [C.window, window], [C.conditions, options || "none"],
+        [D.use.combo, row.enabled ? "on" : "off"], [sentence(VOCABULARY.comboOptions.useOutputBehavior), row.useOutputBehavior ? "on" : "off"],
+        [D.allowedLayers, allowedLayers(row.allowedLayers, names)]]));
 }
 // The two values every combo shares. A version 1 table has no default window,
 // and without combos no hold threshold either.
 /** @param {Combos} table @returns {Fields} */
-const comboTimingFields = table => new Map([["Default window", table.defaultTermMs === null ? "none" : `${table.defaultTermMs} ms`],
-    ["Hold threshold", table.holdTermMs === null ? "none" : `${table.holdTermMs} ms`]]);
+const comboTimingFields = table => new Map([[comboTimingLabel("default"), table.defaultTermMs === null ? "none" : `${table.defaultTermMs} ms`],
+    [comboTimingLabel("hold"), table.holdTermMs === null ? "none" : `${table.holdTermMs} ms`]]);
+// Combo timing's fields as How combos run labels them.
+/** @param {string} id */
+function comboTimingLabel(id) { return COMBO_TIMING.find(field => field.id === id)?.label || id; }
 
 // Combo IDs are packed positions, not stable identities. Recognize a single
 // removed row by its stored contents so the shifted suffix is not presented as
@@ -268,8 +288,15 @@ function singleComboRemovalIndex(before, after) {
 /** @param {import("../../contracts/model.js").WordList} list @param {Record<string, number>} values @param {number} value */
 const nameIn = (list, values, value) => word(list, Object.entries(values).find(([, id]) => id === value)?.[0] ?? value);
 const V = VOCABULARY;
+const F = V.lightingFields;
 /** @param {import("../schema/types.js").Hsv} value @param {string} [off] */
 const colour = (value, off = "off") => ({text: value.v ? hsv(value) : off, key: hsv(value), colour: {h: value.h, s: value.s, v: value.v}});
+// A colour a layer, a pointing slot, combo feedback or a feedback case owns
+// (D-L94, firmware D-F74): passthrough at saturation and value 0, at any
+// hue; off at value 0 with saturation, its LEDs dark. A passthrough colour
+// keeps its stored hue as detail, so two that differ only in it read apart.
+/** @param {import("../schema/types.js").Hsv} value */
+const owned = value => colourPaints(value) ? colour(value, "off") : {...colour(value), text: "passthrough", detail: `passthrough · ${hsv(value)}`};
 
 /** @param {Decoded} value @returns {Map<string, LightingRecord>} */
 function lightingRecords(value) {
@@ -289,38 +316,69 @@ function lightingRecords(value) {
         return [stage.label, {text: on ? "on" : "off", key: on, mark: {kind: "stage", on}}];
     }));
     for (const row of r.layerColors) record(UNIT.rgbLayer(row.layerId), `${layerName(row.layerId)} colour`, "layers",
-        [["Colour", colour(row.color, row.layerId === 0 ? "off · the background effect shows" : "off")], ["Paints", nameIn(V.paintModes, rgbEnums.RGB_LAYER_MODES, row.mode)]], {layer: row.layerId}, {kind: "layer", layer: row.layerId});
+        [[F.colour, owned(row.color)], [F.paintMode, nameIn(V.paintModes, rgbEnums.RGB_LAYER_MODES, row.mode)]], {layer: row.layerId}, {kind: "layer", layer: row.layerId});
     for (const row of r.pdModeColors) record(UNIT.rgbPd(row.pdModeId), `Pointing mode colour · ${slotCalled(row.pdModeId)}`, "pd",
-        [["Colour", colour(row.color)], ["Where", nameIn(V.localities, rgbEnums.RGB_LOCALITIES, row.locality)]], {slot: row.pdModeId}, {kind: "pointing", slot: row.pdModeId});
-    record(UNIT.rgb("automouse"), "Auto-mouse fade", "auto", [["Fade", nameIn(V.fadeModes, rgbEnums.RGB_AUTOMOUSE_MODES, r.automouseFade.mode)], ["End colour", colour(r.automouseFade.endColor)]]);
-    record(UNIT.rgb("combo"), "Combo feedback", "combo", [["Colour", colour(r.comboFeedback.color)], ["Where", nameIn(V.localities, rgbEnums.RGB_LOCALITIES, r.comboFeedback.locality)]]);
+        [[F.colour, owned(row.color)], [F.locality, nameIn(V.localities, rgbEnums.RGB_LOCALITIES, row.locality)]], {slot: row.pdModeId}, {kind: "pointing", slot: row.pdModeId});
+    record(UNIT.rgb("automouse"), "Auto-mouse fade", "auto", [[F.fadeMode, nameIn(V.fadeModes, rgbEnums.RGB_AUTOMOUSE_MODES, r.automouseFade.mode)], [F.endColour, colour(r.automouseFade.endColor)]]);
+    record(UNIT.rgb("combo"), "Combo feedback", "combo", [[F.colour, owned(r.comboFeedback.color)], [F.locality, nameIn(V.localities, rgbEnums.RGB_LOCALITIES, r.comboFeedback.locality)]]);
+    /** @param {number} value */
+    const where = value => nameIn(V.localities, rgbEnums.RGB_LOCALITIES, value);
+    // A case's colour by its name, and where it paints by its name and the
+    // Locality field's, so a change to one case says which (D-L93).
+    /** @param {string} name @param {Field} shade @param {number} locality @returns {[string, Field][]} */
+    const kase = (name, shade, locality) => [[name, shade], [`${name} · ${F.locality}`, where(locality)]];
     const k = r.keyFeedback;
-    record(UNIT.rgb("key"), "Key feedback", "key", [...k.tapBranchColors.map(/** @returns {[string, Field]} */ (value, i) => [`${i + 2}× branch`, colour(value)]),
-        ["Tap committed", colour(k.tapCommittedColor)], ["Hold active", colour(k.holdActiveColor)], ["Long hold active", colour(k.longHoldActiveColor)],
-        ["Tap commit", nameIn(V.tapCommit, rgbEnums.RGB_TAP_COMMIT_MODES, k.tapCommitMode)], ["Where", nameIn(V.localities, rgbEnums.RGB_LOCALITIES, k.locality)]]);
-    // LED groups are one record with every row that paints them: rows name
-    // groups by id, so a row put back without its group could point at a
-    // group that no longer exists. Groups read as the Lighting screen shows
-    // them, "Group 1 · 3 LEDs", and each row as who it paints for.
+    // Named and ordered as the Behaviour feedback tab lists them: the tiers, then
+    // the tap branches; the tap-commit policy is Tap committed's, on its pane,
+    // so it follows Tap committed's own.
+    /** @param {"tapCommittedColor" | "holdActiveColor" | "longHoldActiveColor"} field @param {number} locality */
+    const tier = (field, locality) => kase(word(V.feedbackOwners, V.feedbackColourOwners[field]), owned(k[field]), locality);
+    const committed = word(V.feedbackOwners, V.feedbackColourOwners.tapCommittedColor);
+    record(UNIT.rgb("key"), "Behaviour feedback", "key", [
+        ...tier("tapCommittedColor", k.tapCommittedLocality),
+        [`${committed} · ${F.doubleTapFlash}`, nameIn(V.tapCommit, rgbEnums.RGB_TAP_COMMIT_MODES, k.tapCommitMode)],
+        ...tier("holdActiveColor", k.holdActiveLocality),
+        ...tier("longHoldActiveColor", k.longHoldActiveLocality),
+        ...k.tapBranches.flatMap((branch, i) => kase(V.branches[i + 1] || `${i + 2} taps`, owned(branch.color), branch.locality))]);
+    // Replacement feedback's four cases as its tab lists them, each with
+    // where it paints, in the words every owned colour reads by.
+    const a = r.autocorrectFeedback;
+    /** @type {Record<keyof typeof V.replacementColourOwners, "textLocality" | "macroLocality" | "undoLocality" | "leadingLocality">} */
+    const replacementLocality = {textColor: "textLocality", macroColor: "macroLocality", undoColor: "undoLocality", leadingColor: "leadingLocality"};
+    record(UNIT.rgb("autocorrect"), "Replacement feedback", "autocorrect",
+        (/** @type {(keyof typeof V.replacementColourOwners)[]} */ (Object.keys(V.replacementColourOwners))).flatMap((field) =>
+            kase(word(V.replacementOwners, V.replacementColourOwners[field]), owned(a[field]), a[replacementLocality[field]])));
+    // Accents are one record with the groups they light: a row names its
+    // group by id, so a row put back without its group could point at one
+    // that no longer exists. Each accent reads as Lighting lists it, by who
+    // it lights for and its LEDs (D-L77); a group reads only while no accent
+    // lights it, as the unused LED set Ark drops at the next accent edit.
     const groups = new Map(r.groups.map(group => [group.id, group]));
+    const lit = new Set([r.layerGroupRows, r.pdModeGroupRows, r.comboGroupRows, r.keyGroupRows, r.autocorrectGroupRows].flat().map(row => row.groupId));
     /** @type {[string, Field][]} */
-    const fields = r.groups.map(group => [`group:${group.id}`, {label: `Group ${group.id}`, text: `LEDs ${group.leds.join(", ")}`, key: group.leds.join(",")}]);
+    const fields = r.groups.filter(group => !lit.has(group.id))
+        .map(group => [`set:${group.leds.join(",")}`, {label: "Unused LED set", text: ledsCalled(group.leds), key: group.leds.join(",")}]);
+    /** @type {Record<string, import("../../contracts/model.js").AccentTable>} */
+    const tableOf = {layerGroupRows: "layer", pdModeGroupRows: "pdMode", comboGroupRows: "combo", keyGroupRows: "keyBehavior", autocorrectGroupRows: "autocorrect"};
     /** @template {{color: import("../schema/types.js").Hsv, groupId: number}} T @param {string} table @param {T[]} rows @param {(row: T) => string} owner @param {(row: T) => Mark | undefined} ownerMark */
     const overrides = (table, rows, owner, ownerMark) => rows.forEach((row, i) => {
-        const group = groups.get(row.groupId), leds = group ? `Group ${group.id} · ${group.leds.length} LED${group.leds.length === 1 ? "" : "s"}` : `Group ${row.groupId}`;
-        const paint = colour(row.color, "inherits the stage colour");
-        fields.push([`${table}:${i}`, {label: `Override · ${owner(row)}`, labelMark: ownerMark(row) || undefined, text: `${leds} · ${paint.text}`,
+        const group = groups.get(row.groupId), leds = group ? ledsCalled(group.leds) : `LED set ${row.groupId}`;
+        const paint = colour(row.color, V.accents[tableOf[table]].stageColour);
+        fields.push([`${table}:${i}`, {label: `Accent · ${owner(row)}`, labelMark: ownerMark(row) || undefined, text: `${leds} · ${paint.text}`,
             key: `${group?.leds.join(",")}|${paint.key}|${owner(row)}`, colour: paint.colour}]);
     });
-    overrides("layerGroupRows", r.layerGroupRows, row => row.selector === 255 ? "all layers" : layerName(row.selector), row => row.selector === 255 ? undefined : {kind: "layer", layer: row.selector});
-    overrides("pdModeGroupRows", r.pdModeGroupRows, row => row.selector === 255 ? "all pointing modes" : slotCalled(row.selector), row => row.selector === 255 ? undefined : {kind: "pointing", slot: row.selector});
-    overrides("comboGroupRows", r.comboGroupRows, () => "combos", () => ({kind: "combo"}));
+    // Owners and an accent's stage colour are named as Lighting names them
+    // (vocabulary.accents), the owner that is all of them included.
+    overrides("layerGroupRows", r.layerGroupRows, row => row.selector === 255 ? V.accents.layer.every : layerName(row.selector), row => row.selector === 255 ? undefined : {kind: "layer", layer: row.selector});
+    overrides("pdModeGroupRows", r.pdModeGroupRows, row => row.selector === 255 ? V.accents.pdMode.every : slotCalled(row.selector), row => row.selector === 255 ? undefined : {kind: "pointing", slot: row.selector});
+    overrides("comboGroupRows", r.comboGroupRows, () => V.accents.combo.every, () => ({kind: "combo"}));
     overrides("keyGroupRows", r.keyGroupRows, row => nameIn(V.feedbackOwners, rgbEnums.RGB_KEY_SEMANTICS, row.semantic), row => {
         const name = Object.entries(rgbEnums.RGB_KEY_SEMANTICS).find(([, id]) => id === row.semantic)?.[0];
         const tier = name === undefined ? undefined : V.feedbackTiers[name];
         return tier ? {kind: "tier", tier} : undefined;
     });
-    record(UNIT.rgb("groups"), "LED overrides", "groups", fields);
+    overrides("autocorrectGroupRows", r.autocorrectGroupRows, row => nameIn(V.replacementOwners, rgbEnums.RGB_AUTOCORRECT_SEMANTICS, row.semantic), () => undefined);
+    record(UNIT.rgb("groups"), "Accents", "accents", fields);
     return records;
 }
 
@@ -426,6 +484,31 @@ function profileReview(before, after, capabilities) {
         const old = macrosA.macros[i], next = macrosB.macros[i], has = /** @param {Macros["macros"][number]} macro */ (macro) => Boolean(macro.payload || macro.name || macro.protection !== "auto");
         item(AREA.macros, UNIT.macro(i), `${macroDefaultName(i)}${(next.name || old.name) ? ` · ${next.name || old.name}` : ""}`, fields(old), fields(next), {kind: "macro", index: i, keycode: macroName(i)}, [has(old), has(next)]);
     });
+    // The text replacement list, an entry an item: its replacement, how it
+    // fires where either side fires after the Leader key, and each input as
+    // it is written. One that changed entries says where it went or came
+    // from; an entry whose replacement changed is one item, old to new.
+    for (const pair of pairEntries(a.autocorrect, b.autocorrect)) {
+        /** @param {import("../schema/autocorrect-domain-v1.js").Entry} entry @param {Decoded} profile */
+        const replacement = (entry, profile) => replacementCalled(entry, profile.settings.macroNames);
+        /** @param {import("../schema/autocorrect-domain-v1.js").Entry | undefined} entry @param {Decoded} mine @param {Decoded} theirs @param {import("../schema/autocorrect-domain-v1.js").Entry | undefined} twin @param {string} moved @returns {Fields} */
+        const fields = (entry, mine, theirs, twin, moved) => new Map(/** @type {[string, Field][]} */ (!entry ? [] : [["Replacement",
+                entry.macro === undefined ? replacement(entry, mine) : {text: replacement(entry, mine), key: `macro:${entry.macro}`, mark: {kind: "macro"}}],
+            // How it fires (D-L91), in the words of its switch: said where
+            // either side fires after the Leader key.
+            ...(triggerOf(entry) || (twin && triggerOf(twin)) ? [/** @type {[string, Field]} */ (["Fires", word(V.inputModes, TRIGGER_NAMES[triggerOf(entry)])])] : []),
+            ...entry.typos.map(typo => {
+                const elsewhere = twin?.typos.some(row => row.typo === typo.typo) ? undefined : heldTypo(theirs.autocorrect, typo.typo)?.entry;
+                return [`typo:${typo.typo}`, {label: "Input", key: typo.match,
+                    text: `${inputForm(typo)}${elsewhere === undefined ? "" : ` · ${moved} ${replacementSaid(elsewhere, theirs.settings.macroNames)}`}`}];
+            })]));
+        const old = pair.before, next = pair.after;
+        const shown = next ? replacement(next, b) : replacement(/** @type {import("../schema/autocorrect-domain-v1.js").Entry} */ (old), a);
+        const key = entryKey(/** @type {import("../schema/autocorrect-domain-v1.js").Entry} */ (old ?? next));
+        item(AREA.autocorrect, UNIT.autocorrect(key, old && next && entryKey(old) !== entryKey(next) ? entryKey(next) : undefined), shown,
+            fields(old, a, b, next, "moved to"), fields(next, b, a, old, "moved from"), {kind: "autocorrect", entry: entryKey(/** @type {import("../schema/autocorrect-domain-v1.js").Entry} */ (next ?? old))}, [Boolean(old), Boolean(next)],
+            (next ?? old)?.macro === undefined ? undefined : {kind: "macro"});
+    }
     if (a.settings.values[HOST_SETTING] !== b.settings.values[HOST_SETTING]) {
         const oldHost = hostSettings(a.settings.values, before.hostOs?.detected), nextHost = hostSettings(b.settings.values, after.hostOs?.detected);
         macrosB.macros.forEach((macro, index) => {
@@ -456,7 +539,7 @@ function profileReview(before, after, capabilities) {
                         ? [[VOCABULARY.macroUninterruptible.label, protectionWords("auto", playback.typing.some(route => route.method !== "layout"))]] : []),
                 ]));
             };
-            // The effect belongs to Host, so discarding it restores Host and
+            // The effect belongs to Your computer, so discarding it restores that section and
             // preserves independently edited macro text and names.
             item(AREA.macros, UNIT.settings("host"), `${macroDefaultName(index)}${macro.name ? ` · ${macro.name}` : ""} · ${VOCABULARY.settingsSections.host} settings`, fields(old, oldHost), fields(next, nextHost), {kind: "macro", index, keycode: macroName(index)}, [true, true]);
             /** @type {Change} */ (items.at(-1)).note = `Playback changes because of ${settingsPath("host", "host")}. Discard it together with that change.`;
@@ -475,7 +558,7 @@ function profileReview(before, after, capabilities) {
         const fields = (name, shortcut, names) => new Map([["Name", name || "no name"], ["Shortcut", shortcutField(shortcut, names)]]);
         /** @param {string} name @param {import("../schema/types.js").CustomKeyShortcut} shortcut */
         const exists = (name, shortcut) => Boolean(name || shortcutPresent(shortcut));
-        item(AREA.customKeys, UNIT.customKey(i), `Custom key ${i}${(next || old) ? ` · ${next || old}` : ""}`, fields(old, shortcutA, namesA), fields(next, shortcutB, namesB), {kind: "customKey", index: i, keycode: customKeyName(i)},
+        item(AREA.customKeys, UNIT.customKey(i), `${customKeyDefaultName(i)}${(next || old) ? ` · ${next || old}` : ""}`, fields(old, shortcutA, namesA), fields(next, shortcutB, namesB), {kind: "customKey", index: i, keycode: customKeyName(i)},
             [exists(old, shortcutA), exists(next, shortcutB)]);
     });
     // The keyboard's own name, edited on Settings' Keyboard card. Empty is the
@@ -554,12 +637,12 @@ function profileReview(before, after, capabilities) {
             change.note = `Its behaviour now follows the ${now === b.settings.values[SETTING.TAPPING_TERM] ? "dual-role" : "tap / hold"} threshold, as its shortcut's layer kind makes the key ${now === b.settings.values[SETTING.TAPPING_TERM] ? "" : "no longer "}dual-role.`;
         }
     }
-    const masks = after.options?.keymapMasks.reduce((mask, value) => mask | value, 0) || 0;
+    const masks = ownedKeyOptions(after.options);
     item(AREA.settings, UNIT.settings("otherKeyOptions"), "Other key options", new Map([["Stored bits", `0x${(a.settings.values[SETTING.KEYMAP_OPTIONS] & ~masks).toString(16)}`]]),
         new Map([["Stored bits", `0x${(b.settings.values[SETTING.KEYMAP_OPTIONS] & ~masks).toString(16)}`]]), {kind: "settings"}, [true, true]);
     for (let id = 0; id < Math.max(a.pdModes?.length || 0, b.pdModes?.length || 0); id++) {
         const old = a.pdModes?.[id], next = b.pdModes?.[id];
-        item(AREA.pointing, UNIT.pd(id), `Slot ${id}${(next?.name || old?.name) ? ` · ${next?.kind ? next.name : old?.name}` : ""}`,
+        item(AREA.pointing, UNIT.pd(id), `${pointingDefaultName(id)}${(next?.name || old?.name) ? ` · ${next?.kind ? next.name : old?.name}` : ""}`,
             pointingFields(old, namesA), pointingFields(next, namesB), {kind: "pointing", slot: id}, [Boolean(old?.kind || old?.name), Boolean(next?.kind || next?.name)], {kind: "pointing", slot: id});
     }
     const lightA = lightingRecords(a), lightB = lightingRecords(b);
@@ -594,7 +677,37 @@ function layerOrderReview(after, order) {
         ...(order[0] !== 0 ? [{label: "Base layer", status: /** @type {const} */ ("changed"), before: layerCalled(names, order.indexOf(0)), after: layerCalled(names, 0)}] : []),
         ...moved.map(/** @returns {import("../../contracts/model.js").ReviewField} */ slot => ({label: layerCalled(names, slot), labelMark: {kind: "layer", layer: slot}, status: "changed", before: String(order[slot]), after: where(slot)})),
     ];
-    return {area: AREA.layers, unit: UNIT.layerOrder, title: "Layer priority", note: "Higher layers win", status: "changed", fields,
+    return {area: AREA.layers, unit: UNIT.layerOrder, title: ORDER_TITLES.layers, note: "Higher layers win", status: "changed", fields,
         place: {kind: "layers", layers: moved}};
 }
-module.exports = {layerOrderReview, profileReview, singleComboRemovalIndex};
+// What each bank's order item is called: the layers' priority, and the
+// slots' order (D-L81).
+/** @type {Readonly<Record<import("./draft-order.js").Bank, string>>} */
+const ORDER_TITLES = Object.freeze({layers: "Layer priority", macros: "Macro order", customKeys: "Custom key order", pdModes: "Pointing mode order"});
+// A bank's swaps as one item: each macro, custom key or pointing mode that
+// sits in another slot than on the keyboard, named as the draft names it now,
+// in its mark, with the slot it sat in and the one it sits in, lowest first
+// as its screen lists them. Swaps compose, so three swaps are one item that
+// says where each thing is now.
+/** @param {Snapshot} after @param {import("./slot-order.js").SlotBank} bank @param {readonly number[]} order @returns {Change} */
+function slotOrderReview(after, bank, order) {
+    const {settings, pdModes} = decodedOf(after);
+    const moved = order.map((held, slot) => slot).filter(slot => order[slot] !== slot);
+    /** @param {number} slot */
+    const called = slot => bank === "macros" ? settings.macroNames[slot] || macroDefaultName(slot)
+        : bank === "customKeys" ? settings.customKeyNames[slot] || customKeyDefaultName(slot) : slotName(pdModes[slot], slot);
+    /** @param {number} slot @returns {import("../../contracts/model.js").ReviewMark} */
+    const mark = slot => bank === "pdModes" ? {kind: "pointing", slot} : {kind: bank === "macros" ? "macro" : "customKey"};
+    const fields = moved.map(/** @returns {import("../../contracts/model.js").ReviewField} */ slot =>
+        ({label: called(slot), labelMark: mark(slot), status: "changed", before: `slot ${order[slot]}`, after: `slot ${slot}`}));
+    /** @type {import("./types.js").ModelReviewPlace} */
+    const place = bank === "pdModes" ? {kind: "slots", bank, slots: moved}
+        : {kind: "slots", bank, keycodes: moved.map(slot => bank === "macros" ? macroName(slot) : customKeyName(slot))};
+    return {area: bank === "macros" ? AREA.macros : bank === "customKeys" ? AREA.customKeys : AREA.pointing, unit: UNIT[ORDER_UNITS[bank]], title: ORDER_TITLES[bank],
+        status: "changed", fields, place};
+}
+// The order items of a draft in `order` (draft-order.js): the layer priority,
+// then each slot bank's order, for every bank that moved anything.
+/** @param {Snapshot} after @param {import("./draft-order.js").Order} order @returns {Change[]} */
+const orderReview = (after, order) => movedBanks(order).map(bank => bank === "layers" ? layerOrderReview(after, order.layers) : slotOrderReview(after, bank, order[bank]));
+module.exports = {ORDER_TITLES, layerOrderReview, orderReview, profileReview, singleComboRemovalIndex, slotOrderReview};

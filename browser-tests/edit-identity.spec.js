@@ -79,7 +79,7 @@ const forms = [
         open: page => page.evaluate(async () => {
             const store = await import("/webview/store.mjs");
             const model = structuredClone(store.getModel());
-            Object.assign(model.customKeys[1], {shortcut: {mods: 0x01, keys: [0x0e], layers: 0, layerKind: 0}, shortcutLabel: "Left Ctrl + K"});
+            Object.assign(model.customKeys[1], {shortcut: {mods: 0x01, keys: [0x0e], layers: 0, layerKind: 0}, shortcutLabel: "Ctrl+K"});
             store.setModel(model); store.render();
         }),
         commit: page => page.locator('[data-act="clear-shortcut"]').click(), type: "updateCustomKeyShortcut", names: "fingerprint"},
@@ -104,15 +104,17 @@ const forms = [
         commit: page => page.locator('[data-f="setting:effectSpeed"]').evaluate(node => {
             /** @type {HTMLInputElement} */ (node).value = "77"; node.dispatchEvent(new Event("change", {bubbles: true}));
         }), type: "updateConfigDefaults", names: "fingerprint"},
-    {name: "key feedback flash", screen: "lighting", state: {stage: "key"}, shown: '[data-f="setting:feedbackFlash"]',
+    {name: "behaviour feedback flash", screen: "lighting", state: {stage: "key"}, shown: '[data-f="setting:feedbackFlash"]',
         commit: page => change(page.locator('[data-f="setting:feedbackFlash"]'), 77), type: "updateConfigDefaults", names: "fingerprint"},
+    {name: "replacement feedback flash", screen: "lighting", state: {stage: "autocorrect"}, shown: '[data-f="setting:replacementFlash"]',
+        commit: page => change(page.locator('[data-f="setting:replacementFlash"]'), 77), type: "updateConfigDefaults", names: "fingerprint"},
     {name: "auto-mouse hold", screen: "lighting", state: {stage: "auto"}, shown: '[data-f="lighting:auto:mouseFadeHold"]',
         commit: page => page.locator('[data-f="lighting:auto:mouseFadeHold"]').evaluate(node => {
             /** @type {HTMLInputElement} */ (node).value = "77"; node.dispatchEvent(new Event("change", {bubbles: true}));
         }), type: "updateConfigDefaults", names: "fingerprint"},
 
     // Behaviours.
-    {name: "behaviour timing", screen: "keys", state: {tab: "behaviours", behaviourRow: "KC_LEFT_GUI"}, shown: '[data-f="behaviour:KC_LEFT_GUI:timing:tapHoldTerm"]',
+    {name: "behaviour timing", screen: "keys", state: {tab: "behaviours", behaviourRow: "KC_LEFT_GUI", foldsOpen: ["behaviour:timings"]}, shown: '[data-f="behaviour:KC_LEFT_GUI:timing:tapHoldTerm"]',
         commit: page => change(page.locator('[data-f="behaviour:KC_LEFT_GUI:timing:tapHoldTerm"]'), 177), type: "saveBehavior", names: "base"},
     {name: "behaviour on or off", screen: "keys", state: {tab: "behaviours", behaviourRow: "KC_LEFT_GUI"}, shown: '[data-f="behaviour:KC_LEFT_GUI:definition:enabled"]',
         commit: page => page.locator('label:has([data-f="behaviour:KC_LEFT_GUI:definition:enabled"])').click(), type: "saveBehavior", names: "base"},

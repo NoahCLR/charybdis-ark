@@ -11,11 +11,12 @@
 // another key that sends a custom key sends only its shortcut.
 
 const {decodedOf, editProfileDomains} = require("./portable-profile");
-const {PROFILE_FULL_WORDS} = require("./vocabulary");
+const {PROFILE_FULL_WORDS, customKeyDefaultName} = require("./vocabulary");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {SETTINGS, SHORTCUT_KEY_LIMITS, validShortcutKey, shortcutStoreRefusal, shortcutIdentity} = require("../schema/settings-domain-v1");
 const {validName} = require("../schema/profile-name");
 const {shortcutLayerTargets, shortcutRefusal} = require("./shortcut-layers");
+const {holdOrderRefusal} = require("./gesture-timing");
 const keycodes = require("../data/keycode-catalog");
 const {knownActionAbi} = require("../schema/actions");
 const {CUSTOM_KEY_SLOTS, customKeyCode, customKeyName, customKeyOfName} = require("../data/user-keycodes");
@@ -34,7 +35,7 @@ function customKeyEditorView(snapshot, capabilities) {
     const names = settings.customKeyNames;
     const behaved = new Set(behaviors.rows.filter(row => row.target.kind === ACTION.CUSTOM_KEY).map(row => row.target.operand));
     return {identity: snapshot.fingerprint,
-        keys: names.map((name, slot) => ({slot, keycode: customKeyName(slot), code: customKeyCode(slot), name, hasBehavior: behaved.has(slot),
+        keys: names.map((name, slot) => ({slot, keycode: customKeyName(slot), code: customKeyCode(slot), name, defaultName: customKeyDefaultName(slot), hasBehavior: behaved.has(slot),
             shortcut: {...settings.customKeyShortcuts[slot], keys: [...settings.customKeyShortcuts[slot].keys]}})),
         // Each name may be 32 bytes of text; the profile as a whole has a ceiling.
         names: {perName: SETTINGS.NAME_MAX_BYTES},
@@ -50,11 +51,13 @@ const SHORTCUT_KEY_NAMES = Object.freeze(keycodes.entries()
     .flatMap(entry => [entry.name, ...entry.aliases]));
 
 // A custom key's name, or its shortcut. Both live in the profile's settings
-// domain; a message carries one or the other.
-/** @param {import("./types.js").PortableDocument} document @param {import("../../contracts/edits.js").EditPayloads['updateCustomKey'] | import("../../contracts/edits.js").EditPayloads['updateCustomKeyShortcut']} message @param {import("./types.js").Draft} draft */
+// domain; a message carries one or the other. Clearing the key empties both
+// and takes its behaviour row away, in one step.
+/** @param {import("./types.js").PortableDocument} document @param {Extract<import("../../contracts/edits.js").PanelEdit, {type: 'updateCustomKey' | 'updateCustomKeyShortcut' | 'clearCustomKey'}>} message @param {import("./types.js").Draft} draft */
 function editCustomKey(document, message, draft) {
     const slot = customKeyOfName(message.keycode);
     if (slot === undefined) throw fail("Choose a custom key the keyboard has.");
+    if (message.type === "clearCustomKey") return clearCustomKey(document, slot, draft);
     // A message renames the key, sets its shortcut, or both at once (a key
     // made for a shortcut the picker could not store as a keycode).
     const renaming = "name" in message && message.name !== undefined;
@@ -80,7 +83,48 @@ function editCustomKey(document, message, draft) {
         const settings = open("settings");
         if (renaming) settings.customKeyNames[slot] = name;
         if (given) settings.customKeyShortcuts[slot] = now;
+        // A shortcut that turns its layers on as TT() or OSL() does makes the
+        // key's behaviour wait the dual-role default (gesture-timing.js), which
+        // must still come before its Long hold (D-L82).
+        const {rows} = read().behaviors;
+        const timingRefusal = holdOrderRefusal({rows, values: stored.values, shortcuts: stored.customKeyShortcuts},
+            {rows, values: settings.values, shortcuts: settings.customKeyShortcuts}, {viaDefault: true});
+        if (timingRefusal) throw fail(timingRefusal, "CUSTOM_KEY_SHORTCUT_INVALID");
     });
 }
 
-module.exports = {customKeyEditorView, editCustomKey};
+// An empty custom key has no name, no shortcut and no behaviour, so it is no
+// longer in use. Whatever sends it (a layout key, a behaviour step, a combo)
+// stays, and sends nothing until the key holds something again.
+/** @param {import("./types.js").PortableDocument} document @param {number} slot @param {import("./types.js").Draft} draft */
+function clearCustomKey(document, slot, draft) {
+    if (!customKeysSupported(document, draft.capabilities)) throw fail("Custom keys need firmware with the userspace keycode blocks.", "CUSTOM_KEYS_UNSUPPORTED");
+    return editProfileDomains(document, draft, (open, read) => emptyCustomKey(open, read, slot));
+}
+const NO_SHORTCUT = {mods: 0, keys: [], layers: 0, layerKind: 0};
+
+/** @param {import("../schema/types.js").BehaviorRow} row @param {number} slot */
+const behavesFor = (row, slot) => row.target.kind === ACTION.CUSTOM_KEY && row.target.operand === slot;
+
+// Whether a custom key is in use: it has a name, a shortcut or a behaviour.
+/** @param {Pick<import("./types.js").DecodedProfile, "settings" | "behaviors">} decoded @param {number} slot */
+function customKeyInUse({settings, behaviors}, slot) {
+    return Boolean(settings.customKeyNames[slot]) || shortcutIdentity(settings.customKeyShortcuts[slot]) !== shortcutIdentity(NO_SHORTCUT)
+        || behaviors.rows.some(row => behavesFor(row, slot));
+}
+
+// Empties one custom key within an edit (editProfileDomains): its name, its
+// shortcut and its behaviour rows. Every way Ark empties a custom key does it
+// here: the Keys editor's Clear, and an import's blank slate (D-L97).
+/** @param {import("./types.js").OpenDomain} open @param {() => import("./types.js").DecodedProfile} read @param {number} slot */
+function emptyCustomKey(open, read, slot) {
+    const {settings, behaviors} = read();
+    if (settings.customKeyNames[slot]) open("settings").customKeyNames[slot] = "";
+    if (shortcutIdentity(settings.customKeyShortcuts[slot]) !== shortcutIdentity(NO_SHORTCUT)) open("settings").customKeyShortcuts[slot] = {...NO_SHORTCUT, keys: []};
+    if (behaviors.rows.some(row => behavesFor(row, slot))) {
+        const opened = open("behaviors");
+        opened.rows = opened.rows.filter(row => !behavesFor(row, slot));
+    }
+}
+
+module.exports = {customKeyEditorView, editCustomKey, customKeyInUse, emptyCustomKey, customKeysSupported};

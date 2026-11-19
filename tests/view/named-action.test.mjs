@@ -21,7 +21,7 @@ test("a branch action that sends a pointing mode reads as the mode, held or lock
     assert.deepEqual([hold.slot.id, hold.name, hold.how, hold.empty], [0, "Dragscroll", "hold", false]);
     assert.equal(pointingAction(model, "PD_MODE_0_LOCK").how, "lock");
     const empty = pointingAction(model, "PD_MODE_6");
-    assert.deepEqual([empty.name, empty.how, empty.empty], ["Slot 6", "hold", true], "an unnamed empty slot goes by its number");
+    assert.deepEqual([empty.name, empty.how, empty.empty], ["Pointing mode 6", "hold", true], "an unnamed empty slot goes by its number");
     assert.equal(pointingAction(model, "0x7EA6").how, "lock", "the lock keycode as a raw value too");
     assert.equal(pointingAction(model, "KC_A"), null);
 });

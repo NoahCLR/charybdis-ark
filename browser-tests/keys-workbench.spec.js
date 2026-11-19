@@ -70,6 +70,36 @@ test("rows scrolling under the header and the group's band never show through", 
     }
 });
 
+// A tab's own New sits with what it opens, not in the tab bar: New combo
+// heads the builder's column, centred on the table's first group band, and
+// stays put when the builder opens under it. What the tab bar does carry, a
+// tab's way to its screen, centres on the bar.
+test("New combo heads the builder's column centred on the first group, and the tab bar's links centre on it", async ({page}) => {
+    await openPreview(page);
+    await tab(page, "combos").click();
+    await expect(page.locator("#benchRight")).toBeEmpty();
+    const add = page.locator('#comboSide > [data-act="new-combo"]');
+    for (const open of [false, true]) {
+        if (open) await add.click();
+        const at = await page.evaluate(() => {
+            const box = (selector) => /** @type {HTMLElement} */ (document.querySelector(selector)).getBoundingClientRect();
+            return {band: box(".bench-pane td.t-group"), add: box("#comboSide > [data-act=\"new-combo\"]"), next: box("#comboSide > :nth-child(2)")};
+        });
+        expect(at.add.top + at.add.height / 2, "New combo is centred on the first group's band").toBeCloseTo(at.band.top + at.band.height / 2, 1);
+        expect(at.next.top, `the ${open ? "builder" : "hint"} starts a gap under it`).toBe(at.add.bottom + 8);
+    }
+    await expect(add, "New combo never doubles as the builder's close").toBeDisabled();
+
+    await tab(page, "pointing").click();
+    const gaps = await page.evaluate(() => {
+        const bar = /** @type {HTMLElement} */ (document.querySelector(".bench-tabs"));
+        const link = /** @type {HTMLElement} */ (document.querySelector("#benchRight button")).getBoundingClientRect();
+        const rule = parseFloat(getComputedStyle(bar).borderBottomWidth);
+        return {above: link.top - bar.getBoundingClientRect().top, below: bar.getBoundingClientRect().bottom - rule - link.bottom};
+    });
+    expect(gaps.above, "the tab's link sits in the middle of the bar").toBe(gaps.below);
+});
+
 // Each tab is opened first in a page of its own, so no height carried over
 // from another tab can stand in for the Behaviours tab's.
 test("every tab is as tall as the Behaviours tab, before it is ever opened", async ({context}) => {
@@ -154,7 +184,7 @@ test("the Custom keys tab lists the custom keys a layer reaches, and opens one o
     await expect(page.locator('[data-screen="customKeys"]')).toHaveAttribute("aria-current", "true");
     await expect(page.locator('.mslot[data-custom-key="CUSTOM_KEY_0"]')).toHaveAttribute("aria-current", "true");
 
-    // And back: a layer under On layers opens the tab on the key's row.
+    // And back: a layer chip at the top of its editor opens the tab on the key's row.
     await page.locator("[data-goto-layer]").first().click();
     await expect(tab(page, "customKeys")).toHaveAttribute("aria-selected", "true");
     await expect(page.locator('.bench-pane tr[data-reach="here:CUSTOM_KEY_0"]')).toHaveAttribute("data-picked", "true");
@@ -227,7 +257,7 @@ test("the Pointing modes tab says a mode's link, and the layer that starts it re
     // line says only where it comes from; the others started it.
     const viewRow = pane(page).locator('tr[data-reach="view:4"]');
     await expect(cell(viewRow, 5).locator(".reach-line"))
-        .toHaveText([/^Navigation ?Hold$/, /^Custom key 0 · sends Navigation ?lock$/, /^from Right Option KC_RIGHT_ALT · 1× ?tap$/]);
+        .toHaveText([/^Navigation ?Hold$/, /^Custom key 0 · sends Navigation ?lock$/, /^from Right Option · 1× ?tap$/]);
     await expect(cell(viewRow, 0).locator(".sends-tag")).toHaveText(["lock", "started"]);
     if (process.env.ARK_SHOT) {
         await page.locator(".board").first().screenshot({path: `${process.env.ARK_SHOT}/pointing-tab-board.png`});
@@ -255,6 +285,57 @@ test("the Pointing modes tab says a mode's link, and the layer that starts it re
         window.dispatchEvent(new MessageEvent("message", {data: {type: "model", model}}));
     });
     await expect(cell(pane(page).locator('tr[data-reach="here:4"]'), 5).locator(".reach-line")).toHaveText([/^Navigation ?Hold$/]);
+});
+
+// A slot's name holds its mark on its line, and each keycode stays whole beside
+// its hold or lock tag: a column too narrow for them wraps between them, never
+// through a keycode. A column narrower than a keycode breaks it, and still holds it.
+test("a slot's row wraps between its keycodes, never through one", async ({page}) => {
+    await openPreview(page);
+    await page.setViewportSize({width: 1500, height: 1100});
+    // Dragscroll changed in the draft, so its row carries the draft's dot.
+    await page.evaluate(async () => {
+        const store = await import("/webview/store.mjs");
+        const model = structuredClone(store.getModel());
+        model.draft.changes = [...(model.draft.changes || []), {place: {kind: "pointing", slot: 0}, status: "changed", title: "Dragscroll", fields: []}];
+        model.draft.revision++;
+        window.dispatchEvent(new MessageEvent("message", {data: {type: "model", model}}));
+    });
+    await tab(page, "pointing").click();
+    const row = pane(page).locator("tbody tr:has(td:first-child code:text-is('PD_MODE_0_LOCK'))").first();
+    await expect(row).toBeVisible();
+    const slotCell = () => row.locator("td").first().evaluate((cell) => {
+        const box = (node) => node.getBoundingClientRect();
+        const lineHeight = (node) => parseFloat(getComputedStyle(node).lineHeight);
+        const named = /** @type {HTMLElement} */ (cell.querySelector(".slot-named"));
+        const icon = box(/** @type {HTMLElement} */ (named.querySelector(".kind-icon")));
+        const name = box(/** @type {HTMLElement} */ (named.querySelector(".sends-name")));
+        const dot = box(/** @type {HTMLElement} */ (named.querySelector(".draft-dot")));
+        return {
+            codes: [...named.querySelectorAll("code")].map((code) => ({text: code.textContent, whole: box(code).height <= lineHeight(code) * 1.5})),
+            tagged: [...named.querySelectorAll("code")].map((code) => {
+                const tag = /** @type {HTMLElement} */ (code.previousElementSibling);
+                return Math.abs(box(tag).top + box(tag).height / 2 - box(code).top - box(code).height / 2);
+            }),
+            iconOffName: Math.abs(icon.top + icon.height / 2 - name.top - name.height / 2),
+            iconBeforeName: icon.left < name.left,
+            dotOffName: Math.abs(dot.top + dot.height / 2 - name.top - name.height / 2),
+            nameOffCell: Math.abs(name.top - box(cell).top - parseFloat(getComputedStyle(cell).paddingTop)),
+            contained: named.scrollWidth <= cell.clientWidth,
+        };
+    });
+    const wide = await slotCell();
+    expect(wide.codes).toEqual([{text: "PD_MODE_0", whole: true}, {text: "PD_MODE_0_LOCK", whole: true}]);
+    for (const offset of wide.tagged) expect(offset, "a tag stays on its keycode's line").toBeLessThan(6);
+    expect(wide.iconBeforeName, "the mark stays before the name").toBe(true);
+    expect(wide.iconOffName, "the mark is centred on the name's line").toBeLessThan(2);
+    expect(wide.dotOffName, "the draft's dot is centred on the name's line").toBeLessThan(2);
+    expect(wide.nameOffCell, "the name starts at the top of the cell, level with the row's other cells").toBeLessThan(2);
+    expect(wide.contained).toBe(true);
+
+    await page.setViewportSize({width: 700, height: 1100});
+    await expect(row).toBeVisible();
+    expect((await slotCell()).contained, "a column narrower than a keycode still holds it").toBe(true);
 });
 
 // The Key tab says why a key cannot be edited in a box under the key, and

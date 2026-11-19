@@ -8,7 +8,7 @@ import {modifierBits, keyDisplayName, modifierNames, modifierPick, pickerModifie
 
 test("modifier masks read back as the names the keyboard holds", () => {
     assert.deepEqual(modifierNames(buildDeviceModel(), 0), []);
-    assert.deepEqual(modifierNames(buildDeviceModel(), 1 | 8), ["Left Ctrl", "Left GUI"]);
+    assert.deepEqual(modifierNames(buildDeviceModel(), 1 | 8), ["Ctrl", "GUI"]);
     assert.deepEqual(modifierNames(buildDeviceModel(), 255), modifierBits(buildDeviceModel()).map(([, name]) => name));
 });
 

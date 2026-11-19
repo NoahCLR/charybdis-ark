@@ -5,6 +5,8 @@ import {modifierNames, pointingMacro} from "../../view/keyvalues.mjs";
 import {word} from "../../view/vocabulary.mjs";
 import {state} from "../../store.mjs";
 import {ARROWS, SCROLL_LEAD, SCROLL_RATIOS, SCROLL_SINGLES, scrollLabel, tipFor, words} from "./common.mjs";
+import {told} from "./form-controls.mjs";
+import {attachInfoMarks, infoMark} from "../info-mark.mjs";
 
 /** @typedef {ReturnType<typeof import("./form-controls.mjs").formControls>} FormControls */
 /** @param {import("../../../contracts/panel.js").PublishedModel} model @param {import("../surface-types.js").PresentedSlot} slot @param {boolean} scrolling @param {FormControls} controls */
@@ -14,9 +16,13 @@ export function advancedControls(model, slot, scrolling, {form, disabled, field,
         ${DISCLOSURE}<h3>Advanced</h3><span class="right note">${scrolling ? "thresholds, ratios, decay, expiry" : "distance, held modifiers"}</span></summary>
         <div class="card-b stack"></div></details>`));
     const advancedBody = /** @type {HTMLElement} */ (advanced.querySelector(".card-b"));
-    /** @param {string} title */
-    const section = (title) => {
-        const node = el(`<section class="pd-sect"><div class="sect-h"><h4>${esc(title)}</h4></div></section>`);
+    // A section, and what its settings do beside its title, read once
+    // (D-L96): what is on show under a field is its value alone.
+    /** @param {string} key names its info mark, which stays open across redraws @param {string} title @param {import("../info-mark.mjs").InfoContent} [content] */
+    const section = (key, title, content = {}) => {
+        const info = infoMark({id: `pd-info-${slot.id}-${key}`, label: `About ${title}`, heading: title, ...content});
+        const node = el(`<section class="pd-sect"><div class="sect-h"><h4>${esc(title)}</h4>${info}</div></section>`);
+        attachInfoMarks(node);
         advancedBody.append(node);
         return node;
     };
@@ -30,23 +36,24 @@ export function advancedControls(model, slot, scrolling, {form, disabled, field,
         // once per movement, the threshold is how far a movement has to go.
         const per = word(words(model).directionStep, slot.directionOutput);
         const dpi = modeDpi(slot, model.configDefaults);
-        // What the threshold does, by how often the mode sends, then how far it is.
+        // What the threshold does, by how often the mode sends, is the
+        // section's info mark; how far it is, under each field.
         const does = tipFor(model, slot.directionOutput === 1 ? "thresholdOnce" : "thresholdEvery");
         /** @param {number} counts */
         const distance = (counts) => {
             const shown = thresholdDistance(counts, dpi);
-            return shown ? {unit: shown.short, wide: true, tip: `${does} ${shown.long}`} : {tip: `${does} In sensor counts at this mode's pointer speed.`};
+            return told(shown ? shown.long : "In sensor counts at this mode's pointer speed.", shown ? {unit: shown.short, wide: true} : {});
         };
-        if (readsHorizontal(slot.axis)) distances.append(field(`Horizontal ${per}`, slot.thresholdX, "thresholdX", distance(slot.thresholdX)));
-        if (readsVertical(slot.axis)) distances.append(field(`Vertical ${per}`, slot.thresholdY, "thresholdY", distance(slot.thresholdY)));
-        section("Distance").append(distances);
+        if (readsHorizontal(slot.axis)) distances.append(field(`${words(model).fieldLabels.horizontal} ${per}`, slot.thresholdX, "thresholdX", distance(slot.thresholdX)));
+        if (readsVertical(slot.axis)) distances.append(field(`${words(model).fieldLabels.vertical} ${per}`, slot.thresholdY, "thresholdY", distance(slot.thresholdY)));
+        section("distance", "Distance", {lead: does}).append(distances);
     }
 
     if (!scrolling) {
         // Each shortcut's own handling of modifiers held while it sends. A
         // direction with no shortcut stores none, so only those with one
         // are listed; an "Ignore" still being set up is drawn as chosen.
-        const mods = section("Held modifiers");
+        const mods = section("modifiers", "Held modifiers");
         const unfinished = state.pdTaps?.slot === slot.id ? state.pdTaps.rows : {};
         const rows = TAP_ROWS.filter(({group, name}) => (group === "diagonals" ? slot.axis === AXIS.EIGHT : axisReads(slot.axis).includes(name))
             && Number(slot[group]?.[name]?.keycode));
@@ -82,13 +89,18 @@ export function advancedControls(model, slot, scrolling, {form, disabled, field,
     if (scrolling) {
         const tuning = el(`<div class="pd-grid3"></div>`);
         const drawn = new Set(SCROLL_LEAD.map(([key]) => key));
+        // What each does, by its label, in the section's info mark.
+        /** @type {import("../info-mark.mjs").InfoRow[]} */
+        const says = [];
         for (const [key, unit] of SCROLL_SINGLES) {
-            tuning.append(field(scrollLabel(model, key, unit), slot.scroll?.[key], `scroll:${key}`, {unit, tip: tipFor(model, key)}));
+            tuning.append(field(scrollLabel(model, key, unit), slot.scroll?.[key], `scroll:${key}`, {unit}));
+            says.push({term: scrollLabel(model, key, unit), says: tipFor(model, key)});
             drawn.add(key);
         }
         for (const [top, bottom] of SCROLL_RATIOS) {
             const label = scrollLabel(model, top).replace(/\s*·\s*numerator$/, "");
-            const pair = el(`<div class="field" data-tip="${esc(tipFor(model, top))}"><span>${esc(label)}</span><div class="pd-ratio"></div></div>`);
+            says.push({term: label, says: tipFor(model, top)});
+            const pair = el(`<div class="field"><span>${esc(label)}</span><div class="pd-ratio"></div></div>`);
             const inputs = /** @type {HTMLElement} */ (pair.querySelector(".pd-ratio"));
             for (const [index, key] of [top, bottom].entries()) {
                 const input = /** @type {HTMLInputElement} */ (el(`<input data-f="pointing:${esc(slot.id)}:scroll:${esc(key)}" class="input mono num" value="${esc(slot.scroll?.[key] ?? "")}" inputmode="numeric"
@@ -105,7 +117,7 @@ export function advancedControls(model, slot, scrolling, {form, disabled, field,
             const label = scrollLabel(model, key);
             if (!drawn.has(key)) tuning.append(field(label, slot.scroll?.[key], `scroll:${key}`));
         }
-        section("Scroll tuning").append(tuning);
+        section("tuning", "Scroll tuning", {rows: says}).append(tuning);
     }
 
     // Open stays open from slot to slot, so two modes' tuning can be compared.

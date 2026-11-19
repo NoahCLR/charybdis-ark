@@ -9,7 +9,7 @@
 // interface as `model.vocabulary`, so an editor, its dropdown and the review
 // never name one thing two ways. Lists are ordered as the editors offer them.
 
-const {RGB_STAGE_BITS} = require("../schema/rgb-domain-v1");
+const {RGB_EVERY_OWNER, RGB_STAGE_BITS} = require("../schema/rgb-domain-v1");
 const {FIRMWARE_UPDATE} = require("../schema/profile-blob-v1");
 const {hostLayouts} = require("../data/host-layouts");
 const {MACRO_LIMITS, macroProblemWords: wordedProblem} = require("../../rules/macro-payload.mjs");
@@ -178,12 +178,16 @@ const SAVE_FAILURE_WORDS = Object.freeze({
 const PROFILE_FULL_WORDS = Object.freeze({
     /** @type {Readonly<Record<string, (most: number) => string>>} */
     counts: Object.freeze({
-        lightingGroups: (most) => `The keyboard holds at most ${most} LED groups. Remove one before adding another.`,
-        lightingGroupRows: (most) => `The keyboard holds at most ${most} LED overrides across layers, pointing modes, combo feedback and key feedback. Remove one before adding another.`,
+        lightingGroups: (most) => `The keyboard holds at most ${most} different LED sets across all accents. Remove an accent, or light LEDs another accent already lights.`,
+        lightingGroupRows: (most) => `The keyboard holds at most ${most} accents across layers, pointing modes, combo feedback, behaviour feedback and replacement feedback. Remove one before adding another.`,
+        lightingTableGroupRows: (most) => `The keyboard holds at most ${most} accents on any one of layers, pointing modes, combo feedback, behaviour feedback and replacement feedback. Remove one there before adding another.`,
         behaviours: (most) => `The keyboard holds at most ${most} behaviours. Remove one before adding another.`,
         behaviourSteps: (most) => `The keyboard holds at most ${most} behaviour tap counts, added up across all behaviours. Remove a tap count or a behaviour first.`,
+        autocorrectCorrections: (most) => `The keyboard holds at most ${most.toLocaleString("en-US")} text replacements. Delete one before adding another.`,
+        autocorrectTypos: (most) => `The keyboard holds at most ${most.toLocaleString("en-US")} inputs across all text replacements. Remove one before adding another.`,
+        autocorrectText: (most) => `The text replacement list holds at most ${most.toLocaleString("en-US")} bytes of text across its replacements and their inputs. Delete a replacement first.`,
     }),
-    profile: "This change does not fit: the keyboard's profile is full. Remove an LED group, a behaviour, a combo or a macro first.",
+    profile: "This change does not fit: the keyboard's profile is full. Remove an accent, a behaviour, a combo or a macro first.",
     name: "The keyboard's profile is full, so this name does not fit. Shorten another name, or remove a behaviour or combo.",
 });
 
@@ -314,19 +318,19 @@ const OS_WORDS = {macos: "macOS", windows: "Windows", linux: "Linux"};
 // draws it; a note says where a section is in these words too.
 const SETTINGS_SECTIONS = Object.freeze({
     keyTiming: "Tap & hold timing", normalPointerSpeed: "Pointer speed", sniping: "Auto-sniping", autoMouse: "Auto-mouse",
-    automouseFade: "Auto-mouse fade", lightingPower: "All lighting", rgbAppearance: "Background effect", lightingFeedback: "Key feedback flash",
+    automouseFade: "Auto-mouse fade", lightingPower: "All lighting", rgbAppearance: "Background effect", lightingFeedback: "Behaviour feedback flash", replacementFeedback: "Replacement feedback flash",
     startupLayers: "Default layers", behaviorSettings: "Where behaviours run", comboSettings: "How combos run", comboReferences: "Combo layer matching",
-    keyboardOptions: "Key swaps & typing", host: "Your computer",
+    host: "Your computer", autocorrect: "Text replacement",
 });
 
 // A Settings screen as anything but the rail names it. The rail lists
 // "Pointer" under Settings; a link, a tip or a fix that sends a person
 // there has no rail around it, so it says "Pointer settings".
-const SETTINGS_SCREENS = Object.freeze({behaviours: "Behaviour settings", combos: "Combo settings", pointer: "Pointer settings", host: "Host settings"});
+const SETTINGS_SCREENS = Object.freeze({behaviours: "Behaviour settings", combos: "Combo settings", pointer: "Pointer settings", host: "Typing settings"});
 
 // Where a person finds a settings section, as a note core writes names it:
 // the Settings screen as it is named outside the rail, then the section's
-// heading ("Host settings → Your computer"), as the interface's sectionPath
+// heading ("Typing settings → Your computer"), as the interface's sectionPath
 // (webview/view/settings-layout.mjs) says it.
 /** @param {keyof typeof SETTINGS_SCREENS} screen @param {keyof typeof SETTINGS_SECTIONS} section */
 const settingsPath = (screen, section) => `${SETTINGS_SCREENS[screen]} → ${SETTINGS_SECTIONS[section]}`;
@@ -342,9 +346,18 @@ const THRESHOLDS = Object.freeze({tapHoldTerm: "tap / hold", longHoldTerm: "long
 /** @param {import("../../contracts/model.js").WordList<unknown>} list @param {unknown} key @returns {string} */
 const word = (list, key) => (list.find(([id]) => id === key)?.[1] ?? String(key ?? ""));
 
+// QMK's switch keys for autocorrect, which is text replacement here
+// (GLOSSARY.md): each key's words, as the switch keys for combos, behaviours
+// and auto-mouse are worded (Combo On, Combo Off, Toggle Combo). QMK's own
+// words stay among a key's search terms, so either name finds it.
+const TEXT_REPLACEMENT_KEYS = Object.freeze({QK_AUTOCORRECT_ON: "Text replacement On", QK_AUTOCORRECT_OFF: "Text replacement Off", QK_AUTOCORRECT_TOGGLE: "Toggle Text replacement"});
 // How a macro plays: whether it is uninterruptible, chosen or automatic.
 /** @type {import("../../contracts/model.js").WordList<"auto" | "on" | "off">} */
 const MACRO_PROTECTION = [["auto", "Automatic"], ["on", "On"], ["off", "Off"]];
+
+// A branch by how many taps start it, as the behaviour grid heads its rows;
+// Behaviour feedback names each tap branch's case by the same words.
+const BRANCHES = Object.freeze(["Single tap", "Double tap", "Triple tap", "Quadruple tap", "Quintuple tap"]);
 
 /** @type {Readonly<import("../../contracts/model.js").Vocabulary>} */
 const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.js").Vocabulary} */ ({
@@ -365,7 +378,12 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     // playback"), as its field and Review name it, and Automatic as it says
     // whether it plays the macro uninterruptibly now ("Automatic · on").
     macroUninterruptible: {label: "Uninterruptible playback",
-        automatic: {on: `${word(MACRO_PROTECTION, "auto")} · on`, off: `${word(MACRO_PROTECTION, "auto")} · off`}},
+        automatic: {on: `${word(MACRO_PROTECTION, "auto")} · on`, off: `${word(MACRO_PROTECTION, "auto")} · off`},
+        // How playing uninterruptibly works (firmware D-F17), and what each
+        // choice of macroProtection means, by its value: read once in the
+        // setting's info mark (D-L96).
+        plays: "Only the macro types while it plays: keys already held are suspended, and new presses are ignored and never replayed. Held modifiers resume afterward; a suspended key must be pressed again. Pointing and other keyboards can still interfere.",
+        means: [["auto", "Turns it on when this layout needs Unicode entry for the macro's text."], ["on", "The whole macro plays uninterruptibly."], ["off", "Your typing can mix with it."]]},
     // Why a macro does not read, by the macro grammar's reason
     // (rules/macro-payload.mjs), as the step editor and core's refusals both
     // say it; a key the reason names leads the words of unknown and notHeld
@@ -378,17 +396,34 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
         empty: "An empty {} is not a macro command.",
         noKeys: "A macro command needs at least one key.",
         pressOne: "A press or release names one key; use a tap for a chord.",
-        chord: `A chord is up to ${MACRO_LIMITS.maxHeldKeys} distinct keys.`,
+        chord: "A chord names each key only once.",
         unknown: "is not a key a macro can send.",
         notHeld: "is released but was never pressed.",
         heldAgain: "A macro presses a key that is already held.",
-        tooManyHeld: `A macro holds at most ${MACRO_LIMITS.maxHeldKeys} keys at once.`,
+        reportFull: `A macro holds at most ${MACRO_LIMITS.reportKeys} keys at once besides modifiers: keys still held, a chord's keys and a key typing text all count.`,
         textHold: "Release ordinary keys before text your keyboard layout cannot type, which needs Unicode entry; modifier holds are supported.",
         stillHeld: "Release every held key before the macro ends.",
     },
     // Each kind of macro step by its one name (glossary "Macro step"): the
     // add buttons, the step editor and the picker it opens all say it so.
     macroSteps: [["text", "Text"], ["tap", "Key or chord"], ["delay", "Delay"], ["press", "Press"], ["release", "Release"]],
+    // What a text replacement is (schema/autocorrect-domain-v1.js
+    // AUTOCORRECT_KIND), as its editor's choice and its tag say it.
+    replacementKinds: [["text", "Text"], ["macro", "Macro"]],
+    // How a replacement fires (D-L91): as you type, after the Leader key, or
+    // both; its inputs are one list whichever. The switch on its editor.
+    inputModes: [["word", "As you type"], ["leader", "After Leader"], ["both", "Both"]],
+    // What each means, by the same value, read once in the Fires info mark
+    // (D-L96); how long the Leader key waits is said after it, by its setting.
+    inputModesMean: [["word", "Replaced as you finish the word."],
+        ["leader", "Press the Leader key, then type one of its inputs: the keyboard sends the replacement the moment it is typed, and the computer never sees what you typed."],
+        ["both", "Either way."]],
+    // The Leader key as its cap names it, where a replacement's editor says
+    // the key is placed.
+    leaderKey: "Leader",
+    // The formats a text replacement list is saved in (autocorrect-import.js
+    // AUTOCORRECT_FILE_FORMATS), as Export's menu names each.
+    listFileFormats: [["txt", "Text (QMK)"], ["csv", "CSV"], ["json", "JSON"]],
     // The same names, short, as the word under a step's tile, the editor's
     // legend beside its mark and a screen reader before a chip say them; a
     // key or chord step says which of the two it is.
@@ -451,73 +486,205 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
         multiTapTerm: "The time allowed from releasing the key to pressing it again for another tap. A Double tap Hold is press, release, then press and keep holding.",
     },
     tiers: {tap: "Tap", hold: "Hold", long: "Long hold"},
+    // What lands a press in each tier, said on the grid's headings.
+    tierTips: {tap: "Let go before the Tap / hold threshold.", hold: "Held past the Tap / hold threshold.", long: "Held past the Long hold threshold."},
     // A behaviour's branch by how many taps start it.
-    branches: ["Single tap", "Double tap", "Triple tap", "Quadruple tap", "Quintuple tap"],
+    branches: BRANCHES,
 
     localities: [
-        ["RGB_BOTH_HALVES", "Both halves"], ["RGB_LEFT_HALF", "Left half"], ["RGB_RIGHT_HALF", "Right half"],
+        ["RGB_BOTH_HALVES", "All LEDs"], ["RGB_LEFT_HALF", "Left half"], ["RGB_RIGHT_HALF", "Right half"],
         ["RGB_KEY_HALF", "The half holding the trigger key"], ["RGB_KEYS_ONLY", "Only the trigger key"],
     ],
-    paintModes: [["KEYS_MAPPED_ON_THIS_LAYER_ONLY", "Keys mapped on this layer only"], ["ALL_KEYS", "All keys"]],
+    // The same places in a word or two, for a list's cell, so a row stays one
+    // line; the Locality field names them whole.
+    localitiesBrief: [
+        ["RGB_BOTH_HALVES", "all LEDs"], ["RGB_LEFT_HALF", "left half"], ["RGB_RIGHT_HALF", "right half"],
+        ["RGB_KEY_HALF", "trigger's half"], ["RGB_KEYS_ONLY", "trigger key"],
+    ],
+    paintModes: [["KEYS_MAPPED_ON_THIS_LAYER_ONLY", "Keys mapped on this layer only"], ["ALL_KEYS", "All LEDs"]],
+    // The same modes in two words, for a list's cell.
+    paintModesBrief: [["KEYS_MAPPED_ON_THIS_LAYER_ONLY", "mapped keys"], ["ALL_KEYS", "all LEDs"]],
     fadeModes: [
         ["FOLLOW_REAL_DESTINATION", "Follow the real destination"],
         ["END_COLOR_WHERE_BASE_EFFECT_WOULD_SHOW", "End colour where the background effect would show"],
-        ["END_COLOR_ON_ALL_KEYS", "End colour on all keys"],
+        ["END_COLOR_ON_ALL_KEYS", "End colour on all LEDs"],
     ],
-    tapCommit: [["KEY_FEEDBACK_TAP_COMMIT_OFF", "Off"], ["KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS", "Double taps and more"]],
-    // What the colour editor says about HSV(0, 0, 0) in each stage: the tip on
-    // Turn off and the note shown once it is stored. Outside a layer colour
-    // and a group row black is literal black (firmware RGB domain spec,
-    // "Black"), so there only the Stage on switch paints nothing. The
-    // background effect offers no Turn off.
+    // Whether Tap committed also flashes as a double tap or more fires (the
+    // tap-commit policy, firmware rgb-domain-v1); a tap branch is not touched.
+    tapCommit: [["KEY_FEEDBACK_TAP_COMMIT_OFF", "Off"], ["KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS", "On"]],
+    // Lighting's fields, as its tabs label them and the review names them.
+    lightingFields: {colour: "Colour", locality: "Locality", paintMode: "Which LEDs light up", fadeMode: "Fade mode", endColour: "End colour",
+        doubleTapFlash: "Flash on a double tap or more"},
+    // The colour editor's choice for a colour that may paint nothing (D-L94,
+    // D-L95): a colour, or off, its LEDs dark; passthrough is each stage's
+    // `colourOff[stage].offWord`.
+    colourChoice: {colour: "Colour", off: "Off"},
+    // What the colour editor says about HSV(0, 0, 0) in each stage (D-L94,
+    // firmware D-F74): every colour a layer, a pointing slot, combo feedback
+    // or a feedback case owns is passthrough at saturation and value 0, at
+    // any hue, painting nothing so what is beneath shows; Off, value 0 with
+    // saturation, is a choice of its own that turns its LEDs dark. The
+    // auto-mouse fade's end colour is literal, so 0, 0, 0 is off there; the
+    // background effect offers neither. The editor's choice reads Colour,
+    // Off and `offWord` (D-L95); each choice's tip is `ledsOffTip` for Off
+    // and `offTip` for Passthrough, the fade end's Off; a passthrough
+    // colour's note is `offNote`. An off one says it on its item's head.
     colourOff: {
         layers: {
             offTip: "Store HSV(0, 0, 0): this layer then paints nothing, and what is beneath shows through.",
-            offNote: "No colour is stored for this layer, so the background effect shows through wherever it would paint.",
-        },
-        groups: {
-            offTip: "Store HSV(0, 0, 0): this row then takes its stage's colour.",
-            offNote: "A row stored as HSV(0, 0, 0) inherits its stage colour instead of painting its own.",
+            offNote: "This layer is passthrough: it paints nothing, so what is beneath shows through wherever it would paint.",
+            offWord: "Passthrough",
+            ledsOffTip: "Store brightness 0 with saturation: this layer's keys then go dark, covering what is beneath.",
         },
         auto: {
-            offTip: "Store HSV(0, 0, 0): the fade then ends on black.",
+            offTip: "Store HSV(0, 0, 0): the fade then ends with the LEDs off.",
         },
         pd: {
-            offTip: "Store HSV(0, 0, 0): this mode then paints its locality black while it runs. To paint nothing, switch Stage on off.",
-            offNote: "The colour is black, so this mode paints its locality black while it runs. To paint nothing, switch Stage on off; that turns off every pointing mode's colour.",
+            offTip: "Store HSV(0, 0, 0): this mode then paints nothing while it runs, and what is beneath shows. Its accents in a colour of their own still light.",
+            offNote: "This mode is passthrough: it paints nothing while it runs, so what is beneath shows. Its accents in a colour of their own still light.",
+            offWord: "Passthrough",
+            ledsOffTip: "Store brightness 0 with saturation: this mode then turns its area's LEDs off while it runs, covering what is beneath.",
         },
         combo: {
-            offTip: "Store HSV(0, 0, 0): combo feedback then paints its locality black while a combo's inputs are held. To paint nothing, switch Stage on off.",
-            offNote: "The colour is black, so combo feedback paints its locality black while a combo's inputs are held. To paint nothing, switch Stage on off.",
+            offTip: "Store HSV(0, 0, 0): combo feedback then paints nothing while a combo's inputs are held, and what is beneath shows. Its accents in a colour of their own still light.",
+            offNote: "Combo feedback is passthrough: it paints nothing while a combo's inputs are held, so what is beneath shows. Its accents in a colour of their own still light.",
+            offWord: "Passthrough",
+            ledsOffTip: "Store brightness 0 with saturation: combo feedback then turns its area's LEDs off while a combo's inputs are held, covering what is beneath.",
         },
         key: {
-            offTip: "Store HSV(0, 0, 0): this state then flashes black. To flash nothing, switch Stage on off.",
-            offNote: "The colour is black, so the keyboard flashes black for this state. To flash nothing, switch Stage on off; that turns off every feedback colour.",
+            offTip: "Store HSV(0, 0, 0): this case then paints nothing, and what is beneath shows. The other cases still light, and so do its accents in a colour of their own.",
+            offNote: "This case is passthrough: it paints nothing, so what is beneath shows. The other cases still light, and so do its accents in a colour of their own.",
+            offWord: "Passthrough",
+            ledsOffTip: "Store brightness 0 with saturation: this case then turns its area's LEDs off, covering what is beneath.",
+        },
+        autocorrect: {
+            offTip: "Store HSV(0, 0, 0): this case then paints nothing, and what is beneath shows. The other cases still light, and so do its accents in a colour of their own.",
+            offNote: "This case is passthrough: it paints nothing, so what is beneath shows, and its accents that take its colour stay dark. The other cases still light.",
+            offWord: "Passthrough",
+            ledsOffTip: "Store brightness 0 with saturation: this case then turns its area's LEDs off, covering what is beneath.",
         },
     },
+    // What Behaviour feedback shows (D-L93; the firmware's behaviour-feedback
+    // semantics, D-F73): the tiers, then each tap branch pending, named as
+    // the behaviour grid names its tap count (the last for every deeper one
+    // too), and all of them, which an accent may light for.
     feedbackOwners: [
-        ["KEY_FEEDBACK_GROUP_ALL", "Every feedback state"],
-        ["KEY_FEEDBACK_GROUP_TAP_BRANCH_PENDING", "Tap branch pending"],
+        ["KEY_FEEDBACK_GROUP_ALL", "Every behaviour state"],
         ["KEY_FEEDBACK_GROUP_TAP_COMMITTED", "Tap committed"],
         ["KEY_FEEDBACK_GROUP_HOLD_ACTIVE", "Hold active"],
         ["KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE", "Long hold active"],
+        ...[2, 3, 4, 5].map((count) => /** @type {[string, string]} */ ([`KEY_FEEDBACK_GROUP_TAP_COUNT_${count}`, BRANCHES[count - 1]])),
+        ["KEY_FEEDBACK_GROUP_TAP_BRANCH_ANY", "Every tap branch"],
     ],
-    // The behaviour tier each key feedback state flashes for, which marks its
+    // The behaviour tier each behaviour state flashes for, which marks its
     // rows with that tier's dot, as the review does; the other states have
     // none.
     feedbackTiers: {KEY_FEEDBACK_GROUP_TAP_COMMITTED: "tap", KEY_FEEDBACK_GROUP_HOLD_ACTIVE: "hold", KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE: "long"},
-    // The four tables of LED group rows, by the target an LED row edit names.
-    ledTables: [["layer", "Layer LED groups"], ["pdMode", "Pointing-mode LED groups"], ["combo", "Combo feedback LED groups"], ["keyBehavior", "Key feedback LED groups"]],
-    // The lighting stages in the order the firmware paints them. A stage is
-    // found by its id or bit, never by its words.
-    stages: [
-        {id: "base", label: "Background effect"},
-        {id: "layers", label: "Layer colours", bit: RGB_STAGE_BITS.LAYER},
-        {id: "auto", label: "Auto-mouse fade", bit: RGB_STAGE_BITS.AUTOMOUSE},
-        {id: "pd", label: "Pointing modes", bit: RGB_STAGE_BITS.POINTING_MODE},
-        {id: "combo", label: "Combo feedback", bit: RGB_STAGE_BITS.COMBO},
-        {id: "key", label: "Key feedback", bit: RGB_STAGE_BITS.KEY_BEHAVIOR},
+    // What Replacement feedback shows (D-L89, D-L92; the firmware's
+    // replacement-feedback semantics, D-F70, D-F72): the four cases, an input
+    // replaced with text, one replaced by its macro and a replacement undone
+    // with Backspace, which flash, and the leader waiting, which holds; and
+    // all of them, which an accent may light for.
+    replacementOwners: [
+        ["AUTOCORRECT_FEEDBACK_GROUP_ALL", "Every case"],
+        ["AUTOCORRECT_FEEDBACK_GROUP_TEXT", "Replaced with text"],
+        ["AUTOCORRECT_FEEDBACK_GROUP_MACRO", "Replaced by a macro"],
+        ["AUTOCORRECT_FEEDBACK_GROUP_UNDO", "Replacement undone"],
+        ["AUTOCORRECT_FEEDBACK_GROUP_LEADING", "Leader waiting"],
     ],
+    // When each case shows (firmware D-F70, D-F72), said in one line under
+    // its name on the tab: the three flashes, and Leader waiting, held from
+    // the Leader key until the leader sends or gives up. The rest of what a
+    // case does is in the stage's info mark (ui/lighting/help.mjs).
+    replacementWhen: {
+        AUTOCORRECT_FEEDBACK_GROUP_TEXT: "Flashes once as an input is replaced with text, and as the Leader key sends text.",
+        AUTOCORRECT_FEEDBACK_GROUP_MACRO: "Flashes once as an input is erased for its macro, and as the Leader key plays a macro.",
+        AUTOCORRECT_FEEDBACK_GROUP_UNDO: "Flashes once as Backspace, straight after a replacement, puts the word back.",
+        AUTOCORRECT_FEEDBACK_GROUP_LEADING: "Held, not flashed, from the Leader key until the leader sends or gives up.",
+    },
+    // When each Behaviour feedback case shows, and how, in a line short
+    // enough to head its pane at 1280px as replacementWhen heads a
+    // replacement case's (firmware rgb-domain-v1, key runtime feedback.c),
+    // by kind of case: Tap committed, while the tap-commit policy is Off and
+    // On; Hold active and Long hold active alike, the only cases that blink,
+    // at the Blink time, and only for a hold held until release or repeating
+    // (holdStyles; feedback.c, handled_key_policy.h), any other steady while
+    // reached and still to send, or one flash as it sends (the spec's hold
+    // pulse, as after a run of two or more taps); and every tap branch, its
+    // name heading the line.
+    // The stage's info mark says the rest.
+    feedbackWhen: {
+        tapCommitted: "Steady while a tap with no hold is held",
+        tapCommittedFlashes: "Steady while a tap with no hold is held; one flash after a double tap or more",
+        hold: "Blinks if held until release or repeating; else steady or one flash",
+        tapBranch: "Steady while a run of taps waits on this count",
+    },
+    // The case each Replacement feedback colour shows, by the colour's
+    // field, in the order the keyboard stores them. The tab lists its
+    // colours by it, the review names them by it, and an accent of the case
+    // is found by it.
+    replacementColourOwners: {textColor: "AUTOCORRECT_FEEDBACK_GROUP_TEXT", macroColor: "AUTOCORRECT_FEEDBACK_GROUP_MACRO", undoColor: "AUTOCORRECT_FEEDBACK_GROUP_UNDO", leadingColor: "AUTOCORRECT_FEEDBACK_GROUP_LEADING"},
+    // Accents (D-L77), by the table an accent edit names: when they light,
+    // with {owner} for the layer, mode, behaviour state or replacement case picked; the owner
+    // that is all of a table's, by the name core reads and writes
+    // (`everyOwner`, the schema's RGB_EVERY_OWNER), and what it is called, as an accent lighting for it is
+    // tagged and offered and the review names it (combo accents all light for
+    // every combo, so that table has no such owner, only its words); and
+    // what an accent that takes its stage's colour (HSV(0, 0, 0)) takes.
+    accents: {
+        layer: {when: "LEDs that light in a colour of their own while {owner} is on, with those for every layer. An accent on a lower layer stays lit over the layers above it.",
+            everyOwner: RGB_EVERY_OWNER.layer, every: "Every layer", stageColour: "Same as the layer"},
+        pdMode: {when: "LEDs that light in a colour of their own while {owner} runs, with those for every pointing mode.",
+            everyOwner: RGB_EVERY_OWNER.pdMode, every: "Every pointing mode", stageColour: "Same as the mode"},
+        combo: {when: "LEDs that light in a colour of their own while a combo's inputs are held: the same LEDs for every combo.",
+            every: "Every combo", stageColour: "Same as combo feedback"},
+        keyBehavior: {when: "LEDs that light in a colour of their own while a key shows {owner}, with those for every behaviour state: the same LEDs whichever key it is.",
+            everyOwner: RGB_EVERY_OWNER.keyBehavior, every: "Every behaviour state", stageColour: "Same as the feedback colour",
+            // Each tap branch's accents may light for all of them at once
+            // (D-L93, firmware D-F75), in the colour of the branch showing.
+            group: {owner: "KEY_FEEDBACK_GROUP_TAP_BRANCH_ANY", words: "Every tap branch", members: ["KEY_FEEDBACK_GROUP_TAP_COUNT_2", "KEY_FEEDBACK_GROUP_TAP_COUNT_3", "KEY_FEEDBACK_GROUP_TAP_COUNT_4", "KEY_FEEDBACK_GROUP_TAP_COUNT_5"]}},
+        autocorrect: {when: "LEDs that light in a colour of their own while the keyboard shows {owner}, with those for every case: the same LEDs whichever key caused it, or none.",
+            everyOwner: RGB_EVERY_OWNER.autocorrect, every: "Every case", stageColour: "Same as the case's colour"},
+    },
+    // The accent editor's own fields; its colour field is lightingFields.colour.
+    accentFields: {lightsFor: "Lights for", ownColour: "Its own"},
+    // The case each Behaviour feedback row shows (D-L93), by the row: a
+    // tier's colour field, then each tap branch's, `branch:0` the double
+    // tap's. Behaviour feedback lists its cases by it, the review names them
+    // by it, and an accent of the case is found by it.
+    feedbackColourOwners: {tapCommittedColor: "KEY_FEEDBACK_GROUP_TAP_COMMITTED", holdActiveColor: "KEY_FEEDBACK_GROUP_HOLD_ACTIVE",
+        longHoldActiveColor: "KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE",
+        "branch:0": "KEY_FEEDBACK_GROUP_TAP_COUNT_2", "branch:1": "KEY_FEEDBACK_GROUP_TAP_COUNT_3",
+        "branch:2": "KEY_FEEDBACK_GROUP_TAP_COUNT_4", "branch:3": "KEY_FEEDBACK_GROUP_TAP_COUNT_5"},
+    // The groups of Lighting's lists beside an editor (webview/ui/groups.mjs
+    // groupedTable): the layers and slots in use, ahead of the empty ones;
+    // Behaviour feedback's two groups of colours, as the behaviour grid's columns
+    // and rows; Replacement feedback's cases; and the combos by what holding
+    // one shows. A group's band is no control, so it carries no tip: what a
+    // group means is said once, in its stage's info mark.
+    lightingLists: {
+        inUse: "In use",
+        tiers: {title: "Tiers"},
+        tapBranches: {title: "Tap branches"},
+        replacements: {title: "Cases"},
+        comboFeedback: {title: "Combo feedback", empty: "No combo on this view lights combo feedback."},
+        holdLayer: {title: "Hold a layer", empty: "No combo on this view holds a layer."},
+    },
+    // The lighting stages in the order the firmware paints them, each with
+    // the word its tab reads by where the window is too narrow for the
+    // whole name (its stage bar still says it whole). A stage is found by its
+    // id or bit, never by its words.
+    stages: [
+        {id: "base", label: "Background effect", short: "Background"},
+        {id: "layers", label: "Layer colours", short: "Layers", bit: RGB_STAGE_BITS.LAYER},
+        {id: "auto", label: "Auto-mouse fade", short: "Auto-mouse", bit: RGB_STAGE_BITS.AUTOMOUSE},
+        {id: "pd", label: "Pointing modes", short: "Pointing", bit: RGB_STAGE_BITS.POINTING_MODE},
+        {id: "combo", label: "Combo feedback", short: "Combos", bit: RGB_STAGE_BITS.COMBO},
+        {id: "key", label: "Behaviour feedback", short: "Behaviours", bit: RGB_STAGE_BITS.KEY_BEHAVIOR},
+        {id: "autocorrect", label: "Replacement feedback", short: "Replacement", bit: RGB_STAGE_BITS.AUTOCORRECT},
+    ],
+    // Lighting's last tab, which lists every stage's accents and is no stage.
+    allAccents: "All accents",
 
     // A custom key's shortcut (firmware D-F26): why a layer cannot be one it
     // turns on, said in the layer's row of the shortcut picker, and how it
@@ -536,6 +703,13 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     // (key-names.js), and a branch or combo action that acts on a layer is
     // tagged with them. TG is a lock on this firmware (firmware D-F46).
     layerKeyVerbs: {MO: "Hold", TG: "Lock", LOCK_LAYER: "Lock", TT: "Tap-toggle", OSL: "One-shot", TO: "Move to", DF: "Default", PDF: "Default"},
+    // The switch keys for behaviours and for auto-mouse, by their names' homes
+    // (data/user-keycodes.js BEHAVIOR_SWITCH_KEYS, AUTO_MOUSE_SWITCH_KEYS),
+    // worded as QMK's catalogue words the switch keys for combos: Combo On,
+    // Combo Off, Toggle Combo.
+    switchKeys: /** @satisfies {Readonly<Record<import("../data/user-keycodes.js").BehaviorSwitchKey | import("../data/user-keycodes.js").AutoMouseSwitchKey, string>>} */ ({
+        BH_ON: "Behaviours On", BH_OFF: "Behaviours Off", BH_TOGG: "Toggle Behaviours",
+        AM_ON: "Auto-mouse On", AM_OFF: "Auto-mouse Off", AM_TOGG: "Toggle Auto-mouse"}),
     // Review's checks: each level's word, and where a check that is not new
     // in the draft comes from.
     checkLevels: {blocker: "Blocker", trap: "Trap", warning: "Warning", notice: "Notice"},
@@ -548,12 +722,16 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     // A backup's settings sections, as Import's summary counts the
     // file's differences: by their headings, but for three. The summary
     // already names behaviour and combo rows "Behaviours" and "Combos", so
-    // their sections say "settings"; Key feedback flash is counted with the
-    // Key feedback lighting stage, so it takes the stage's name.
+    // their sections say "settings"; Behaviour feedback flash and Replacement
+    // feedback flash are counted with their lighting stages, so they take the
+    // stages' names; and Text
+    // replacement's section, which is its switch, is counted beside its list
+    // and says so.
     fileSections: {
         keyTiming: SETTINGS_SECTIONS.keyTiming, startupLayers: SETTINGS_SECTIONS.startupLayers, behaviorSettings: "Behaviour settings", comboSettings: "Combo settings",
-        comboReferences: SETTINGS_SECTIONS.comboReferences, keyboardOptions: SETTINGS_SECTIONS.keyboardOptions, lightingPower: SETTINGS_SECTIONS.lightingPower, rgbAppearance: SETTINGS_SECTIONS.rgbAppearance,
-        lightingFeedback: "Key feedback", normalPointerSpeed: SETTINGS_SECTIONS.normalPointerSpeed, sniping: SETTINGS_SECTIONS.sniping, autoMouse: SETTINGS_SECTIONS.autoMouse,
+        comboReferences: SETTINGS_SECTIONS.comboReferences, lightingPower: SETTINGS_SECTIONS.lightingPower, rgbAppearance: SETTINGS_SECTIONS.rgbAppearance,
+        lightingFeedback: "Behaviour feedback", replacementFeedback: "Replacement feedback", normalPointerSpeed: SETTINGS_SECTIONS.normalPointerSpeed, sniping: SETTINGS_SECTIONS.sniping, autoMouse: SETTINGS_SECTIONS.autoMouse,
+        autocorrect: "Text replacement switch",
     },
     // Why a behaviour, or a key toward a combo, does not take part
     // (participation.js), in the words of the switch that says no, and of the
@@ -572,16 +750,17 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     // "this key on" that layer.
     participationPlaces: {key: "this key on this layer", layer: "this layer", keyOn: "this key on"},
     // What a profile holds that the keyboard counts against a limit
-    // (profile-usage.js), as the keyboard's usage table names each.
+    // (profile-usage.js), as the keyboard's usage table names each, in its order.
     usageCounts: {
         behaviours: {label: "Behaviours", what: "Keys with a behaviour."},
         behaviourSteps: {label: "Behaviour tap counts", what: "Each behaviour's tap counts, up to the deepest one it sets, added up across all behaviours."},
         combos: {label: "Combos", what: "Combos on any layer."},
-        lightingGroups: {label: "LED groups", what: "Named LED groups on Lighting."},
-        lightingGroupRows: {label: "LED overrides", what: "LED override rows on layers, pointing modes, combo feedback and key feedback."},
         macros: {label: "Macros", what: "Macro slots with steps."},
+        autocorrectInputs: {label: "Text replacement inputs", what: "Every input of every text replacement, added up across the list."},
         customKeys: {label: "Custom keys", what: "Custom keys with a name, a shortcut or a behaviour."},
         pointingModes: {label: "Pointing modes", what: "Slots that hold a pointing mode."},
+        lightingGroups: {label: "LED sets", what: "The different sets of LEDs accents light; accents that light the same LEDs share one."},
+        lightingGroupRows: {label: "Accents", what: "Accents on layers, pointing modes, combo feedback, behaviour feedback and replacement feedback."},
     },
     pointing: {
         kinds: [[0, "Empty"], [1, "Send keys"], [2, "Scroll"]],
@@ -638,22 +817,19 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
         heldModifiers: "Hold modifiers while scrolling",
         // What each setting of a mode does, by the field it sets, as the
         // firmware runs it (its pointing spec; pointing_mode_dragscroll.c for
-        // the scroll fields): said as the field's tip wherever it is drawn. A
-        // ratio's tip is its numerator's; a directional threshold's is by how
+        // the scroll fields): said once, as the field's tip in a step, or in
+        // the info mark of its step or Advanced section (D-L96). A ratio's
+        // words are its numerator's; a directional threshold's are by how
         // often the mode sends (thresholdEvery, thresholdOnce).
         tips: {
             axis: "Which movement this mode turns into keys. Switching to one axis empties the other axis's keys.",
-            emptyDirection: "Moving toward a direction with no key: its neighbours take over its share; both neighbours are sent (a diagonal's two straight directions, a straight direction's two diagonals, so in eight directions only); or the move does nothing.",
-            directionOutput: "Every step sends the key again each time the ball moves a threshold further. Once per movement sends it once, however far the ball goes; a movement starts again after a 150 ms pause, and only turning more than 90 degrees from the direction that sent sends again before then.",
             thresholdEvery: "How far the ball must move for each key a direction sends: one key per this distance. Lower sends more often.",
             thresholdOnce: "How far the ball must move before a direction sends its key; it sends once however far the ball goes.",
             scrollAxes: "Which way this mode scrolls. With one axis, a swipe the other way does nothing, and its slight drift does not scroll the allowed axis.",
             dpi: "Sensor DPI while this mode runs.",
-            pointerLayer: "Keep the pointer layer active: the pointer layer stays on while the mode runs, and a locked mode keeps auto-mouse on. Return to the typing layer: starting the mode turns the pointer layer off, and it stays off while the mode runs. A mode its layers started never keeps the pointer layer on.",
             linkedLayers: "While one of these layers is on, held or locked, it starts this pointing mode. A mode started by its key wins over one its layers started.",
             linkTurnsOn: "While this pointing mode's key runs it, held or locked, these layers stay on; each goes off when the mode ends unless something else keeps it.",
-            linkEnds: "A higher layer: one above the highest layer that starts this pointing mode and is on. Any layer: any layer that is on and starts or is turned on by neither. Either ends the mode until that layer goes off; the pointer layer and the default layers never do, and a mode its key runs is never ended.",
-            thresholdH: "How far the ball must move sideways, in sensor counts, before a scroll can go sideways. When both axes are below their thresholds, the scroll lets go of its axis.",
+            thresholdH: "How far the ball must move sideways, in sensor counts, before a scroll can go sideways.",
             thresholdV: "How far the ball must move up or down, in sensor counts, before a scroll can go up or down. When both axes are below their thresholds, the scroll lets go of its axis.",
             divisorH: "Sensor counts of sideways movement for one scroll step. Lower scrolls faster.",
             divisorV: "Sensor counts of up-and-down movement for one scroll step. Lower scrolls faster.",
@@ -666,26 +842,91 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
             startNumerator: "To pick an axis, its movement must be at least this many times the other axis's: 7 : 4 is 1.75 times. Higher needs a straighter movement before a scroll starts; when neither axis wins, it waits.",
             sustainNumerator: "A scroll keeps its axis while that axis moves at least this many times the other (5 : 4 is 1.25 times, never more than the selection ratio). Below it, the other axis takes over only if it reaches the selection ratio; otherwise the scroll stays on its axis through the wobble.",
         },
+        // What each choice of a step means, by the value it stores, read once
+        // in its step's info mark (D-L96); each choice's own words are its
+        // table's above, and `lead` is what holds whichever is chosen.
+        choicesMean: {
+            emptyDirection: {rows: [[0, "Moving toward it, the directions either side take over its share."],
+                [1, "Moving toward it sends both directions either side: a diagonal's two straight directions, a straight direction's two diagonals. In eight directions only; elsewhere its neighbours take over."],
+                [2, "Moving toward it does nothing."]]},
+            directionOutput: {rows: [[0, "Sends the key again each time the ball moves a threshold further."],
+                [1, "Sends it once, however far the ball goes. A movement starts again after a 150 ms pause; before then, only turning more than 90 degrees from the direction that sent sends again."]]},
+            linkEnds: {lead: "That layer ends a mode its layers started, and the mode comes back when the layer goes off. A mode its key runs is never ended, and the pointer layer and the default layers never end one.",
+                rows: [[0, "No other layer ends it."], [1, "A layer above the highest layer that starts this mode and is on."],
+                    [2, "Any layer that is on and neither starts this mode nor is turned on by its key."]]},
+            pointerLayer: {lead: "A mode its layers started never keeps the pointer layer on.",
+                rows: [[0, "The pointer layer stays on while the mode runs, and a locked mode keeps auto-mouse on."],
+                    [1, "Starting the mode turns the pointer layer off, and it stays off while the mode runs."]]},
+        },
         // What the pointer layer does while a mode its key started runs: on,
         // or off so the typing layer's keys stay under the hand.
         pointerLayerLabel: "Pointer layer",
+        // The editor's other field labels, which the review names its fields
+        // by. A directional threshold is its axis's word and then its
+        // directionStep ("Horizontal movement per tap").
+        fieldLabels: {name: "Pointing mode name", dpi: "Pointer speed", axis: "Reads", emptyDirection: "When a direction has no key",
+            directionOutput: "How often it sends", scrollAxes: "Scrolls", invert: "Reverse scrolling", horizontal: "Horizontal", vertical: "Vertical"},
     },
-    modifiers: [[1, "Left Ctrl"], [2, "Left Shift"], [4, "Left Alt"], [8, "Left GUI"],
+    // The eight modifiers by their bits, as they read held together: the left
+    // one unmarked, the right one named so (D-L83). A modifier key on its own
+    // keeps its side ("Left Ctrl"), the catalogue's name for it.
+    modifiers: [[1, "Ctrl"], [2, "Shift"], [4, "Alt"], [8, "GUI"],
         [16, "Right Ctrl"], [32, "Right Shift"], [64, "Right Alt"], [128, "Right GUI"]],
     comboOptions: {useOutputBehavior: "use output behaviour", mustHold: "must be held", mustTap: "tap only", ordered: "keys in order"},
+    // What a behaviour and a combo share, as both editors label it and the
+    // review names it: whether it runs, and on which layers.
+    definitionFields: {use: {behaviour: "Use this behaviour", combo: "Use this combo"}, allowedLayers: "Layers it runs on",
+        offInSettings: {behaviour: `off in ${SETTINGS_SCREENS.behaviours}`, combo: `off in ${SETTINGS_SCREENS.combos}`}, onceOn: {behaviour: "For a key on this layer, this switch takes effect once that is on again; for a combo sending this behaviour, it applies now.",
+            combo: "This switch takes effect once that is on again."}},
+    // A banner while a global switch keeps something off, which goes to that
+    // switch, and what a lighting stage adds when it is the thing kept off.
+    // `off` is said as the banner's first sentence and, alone, on a Lighting
+    // stage's bar.
+    settingOff: {switches: {behaviour: {off: "Behaviours are off", fix: `Turn them on in ${SETTINGS_SCREENS.behaviours} →`},
+        combo: {off: "Combos are off", fix: `Turn them on in ${SETTINGS_SCREENS.combos} →`},
+        autoMouse: {off: "Auto-mouse is off", fix: `Turn it on in ${SETTINGS_SCREENS.pointer} →`},
+        autocorrect: {off: "Text replacement is off", detail: "The keyboard keeps this list and replaces nothing.", fix: `Turn it on in ${SETTINGS_SCREENS.host} →`}}, stage: "This stage paints nothing.",
+        // With a leader input on the list the leader still sends, and its
+        // sends still flash (firmware D-F71, D-L91).
+        leading: {list: "Words you finish are left as you typed them; the Leader key still sends your leader inputs.", stage: "Words you finish never flash; Leader waiting still lights, and what the Leader key sends still flashes, in the text or macro colour."}},
+    // A behaviour's own switch, as its editor labels it and the review names
+    // it, and the fold its timings open from.
+    behaviourFields: {anchor: "Keeps the pointer layer on", timings: "Timings"},
+    // A combo's fields, as the Combos table heads them and the review names them.
+    comboFields: {inputs: "Inputs", sends: "Sends", window: "Window", conditions: "Conditions"},
 }));
 
-// The names a person reads for a layer and a pointing slot that have none of
-// their own. Layer 0 is the base layer.
+// The names a person reads for a layer and a slot that have none of their
+// own. Layer 0 is the base layer. A slot goes by its kind and its number,
+// "Macro 3", "Custom key 3", "Pointing mode 3": what its name field holds
+// while empty, and the tag its editor's title bar wears always.
 /** @param {readonly string[] | null | undefined} names @param {number} index */
 const layerName = (names, index) => names?.[index] || (index ? `Layer ${index}` : "Base");
-// A macro slot's name when it has none of its own.
 /** @param {number} index */
 const macroDefaultName = (index) => `Macro ${index}`;
+/** @param {number} index */
+const customKeyDefaultName = (index) => `Custom key ${index}`;
+/** @param {number} index */
+const pointingDefaultName = (index) => `Pointing mode ${index}`;
+// A pointing slot's name: its own while it holds a mode, else its default.
 /** @param {{id: number, kind: number, name: string} | null | undefined} slot @param {number} [id] */
-const slotName = (slot, id = slot?.id) => (slot?.kind && slot.name) || `Slot ${id}`;
+const slotName = (slot, id = slot?.id) => (slot?.kind && slot.name) || pointingDefaultName(Number(id));
 /** @param {number} count */
 const branchName = (count) => VOCABULARY.branches[count - 1] || `${count} taps`;
+// The LEDs an accent lights, by the indices the board numbers them with, a
+// run of three or more as a range: "LEDs 24–28, 53–55" (D-L77).
+/** @param {readonly number[]} leds */
+const ledsCalled = (leds) => {
+    const sorted = [...new Set(leds)].sort((left, right) => left - right);
+    /** @type {[number, number][]} */
+    const runs = [];
+    for (const led of sorted) {
+        const last = runs[runs.length - 1];
+        if (last && led === last[1] + 1) last[1] = led; else runs.push([led, led]);
+    }
+    const parts = runs.flatMap(([from, to]) => to - from >= 2 ? [`${from}–${to}`] : from === to ? [`${from}`] : [`${from}`, `${to}`]);
+    return `LED${sorted.length === 1 ? "" : "s"} ${parts.join(", ")}`;
+};
 // Why a macro does not read, in words (rules/macro-payload.mjs).
 /** @param {{code: string, key?: string}} problem */
 const macroProblemWords = (problem) => wordedProblem(problem, VOCABULARY.macroProblems);
@@ -713,14 +954,14 @@ const modifierNames = (mask) => VOCABULARY.modifiers.filter(([bit]) => mask & bi
 // that screen is (the pointer's settings are Pointer's); Settings is the
 // other Settings screens'. The interface keeps a copy of the order
 // (webview/view/review.mjs AREAS, pinned by tests/view/enum-drift.test.mjs).
-const REVIEW_AREAS = Object.freeze({keys: "Keys", layers: "Layers", behaviours: "Behaviours", combos: "Combos", customKeys: "Custom keys", macros: "Macros",
+const REVIEW_AREAS = Object.freeze({keys: "Keys", layers: "Layers", behaviours: "Behaviours", combos: "Combos", customKeys: "Custom keys", macros: "Macros", autocorrect: "Text replacement",
     pointer: "Pointer", pointing: "Pointing modes", lighting: "Lighting", settings: "Settings", profile: "Profile", recovery: "Recovery"});
 // Each part of the profile as the area Review groups its changes under, by
 // the area core/schema/profile-domains.js gives it: where a refusal says the
 // keyboard found a problem.
 /** @type {Readonly<Record<import("../schema/profile-domains.js").ProfileDomain["area"], string>>} */
 const PROFILE_AREAS = Object.freeze({lighting: REVIEW_AREAS.lighting, behaviours: REVIEW_AREAS.behaviours, combos: REVIEW_AREAS.combos, settings: REVIEW_AREAS.settings,
-    pointing: REVIEW_AREAS.pointing, keys: REVIEW_AREAS.keys, macros: REVIEW_AREAS.macros});
+    pointing: REVIEW_AREAS.pointing, keys: REVIEW_AREAS.keys, macros: REVIEW_AREAS.macros, autocorrect: REVIEW_AREAS.autocorrect});
 
 // What a failure says to a person (interface contracts: no code or developer
 // word reaches one). Ark's own failures are sentences written for a person: a
@@ -736,7 +977,7 @@ const PROFILE_AREAS = Object.freeze({lighting: REVIEW_AREAS.lighting, behaviours
 // publicError): "Error" for Ark's plain sentence, "TypeError" for a fault.
 const FAILURE_WORDS = Object.freeze({
     unexpected: "Ark ran into a problem of its own. Try again, and reload the page if it keeps happening.",
-    unreadable: "The keyboard answered with something Ark could not read. Read the keyboard again; if it keeps happening, the Keyboard screen's Diagnostics say what it sent.",
+    unreadable: "The keyboard answered with something Ark could not read. Read the keyboard again.",
     incompatible: "The keyboard's firmware answers in a form this Ark does not read. Update both halves to current firmware.",
 });
 // The codes of an answer in a form this Ark does not support.
@@ -770,4 +1011,4 @@ function failureSentence(error) {
     return INCOMPATIBLE_ANSWERS.has(String(code)) ? FAILURE_WORDS.incompatible : FAILURE_WORDS.unreadable;
 }
 
-module.exports = {PHASE, listed, PHASE_WORDS, HALVES_WORDS, LIVE_RESULT_WORDS, SAVE_STEP_WORDS, SAVE_FAILURE_WORDS, APPLY_VERDICTS, SAVE_WORDS, INTERRUPTION_REASONS, PROFILE_FULL_WORDS, heldWords, EDIT_MODE_WORDS, editModeWords, quietWords, VOCABULARY, word, layerName, macroDefaultName, slotName, branchName, LAYER_KEY_VERBS, wordedMacroError, protectionWords, settingsPath, modifierNames, PROFILE_AREAS, REVIEW_AREAS, FAILURE_WORDS, sayable, arkCode, failureSentence};
+module.exports = {TEXT_REPLACEMENT_KEYS, PHASE, listed, PHASE_WORDS, HALVES_WORDS, LIVE_RESULT_WORDS, SAVE_STEP_WORDS, SAVE_FAILURE_WORDS, APPLY_VERDICTS, SAVE_WORDS, INTERRUPTION_REASONS, PROFILE_FULL_WORDS, heldWords, EDIT_MODE_WORDS, editModeWords, quietWords, VOCABULARY, word, layerName, macroDefaultName, customKeyDefaultName, pointingDefaultName, slotName, branchName, ledsCalled, LAYER_KEY_VERBS, wordedMacroError, protectionWords, settingsPath, modifierNames, PROFILE_AREAS, REVIEW_AREAS, FAILURE_WORDS, sayable, arkCode, failureSentence};

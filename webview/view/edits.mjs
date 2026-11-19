@@ -34,7 +34,7 @@ export const reviewPortableProfile = (text, name) => ({type: "reviewPortableProf
 
 // ── layout keys ─────────────────────────────────────────────────────────
 
-/** @param {import("../../contracts/edits.js").LayerReference} layer @param {{layoutIndex: number, keycode: string}[]} changes @returns {import("../../contracts/edits.js").EditOf<'updateLayoutKeys'>} */
+/** @param {import("../../contracts/edits.js").LayerReference} layer @param {import("../../contracts/edits.js").EditOf<'updateLayoutKeys'>["changes"]} changes @returns {import("../../contracts/edits.js").EditOf<'updateLayoutKeys'>} */
 export const layoutKeys = (layer, changes) => ({type: "updateLayoutKeys", layer, changes});
 /** @param {import("../../contracts/edits.js").LayerReference} layer @param {number} layoutIndex @param {string} keycode */
 export const setKey = (layer, layoutIndex, keycode) => layoutKeys(layer, [{layoutIndex, keycode}]);
@@ -43,10 +43,13 @@ export const setKey = (layer, layoutIndex, keycode) => layoutKeys(layer, [{layou
 export const clearKey = (layer, layoutIndex) => setKey(layer, layoutIndex, "KC_TRANSPARENT");
 /** @param {number} layer @param {number} layoutIndex @param {boolean} useBehavior @param {boolean} joinCombos @returns {import("../../contracts/edits.js").EditOf<'updatePlacementPolicy'>} */
 export const placementPolicy = (layer, layoutIndex, useBehavior, joinCombos) => ({type: "updatePlacementPolicy", layer, layoutIndex, useBehavior, joinCombos});
-// A swap is one message, so one undo takes both keys back.
-/** @param {import("../../contracts/edits.js").LayerReference} layer @param {{layoutIndex: number, keycode: string}} from @param {{layoutIndex: number, keycode: string}} to */
-export const swapKeys = (layer, from, to) => layoutKeys(layer, [
-    {layoutIndex: from.layoutIndex, keycode: to.keycode},
+// A swap is one message, so one undo takes both keys back. It is the edit of
+// the layer the key landed on; the key it came from names its own layer when
+// it was dragged there from another.
+/** @typedef {{layer: import("../../contracts/edits.js").LayerReference, layoutIndex: number, keycode: string}} PlacedKey */
+/** @param {PlacedKey} from @param {PlacedKey} to */
+export const swapKeys = (from, to) => layoutKeys(to.layer, [
+    {layoutIndex: from.layoutIndex, keycode: to.keycode, ...(from.layer === to.layer ? {} : {layer: from.layer})},
     {layoutIndex: to.layoutIndex, keycode: from.keycode},
 ]);
 
@@ -186,53 +189,135 @@ export const pdModeColour = (pointingMode, locality, colour) => ({type: "updateP
 /** @param {string} locality @param {Colour} colour @returns {import("../../contracts/edits.js").EditOf<'updateComboFeedback'>} */
 export const comboFeedback = (locality, colour) => ({type: "updateComboFeedback", locality, ...hsvPayload(colour)});
 
-// Key feedback is stored as one record, so any change posts the whole thing
-// with the one field replaced: `rowId` is a colour field or `branch:<n>`.
-/** @param {Partial<import("../../contracts/edits.js").KeyFeedback<Colour>>} [feedback] @param {import("../../contracts/edits.js").FeedbackRow | null} [rowId] @param {Colour} [next] @param {{tapCommitMode?: string, locality?: string}} [overrides] @returns {import("../../contracts/edits.js").EditOf<'updateKeyBehaviorFeedback'>} */
+// Behaviour feedback is stored as one record, so any change posts the whole thing
+// with the one field replaced: `rowId` is the case, a tier's colour field or
+// `branch:<n>`, whose colour `next` replaces; `overrides` the tap-commit
+// policy, the stage's own.
+/** @param {Partial<import("../../contracts/edits.js").KeyFeedback<Colour>>} [feedback] @param {import("../../contracts/edits.js").FeedbackRow | null} [rowId] @param {Colour | null} [next] @param {{tapCommitMode?: string}} [overrides] @returns {import("../../contracts/edits.js").EditOf<'updateKeyBehaviorFeedback'>} */
 export function keyFeedback(feedback = {}, rowId, next, overrides = {}) {
-    const config = {
-        tapBranchColors: (feedback.tapBranchColors || []).map(hsvPayload),
-        tapCommittedColor: hsvPayload(feedback.tapCommittedColor),
-        holdActiveColor: hsvPayload(feedback.holdActiveColor),
-        longHoldActiveColor: hsvPayload(feedback.longHoldActiveColor),
-        tapCommitMode: feedback.tapCommitMode,
-        locality: feedback.locality,
-        ...overrides,
-    };
+    const config = keyFeedbackConfig(feedback, overrides);
     if (rowId && next) {
-        const branch = /^branch:(\d+)$/.exec(rowId);
-        if (branch) config.tapBranchColors[Number(branch[1])] = hsvPayload(next);
+        const branch = tapBranchOf(rowId);
+        if (branch !== null) config.tapBranches[branch] = {...config.tapBranches[branch], color: hsvPayload(next)};
         else config[/** @type {import("../../contracts/edits.js").FeedbackColourField} */ (rowId)] = hsvPayload(next);
     }
     return {type: "updateKeyBehaviorFeedback", config};
 }
-
-// A new LED group row: its table, whose row it is (combo feedback has no
-// owner — every combo shares one colour), and either a saved group or the
-// LEDs picked on the board.
-/** @param {{target: string, owner: string, source: string}} row @param {number[]} ledIndices @param {Colour} colour @returns {import("../../contracts/edits.js").EditOf<'addRgbLedGroup'>} */
-export const ledRow = ({target, owner, source}, ledIndices, colour) => ({
-    type: "addRgbLedGroup",
-    group: {
-        target,
-        ...(target === "combo" ? {} : {owner}),
-        ...(source ? {ledGroupName: source} : {ledIndices}),
-        ...hsvPayload(colour),
-    },
+// Where one case of behaviour feedback paints, the rest of the record as it
+// stands (D-L93).
+/** @param {Partial<import("../../contracts/edits.js").KeyFeedback<Colour>>} feedback @param {import("../../contracts/edits.js").FeedbackRow} rowId @param {string} locality @returns {import("../../contracts/edits.js").EditOf<'updateKeyBehaviorFeedback'>} */
+export function keyFeedbackLocality(feedback, rowId, locality) {
+    const config = keyFeedbackConfig(feedback);
+    const branch = tapBranchOf(rowId);
+    if (branch !== null) config.tapBranches[branch] = {...config.tapBranches[branch], locality};
+    else config[localityOf(/** @type {import("../../contracts/edits.js").FeedbackColourField} */ (rowId))] = locality;
+    return {type: "updateKeyBehaviorFeedback", config};
+}
+/** @param {Partial<import("../../contracts/edits.js").KeyFeedback<Colour>>} feedback @param {{tapCommitMode?: string}} [overrides] @returns {import("../../contracts/edits.js").KeyFeedback} */
+const keyFeedbackConfig = (feedback, overrides = {}) => ({
+    tapBranches: (feedback.tapBranches || []).map((branch) => ({color: hsvPayload(branch.color), locality: branch.locality})),
+    tapCommittedColor: hsvPayload(feedback.tapCommittedColor),
+    tapCommittedLocality: feedback.tapCommittedLocality,
+    holdActiveColor: hsvPayload(feedback.holdActiveColor),
+    holdActiveLocality: feedback.holdActiveLocality,
+    longHoldActiveColor: hsvPayload(feedback.longHoldActiveColor),
+    longHoldActiveLocality: feedback.longHoldActiveLocality,
+    tapCommitMode: feedback.tapCommitMode,
+    ...overrides,
 });
-/** @param {string} target @param {number} index @returns {import("../../contracts/edits.js").EditOf<'deleteRgbLedGroup'>} */
-export const deleteLedRow = (target, index) => ({type: "deleteRgbLedGroup", target, index});
-/** @param {number[]} ledIndices @returns {import("../../contracts/edits.js").EditOf<'saveRgbReusableLedGroup'>} */
-export const saveLedGroup = (ledIndices) => ({type: "saveRgbReusableLedGroup", group: {ledIndices}});
-/** @param {string} name @returns {import("../../contracts/edits.js").EditOf<'deleteRgbReusableLedGroup'>} */
-export const deleteLedGroup = (name) => ({type: "deleteRgbReusableLedGroup", name});
+// The tap branch a Behaviour feedback row is, by index from the double
+// tap's; null for a tier.
+/** @param {string} rowId */
+export const tapBranchOf = (rowId) => { const match = /^branch:(\d+)$/.exec(rowId); return match ? Number(match[1]) : null; };
+// The locality field beside a case's colour field ("holdActiveColor" →
+// "holdActiveLocality"), in either stage's record.
+/** @template {string} F @param {F} field @returns {F extends `${infer Case}Color` ? `${Case}Locality` : never} */
+export const localityOf = (field) => /** @type {any} */ (field.replace(/Color$/, "Locality"));
+
+// Replacement feedback is stored as one record too (D-L89): `field` is the
+// colour of the case changed, and HSV(0, 0, 0) makes it passthrough (D-L94).
+/** @param {Partial<import("../../contracts/edits.js").AutocorrectFeedback<Colour>>} [feedback] @param {import("../../contracts/edits.js").AutocorrectFeedbackColourField | null} [field] @param {Colour} [next] @returns {import("../../contracts/edits.js").EditOf<'updateAutocorrectFeedback'>} */
+export function autocorrectFeedback(feedback = {}, field, next) {
+    const config = autocorrectFeedbackConfig(feedback);
+    if (field && next) config[field] = hsvPayload(next);
+    return {type: "updateAutocorrectFeedback", config};
+}
+// Where one case of replacement feedback paints, by its colour's field
+// (D-L93).
+/** @param {Partial<import("../../contracts/edits.js").AutocorrectFeedback<Colour>>} feedback @param {import("../../contracts/edits.js").AutocorrectFeedbackColourField} field @param {string} locality @returns {import("../../contracts/edits.js").EditOf<'updateAutocorrectFeedback'>} */
+export function autocorrectFeedbackLocality(feedback, field, locality) {
+    const config = autocorrectFeedbackConfig(feedback);
+    config[localityOf(field)] = locality;
+    return {type: "updateAutocorrectFeedback", config};
+}
+/** @param {Partial<import("../../contracts/edits.js").AutocorrectFeedback<Colour>>} feedback @returns {import("../../contracts/edits.js").AutocorrectFeedback} */
+const autocorrectFeedbackConfig = (feedback) => ({
+    textColor: hsvPayload(feedback.textColor),
+    textLocality: feedback.textLocality,
+    macroColor: hsvPayload(feedback.macroColor),
+    macroLocality: feedback.macroLocality,
+    undoColor: hsvPayload(feedback.undoColor),
+    undoLocality: feedback.undoLocality,
+    leadingColor: hsvPayload(feedback.leadingColor),
+    leadingLocality: feedback.leadingLocality,
+});
+
+// An accent (D-L77): the LEDs it lights, its colour (HSV(0, 0, 0) takes its
+// stage's) and who it lights for in its table, the owner that is all of them
+// included; combo accents have no owner, since every combo shares one colour.
+// Ark keeps the groups, so an accent names only its LEDs.
+/** @typedef {{target: import("../../contracts/model.js").AccentTable, owner: string, leds: readonly number[], colour: Colour}} AccentEdit */
+/** @param {AccentEdit} accent */
+const accentPayload = ({target, owner, leds, colour}) => ({...(target === "combo" ? {} : {owner}), ledIndices: [...leds].sort((left, right) => left - right), ...hsvPayload(colour)});
+/** @param {AccentEdit} accent @returns {import("../../contracts/edits.js").EditOf<'addRgbLedGroup'>} */
+export const addAccent = (accent) => ({type: "addRgbLedGroup", group: {target: accent.target, ...accentPayload(accent)}});
+// An accent changed where it stands in its table, which keeps its place in
+// the order the keyboard paints them.
+/** @param {number} index @param {AccentEdit} accent @returns {import("../../contracts/edits.js").EditOf<'updateRgbLedGroup'>} */
+export const updateAccent = (index, accent) => ({type: "updateRgbLedGroup", target: accent.target, index, group: accentPayload(accent)});
+/** @param {import("../../contracts/model.js").AccentTable} target @param {number} index @returns {import("../../contracts/edits.js").EditOf<'deleteRgbLedGroup'>} */
+export const deleteAccent = (target, index) => ({type: "deleteRgbLedGroup", target, index});
 
 // ── macros, pointing, settings ──────────────────────────────────────────
 
-/** @param {string} keycode @param {string} payload @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'updateMacro'> & {payload: string}} */
-export const macroMessage = (keycode, payload, identity) => ({type: "updateMacro", keycode, payload, expectedFingerprint: identity});
+// A macro's steps; with `fields`, its name and playback protection in the same
+// step (Clear macro, and undoing it).
+/** @param {string} keycode @param {string} payload @param {string} [identity] @param {import("../state.js").MacroSlotFields} [fields] @returns {import("../../contracts/edits.js").EditOf<'updateMacro'> & {payload: string}} */
+export const macroMessage = (keycode, payload, identity, fields) => ({type: "updateMacro", keycode, payload, ...(fields ? {name: fields.name, protection: fields.protection} : {}), expectedFingerprint: identity});
 /** @param {string} keycode @param {string} payload @param {number} requestId @returns {import("../../contracts/edits.js").EditOf<'validateMacro'>} */
 export const macroValidationMessage = (keycode, payload, requestId) => ({type: "validateMacro", keycode, payload, requestId});
+// The text replacement list (firmware D-F68, where a replacement is a
+// correction and an input a typo; the edits keep those names). A
+// replacement is named by its text or by the macro slot it plays; an input
+// is posted as it is written, with `*` where other letters may go. Core
+// trims and folds what is typed, reads the `*`, and judges every edit; a
+// refusal comes back in words.
+/** @typedef {import("../../contracts/edits.js").AutocorrectReplacement} AutocorrectReplacement */
+// Inputs for a replacement: the entry is made when the list has none of
+// that text or macro, firing as `fires` says, else they are added to it.
+// `typed` is the field's text as it stands: core reads it into its inputs.
+/** @param {AutocorrectReplacement} replacement @param {string} typed @param {string} [identity] @param {import("../../contracts/edits.js").AutocorrectTrigger} [fires] how a new replacement fires, as you type when left out @returns {import("../../contracts/edits.js").EditOf<'addAutocorrectTypos'>} */
+export const addAutocorrectInputs = (replacement, typed, identity, fires = "word") => ({type: "addAutocorrectTypos", ...replacement, inputs: typed, ...(fires === "word" ? {} : {trigger: fires}), expectedFingerprint: identity});
+// How a replacement fires (D-L91): as you type, after the Leader key, or both.
+/** @param {AutocorrectReplacement} replacement @param {import("../../contracts/edits.js").AutocorrectTrigger} trigger @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'updateAutocorrectTrigger'>} */
+export const autocorrectTrigger = (replacement, trigger, identity) => ({type: "updateAutocorrectTrigger", ...replacement, trigger, expectedFingerprint: identity});
+// A replacement changed where it stands: to other text, or to a macro.
+/** @param {AutocorrectReplacement} replacement @param {AutocorrectReplacement} to @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'updateAutocorrectCorrection'>} */
+export const changeAutocorrectReplacement = (replacement, to, identity) => ({type: "updateAutocorrectCorrection", ...replacement,
+    ...(to.macro === undefined ? {to: to.correction} : {toMacro: to.macro}), expectedFingerprint: identity});
+// One input, named by its stored letters, written anew.
+/** @param {string} typo @param {string} to @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'updateAutocorrectTypo'>} */
+export const changeAutocorrectInput = (typo, to, identity) => ({type: "updateAutocorrectTypo", typo, to, expectedFingerprint: identity});
+/** @param {string} typo @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'deleteAutocorrectTypo'>} */
+export const deleteAutocorrectTypo = (typo, identity) => ({type: "deleteAutocorrectTypo", typo, expectedFingerprint: identity});
+/** @param {AutocorrectReplacement} replacement @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'deleteAutocorrectEntry'>} */
+export const deleteAutocorrectEntry = (replacement, identity) => ({type: "deleteAutocorrectEntry", ...replacement, expectedFingerprint: identity});
+// A file's entries added to the list or replacing it.
+/** @param {'add' | 'replace'} mode @param {import("../../contracts/edits.js").AutocorrectEntryEdit[]} entries @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'importAutocorrect'>} */
+export const importAutocorrect = (mode, entries, identity) => ({type: "importAutocorrect", mode, entries, expectedFingerprint: identity});
+// An autocorrect edit to be checked without staging it.
+/** @param {import("../../contracts/edits.js").AutocorrectEdit} edit @param {number} requestId @returns {import("../../contracts/edits.js").EditOf<'validateAutocorrect'>} */
+export const autocorrectValidationMessage = (edit, requestId) => ({type: "validateAutocorrect", edit, requestId});
 // A macro's name; its steps stay as they are.
 /** @param {string} keycode @param {string} name @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'updateMacro'> & {name: string}} */
 export const macroNameMessage = (keycode, name, identity) => ({type: "updateMacro", keycode, name: String(name ?? "").trim(), expectedFingerprint: identity});
@@ -240,6 +325,9 @@ export const macroNameMessage = (keycode, name, identity) => ({type: "updateMacr
 export const macroProtectionMessage = (keycode, protection, identity) => ({type: "updateMacro", keycode, protection, expectedFingerprint: identity});
 /** @param {string} keycode @param {string} name @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'updateCustomKey'>} */
 export const customKeyNameMessage = (keycode, name, identity) => ({type: "updateCustomKey", keycode, name: String(name ?? "").trim(), expectedFingerprint: identity});
+// An empty custom key: no name, no shortcut and no behaviour, in one step.
+/** @param {string} keycode @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'clearCustomKey'>} */
+export const clearCustomKeyMessage = (keycode, identity) => ({type: "clearCustomKey", keycode, expectedFingerprint: identity});
 // A custom key's shortcut: the eight-bit modifier mask the grid reads, its keys
 // in the order they are pressed (none for none), the mask of layers it turns
 // on and how it turns them on
@@ -257,6 +345,17 @@ export const customKeyForShortcut = (keycode, shortcut, name, then, identity) =>
 // The keyboard's own name; empty gives it back its built-in name.
 /** @param {string} name @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'renameKeyboard'>} */
 export const keyboardNameMessage = (name, identity) => ({type: "renameKeyboard", name: String(name ?? "").trim(), expectedFingerprint: identity});
+
+// ── swapping slots (D-L81) ──────────────────────────────────────────────
+
+// Two slots of a bank trade places, named as their screens pick them: a
+// macro and a custom key by keycode, a pointing mode by slot.
+/** @param {string} a @param {string} b @returns {import("../../contracts/edits.js").EditOf<'swapMacros'>} */
+export const swapMacros = (a, b) => ({type: "swapMacros", keycodes: [a, b]});
+/** @param {string} a @param {string} b @returns {import("../../contracts/edits.js").EditOf<'swapCustomKeys'>} */
+export const swapCustomKeys = (a, b) => ({type: "swapCustomKeys", keycodes: [a, b]});
+/** @param {number} a @param {number} b @returns {import("../../contracts/edits.js").EditOf<'swapPdModes'>} */
+export const swapPdModes = (a, b) => ({type: "swapPdModes", slots: [a, b]});
 
 /** @param {number} slot @param {import("../../contracts/edits.js").PdConfig} config @param {Partial<BaseIdentity> | null} [identity] @returns {import("../../contracts/edits.js").EditOf<'savePdMode'>} */
 export const pdMode = (slot, config, identity) => ({type: "savePdMode", slot, expectedBase: identity ?? undefined, config});

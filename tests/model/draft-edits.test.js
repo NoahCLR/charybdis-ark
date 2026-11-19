@@ -1,4 +1,5 @@
 "use strict";
+const {CURRENT_BASE} = require("../fixtures/portable-profile");
 const {profileLayers} = require("../fixtures/profile-document");
 const test = require("node:test"), assert = require("node:assert/strict");
 const fs = require("node:fs"), path = require("node:path");
@@ -11,8 +12,9 @@ const {document: pdDocument} = require("../fixtures/pd-profile");
 
 const ROOT = path.join(__dirname, "..", "..");
 // Posted beside the edits but never staged: a dropped profile opens an import
-// review, and a macro check is answered without touching the draft.
-const NOT_DRAFT_EDITS = ["reviewPortableProfile", "validateMacro"];
+// review, and a macro or autocorrect check is answered without touching the
+// draft.
+const NOT_DRAFT_EDITS = ["reviewPortableProfile", "validateMacro", "validateAutocorrect"];
 
 // The contract is declarations only, so its keys are read from the text: each
 // `name:` that opens a line of the EditPayloads interface.
@@ -46,7 +48,7 @@ test("the registry, the contract and the interface's builders name the same edit
 
 test("every registered edit names its editor, its words and, on the profile, its domain", () => {
     for (const [type, entry] of Object.entries(DRAFT_EDIT_TYPES)) {
-        assert.ok(["keymap", "settings", "macro", "customKey", "keyboardName", "profile"].includes(entry.editor), type);
+        assert.ok(["keymap", "settings", "macro", "autocorrect", "customKey", "keyboardName", "slots", "profile"].includes(entry.editor), type);
         assert.equal("domain" in entry, entry.editor === "profile", type);
         if (entry.editor === "profile") assert.ok(["placement", "pointing", "combos", "behaviours", "lighting"].includes(entry.domain), type);
         assert.ok(typeof entry.label === "function" || (typeof entry.label === "string" && entry.label), type);
@@ -59,7 +61,7 @@ test("every registered edit names its editor, its words and, on the profile, its
 function draft() {
     const doc = pdDocument();
     const snapshot = {document: doc, fingerprint: portable.fingerprint(doc), summary: portable.summary(doc), limits: {brightnessMax: 200}};
-    return new ProfileDraftSession(snapshot, "test-device", {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 3}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0x67df11b3});
+    return new ProfileDraftSession(snapshot, "test-device", CURRENT_BASE);
 }
 
 test("each edit is recorded in its own words", () => {
@@ -69,6 +71,15 @@ test("each edit is recorded in its own words", () => {
     assert.equal(layout([{layoutIndex: 0, keycode: "KC_A"}]), "Changed a key");
     assert.equal(layout([{layoutIndex: 0, keycode: "KC_A"}, {layoutIndex: 1, keycode: "KC_B"}, {layoutIndex: 2, keycode: "KC_C"}]), "Changed 3 keys at once");
     assert.equal(layout([{layoutIndex: 0, keycode: stored(1)}, {layoutIndex: 1, keycode: stored(0)}]), "Swapped two keys");
+    // Across layers, each change is read on its own layer.
+    const keyed = draft();
+    for (const [layer, layoutIndex, keycode] of [["Layer 0", 0, "KC_A"], ["Layer 1", 5, "KC_B"]]) {
+        keyed.stage({type: "updateLayoutKeys", draftRevision: keyed.revision, layer, changes: [{layoutIndex, keycode}]});
+    }
+    const across = [{layoutIndex: 0, keycode: "KC_B", layer: "Layer 0"}, {layoutIndex: 5, keycode: "KC_A"}];
+    assert.equal(draftEditLabel({type: "updateLayoutKeys", layer: "Layer 1", changes: across}, keyed.document), "Swapped two keys", "a swap across layers");
+    assert.equal(draftEditLabel({type: "updateLayoutKeys", layer: "Layer 1", changes: [{layoutIndex: 0, keycode: "KC_B"}, across[1]]}, keyed.document),
+        "Changed 2 keys at once", "the same keys read on one layer are no swap");
     const behaviours = require("../../core/model/portable-profile").validateSnapshot(document).behaviors.rows;
     const saved = keycodes.resolve(behaviours[0].target.operand).name;
     const unused = ["KC_F24", "KC_F23", "KC_F22"].find(key => !behaviours.some(row => keycodes.resolve(row.target.operand)?.name === key));
@@ -81,6 +92,7 @@ test("each edit is recorded in its own words", () => {
     assert.equal(draftEditLabel({type: "updateCustomKeyShortcut", keycode: "CUSTOM_KEY_0", shortcut: {mods: 1, keys: [], layers: 0, layerKind: 0}}, document), "Changed a custom key's shortcut");
     assert.equal(draftEditLabel({type: "updateCustomKeyShortcut", keycode: "CUSTOM_KEY_0", shortcut: {mods: 0, keys: [], layers: 0, layerKind: 0}}, document), "Cleared a custom key's shortcut");
     assert.equal(draftEditLabel({type: "updateCustomKeyShortcut", keycode: "CUSTOM_KEY_0", shortcut: {mods: 0, keys: [], layers: 8, layerKind: 0}}, document), "Changed a custom key's shortcut", "layers alone");
+    assert.equal(draftEditLabel({type: "clearCustomKey", keycode: "CUSTOM_KEY_0"}, document), "Cleared a custom key");
     assert.equal(draftEditLabel({type: "renameKeyboard", name: "Board"}, document), "Renamed the keyboard");
 
     session.stage({type: "updateLayoutKeys", draftRevision: session.revision, layer: "Layer 1", changes: [{layoutIndex: 0, keycode: "KC_A"}]});

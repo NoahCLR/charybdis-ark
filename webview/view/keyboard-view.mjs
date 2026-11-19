@@ -7,8 +7,29 @@ import {vocabulary} from "./vocabulary.mjs";
 
 /** @typedef {import("../../contracts/panel.js").PublishedModel} Model */
 
-// Where to get the firmware, as the README says.
-export const FIRMWARE_RELEASES = "https://github.com/NoahCLR/charybdis-4x6/releases/latest";
+// Where to get the firmware: its releases, newest first.
+export const FIRMWARE_RELEASES = "https://github.com/NoahCLR/charybdis-4x6/releases";
+
+// What a page with no keyboard, or one it could not read, tells a new user:
+// Ark edits only its own firmware, flashed to both halves from one release.
+export const FIRMWARE_NEEDED = Object.freeze({
+    eyebrow: "New to Ark?",
+    title: "Flash the firmware first",
+    words: "Ark edits a Charybdis running the charybdis-4x6 firmware. Flash both halves from the same release, then choose your keyboard here.",
+    // A keyboard already chosen is read again, not chosen.
+    wordsConnected: "Ark edits a Charybdis running the charybdis-4x6 firmware. Flash both halves from the same release, then read the keyboard again.",
+    label: "Firmware releases",
+    href: FIRMWARE_RELEASES,
+    // Flashing replaces a VIA keymap, and Backups imports VIA's saved layout.
+    viaLead: "Coming from VIA?",
+    via: "Before you flash, save your layout there (Save + Load, Save Current Layout). Once Ark reads the keyboard, import that file in Backups to carry over your keys and macros.",
+});
+
+// Diagnostics are for whoever looks into a fault, not for using the
+// keyboard, so the Keyboard screen shows them only on a page opened with
+// `?diagnostics` in its address (D-L100).
+/** @param {string} [search] the page address's query, `location.search` */
+export const diagnosticsShown = (search = globalThis.location?.search || "") => new URLSearchParams(search).has("diagnostics");
 
 // Each half by its role: the master half is always the right one, with the
 // USB cable and the trackball (the firmware builds force it), and the slave

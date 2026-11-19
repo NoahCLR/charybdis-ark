@@ -86,7 +86,9 @@ test("halves that stored different modes offer Settle; a mode not stored yet is 
     assert.match(conflict.mode?.warn || "", /halves stored different modes/);
     const notStored = keyboardControl(connected({notStored: true}));
     assert.equal(notStored.edits?.notStored, true);
-    assert.match(notStored.mode?.warn || "", /Unplugging it now may lose the mode/);
+    // What unplugging risks is on screen in the menu, never again in the tip (D-L96).
+    assert.match(notStored.mode?.warn || "", /not stored its edit mode yet/);
+    assert.doesNotMatch(notStored.mode?.warn || "", /Unplugging/);
 });
 
 test("several keyboards are listed with the selected one ticked; one keyboard is not", () => {

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import {said} from "../../webview/view/vocabulary.mjs";
 import {createRequire} from "node:module";
 import {keyBehaviour, keyReach, keyReachAt} from "../../webview/view/key-reach.mjs";
 import {layerView} from "../../webview/view/layer-view.mjs";
@@ -47,16 +48,16 @@ test("a row that changes nothing says so, and why, in place of its details", () 
 test("a dual-role key leads with its tap / hold, waiting the row's threshold only while the row runs", () => {
     const plain = card(4);
     assert.deepEqual(plain.role, {tap: "F", hold: {layer: 2, name: "Symbols"}});
-    assert.deepEqual(plain.lead, {kind: "tapHold", term: defaultTerm, holdAction: "MO(2)", note: ""}, "a layer-tap holds its layer as the grid's Hold does");
-    assert.deepEqual(card(5).lead, {kind: "tapHold", term: defaultTerm, holdAction: "", note: ""}, "a mod-tap holds its modifier");
+    assert.deepEqual(plain.lead, {kind: "tapHold", term: defaultTerm, holdAction: "MO(2)", note: []}, "a layer-tap holds its layer as the grid's Hold does");
+    assert.deepEqual(card(5).lead, {kind: "tapHold", term: defaultTerm, holdAction: "", note: []}, "a mod-tap holds its modifier");
 
     const timed = card(6);
     assert.equal(timed.lead?.kind === "tapHold" && timed.lead.term.ms, "250", "a row with no branches still waits its own threshold");
     assert.equal(timed.branches, false, "and shows no branch section");
 
     const off = card(7);
-    assert.deepEqual(off.lead, {kind: "tapHold", term: defaultTerm, holdAction: "",
-        note: `Its behaviour is not used: ${off.use.reasons.join("; ")}. The key keeps this tap and hold.`}, "a row that does not run is ignored, its threshold with it");
+    assert.deepEqual(off.lead?.kind === "tapHold" && {...off.lead, note: said(off.lead.note)}, {kind: "tapHold", term: defaultTerm, holdAction: "",
+        note: `Its behaviour is not used: ${off.use.reasons.map((reason) => said(reason)).join("; ")}. The key keeps this tap and hold.`}, "a row that does not run is ignored, its threshold with it");
     assert.equal(off.branches, false);
 
     const branched = card(8);
@@ -83,11 +84,11 @@ test("a key reaches its macro, by the slot the keyboard reported", () => {
     assert.deepEqual(reachOf(14).macros, []);
 });
 
-test("a pointing key reaches its mode, said by its kind in the vocabulary's words and where it paints", () => {
+test("a pointing key reaches its mode, said by its kind in the vocabulary's words", () => {
     const {pointing} = reachOf(11);
-    assert.deepEqual([pointing?.slot.id, pointing?.kind, pointing?.paints], [0, "scroll", "right half"]);
+    assert.deepEqual([pointing?.slot.id, pointing?.kind], [0, "scroll"]);
     const empty = reachOf(12).pointing;
-    assert.deepEqual([empty?.slot.id, empty?.kind, empty?.paints], [6, "", ""], "an empty slot has no kind and paints nowhere");
+    assert.deepEqual([empty?.slot.id, empty?.kind], [6, ""], "an empty slot has no kind");
 });
 
 test("a custom key shows its shortcut only when it has one", () => {
@@ -99,7 +100,7 @@ test("a custom key shows its shortcut only when it has one", () => {
 
 test("a key's combos say whether they fire here, run their output's behaviour, or send a custom key's shortcut", () => {
     const combos = reachOf(14).combos.map(({combo, use, runs, sendsInstead}) => [combo.badge, use.fires, runs, sendsInstead]);
-    assert.deepEqual(combos, [["C0", true, true, ""], ["C1", true, false, "sends its shortcut, Left Ctrl + Right Alt + K"], ["C2", false, false, ""]]);
+    assert.deepEqual(combos, [["C0", true, true, ""], ["C1", true, false, "sends its shortcut, Ctrl+Right Alt+K"], ["C2", false, false, ""]]);
     assert.ok(reachOf(14).combos[2].use.reasons.length, "a combo that does not fire says why");
     assert.deepEqual(keyReach(layerView(reaching, 0), reaching.layers[0], reaching.layers[0].positions[0], -1, []).combos, [], "the combos a caller passes are the ones shown");
 });

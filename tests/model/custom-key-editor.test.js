@@ -1,4 +1,5 @@
 "use strict";
+const {CURRENT_BASE} = require("../fixtures/portable-profile");
 const {profileLayers} = require("../fixtures/profile-document");
 const test = require("node:test");
 const assert = require("node:assert/strict");
@@ -11,15 +12,15 @@ const {macroEditorView} = require("../../core/model/macro-editor");
 const {profileReview} = require("../../core/model/profile-review");
 const {revertUnits} = require("../../core/model/profile-revert");
 const {buildDeviceModel} = require("../../core/session/device-model");
-const capabilities = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 3}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0x67df11b3};
+const capabilities = CURRENT_BASE;
 const snapshot = value => ({document: value, fingerprint: fingerprint(value)});
 
 test("all 128 custom keys are listed, and a name changes nothing else", () => {
     const before = snapshot(pdDocument());
     const view = customKeyEditorView(before, capabilities);
     assert.equal(view.keys.length, 128);
-    assert.deepEqual(view.keys[2], {slot: 2, keycode: "CUSTOM_KEY_2", code: 0x7f02, name: "", hasBehavior: true, shortcut: {mods: 0, keys: [], layers: 0, layerKind: 0}}, "the compiled profile gives Click Spam a behaviour");
-    assert.deepEqual(view.keys[127], {slot: 127, keycode: "CUSTOM_KEY_127", code: 0x7f7f, name: "", hasBehavior: false, shortcut: {mods: 0, keys: [], layers: 0, layerKind: 0}});
+    assert.deepEqual(view.keys[2], {slot: 2, keycode: "CUSTOM_KEY_2", code: 0x7f02, name: "", defaultName: "Custom key 2", hasBehavior: true, shortcut: {mods: 0, keys: [], layers: 0, layerKind: 0}}, "the compiled profile gives Click Spam a behaviour");
+    assert.deepEqual(view.keys[127], {slot: 127, keycode: "CUSTOM_KEY_127", code: 0x7f7f, name: "", defaultName: "Custom key 127", hasBehavior: false, shortcut: {mods: 0, keys: [], layers: 0, layerKind: 0}});
     assert.deepEqual(view.names, {perName: 32}, "a name is counted in bytes of UTF-8");
     assert.ok(["KC_A", "KC_EXSEL", "QK_MOUSE_BUTTON_1", "MS_BTN1", "QK_MOUSE_BUTTON_8", "KC_SYSTEM_POWER", "KC_AUDIO_MUTE", "KC_MEDIA_PLAY_PAUSE", "KC_LAUNCHPAD", "QK_MOUSE_CURSOR_UP", "QK_MOUSE_WHEEL_RIGHT"]
         .every(name => view.shortcutKeys.includes(name)), "keyboard, system and media keys, mouse buttons, the wheel and cursor movement");
@@ -37,7 +38,7 @@ test("all 128 custom keys are listed, and a name changes nothing else", () => {
     assert.equal(view.shortcutKeyLimits.words, "up to 6 keys held together, at most one media key and one system key");
     const named = draftEdit(before, {type: "updateCustomKey", keycode: "CUSTOM_KEY_2", name: " Click Spam "}, capabilities);
     const after = validateSnapshot(named, capabilities);
-    assert.equal(after.settings.formatVersion, 11);
+    assert.equal(after.settings.formatVersion, 13);
     assert.equal(after.settings.customKeyNames[2], "Click Spam", "trimmed");
     assert.deepEqual(after.settings.macroNames, validateSnapshot(before.document).settings.macroNames, "the macros keep their names");
     assert.deepEqual(profileLayers(named), profileLayers(before.document));
@@ -57,7 +58,7 @@ test("a macro name edit keeps the custom-key names", () => {
     current = snapshot(draftEdit(current, {type: "updateCustomKey", keycode: "CUSTOM_KEY_0", name: "Right Thumb"}, capabilities));
     current = snapshot(draftEdit(current, {type: "updateMacro", keycode: "MACRO_3", name: "OCR Copy"}, capabilities));
     const settings = validateSnapshot(current.document).settings;
-    assert.equal(settings.formatVersion, 11);
+    assert.equal(settings.formatVersion, 13);
     assert.equal(settings.customKeyNames[0], "Right Thumb");
     assert.equal(macroEditorView(current).macros[3].name, "OCR Copy");
 });
@@ -71,7 +72,7 @@ test("an imported profile without custom-key names can take one name back from t
     assert.deepEqual(profileReview(keyboard, imported).filter(row => row.unit.startsWith("customKey:")).map(row => row.unit), ["customKey:0", "customKey:1"]);
     const kept = snapshot(revertUnits(keyboard, imported, new Set(["customKey:0"]), capabilities));
     const settings = validateSnapshot(kept.document, capabilities).settings;
-    assert.equal(settings.formatVersion, 11);
+    assert.equal(settings.formatVersion, 13);
     assert.deepEqual(settings.customKeyNames.slice(0, 2), ["Right Thumb", ""]);
     assert.deepEqual(settings.macroNames, validateSnapshot(imported.document).settings.macroNames, "the imported macro names stay");
     assert.deepEqual(profileReview(keyboard, kept).filter(row => row.unit.startsWith("customKey:")).map(row => row.unit), ["customKey:1"]);
@@ -101,13 +102,13 @@ test("a shortcut is staged, reviewed beside the name, discarded alone and named 
     const message = {type: "updateCustomKeyShortcut", keycode: "CUSTOM_KEY_2", shortcut: {mods: 0x41, keys: [0x0e], layers: 0, layerKind: 0}};
     const changed = draftEdit(before, message, capabilities);
     const after = validateSnapshot(changed, capabilities);
-    assert.deepEqual(after.settings.customKeyShortcuts[2], {mods: 0x41, keys: [0x0e], layers: 0, layerKind: 0}, "Left Ctrl + Right Alt + K, mixed sides");
+    assert.deepEqual(after.settings.customKeyShortcuts[2], {mods: 0x41, keys: [0x0e], layers: 0, layerKind: 0}, "Ctrl+Right Alt+K, mixed sides");
     assert.equal(after.settings.customKeyNames[2], "", "the name is untouched");
     assert.deepEqual(after.settings.customKeyShortcuts.filter(({mods, keys}) => mods || keys.length).length, 1, "no other key changes");
     assert.deepEqual(profileLayers(changed), profileLayers(before.document));
     const [item] = profileReview(before, snapshot(changed)).filter(row => row.unit === "customKey:2");
     assert.equal(item.status, "added", "a key with no name or shortcut gains one");
-    assert.deepEqual(item.fields.map(field => [field.label, field.before, field.after]), [["Shortcut", null, "Left Ctrl + Right Alt + K"]]);
+    assert.deepEqual(item.fields.map(field => [field.label, field.before, field.after]), [["Shortcut", null, "Ctrl+Right Alt+K"]]);
     const reverted = revertUnits(before, snapshot(changed), new Set(["customKey:2"]), capabilities);
     assert.deepEqual(validateSnapshot(reverted, capabilities).settings.customKeyShortcuts[2], {mods: 0, keys: [], layers: 0, layerKind: 0}, "discarded with its key");
     // Modifiers alone and a key alone are shortcuts; both zero clears one.
@@ -129,9 +130,9 @@ test("a shortcut is staged, reviewed beside the name, discarded alone and named 
     const sixKeyed = snapshot(draftEdit(before, {...message, shortcut: six}, capabilities));
     assert.deepEqual(validateSnapshot(sixKeyed.document, capabilities).settings.customKeyShortcuts[2], six);
     const sixModel = buildDeviceModel({customKeyView: customKeyEditorView(sixKeyed, capabilities), capabilities});
-    assert.deepEqual(sixModel.customKeys[2].shortcutKeys.slice(0, 4), ["Left Shift", "A", "S", "D"], "each key, in the order it is pressed");
+    assert.deepEqual(sixModel.customKeys[2].shortcutKeys.slice(0, 4), ["Shift", "A", "S", "D"], "each key, in the order it is pressed");
     assert.equal(sixModel.customKeys[2].shortcutKeys.length, 7);
-    assert.equal(sixModel.customKeys[2].shortcutLabel, sixModel.customKeys[2].shortcutKeys.join(" + "), "the list and the tab name every key");
+    assert.equal(sixModel.customKeys[2].shortcutLabel, sixModel.customKeys[2].shortcutKeys.join("+"), "the list and the tab name every key");
     const [sixItem] = profileReview(before, sixKeyed).filter(row => row.unit === "customKey:2");
     assert.deepEqual(sixItem.fields.map(field => [field.label, field.after]), [["Shortcut", sixModel.customKeys[2].shortcutLabel]], "Review names every key");
     for (const [keys, words] of [[[4, 5, 6, 7, 8, 9, 10], /at most 6 keys/], [[4, 5, 4], /each key once/], [[0xae, 0xa9], /one media key/], [[0xa5, 0xa7], /one system key/]]) {
@@ -149,30 +150,30 @@ test("a shortcut is staged, reviewed beside the name, discarded alone and named 
     }
     // Named for the host: macOS calls Alt Option and GUI Command.
     const model = buildDeviceModel({customKeyView: customKeyEditorView(snapshot(changed), capabilities), capabilities});
-    assert.equal(model.customKeys[2].shortcutLabel, "Left Ctrl + Right Alt + K");
+    assert.equal(model.customKeys[2].shortcutLabel, "Ctrl+Right Alt+K");
     assert.equal(model.customKeys[3].shortcutLabel, "");
-    assert.deepEqual(model.customKeys[2].shortcutKeys, ["Left Ctrl", "Right Alt", "K"], "what it sends, one part each, for the hover card");
+    assert.deepEqual(model.customKeys[2].shortcutKeys, ["Ctrl", "Right Alt", "K"], "what it sends, one part each, for the hover card");
     assert.deepEqual(model.customKeys[3].shortcutKeys, []);
-    assert.equal(model.qmkKeycodes.find(entry => entry.value === "CUSTOM_KEY_2").tip, "Custom key 2 · sends Left Ctrl + Right Alt + K", "the picker's tip names it");
+    assert.equal(model.qmkKeycodes.find(entry => entry.value === "CUSTOM_KEY_2").tip, "Custom key 2 · sends Ctrl+Right Alt+K", "the picker's tip names it");
     assert.equal(model.qmkKeycodes.find(entry => entry.value === "CUSTOM_KEY_3").tip, "Custom key 3 · no shortcut");
     const {shortcutKeys, shortcutLabel, profileKeyNames} = require("../../core/model/key-names");
     // Its layers follow, by name, lowest first (firmware D-F26).
     const named = profileKeyNames({hostOs: 1, layers: ["Base", "Numbers", "Symbols", "Navigation", "", "Extra"]});
-    assert.equal(shortcutLabel(named, {mods: 0x08, keys: [], layers: (1 << 5) | (1 << 3), layerKind: 0}), "Left Command + Navigation + Extra");
+    assert.equal(shortcutLabel(named, {mods: 0x08, keys: [], layers: (1 << 5) | (1 << 3), layerKind: 0}), "Command+Navigation+Extra");
     assert.equal(shortcutLabel(named, {mods: 0, keys: [], layers: 1 << 4, layerKind: 0}), "Layer 4", "an unnamed layer by its number");
     // Any kind but hold leads its layers with its layer key's verb.
     assert.deepEqual([1, 2, 3, 4].map((layerKind) => shortcutLabel(named, {mods: 0x08, keys: [], layers: (1 << 5) | (1 << 3), layerKind})),
-        ["Left Command + Lock Navigation + Extra", "Left Command + Move to Navigation + Extra", "Left Command + Tap-toggle Navigation + Extra", "Left Command + One-shot Navigation + Extra"]);
+        ["Command+Lock Navigation+Extra", "Command+Move to Navigation+Extra", "Command+Tap-toggle Navigation+Extra", "Command+One-shot Navigation+Extra"]);
     assert.equal(shortcutLabel(named, {mods: 0, keys: [], layers: 1 << 3, layerKind: 1}), "Lock Navigation", "layers alone");
     // A tip says what it does: a shortcut of layers alone by what it does
     // with them, not "sends".
     const {shortcutAct} = require("../../core/model/key-names");
     assert.deepEqual([0, 1, 2, 3, 4].map((layerKind) => shortcutAct(named, {mods: 0, keys: [], layers: (1 << 5) | (1 << 3), layerKind})),
-        ["holds Navigation + Extra on", "locks Navigation + Extra", "moves to Navigation + Extra", "tap-toggles Navigation + Extra", "turns Navigation + Extra on as a one-shot"]);
-    assert.equal(shortcutAct(named, {mods: 0x08, keys: [], layers: 1 << 3, layerKind: 1}), "sends Left Command + Lock Navigation");
+        ["holds Navigation+Extra on", "locks Navigation+Extra", "moves to Navigation+Extra", "tap-toggles Navigation+Extra", "turns Navigation+Extra on as a one-shot"]);
+    assert.equal(shortcutAct(named, {mods: 0x08, keys: [], layers: 1 << 3, layerKind: 1}), "sends Command+Lock Navigation");
     assert.equal(shortcutAct(named, {mods: 0, keys: [], layers: 0, layerKind: 0}), "");
-    assert.deepEqual(shortcutKeys(named, {mods: 0x08, keys: [], layers: 1 << 3, layerKind: 0}), ["Left Command"], "its layers are not keys it sends");
-    assert.equal(shortcutLabel(profileKeyNames({hostOs: 1}), {mods: 0x8c, keys: [0xd1], layers: 0, layerKind: 0}), "Left Alt + Left GUI + Right GUI + Mouse Button 1".replace(/Alt/, "Option").replace(/GUI/g, "Command"));
+    assert.deepEqual(shortcutKeys(named, {mods: 0x08, keys: [], layers: 1 << 3, layerKind: 0}), ["Command"], "its layers are not keys it sends");
+    assert.equal(shortcutLabel(profileKeyNames({hostOs: 1}), {mods: 0x8c, keys: [0xd1], layers: 0, layerKind: 0}), "Alt+GUI+Right GUI+Mouse Button 1".replace(/Alt/, "Option").replace(/GUI/g, "Command"));
     assert.ok(model.customKeyShortcutKeys.includes("KC_K"));
 });
 
@@ -183,6 +184,26 @@ test("one message can name a custom key and set its shortcut together", () => {
     assert.deepEqual(after.settings.customKeyShortcuts[9], {mods: 0x88, keys: [], layers: 0, layerKind: 0});
     assert.throws(() => draftEdit(before, {type: "updateCustomKeyShortcut", keycode: "CUSTOM_KEY_9", name: "x", shortcut: {mods: 0, keys: [0xe0], layers: 0, layerKind: 0}}, capabilities),
         /not modifier keys/, "the shortcut is still checked");
+});
+
+test("clearing a custom key empties its name, shortcut and behaviour in one step, and leaves what sends it", () => {
+    let before = snapshot(pdDocument());
+    before = snapshot(draftEdit(before, {type: "updateCustomKeyShortcut", keycode: "CUSTOM_KEY_2", name: "Click Spam", shortcut: {mods: 0x01, keys: [0x06], layers: 0, layerKind: 0}}, capabilities));
+    before = snapshot(draftEdit(before, {type: "updateCustomKey", keycode: "CUSTOM_KEY_3", name: "Neighbour"}, capabilities));
+    const was = validateSnapshot(before.document, capabilities);
+    assert.ok(customKeyEditorView(before, capabilities).keys[2].hasBehavior, "the compiled profile gives it a behaviour");
+    const cleared = draftEdit(before, {type: "clearCustomKey", keycode: "CUSTOM_KEY_2", expectedFingerprint: before.fingerprint}, capabilities);
+    const after = validateSnapshot(cleared, capabilities);
+    assert.deepEqual(customKeyEditorView(snapshot(cleared), capabilities).keys[2],
+        {slot: 2, keycode: "CUSTOM_KEY_2", code: 0x7f02, name: "", defaultName: "Custom key 2", hasBehavior: false, shortcut: {mods: 0, keys: [], layers: 0, layerKind: 0}});
+    assert.equal(after.settings.customKeyNames[3], "Neighbour", "another key keeps its name");
+    assert.equal(after.behaviors.rows.length, was.behaviors.rows.length - 1, "only its own behaviour row goes");
+    assert.deepEqual(profileLayers(cleared), profileLayers(before.document), "keys that send it stay on the board");
+    assert.ok(profileReview(before, snapshot(cleared)).some(row => row.unit === "customKey:2"), "Review shows the key changed");
+    const empty = draftEdit(snapshot(cleared), {type: "clearCustomKey", keycode: "CUSTOM_KEY_2"}, capabilities);
+    assert.equal(empty, cleared, "an empty key is left as it is");
+    assert.throws(() => draftEdit(before, {type: "clearCustomKey", keycode: "CUSTOM_KEY_200"}, capabilities), /custom key the keyboard has/);
+    assert.throws(() => draftEdit(before, {type: "clearCustomKey", keycode: "CUSTOM_KEY_2", expectedFingerprint: "stale"}, capabilities), /changed since this draft/);
 });
 
 test("a shortcut's layers are staged, listed by name, moved by a reorder and kept off the default layers", () => {
@@ -199,7 +220,7 @@ test("a shortcut's layers are staged, listed by name, moved by a reorder and kep
     assert.deepEqual(view.shortcutLayers.filter(target => target.refusal).map(target => target.layer), [0], "only the base layer is always on here");
     const model = buildDeviceModel({customKeyView: view, capabilities});
     // Built without the profile's layer names, the layers read by number.
-    assert.equal(model.customKeys[9].shortcutLabel, "Left GUI + Layer 3 + Layer 6");
+    assert.equal(model.customKeys[9].shortcutLabel, "GUI+Layer 3+Layer 6");
     assert.deepEqual(model.customKeyShortcutLayers[0], {layer: 0, refusal: model.customKeyShortcutLayers[0].refusal, alwaysOn: "base"});
     // A reorder renumbers its layers as it does layer keys.
     const moved = validateSnapshot(reorderLayers(layered.document, [0, 3, 1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]));
@@ -213,4 +234,18 @@ test("a shortcut's layers are staged, listed by name, moved by a reorder and kep
     // A layer no shortcut names may still become one.
     const free = section.fields.map(field => field.macro === "startupLayer2" ? {macro: field.macro, enabled: true} : keep(field));
     assert.doesNotThrow(() => draftEdit(layered, {type: "updateConfigDefaults", sectionId: "startupLayers", fields: free}, capabilities));
+});
+
+test("a shortcut that makes a custom key's behaviour wait the dual-role default is refused when that reaches its Long hold (D-L82)", () => {
+    const {editProfileDomains} = require("../../core/model/portable-profile");
+    // CUSTOM_KEY_0's behaviour follows the 150 ms Tap / hold default and sets
+    // its own 180 ms Long hold; as TT() or OSL() it would wait 200 ms.
+    const document = editProfileDomains(pdDocument(), {capabilities}, open => Object.assign(open("behaviors").rows.find(row => row.target.kind === 7 && row.target.operand === 0), {tapHoldTerm: 0, longHoldTerm: 180}));
+    const current = snapshot(document);
+    const shortcut = layerKind => ({type: "updateCustomKeyShortcut", keycode: "CUSTOM_KEY_0", shortcut: {mods: 0, keys: [], layers: 1 << 3, layerKind}});
+    for (const layerKind of [3, 4]) {
+        assert.throws(() => draftEdit(current, shortcut(layerKind), capabilities), {code: "CUSTOM_KEY_SHORTCUT_INVALID",
+            message: "The behaviour on CUSTOM_KEY_0: its Long hold threshold, 180 ms, must be later than its Tap / hold threshold, 200 ms. Change that behaviour's own timings first."});
+    }
+    assert.equal(validateSnapshot(draftEdit(current, shortcut(1), capabilities), capabilities).settings.customKeyShortcuts[0].layerKind, 1, "a lock waits the behaviour default");
 });

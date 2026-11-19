@@ -2,7 +2,7 @@
 "use strict";
 const {PROFILE_WIRE_DOMAINS} = require("../schema/profile-domains");
 const {pdTapProblem, isPdMacro, PD_DOMAIN} = require("../schema/pd-mode-domain-v1");
-const {RGB_LAYER_MODES, RGB_LOCALITIES, RGB_AUTOMOUSE_MODES, RGB_TAP_COMMIT_MODES, RGB_POINTING_MODE_IDS, RGB_KEY_SEMANTICS} = require("../schema/rgb-domain-v1");
+const {RGB_DOMAIN_V1, RGB_EVERY_OWNER, RGB_LAYER_MODES, RGB_LOCALITIES, RGB_AUTOMOUSE_MODES, RGB_TAP_COMMIT_MODES, RGB_POINTING_MODE_IDS, RGB_KEY_SEMANTICS, RGB_AUTOCORRECT_SEMANTICS, RGB_STAGE_MASK_ALL} = require("../schema/rgb-domain-v1");
 
 const catalog = require("../data/keycode-catalog");
 const keycodes = require("../schema/keycodes");
@@ -59,8 +59,9 @@ function namedId(value, prefix) {
     if (!match) throw invalid(`Choose a reported ${prefix.toLowerCase()}.`);
     return integer(match[1], 255, prefix);
 }
-// A group is its set of LEDs, so two groups never hold the same set: a row
-// or a saved selection that matches an existing group reuses it.
+// Groups are Ark's to keep, never the person's (D-L77): an accent names
+// LEDs, and a group is only the set of LEDs it lights, so two groups never
+// hold the same set and an accent that matches an existing group reuses it.
 /** @param {number[]} leds */
 const ledSet = leds => [...new Set(leds)].sort((left, right) => left - right).join(",");
 /** @param {number[]} left @param {number[]} right */
@@ -72,12 +73,55 @@ function groupFor(rgb, leds) {
     rgb.groups.push({id: rgb.groups.length, leds});
     return rgb.groups.length - 1;
 }
+// The five tables of accents, each row naming a group by id.
+/** @param {Rgb} rgb */
+const accentRows = rgb => [rgb.layerGroupRows, rgb.pdModeGroupRows, rgb.comboGroupRows, rgb.keyGroupRows, rgb.autocorrectGroupRows].flat();
+// A group no accent lights paints nothing but still takes one of the
+// keyboard's groups, so it goes. Group ids are positions, consecutive from
+// zero: the ones after it renumber, and every accent follows its group.
+/** @param {Rgb} rgb */
+function pruneGroups(rgb) {
+    const used = new Set(accentRows(rgb).map(row => row.groupId));
+    const kept = rgb.groups.filter(group => used.has(group.id));
+    if (kept.length === rgb.groups.length) return;
+    const renumbered = new Map(kept.map((group, index) => [group.id, index]));
+    for (const row of accentRows(rgb)) row.groupId = /** @type {number} */ (renumbered.get(row.groupId));
+    kept.forEach((group, index) => {group.id = index;});
+    rgb.groups = kept;
+}
+// The LEDs an accent lights, which it must have some of.
+/** @param {unknown} value */
+function accentLeds(value) {
+    const leds = (Array.isArray(value) ? value : []).map(led => integer(led, 57, "LED index"));
+    if (!leds.length) throw invalid("Pick LEDs on the board for the accent to light.");
+    return leds;
+}
+// Puts an accent's row at `index` of its table: its colour, its group and
+// who it lights for. Who it lights for is checked before its LEDs take a group.
+/** @param {Rgb} rgb @param {{target: string, owner?: string, ledIndices?: number[]}} group @param {import("../schema/types.js").Hsv} color @param {number} index */
+function placeAccent(rgb, group, color, index) {
+    const leds = accentLeds(group.ledIndices);
+    if (group.target === "layer") {
+        const selector = group.owner === RGB_EVERY_OWNER.layer ? RGB_DOMAIN_V1.SELECTOR_ALL : namedId(group.owner, "Layer");
+        rgb.layerGroupRows.splice(index, 0, {color, groupId: groupFor(rgb, leds), selector});
+    } else if (group.target === "pdMode") {
+        const selector = group.owner === RGB_EVERY_OWNER.pdMode ? RGB_DOMAIN_V1.SELECTOR_ALL : enumValue(group.owner, RGB_POINTING_MODE_IDS, "pointing mode");
+        rgb.pdModeGroupRows.splice(index, 0, {color, groupId: groupFor(rgb, leds), selector});
+    } else if (group.target === "keyBehavior") {
+        const semantic = enumValue(group.owner, RGB_KEY_SEMANTICS, "behaviour state");
+        rgb.keyGroupRows.splice(index, 0, {color, groupId: groupFor(rgb, leds), semantic});
+    } else if (group.target === "autocorrect") {
+        const semantic = enumValue(group.owner, RGB_AUTOCORRECT_SEMANTICS, "replacement case");
+        rgb.autocorrectGroupRows.splice(index, 0, {color, groupId: groupFor(rgb, leds), semantic});
+    } else if (group.target === "combo") rgb.comboGroupRows.splice(index, 0, {color, groupId: groupFor(rgb, leds)});
+    else throw invalid("Unknown accent table.");
+}
 /** @param {Rgb} rgb @param {string} target */
 function groupRows(rgb, target) {
-    /** @type {Record<string, "layerGroupRows" | "pdModeGroupRows" | "comboGroupRows" | "keyGroupRows">} */
-    const tables = {layer: "layerGroupRows", pdMode: "pdModeGroupRows", combo: "comboGroupRows", keyBehavior: "keyGroupRows"};
+    /** @type {Record<string, "layerGroupRows" | "pdModeGroupRows" | "comboGroupRows" | "keyGroupRows" | "autocorrectGroupRows">} */
+    const tables = {layer: "layerGroupRows", pdMode: "pdModeGroupRows", combo: "comboGroupRows", keyBehavior: "keyGroupRows", autocorrect: "autocorrectGroupRows"};
     const table = tables[target];
-    if (!table) throw invalid("Unknown LED group target.");
+    if (!table) throw invalid("Unknown accent table.");
     return rgb[table];
 }
 /** @template T @param {T[]} rows @param {(row: T) => boolean} predicate @param {string} label @returns {T} */
@@ -125,7 +169,7 @@ const PROFILE_EDITS = Object.freeze(/** @satisfies {{[D in import("./draft-edits
         if (!((context.capabilities?.supportedDomainMask || 0) & PROFILE_WIRE_DOMAINS.PD_MODES)) throw invalid("Pointing mode editing needs firmware with configurable pointing slots.");
         return editProfileDomains(document, context, open => editPointing(open, message));
     },
-    behaviours: (document, message, context) => editProfileDomains(document, {...context, checkActions: true}, open => editKeyBehaviors(open("behaviors"), message, context.capabilities)),
+    behaviours: (document, message, context) => editProfileDomains(document, {...context, checkActions: true}, (open, read) => editKeyBehaviors(open("behaviors"), message, context.capabilities ?? {}, read().settings)),
     lighting: (document, message, context) => editProfileDomains(document, context, open => editLighting(open("rgb"), message, brightnessCeiling(context.limits))),
     combos: editCombos,
 }));
@@ -195,66 +239,78 @@ function editPointing(open, message) {
 
 /** @param {Rgb} rgb @param {Extract<ProfileEdit, {type: import("./draft-edits.js").InDomain<"lighting">}>} message @param {number} maximumBrightness */
 function editLighting(rgb, message, maximumBrightness) {
-    /** @param {ColourInput} value */
-    const editColor = (value) => color(value, maximumBrightness);
+    // A colour the edit sets is held to the keyboard's brightness limit; one
+    // it posts back as it stood (a record sent whole, a policy, an accent's
+    // LEDs) is kept, even past the limit, for Review's blocker to name until
+    // it is lowered (profile-checks.js).
+    /** @param {ColourInput} value @param {import("../schema/types.js").Hsv} [stood] */
+    const editColor = (value, stood) => {
+        const set = color(value);
+        return stood && set.h === stood.h && set.s === stood.s && set.v === stood.v ? set : color(value, maximumBrightness);
+    };
+    /** @param {string | undefined} value */
+    const locality = (value) => enumValue(value, RGB_LOCALITIES, "locality");
     switch (message.type) {
         case "updateLayerColor": {
             const row = existing(rgb.layerColors, row => row.layerId === namedId(message.layer, "Layer"), "Layer");
-            row.color = editColor(message); row.mode = enumValue(message.mode, RGB_LAYER_MODES, "layer policy"); break;
+            row.color = editColor(message, row.color); row.mode = enumValue(message.mode, RGB_LAYER_MODES, "layer policy"); break;
         }
         case "updatePdModeColor": {
             const id = enumValue(message.pointingMode, RGB_POINTING_MODE_IDS, "pointing mode");
             const row = existing(rgb.pdModeColors, row => row.pdModeId === id, "Pointing mode");
-            row.color = editColor(message); row.locality = enumValue(message.locality, RGB_LOCALITIES, "locality"); break;
+            row.color = editColor(message, row.color); row.locality = locality(message.locality); break;
         }
-        case "updateAutomouseFade": rgb.automouseFade = {mode: enumValue(message.mode, RGB_AUTOMOUSE_MODES, "fade policy"), endColor: editColor(message)}; break;
-        case "updateComboFeedback": rgb.comboFeedback = {color: editColor(message), locality: enumValue(message.locality, RGB_LOCALITIES, "locality")}; break;
+        case "updateAutomouseFade": rgb.automouseFade = {mode: enumValue(message.mode, RGB_AUTOMOUSE_MODES, "fade policy"), endColor: editColor(message, rgb.automouseFade.endColor)}; break;
+        case "updateComboFeedback": rgb.comboFeedback = {color: editColor(message, rgb.comboFeedback.color), locality: locality(message.locality)}; break;
+        // Each case of behaviour feedback, a colour and where it paints, and
+        // the stage's tap-commit policy, stored as one record (firmware D-F73).
         case "updateKeyBehaviorFeedback": {
-            const feedback = message.config;
-            rgb.keyFeedback = {tapBranchColors: feedback.tapBranchColors.map(editColor), tapCommittedColor: editColor(feedback.tapCommittedColor), holdActiveColor: editColor(feedback.holdActiveColor), longHoldActiveColor: editColor(feedback.longHoldActiveColor), tapCommitMode: enumValue(feedback.tapCommitMode, RGB_TAP_COMMIT_MODES, "tap policy"), locality: enumValue(feedback.locality, RGB_LOCALITIES, "locality")}; break;
+            const feedback = message.config, stood = rgb.keyFeedback;
+            rgb.keyFeedback = {
+                tapBranches: feedback.tapBranches.map((branch, index) => ({color: editColor(branch.color, stood.tapBranches[index]?.color), locality: locality(branch.locality)})),
+                tapCommittedColor: editColor(feedback.tapCommittedColor, stood.tapCommittedColor), tapCommittedLocality: locality(feedback.tapCommittedLocality),
+                holdActiveColor: editColor(feedback.holdActiveColor, stood.holdActiveColor), holdActiveLocality: locality(feedback.holdActiveLocality),
+                longHoldActiveColor: editColor(feedback.longHoldActiveColor, stood.longHoldActiveColor), longHoldActiveLocality: locality(feedback.longHoldActiveLocality),
+                tapCommitMode: enumValue(feedback.tapCommitMode, RGB_TAP_COMMIT_MODES, "tap policy")}; break;
         }
-        case "updateRgbStages": rgb.stageEnableMask = integer(message.stageEnableMask, 31, "RGB stage mask"); break;
-        case "saveRgbReusableLedGroup": {
-            const group = message.group;
-            const leds = (/** @type {number[]} */ (group.ledIndices)).map(value => integer(value, 57, "LED index"));
-            // The keyboard accepts an empty group, but saving one is never meant.
-            if (!leds.length) throw invalid("Pick LEDs on the board before saving them as a group.");
-            if (group.originalName) {
-                const target = existing(rgb.groups, row => row.id === namedId(group.originalName, "Group"), "LED group");
-                const twin = rgb.groups.find(row => row !== target && sameLeds(row.leds, leds));
-                if (twin) throw invalid(`Group ${twin.id} already holds exactly these LEDs.`);
-                target.leds = leds;
-            } else groupFor(rgb, leds);
-            break;
+        // The four cases of replacement feedback, each a colour and where it
+        // paints, stored as one record like behaviour feedback's. A colour of
+        // HSV(0, 0, 0) is passthrough: the case paints nothing (firmware D-F70,
+        // D-F72, D-F73, D-F74).
+        case "updateAutocorrectFeedback": {
+            const feedback = message.config, stood = rgb.autocorrectFeedback;
+            rgb.autocorrectFeedback = {
+                textColor: editColor(feedback.textColor, stood.textColor), textLocality: locality(feedback.textLocality),
+                macroColor: editColor(feedback.macroColor, stood.macroColor), macroLocality: locality(feedback.macroLocality),
+                undoColor: editColor(feedback.undoColor, stood.undoColor), undoLocality: locality(feedback.undoLocality),
+                leadingColor: editColor(feedback.leadingColor, stood.leadingColor), leadingLocality: locality(feedback.leadingLocality)}; break;
         }
-        case "deleteRgbReusableLedGroup": {
-            const id = namedId(message.name, "Group");
-            existing(rgb.groups, row => row.id === id, "LED group");
-            const references = [rgb.layerGroupRows, rgb.pdModeGroupRows, rgb.comboGroupRows, rgb.keyGroupRows].flat();
-            if (references.some(row => row.groupId === id)) throw invalid("Remove this group's RGB assignments before deleting it.");
-            // Group ids are positions: consecutive from zero. Removing one
-            // renumbers the ones after it, and every row follows its group.
-            rgb.groups = rgb.groups.filter(row => row.id !== id);
-            const renumbered = new Map(rgb.groups.map((row, index) => [row.id, index]));
-            rgb.groups.forEach((row, index) => {row.id = index;});
-            for (const row of references) row.groupId = /** @type {number} */ (renumbered.get(row.groupId));
-            break;
-        }
+        case "updateRgbStages": rgb.stageEnableMask = integer(message.stageEnableMask, RGB_STAGE_MASK_ALL, "RGB stage mask"); break;
+        // An accent is added at its table's end, changed where it stands
+        // (rows paint in stored order, so a later one wins where they
+        // overlap; behaviour feedback's and replacement feedback's rows for every
+        // state or case paint first), or removed; each time, a group no accent lights any
+        // more goes, before a new set takes a group of its own.
         case "addRgbLedGroup": {
-            const group = message.group;
-            let groupId;
-            if (group.ledGroupName) groupId = existing(rgb.groups, row => row.id === namedId(group.ledGroupName, "Group"), "LED group").id;
-            else groupId = groupFor(rgb, (/** @type {number[]} */ (group.ledIndices)).map(value => integer(value, 57, "LED index")));
-            const row = {color: editColor(group), groupId};
-            if (group.target === "layer") rgb.layerGroupRows.push({...row, selector: group.owner === "RGB_LAYER_GROUP_ALL" ? 255 : namedId(group.owner, "Layer")});
-            else if (group.target === "pdMode") rgb.pdModeGroupRows.push({...row, selector: group.owner === "RGB_POINTING_MODE_GROUP_ALL" ? 255 : enumValue(group.owner, RGB_POINTING_MODE_IDS, "pointing mode")});
-            else if (group.target === "keyBehavior") rgb.keyGroupRows.push({...row, semantic: enumValue(group.owner, RGB_KEY_SEMANTICS, "key feedback type")});
-            else {groupRows(rgb, group.target); rgb.comboGroupRows.push(row);} break;
+            const rows = groupRows(rgb, message.group.target);
+            pruneGroups(rgb);
+            placeAccent(rgb, message.group, editColor(message.group), rows.length); break;
+        }
+        case "updateRgbLedGroup": {
+            const rows = groupRows(rgb, message.target);
+            const index = integer(message.index, rows.length - 1, "Accent");
+            // Its old LEDs give their group back first, so changing the LEDs
+            // of the only accent lighting them fits on a full keyboard.
+            const [stood] = rows.splice(index, 1);
+            pruneGroups(rgb);
+            placeAccent(rgb, {...message.group, target: message.target}, editColor(message.group, stood.color), index);
+            break;
         }
         case "deleteRgbLedGroup": {
             const rows = groupRows(rgb, message.target);
-            const index = integer(message.index, rows.length - 1, "Assignment index");
-            rows.splice(index, 1); break;
+            const index = integer(message.index, rows.length - 1, "Accent");
+            rows.splice(index, 1);
+            pruneGroups(rgb); break;
         }
         default: throw invalid("Unsupported profile edit.");
     }

@@ -41,6 +41,7 @@ const CONTROLS = Object.freeze({
     managePortableLayers: Object.freeze({route: "portable", action: "manageLayers", binding: "profile", demo: "allow", phase: "panel", identity: false}),
     editPortableLayer: Object.freeze({route: "portable", action: "editLayer", binding: "profile", demo: "allow", phase: "panel", identity: false}),
     savePortableLayers: Object.freeze({route: "portable", action: "saveLayers", binding: "profile", demo: "allow", phase: "restore", identity: false}),
+    setViaImportClears: Object.freeze({route: "portable", action: "viaClears", binding: "profile", demo: "allow", phase: "panel", identity: false}),
     cancelPortableReview: Object.freeze({route: "portable", action: "cancel", binding: "none", demo: "allow", phase: "panel", identity: false}),
     openDemo: Object.freeze({route: "demo", action: "open", binding: "none", demo: "open", phase: "panel", identity: false}),
     openDemoProfile: Object.freeze({route: "demo", action: "openProfile", binding: "none", demo: "replace", phase: "panel", identity: false}),
@@ -57,6 +58,16 @@ const CONTROLS = Object.freeze({
     useRecovery: Object.freeze({route: "shell", action: "useRecovery", binding: "none", demo: "refuse", phase: "shell", identity: false}),
     deleteRecovery: Object.freeze({route: "shell", action: "deleteRecovery", binding: "none", demo: "allow", phase: "shell", identity: false}),
     validateMacro: Object.freeze({route: "inspect", action: "validateMacro", binding: "inspect", demo: "allow", phase: "inspect", identity: false}),
+    validateAutocorrect: Object.freeze({route: "inspect", action: "validateAutocorrect", binding: "inspect", demo: "allow", phase: "inspect", identity: false}),
+    // Try it: text run through the draft's list as the keyboard would
+    // (autocorrect-matcher.js), nothing staged.
+    tryAutocorrect: Object.freeze({route: "inspect", action: "tryAutocorrect", binding: "inspect", demo: "allow", phase: "inspect", identity: false}),
+    // An autocorrect list file (D-L85): read and judged against the draft
+    // without staging anything, dropped or chosen in the shell's chooser;
+    // and the draft's list saved as a file.
+    previewAutocorrectImport: Object.freeze({route: "inspect", action: "previewAutocorrectImport", binding: "inspect", demo: "allow", phase: "inspect", identity: false}),
+    chooseAutocorrectFile: Object.freeze({route: "inspect", action: "chooseAutocorrectFile", binding: "inspect", demo: "allow", phase: "inspect", identity: false}),
+    exportAutocorrect: Object.freeze({route: "portable", action: "exportAutocorrect", binding: "none", demo: "allow", phase: "panel", identity: false}),
     // The Keyboard screen's Diagnostics opened: each half's flash pauses, a
     // background read (flash-pauses.js) skipped while anything runs.
     readFlashPauses: Object.freeze({route: "diagnose", action: "readFlashPauses", binding: "none", demo: "ignore", phase: "diagnose", identity: false}),

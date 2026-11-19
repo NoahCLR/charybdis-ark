@@ -61,8 +61,8 @@ test("only an editor read changes the profile the editors follow", async t => {
     assert.ok(exported.limits && exported.options && exported.hostOs, "what the keyboard accepts travels with the profile");
     const read = await service.readKeyboardProfile();
     assert.equal(service.portable, read);
-    const {settingsView, macroView, customKeyView} = service.snapshot();
-    assert.deepEqual({settingsView, macroView, customKeyView}, JSON.parse(JSON.stringify(editorViews(read, service.capabilities))));
+    const {settingsView, macroView, autocorrectView, customKeyView} = service.snapshot();
+    assert.deepEqual({settingsView, macroView, autocorrectView, customKeyView}, JSON.parse(JSON.stringify(editorViews(read, service.capabilities))));
     assert.equal(service.snapshot().layout?.state, "read");
     assert.equal(service.snapshot().baseRgb?.state, "read");
     const restoreRead = await service.readPortableProfile({forRestore: true});

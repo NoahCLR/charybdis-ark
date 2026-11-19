@@ -6,10 +6,11 @@
 // from the draft, because the draft is what the model carries.
 
 import {GEO, inLocality, trackballInLocality} from "./geometry.mjs";
-import {keyIdentity} from "./key-identity.mjs";
+import {keyIdentity, sameKey} from "./key-identity.mjs";
 import {keyMeaning} from "./keyface.mjs";
+import {masterOff} from "./participation.mjs";
 import {vocabulary} from "./vocabulary.mjs";
-import {OFF, inheritsStageColour, layerPaints, ledColour} from "../../rules/led-light.mjs";
+import {OFF, colourPaints, inheritsStageColour, ledColour, ledsOff, linkedBeneath, ownAccentColour} from "../../rules/led-light.mjs";
 
 /**
  * @typedef {Partial<import("../../contracts/panel.js").PublishedModel> | null | undefined} Model
@@ -39,15 +40,62 @@ export function stageEnabled(model, id) {
 
 // A stage switched on can still paint nothing. The auto-mouse fade runs only
 // while auto-mouse raises its layer: with auto-mouse off, a pointer layer
-// turned on by hand shows its own lighting. This answers why, or null; the
-// stored switch is left as it is, so turning auto-mouse back on restores it.
+// turned on by hand shows its own lighting. Combo feedback lights a combo being
+// held, and behaviour feedback a behaviour firing, so neither paints while the master
+// switch of what it lights is off; replacement feedback flashes for a
+// replacement, and there is none while Text replacement is off, unless the
+// list holds a leader input: the leader still waits and sends then. The stored
+// switch is left as it is, so turning that setting back on restores it.
 // Without settings readback nothing is claimed.
-/** @param {Model} model @param {string} id */
-export function stageIdle(model, id) {
-    if (id !== "auto" || !stageEnabled(model, id)) return null;
+/** @param {Model} model */
+function autoMouseOff(model) {
     const field = (model?.configDefaults || []).find((section) => section.id === "autoMouse")
         ?.fields.find((entry) => entry.macro === "autoMouse");
-    return field && !field.enabled ? "Auto-mouse is off, so this stage paints nothing." : null;
+    return Boolean(field && !field.enabled);
+}
+// Text replacement's switch, a section of its own on Typing settings (D-L87).
+/** @param {Model} model */
+function textReplacementOff(model) {
+    const field = (model?.configDefaults || []).find((section) => section.id === "autocorrect")
+        ?.fields.find((entry) => entry.macro === "autocorrect");
+    return Boolean(field && !field.enabled);
+}
+// The list holds a leader input, as core counts them: the leader sends
+// whatever Text replacement's switch says, and what it sends flashes
+// (firmware D-F71, D-L91).
+/** @param {Model} model */
+const hasLeaderInputs = (model) => (model?.autocorrect?.usage?.leaders ?? 0) > 0;
+// What keeps a stage from painting: the switch it needs, and when it is off.
+// A stage that `still` paints something with that switch off keeps its
+// banner and is not idle; its banner then says what it still paints.
+/** @type {Readonly<Record<string, {needs: import("../../contracts/model.js").SettingOffSwitch, off: (model: Model) => boolean, still?: (model: Model) => boolean}>>} */
+const STAGE_NEEDS = Object.freeze({
+    auto: {needs: "autoMouse", off: autoMouseOff},
+    combo: {needs: "combo", off: (model) => masterOff(model, "combo")},
+    key: {needs: "behaviour", off: (model) => masterOff(model, "behavior")},
+    autocorrect: {needs: "autocorrect", off: textReplacementOff, still: hasLeaderInputs},
+});
+// The global switch keeping this stage from painting; null when none is.
+/** @param {Model} model @param {string} id */
+export function stageHeldOffBy(model, id) {
+    const stage = Object.hasOwn(STAGE_NEEDS, id) ? STAGE_NEEDS[id] : null;
+    return stage && stageEnabled(model, id) && stage.off(model) ? stage.needs : null;
+}
+// What a stage's banner says the switch's being off leaves of it: nothing,
+// or what it still paints (replacement feedback a leader's sends).
+/** @param {Model} model @param {string} id */
+export function stageOffDetail(model, id) {
+    const words = vocabulary(model).settingOff;
+    return Object.hasOwn(STAGE_NEEDS, id) && STAGE_NEEDS[id].still?.(model) ? words.leading.stage : words.stage;
+}
+// Why this stage paints nothing, in the words of its banner; null when it
+// paints, a stage that still paints something with its switch off included.
+/** @param {Model} model @param {string} id */
+export function stageIdle(model, id) {
+    const needs = stageHeldOffBy(model, id);
+    if (!needs || STAGE_NEEDS[id].still?.(model)) return null;
+    const words = vocabulary(model).settingOff;
+    return `${words.switches[needs].off}. ${words.stage}`;
 }
 
 /** @param {Model} model @param {string} id */
@@ -136,7 +184,7 @@ export function feedbackColours(model) {
         tap: feedback?.tapCommittedColor || OFF,
         hold: feedback?.holdActiveColor || OFF,
         long: feedback?.longHoldActiveColor || OFF,
-        branches: feedback?.tapBranchColors || [],
+        branches: (feedback?.tapBranches || []).map((branch) => branch.color),
     };
 }
 
@@ -154,13 +202,53 @@ const isMapped = (model, position) => {
 /** @param {Model} model @param {Layer} layer */
 export const mappedKeyCount = (model, layer) => (layer?.positions || []).filter((position) => isMapped(model, position)).length;
 
-// The firmware's two rules for "no colour" (rules/led-light.mjs).
-export {inheritsStageColour, layerPaints};
+// The firmware's rules for "no colour" (rules/led-light.mjs).
+export {colourPaints, inheritsStageColour, ownAccentColour};
+// Passthrough, as the keyboard means it for every colour a layer, a pointing
+// slot, combo feedback or a feedback case owns (D-L94, firmware D-F74), and
+// off, value 0 with saturation, its LEDs dark: the shared rule, said as the
+// screens ask it.
+/** @param {import("../../contracts/edits.js").Colour | null | undefined} colour */
+export const isPassthrough = (colour) => !colourPaints(colour);
+export const isOff = ledsOff;
+// The class a swatch wears for how its colour lights (styles.css), the one
+// choice every swatch makes: "" for a lit colour, whose swatch is its own;
+// swatch-pass, hatched, for passthrough; swatch-dark, dark and struck
+// through, for off, its LEDs dark; swatch-off for a colour its stage keeps
+// from lighting (hatched in a list, hollow in a tab or chip); swatch-none,
+// hollow and dashed, for one never read.
+/** @typedef {"lit" | "passthrough" | "off" | "unlit" | "unread"} SwatchState */
+/** @param {SwatchState} how */
+export const swatchFor = (how) => how === "passthrough" ? "swatch-pass" : how === "off" ? "swatch-dark"
+    : how === "unlit" ? "swatch-off" : how === "unread" ? "swatch-none" : "";
+// The same for a colour an owner has, by the shared rule, unlit where its
+// stage does not paint.
+/** @param {import("../../contracts/edits.js").Colour | null | undefined} colour @param {{stageOn?: boolean}} [options] */
+export const swatchOf = (colour, {stageOn = true} = {}) => swatchFor(!stageOn ? "unlit" : !colour ? "unread" : isPassthrough(colour) ? "passthrough" : isOff(colour) ? "off" : "lit");
+
+// The key a replacement case's preview follows (D-L89, D-L92). On the
+// keyboard it is the key that ended the word, the Backspace that undid the
+// replacement, or for Leader waiting the Leader key that began it; the board
+// cannot know which key will, so one key stands in: the first that sends
+// `keycode` (KC_SPACE, KC_BACKSPACE or QK_LEADER), on the viewed layer first,
+// then from layer 0 up. With none, the case paints as the keyboard paints one
+// whose key it does not know: every key, under the last two localities.
+/** @param {Model} model @param {Layer} layer @param {string} keycode @returns {{layoutIndex: number, layer: number} | null} */
+export function replacementTrigger(model, layer, keycode) {
+    const stack = model?.layers || [];
+    const order = [layer, ...stack.filter((row) => row !== layer)].filter(Boolean);
+    for (const row of order) {
+        const found = (row?.positions || []).find((position) => sameKey(model, keyMeaning(position), keycode));
+        if (found) return {layoutIndex: found.layoutIndex, layer: /** @type {number} */ (row?.index)};
+    }
+    return null;
+}
 
 // What the colour editor says about HSV(0, 0, 0) in a stage, in the
-// vocabulary's words (colourOff), spread into its options. A layer colour and
-// a group row ("groups", not a stage) are the two places black is not black.
-/** @param {import("./vocabulary.mjs").VocabularyModel | null | undefined} model @param {string} stage @returns {{offTip?: string, offNote?: string}} */
+// vocabulary's words (colourOff), spread into its options. A layer colour is
+// the one stage colour where black is not black (an accent's black takes its
+// stage's colour, which the accent editor offers as a choice of its own).
+/** @param {import("./vocabulary.mjs").VocabularyModel | null | undefined} model @param {string} stage @returns {{offTip?: string, offNote?: string, offWord?: string, ledsOffTip?: string}} */
 export const offWording = (model, stage) => vocabulary(model).colourOff[stage] || {};
 
 
@@ -180,11 +268,16 @@ function mappedOn(model, layer, l, position) {
  *
  *   background effect → every active layer's solid colour, ascending (layer 0 first,
  *   so the default layer shows through a mapped-keys-only layer above it) →
- *   the layer LED group rows → a previewed pointing mode by locality → its
- *   LED group rows.
+ *   the layers' accents → a held combo whose output runs the pointing mode →
+ *   a previewed pointing mode by locality → its accents (beneath the lowest
+ *   layer on that its link names, when one is: firmware D-F62) → any other held
+ *   combo by locality → its accents → a previewed behaviour feedback case
+ *   by its locality → its accents → a previewed replacement flash by
+ *   locality → its accents (rules/led-light.mjs).
  *
  * The answer says what painted the LED last: `source` is the stage ("off",
- * "base", "layer" or "pointing") and, for a layer, `layer` is its id.
+ * "base", "layer", "pointing", "combo", "behaviour" or "replacement") and, for a layer,
+ * `layer` is its id.
  *
  * `options.held` names the layers previewed on as well (by layer id); they
  * paint in the same ascending pass, as rgb_layer_stage.c paints every active
@@ -195,6 +288,26 @@ function mappedOn(model, layer, l, position) {
  * does. A pointing-mode colour is an overlay that exists only while its mode
  * runs, so it is painted only when the caller asks for that preview.
  */
+// The layers the preview has on, lowest first: base, the viewed layer and
+// those held on (by id).
+/** @param {Layer} layer @param {readonly number[]} [held] */
+const layersOn = (layer, held = []) => [...new Set([0, layer?.index ?? 0, ...held])].sort((a, b) => a - b);
+
+// The layer a previewed pointing mode paints beneath, its link's lowest that
+// the preview has on, or null when it paints over every layer (firmware
+// D-F62).
+// A mode with nothing to paint, a passthrough slot with no coloured accent of
+// its own or of every slot, leaves the layer stack whole
+// (rgb_runtime_pointing_mode_stage_has_paint).
+/** @param {Model} model @param {LightOptions["pdActive"]} pdActive @param {Layer} layer @param {readonly number[]} [held] */
+export function pdBeneath(model, pdActive, layer, held) {
+    if (!pdActive) return null;
+    const every = vocabulary(model).accents.pdMode?.everyOwner;
+    const paints = colourPaints(pdActive.color)
+        || (model?.rgb?.pdModeAccents || []).some((accent) => (accent.owner === every || accent.owner === pdActive.mode) && !inheritsStageColour(accent.color));
+    return paints ? linkedBeneath(pdActive.link, layersOn(layer, held)) : null;
+}
+
 /** @param {Model} model @param {Layer} layer @param {number | undefined} led @param {Position} position @param {LightOptions} [options] @returns {import("./types.js").LedLight} */
 function ledLight(model, layer, led, position, options = {}) {
     const baseHere = baseReaches(model, position ? position.layoutIndex : undefined);
@@ -203,9 +316,14 @@ function ledLight(model, layer, led, position, options = {}) {
     // The keyboard paints base and the layers that are on (rgb_layer_stage.c,
     // from layer_state), never the other default layers it keeps: those live
     // in QMK's default layer state, which lighting does not read.
-    const active = [...new Set([0, layer?.index ?? 0, ...(options.held || [])])].sort((a, b) => a - b);
+    const active = layersOn(layer, options.held);
     const lit = (/** @type {{ledIndices?: number[]}} */ group) => (group.ledIndices || []).includes(led ?? -1);
     const preview = options.pdActive;
+    const held = options.comboActive;
+    const flash = options.replacementActive;
+    const flashAccents = flash ? (model?.rgb?.autocorrectFeedbackAccents || []).filter(lit) : [];
+    const shows = options.behaviourActive;
+    const showsAccents = shows ? (model?.rgb?.keyFeedbackAccents || []).filter(lit) : [];
     return ledColour({
         off: lightingOff(model),
         base: base ? {colour: base, source: animated ? "animated" : "base"} : null,
@@ -213,11 +331,24 @@ function ledLight(model, layer, led, position, options = {}) {
             const row = layerColourRow(model, l);
             return {layer: l, colour: row?.color, paints: Boolean(row) && (row?.mode === "ALL_KEYS" || mappedOn(model, layer, l, position))};
         }) : null,
-        layerGroups: (model?.rgb?.layerLedGroups || []).filter(lit).map((group) => ({colour: group.color,
-            owners: group.owner === "RGB_LAYER_GROUP_ALL" ? active : active.filter((l) => group.ownerLayer === l)})),
+        layerGroups: (model?.rgb?.layerAccents || []).filter(lit).map((group) => ({colour: group.color,
+            owners: group.owner === vocabulary(model).accents.layer?.everyOwner ? active : active.filter((l) => group.ownerLayer === l)})),
         pointing: preview && stageEnabled(model, "pd") ? {colour: preview.color,
             reaches: position ? inLocality(position.layoutIndex, preview.locality, preview.triggerIndex) : trackballInLocality(preview.locality, preview.triggerIndex),
-            groups: (model?.rgb?.pdModeLedGroups || []).filter((group) => lit(group) && (group.owner === "RGB_POINTING_MODE_GROUP_ALL" || group.owner === preview.mode)).map((group) => group.color)} : null,
+            groups: (model?.rgb?.pdModeAccents || []).filter((group) => lit(group) && (group.owner === vocabulary(model).accents.pdMode?.everyOwner || group.owner === preview.mode)).map((group) => group.color),
+            beneath: pdBeneath(model, preview, layer, options.held)} : null,
+        combo: held && stageEnabled(model, "combo") ? {colour: held.color,
+            reaches: position ? inLocality(position.layoutIndex, held.locality, held.inputs) : trackballInLocality(held.locality, held.inputs),
+            groups: (model?.rgb?.comboAccents || []).filter(lit).map((group) => group.color), beneath: Boolean(held.beneath)} : null,
+        behaviour: shows && stageEnabled(model, "key") ? {colour: shows.color,
+            reaches: position ? inLocality(position.layoutIndex, shows.locality, shows.triggerIndex) : trackballInLocality(shows.locality, shows.triggerIndex),
+            every: showsAccents.filter((group) => group.owner === vocabulary(model).accents.keyBehavior?.everyOwner).map((group) => group.color),
+            group: showsAccents.filter((group) => group.owner === vocabulary(model).accents.keyBehavior?.group?.owner && vocabulary(model).accents.keyBehavior?.group?.members.includes(shows.owner)).map((group) => group.color),
+            own: showsAccents.filter((group) => group.owner === shows.owner).map((group) => group.color)} : null,
+        replacement: flash && stageEnabled(model, "autocorrect") ? {colour: flash.color,
+            reaches: position ? inLocality(position.layoutIndex, flash.locality, flash.triggerIndex) : trackballInLocality(flash.locality, flash.triggerIndex),
+            every: flashAccents.filter((group) => group.owner === vocabulary(model).accents.autocorrect?.everyOwner).map((group) => group.color),
+            own: flashAccents.filter((group) => group.owner === flash.owner).map((group) => group.color)} : null,
     });
 }
 
@@ -239,9 +370,10 @@ export function trackballLight(model, layer, options = {}) {
 }
 
 // Whether an LED's light is the viewed layer's own rather than seen through it
-// from beneath: that layer or a previewed pointing mode painted it last, or the
-// viewed layer is base, which nothing lies under — the background effect is the floor
-// base sits on, always on with it, not a layer below it.
+// from beneath: that layer, a previewed pointing mode, a previewed behaviour
+// feedback case or a previewed replacement flash painted it last, or the viewed layer is
+// base, which nothing lies under — the background effect is the floor base
+// sits on, always on with it, not a layer below it.
 /** @param {import("./types.js").LedLight | null | undefined} light @param {number} [layerId] */
 export const ownLight = (light, layerId = 0) =>
-    layerId === 0 || light?.source === "pointing" || (light?.source === "layer" && light.layer === layerId);
+    layerId === 0 || light?.source === "pointing" || light?.source === "behaviour" || light?.source === "replacement" || (light?.source === "layer" && light.layer === layerId);

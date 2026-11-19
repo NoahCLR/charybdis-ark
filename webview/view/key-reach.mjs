@@ -11,12 +11,11 @@ import {behaviourRuns} from "./participation.mjs";
 import {behaviourEditorRow, behaviourHasTiming, behaviourThresholds} from "./behavior-editor.mjs";
 import {comboBehaviours} from "./combo-reach.mjs";
 import {customKeyOf, customKeyShortcutOnly, hasShortcut} from "./custom-key.mjs";
-import {pdColourRow} from "./lighting.mjs";
-import {vocabulary, word} from "./vocabulary.mjs";
+import {phrasesJoined, vocabulary, word} from "./vocabulary.mjs";
 
 /**
  * @typedef {import("../../contracts/panel.js").PublishedModel | null} Model
- * @typedef {{kind: "tapHold", term: {ms: string}, holdAction: string, note: string} | {kind: "off"} | {kind: "inert"} | null} BehaviourLead
+ * @typedef {{kind: "tapHold", term: {ms: string}, holdAction: string, note: import("./vocabulary.mjs").Phrase} | {kind: "off"} | {kind: "inert"} | null} BehaviourLead
  * @typedef {import("../../contracts/panel.js").ComboView} ComboView
  */
 
@@ -42,8 +41,7 @@ export function keyReachAt(view, index) {
 // shows its section: its behaviour row (keyBehaviour); the custom key it is,
 // and that key again as `shortcut` when its shortcut section shows; each
 // macro it plays, with the slot the keyboard reported, if any; the pointing
-// mode it runs, by the slot, the words for its kind and where its colour
-// paints; and `combos`, those `view` marks at this position unless the
+// mode it runs, by the slot and the words for its kind; and `combos`, those `view` marks at this position unless the
 // caller passes the ones it badges, each with whether it fires from this key
 // in `view` (the layer shown and those previewed under it), whether it runs
 // its output's behaviour, and the shortcut a custom key it sends sends
@@ -62,22 +60,13 @@ export function keyReach(view, layer, position, index, combos = view.combos.show
         custom,
         shortcut: custom && hasShortcut(custom) ? custom : null,
         macros: [key.macro].filter(Boolean).map((keycode) => ({keycode, slot: (model?.macros || []).find((row) => row.keycode === keycode)})),
-        pointing: slot ? {slot, kind: slot.kind ? word(words.pointing.kinds, slot.kind).toLowerCase() : "",
-            paints: slot.kind ? paintsWhere(model, slot.id) : ""} : null,
+        pointing: slot ? {slot, kind: slot.kind ? word(words.pointing.kinds, slot.kind).toLowerCase() : ""} : null,
         combos: shown.map(({combo, use}) => {
             const runs = running.has(combo.badge), sent = use.fires && !runs ? customKeyOf(model, combo.output) : undefined;
             return {combo, use, runs, sendsInstead: sent ? customKeyShortcutOnly(sent) : ""};
         }),
     };
 }
-
-// Where a pointing mode's colour paints, in the vocabulary's words, read
-// inside a sentence.
-/** @param {Model} model @param {number} slot */
-const paintsWhere = (model, slot) => {
-    const locality = pdColourRow(model, slot)?.locality;
-    return locality ? word(vocabulary(model).localities, locality).toLowerCase() : "its locality";
-};
 
 // `layer` supplies the key, so its switches decide whether the row runs. The
 // keyboard decides every key's tap or hold, with or without a row (firmware
@@ -109,12 +98,12 @@ export function keyBehaviour(model, layer, position) {
 // threshold with it: the key waits its default, the dual-role threshold. A
 // layer-tap's hold reads as the grid's built-in Hold does: the layer action
 // the core says it holds (`holdAction`), else the layer or modifier itself.
-/** @param {Model} model @param {import("../../contracts/panel.js").Position} position @param {NonNullable<ReturnType<typeof dualRole>>} role @param {import("./keyface-types.js").KeyIdentity["behaviour"]} behaviour @param {{runs: boolean, reasons: string[]}} use @param {string} inertNote @returns {BehaviourLead} */
+/** @param {Model} model @param {import("../../contracts/panel.js").Position} position @param {NonNullable<ReturnType<typeof dualRole>>} role @param {import("./keyface-types.js").KeyIdentity["behaviour"]} behaviour @param {{runs: boolean, reasons: import("./vocabulary.mjs").Phrase[]}} use @param {string} inertNote @returns {BehaviourLead} */
 function tapHold(model, position, role, behaviour, use, inertNote) {
     const row = behaviourEditorRow(model, keyMeaning(position));
     const fallback = row?.timingDefaults?.tapHoldTerm ?? model?.behaviorTimingDefaults?.tappingTerm;
     const term = use.runs && behaviour ? behaviourThresholds(model, behaviour).tapHoldTerm : {ms: fallback === undefined ? "" : String(fallback)};
     const holdAction = "layer" in role.hold && row?.builtIn?.hold ? row.builtIn.hold.action : "";
-    const note = behaviour && !use.runs ? `Its behaviour is not used: ${use.reasons.join("; ")}. The key keeps this tap and hold.` : inertNote;
+    const note = behaviour && !use.runs ? ["Its behaviour is not used: ", ...phrasesJoined(use.reasons, "; "), ". The key keeps this tap and hold."] : inertNote ? [inertNote] : [];
     return {kind: "tapHold", term, holdAction, note};
 }

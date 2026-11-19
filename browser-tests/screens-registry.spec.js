@@ -12,6 +12,7 @@ test("every registered screen opens from the rail with its own title and keeps t
     await expect(page.locator(".rail-group")).toHaveText(["Configure", "Settings", "Keyboard"]);
     await expect(page.locator(".rail [data-screen]")).toHaveCount(screens.length);
     const heights = new Set();
+    const themes = new Set();
     for (const {id, label} of screens) {
         const button = page.locator(`.rail [data-screen="${id}"]`);
         await expect(button).toHaveText(label);
@@ -24,10 +25,13 @@ test("every registered screen opens from the rail with its own title and keeps t
         // Every header is as tall as every other, so nothing below it jumps
         // between screens; the Keyboard screen's renamable title included.
         heights.add(await page.locator(".main > .topbar").evaluate((node) => node.getBoundingClientRect().height));
+        // Nor does the theme toggle, beside Lighting's taller power controls.
+        themes.add(await page.locator('.main > .topbar [data-act="theme"]').evaluate((node) => node.getBoundingClientRect().top));
     }
     await page.locator('.main > .topbar [data-f="keyboard:name"]').focus();
     heights.add(await page.locator(".main > .topbar").evaluate((node) => node.getBoundingClientRect().height));
     expect([...heights]).toHaveLength(1);
+    expect([...themes]).toHaveLength(1);
 });
 
 test("a screen waiting for a keyboard is titled as the rail item it highlights", async ({page}) => {

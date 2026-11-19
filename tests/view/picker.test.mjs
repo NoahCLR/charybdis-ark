@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {createRequire} from "node:module";
-import {SEARCH_ROWS, foldedPick, heldModifiers, isLayerKeyPicked, isPicked, offeredEntries, offeredMacros, offeredSections, pickAllowed, pickProblem, pickValue,
-    dropKey, openingPick, pickKey, pickModifier, pickedExpression, pickerMatches, shownSection, storedPick} from "../../webview/view/picker.mjs";
+import {foldedPick, heldModifiers, isLayerKeyPicked, isPicked, offeredEntries, offeredMacros, offeredSections, pickAllowed, pickProblem, pickValue,
+    dropKey, openingPick, pickKey, pickModifier, pickedExpression, shownSection, storedPick} from "../../webview/view/picker.mjs";
 import {pickerSections} from "../../webview/view/picker-sections.mjs";
 
 const {demoDocument, publishedModel} = createRequire(import.meta.url)("../fixtures/published-model");
@@ -33,8 +33,8 @@ test("a field limited to some keys takes only them, by the names QMK gives them"
 
 test("a limited field offers the keyboard and the sections holding one of its keys", () => {
     assert.deepEqual(ids(offeredSections(model, picker())), ids(pickerSections()), "every section for a field taking every key");
-    assert.deepEqual(ids(offeredSections(model, picker({allowedKeys: ["KC_A", "KC_EXLM", "MACRO_0"]}))), ["board", "symbols", "macros", "all"]);
-    assert.deepEqual(ids(offeredSections(model, picker({allowedKeys: ["KC_A"], shortcut: true}))), ["board", "symbols", "layers", "more", "all"],
+    assert.deepEqual(ids(offeredSections(model, picker({allowedKeys: ["KC_A", "KC_EXLM", "MACRO_0"]}))), ["board", "letters", "symbols", "macros", "all"]);
+    assert.deepEqual(ids(offeredSections(model, picker({allowedKeys: ["KC_A"], shortcut: true}))), ["board", "letters", "symbols", "common", "layers", "all"],
         "a shortcut's layer switches, and its modifier keys and shifted symbols");
     const limited = picker({allowedKeys: ["KC_A", "MACRO_0"]});
     assert.equal(shownSection(model, {...limited, section: "macros"})?.id, "macros");
@@ -68,25 +68,31 @@ test("modifiers alone or with a modifier key fold into the simplest keycode; any
     assert.equal(storedPick(model, unfolded), unfolded, "the pick itself when nothing folds");
 });
 
-test("a pick that cannot be used says why in the draft's words; a shortcut is named as core names it", () => {
+// A picker opened on an unassigned key has Transparent picked; KC_NO is no
+// key either. Lit modifiers over either are the modifier key, as with
+// nothing picked (D-L83), never C(KC_TRANSPARENT).
+test("modifiers lit over Transparent or KC_NO give the modifier key, as with nothing picked", () => {
+    for (const seed of ["KC_TRANSPARENT", "KC_NO"]) {
+        const opened = picker(openingPick(model, {mode: "single"}, [seed]));
+        assert.deepEqual(opened, picker({keys: [seed]}), `${seed} opens picked`);
+        const ctrl = {...opened, ...pickModifier(opened, "C")};
+        assert.equal(pickedExpression(model, ctrl), "KC_LEFT_CTRL", seed);
+        assert.equal(pickProblem(model, ctrl), "", seed);
+        assert.equal(pickedExpression(model, {...ctrl, mods: ["C", "S"]}), pickedExpression(model, picker({mods: ["C", "S"]})), `${seed}: several modifiers fold as with no key`);
+        assert.equal(pickedExpression(model, opened), seed, `${seed} alone stays ${seed}`);
+    }
+    const a = picker(openingPick(model, {mode: "single"}, ["KC_A"]));
+    assert.equal(pickedExpression(model, {...a, ...pickModifier(a, "C")}), "C(KC_A)", "a real key still takes the modifier");
+});
+
+test("a pick that cannot be used says why in the draft's words; a shortcut shows as the chord of its QMK names", () => {
     const both = picker({mods: ["C", "S", "RCTL", "RSFT"]});
     assert.ok("shortcut" in /** @type {object} */ (foldedPick(model, both)), "two modifiers on each side are a custom key's shortcut");
     assert.match(pickProblem(model, both), /left modifiers or right modifiers/);
     assert.equal(pickProblem(model, picker({mods: ["S"], keys: ["KC_A"]})), "");
     const shortcut = picker({shortcut: true, mods: ["S"], keys: ["KC_1"]});
     assert.equal(pickProblem(model, shortcut), "");
-    assert.equal(pickedExpression(model, shortcut), "Left Shift + 1");
-});
-
-test("a search finds the field's macros and offered keycodes, the first rows of them", () => {
-    const all = pickerMatches(model, picker({search: "a"}));
-    assert.equal(all.keycodes.length, SEARCH_ROWS, "capped");
-    assert.equal(all.macros.length, model.macros.length, "macros apart from the cap");
-    assert.deepEqual(pickerMatches(model, picker({search: "Mute"})).keycodes.map((entry) => entry.value), ["KC_KB_MUTE", "KC_AUDIO_MUTE"], "case aside, by name or words");
-    assert.deepEqual(pickerMatches(model, picker({search: "SPOT"})).macros.map((slot) => slot.keycode), ["MACRO_0"], "a macro by its name");
-    assert.deepEqual(pickerMatches(model, picker({search: "QK_USER"})).keycodes, [], "what core does not offer is never found");
-    const limited = pickerMatches(model, picker({search: "a", allowedKeys: ["KC_A", "MACRO_0"]}));
-    assert.deepEqual([limited.keycodes.map((entry) => entry.value), limited.macros.map((slot) => slot.keycode)], [["KC_A"], ["MACRO_0"]]);
+    assert.equal(pickedExpression(model, shortcut), "KC_LEFT_SHIFT+KC_1");
 });
 
 test("a layer key lights the button for the same act on its layer, as core words the forms alike", () => {
@@ -143,6 +149,9 @@ test("a click picks by the picker's kind: one key alone, a list in order up to i
     assert.deepEqual(pickKey(model, picker({mode: "list", keys: ["KC_A", "KC_B"]}), "KC_A"), {keys: ["KC_B"]}, "a second click takes it out");
     assert.equal(pickKey(model, picker({mode: "list", maxKeys: 2, keys: ["KC_A", "KC_B"]}), "KC_C"), null, "a full list picks nothing");
     assert.deepEqual(pickKey(model, picker({mode: "list", maxKeys: 1, keys: ["KC_A"]}), "KC_C"), {keys: ["KC_C"]}, "a list of one swaps");
+    const six = ["KC_A", "KC_B", "KC_C", "KC_D", "KC_E", "KC_F"];
+    assert.equal(pickKey(model, picker({mode: "list", maxKeys: 16, heldToReport: true, keys: six}), "KC_G"), null, "a chord takes six keys besides modifiers (firmware D-F65)");
+    assert.deepEqual(pickKey(model, picker({mode: "list", maxKeys: 16, heldToReport: true, keys: six}), "KC_LGUI"), {keys: [...six, "KC_LGUI"]}, "and modifiers beside them");
     assert.deepEqual(pickModifier(picker({mods: ["G"]}), "G").mods, [], "the row's button unlights");
     assert.deepEqual(dropKey(picker({mode: "list", keys: ["KC_A", "KC_B"]}), 0), {keys: ["KC_B"]});
 });

@@ -1,7 +1,7 @@
 // @ts-check
 "use strict";
 const {test, expect} = require("@playwright/test");
-const {openControls, posted} = require("./control-preview");
+const {openControls, posted, wideFont} = require("./control-preview");
 
 // The same kind of control looks and behaves the same on every screen
 // (docs/spec/interface-contracts.md, Shared controls).
@@ -62,6 +62,8 @@ test("a slot bank opens on the slots in use, makes a new one in the first free s
     // The preview's keys 0 to 3 hold behaviours; the other 124 fold.
     await expect(bank.locator("[data-custom-key]")).toHaveCount(4);
     await expect(bank.locator("[data-custom-key]").first()).toContainText("behaviour");
+    // The heading counts the keys in use, as Macros and Pointing modes count theirs.
+    await expect(page.locator(".card:has(#customKeySearch) .card-h .tag")).toHaveText("4 of 128 used");
     const all = bank.locator('[data-all-slots="customKeys"]');
     await expect(all).toHaveText("Show all 128 slots");
     await expect(all).toHaveAttribute("aria-expanded", "false");
@@ -128,16 +130,33 @@ test("every behaviour cell is one size, on Custom keys and in the Keymap's Behav
         const heights = await page.locator(".bgrid .bcell").evaluateAll(cells => [...new Set(cells.map(cell => Math.round(cell.getBoundingClientRect().height)))]);
         expect(heights, `${screen} at ${width}`).toHaveLength(1);
         // A timing field shows its whole placeholder ("150 · default").
-        for (const fits of await page.locator(".bgrid input.num").evaluateAll(inputs => inputs.map(input => {
-            const probe = document.createElement("span");
-            probe.style.font = getComputedStyle(input).font;
-            probe.textContent = input.placeholder;
-            document.body.append(probe);
-            const fits = probe.getBoundingClientRect().width <= input.clientWidth;
-            probe.remove();
-            return fits;
-        }))) expect(fits, `${screen} timing placeholder`).toBe(true);
+        for (const fits of await placeholdersFit(page.locator(".bgrid input.num"))) expect(fits, `${screen} timing placeholder`).toBe(true);
     }
+});
+
+// Whether each field is wide enough for its whole placeholder, in the room
+// its padding leaves (the unit rides in the right padding).
+/** @param {import("@playwright/test").Locator} inputs */
+const placeholdersFit = (inputs) => inputs.evaluateAll(nodes => nodes.map(node => {
+    const input = /** @type {HTMLInputElement} */ (node);
+    const style = getComputedStyle(input);
+    const probe = document.createElement("span");
+    probe.style.font = style.font;
+    probe.style.whiteSpace = "pre";
+    probe.textContent = input.placeholder;
+    document.body.append(probe);
+    const room = input.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    const fits = probe.getBoundingClientRect().width <= room;
+    probe.remove();
+    return fits;
+}));
+
+test("a combo's window shows its whole placeholder, as a behaviour's timings do", async ({page}) => {
+    await openControls(page, "keys", {tab: "combos"});
+    await page.getByRole("button", {name: "New combo", exact: true}).click();
+    const field = page.locator(".combo-builder input[data-window]");
+    await expect(field).toHaveAttribute("placeholder", /· default$/);
+    expect(await placeholdersFit(field)).toEqual([true]);
 });
 
 test("a choice shows a few short options on screen and keeps a longer list in a menu, by one rule", async ({page}) => {
@@ -147,4 +166,217 @@ test("a choice shows a few short options on screen and keeps a longer list in a 
     // Keyboard layout: seven, a menu.
     await expect(page.locator('select[data-f="setting:hostLayout"]')).toHaveCount(1);
     await expect(page.locator('.seg[aria-label="Keyboard layout"]')).toHaveCount(0);
+});
+
+test("keys pressed together are one chip in two sizes, each + kept with the key before it", async ({page}) => {
+    // The demo's combo 0 is D + F / Navigation, and key 27 is its D.
+    /** @param {import("@playwright/test").Locator} keys */
+    const chips = (keys) => keys.evaluate((node) => ({
+        small: node.classList.contains("small"),
+        keys: node.querySelectorAll(":scope > .key-chip > .tok").length,
+        // Every chip but the last carries its +, so no line starts with one.
+        plus: [...node.querySelectorAll(":scope > .key-chip")].map((chip) => chip.querySelector(":scope > .key-plus") ? "+" : ""),
+        height: Math.round(node.querySelector(".tok").getBoundingClientRect().height),
+    }));
+
+    await openControls(page, "keys", {}, "dark", "shell=demo");
+    await page.locator('[data-tab="combos"]').click();
+    const table = await chips(page.locator('tr[data-combo="0"] .key-chips').first());
+    expect(table).toMatchObject({small: false, keys: 2, plus: ["+", ""]});
+
+    await page.locator('.board [data-key="27"]').first().hover();
+    const card = page.locator(".hovercard:visible .hc-combo .key-chips").first();
+    await expect(card.locator(".tok.here")).toHaveText("D");
+    const hover = await chips(card);
+    expect(hover).toMatchObject({small: true, keys: 2, plus: ["+", ""]});
+    expect(hover.height).toBeLessThan(table.height);
+
+    await page.mouse.move(0, 0);
+    await openControls(page, "lighting", {stage: "combo"}, "dark", "shell=demo");
+    expect(await chips(page.locator('tr[data-combo="0"] .key-chips').first())).toEqual(hover);
+});
+
+test("a combo's badge in the hover card sits on its arrow's line, as a branch's tap count sits on its Tap row, and the arrow on what it sends", async ({page}) => {
+    // The demo's combo 0 is D + F / Navigation, and key 27 is its D. Sending a
+    // layer, its line holds the layer's tag, taller than the words around it.
+    await openControls(page, "keys", {}, "dark", "shell=demo");
+    await page.evaluate(async () => {
+        const {getModel} = await import("/webview/store.mjs");
+        const model = structuredClone(getModel());
+        Object.assign(model.combos[0], {output: "MO(3)", outputDisplay: "Hold Navigation"});
+        window.dispatchEvent(new MessageEvent("message", {data: {type: "model", model}}));
+    });
+    await page.locator('.board [data-key="27"]').first().hover();
+    const combo = page.locator(".hovercard:visible .hc-combo").first();
+    await expect(combo.locator(".sends-tag")).toHaveText("Hold");
+    // What it sends runs to a second line, as a custom key's shortcut does.
+    await combo.locator(".hc-sends").evaluate((sends) => {
+        const words = document.createElement("span");
+        words.className = "hc-life hc-runs";
+        words.textContent = "sends its shortcut, Left Ctrl + Left Option + Spacebar, and then some more words";
+        sends.append(words);
+    });
+    const at = await combo.evaluate((node) => {
+        const box = (el) => el.getBoundingClientRect();
+        const badge = box(node.querySelector(":scope > .mk-badge"));
+        const arrow = box(node.querySelector(".hc-sends > .hc-life"));
+        const name = box(node.querySelector(".hc-sends .sends-name"));
+        const sends = box(node.querySelector(".hc-sends"));
+        return {badge: badge.top + badge.height / 2, arrow: arrow.top + arrow.height / 2, name: name.top + name.height / 2, wraps: sends.height > 2 * arrow.height};
+    });
+    expect(at.wraps).toBe(true);
+    // The arrow keeps to the layer's name, not its icon's foot.
+    expect(Math.abs(at.arrow - at.name)).toBeLessThanOrEqual(1);
+    expect(Math.abs(at.badge - at.arrow)).toBeLessThanOrEqual(1);
+});
+
+// The editors that open Layers it runs on, and how each is reached; a
+// behaviour's editor opens Timings too.
+const PANEL_EDITORS = [
+    {where: "combo builder", screen: "keys", state: {tab: "combos"}, editor: ".combo-builder", opensWith: "New combo"},
+    {where: "Behaviours tab", screen: "keys", state: {tab: "behaviours"}, editor: ".beh-main", timings: true},
+    {where: "Custom keys", screen: "customKeys", state: {}, editor: ".custom-key-behaviour", timings: true},
+];
+/** @param {import("@playwright/test").Page} page @param {typeof PANEL_EDITORS[number]} row @param {string} [act] */
+async function openPanel(page, row, act = "definition-layers") {
+    await openControls(page, row.screen, row.state);
+    if (row.opensWith) await page.getByRole("button", {name: row.opensWith, exact: true}).click();
+    await page.locator(`${row.editor} [data-act="${act}"]:visible`).first().click();
+    return page.locator(`${row.editor} .def-pop:visible`).first();
+}
+/** @param {import("@playwright/test").Locator} panel */
+const panelEdges = (panel) => panel.evaluate(node => {
+    const box = node.getBoundingClientRect();
+    return {left: box.left, right: box.right, window: document.documentElement.clientWidth,
+        cut: [...node.querySelectorAll(".sw .txt")].filter(name => name.checkVisibility() && name.scrollWidth > name.clientWidth).map(name => name.textContent)};
+});
+
+test("Layers it runs on is one list on every editor: a layer to a row, one width, each name whole", async ({page}) => {
+    const panels = [];
+    for (const width of [1280, 1920]) for (const row of PANEL_EDITORS) {
+        await page.setViewportSize({width, height: 1000});
+        const panel = await openPanel(page, row);
+        const columns = await panel.evaluate(node => new Set([...node.querySelectorAll(".layer-grid .sw")].filter(sw => sw.checkVisibility())
+            .map(sw => Math.round(sw.getBoundingClientRect().left))).size);
+        const {left, right, cut} = await panelEdges(panel);
+        expect(columns, `${row.where} at ${width}`).toBe(1);
+        expect(cut, `${row.where} at ${width}`).toEqual([]);
+        panels.push([`${row.where} at ${width}`, Math.round(right - left)]);
+        // Names that fit the builder keep the panel inside it.
+        if (row.opensWith) {
+            const builder = await page.locator(row.editor).boundingBox();
+            expect(right, `inside the combo builder at ${width}`).toBeLessThanOrEqual(builder.x + builder.width);
+        }
+    }
+    expect(new Set(panels.map(([, panelWidth]) => panelWidth)).size, JSON.stringify(panels)).toBe(1);
+});
+
+test("a combo's Layers it runs on sits on the Use this combo row, kept to the builder's right edge, its panel opening from there", async ({page}) => {
+    for (const width of [1024, 1280, 1920]) {
+        await page.setViewportSize({width, height: 1000});
+        const row = PANEL_EDITORS[0];
+        const panel = await openPanel(page, row);
+        const at = await page.locator(row.editor).evaluate(builder => {
+            const middle = (/** @type {Element} */ node) => { const box = node.getBoundingClientRect(); return box.top + box.height / 2; };
+            const body = /** @type {HTMLElement} */ (builder.querySelector(".card-b"));
+            const inner = body.getBoundingClientRect().right - parseFloat(getComputedStyle(body).paddingRight);
+            const use = /** @type {Element} */ (builder.querySelector("[data-definition-enabled]")).closest(".sw");
+            const layers = /** @type {Element} */ (builder.querySelector('[data-act="definition-layers"]'));
+            return {use: middle(/** @type {Element} */ (use)), layers: middle(layers), right: layers.getBoundingClientRect().right, inner};
+        });
+        expect(Math.abs(at.use - at.layers), `one row at ${width}`).toBeLessThanOrEqual(1);
+        expect(Math.abs(at.right - at.inner), `right edge at ${width}`).toBeLessThanOrEqual(1);
+        const {right} = await panelEdges(panel);
+        expect(Math.abs(right - at.right), `panel from the button's right at ${width}`).toBeLessThanOrEqual(1);
+    }
+});
+
+test("in a font wider than the Mac's, a combo's Layers it runs on still sits on the Use this combo row at 1024", async ({page}) => {
+    await page.setViewportSize({width: 1024, height: 1000});
+    const row = PANEL_EDITORS[0];
+    await openControls(page, row.screen, row.state);
+    await wideFont(page);
+    await page.getByRole("button", {name: row.opensWith, exact: true}).click();
+    const at = await page.locator(row.editor).evaluate(builder => {
+        const middle = (/** @type {Element} */ node) => { const box = node.getBoundingClientRect(); return box.top + box.height / 2; };
+        return {use: middle(/** @type {Element} */ (/** @type {Element} */ (builder.querySelector("[data-definition-enabled]")).closest(".sw"))),
+            layers: middle(/** @type {Element} */ (builder.querySelector('[data-act="definition-layers"]')))};
+    });
+    expect(Math.abs(at.use - at.layers), "one row").toBeLessThanOrEqual(1);
+});
+
+test("Layers it runs on shows whole with its empty layers unfolded, never cut off by the workbench", async ({page}) => {
+    await page.setViewportSize({width: 1920, height: 1000});
+    for (const row of PANEL_EDITORS) {
+        const panel = await openPanel(page, row);
+        await panel.locator(".disclose").first().click();
+        // Nothing around the panel but the scrolling page clips it.
+        const clipped = await panel.evaluate(node => {
+            const bottom = node.getBoundingClientRect().bottom;
+            const content = node.closest(".content");
+            const clips = [];
+            for (let around = node.parentElement; around && around !== content; around = around.parentElement) {
+                const style = getComputedStyle(around);
+                if (style.overflowY !== "visible" && around.getBoundingClientRect().bottom < bottom) clips.push(around.className);
+            }
+            return clips;
+        });
+        expect(clipped, row.where).toEqual([]);
+    }
+});
+
+test("nothing in a workbench reaches past its edges, as nothing clips it", async ({page}) => {
+    for (const width of [1024, 1280, 1920]) for (const [screen, state] of [
+        ["keys", {tab: "key"}], ["keys", {tab: "behaviours"}], ["keys", {tab: "combos"}], ["keys", {tab: "macros"}],
+        ["keys", {tab: "customKeys"}], ["keys", {tab: "pointing"}], ["lighting", {}], ["lighting", {stage: "key"}]]) {
+        await page.setViewportSize({width, height: 1000});
+        await openControls(page, screen, state);
+        // What a scrolling pane or tab strip inside the workbench holds is
+        // clipped there, so only what sits outside one counts.
+        const outside = await page.locator(".bench").evaluateAll(benches => benches.flatMap(bench => {
+            const edge = bench.getBoundingClientRect();
+            const inPane = (/** @type {Element} */ node) => {
+                for (let around = node.parentElement; around && around !== bench; around = around.parentElement) {
+                    if (getComputedStyle(around).overflowX !== "visible") return true;
+                }
+                return false;
+            };
+            return [...bench.querySelectorAll("*")].filter(node => node.checkVisibility() && !node.closest(".bench-sizer") && !inPane(node))
+                .filter(node => {
+                    const box = node.getBoundingClientRect();
+                    return box.width && box.height && (box.left < edge.left - 1 || box.right > edge.right + 1 || box.top < edge.top - 1 || box.bottom > edge.bottom + 1);
+                }).map(node => `${node.tagName}.${node.className}`);
+        }));
+        expect(outside, `${screen} ${JSON.stringify(state)} at ${width}`).toEqual([]);
+    }
+});
+
+test("a panel a disclosure opens stays inside the window, however far right its button sits", async ({page}) => {
+    for (const width of [1024, 1280]) for (const row of PANEL_EDITORS) for (const act of ["definition-layers", ...row.timings ? ["behaviour-timings"] : []]) {
+        await page.setViewportSize({width, height: 1000});
+        const {left, right, window} = await panelEdges(await openPanel(page, row, act));
+        expect(left, `${row.where} ${act} at ${width}`).toBeGreaterThanOrEqual(0);
+        expect(right, `${row.where} ${act} at ${width}`).toBeLessThanOrEqual(window);
+    }
+});
+
+test("a panel stays inside the window when the window narrows under it, and with a layer's longest name", async ({page}) => {
+    const [, behaviours, customKeys] = PANEL_EDITORS;
+    await page.setViewportSize({width: 1920, height: 1000});
+    const panel = await openPanel(page, customKeys);
+    await page.setViewportSize({width: 1024, height: 1000});
+    await expect.poll(async () => { const {right, window} = await panelEdges(panel); return right <= window; }).toBe(true);
+    // A name of 32 characters, the most a layer's name holds, shows whole.
+    await openPanel(page, behaviours);
+    await page.evaluate(async () => {
+        const store = await import("/webview/store.mjs");
+        Object.assign(store.layers()[0], {name: "W".repeat(32), displayName: "W".repeat(32)});
+        store.render();
+    });
+    const named = page.locator(`${behaviours.editor} .def-pop:visible`).first();
+    const {left, right, window, cut} = await panelEdges(named);
+    await expect(named).toContainText("W".repeat(32));
+    expect(cut).toEqual([]);
+    expect(left).toBeGreaterThanOrEqual(0);
+    expect(right).toBeLessThanOrEqual(window);
 });

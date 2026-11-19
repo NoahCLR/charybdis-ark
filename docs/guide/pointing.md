@@ -5,7 +5,8 @@ Settings in the rail) is how it moves the pointer. **Pointing modes**, under
 Configure, make it do something else while a key is held or locked, or while
 a layer is on: scroll, or send arrows and shortcuts as it moves.
 
-Hover any label on Pointer settings for what it does.
+Each setting on Pointer settings says what it does in the line under its
+name; hovering one adds what that line leaves out, such as QMK's own name.
 
 ## Pointer settings
 
@@ -14,7 +15,7 @@ Hover any label on Pointer settings for what it does.
 - **Normal pointer DPI**: the everyday speed, 400 to 3400 DPI.
 - **Sniping DPI**: a slower speed for precise work, 100 to 400 DPI.
 - **Sniping keys**, under it, shows where the **Sniping (hold)** and
-  **Sniping toggle** keys are placed, with **Place on a key…** for each.
+  **Sniping toggle** keys are placed, with **Place on a key →** for each.
   Sniping is on while one of them is held or toggled, or one of the
   auto-sniping layers is on.
 
@@ -34,7 +35,13 @@ Sniping slows directional pointing modes too; scrolling modes ignore it.
 **Auto-mouse**
 
 - **Auto-mouse** turns the **Pointer layer** on when you move the ball. A
-  layer a pointing mode's link uses can't be the pointer layer.
+  layer a pointing mode's link uses can't be the pointer layer. A
+  [switch key](behaviours.md#switch-keys) on the keyboard can change it too:
+  **Auto-mouse Off** (`AM_OFF`) or **Toggle Auto-mouse** (`AM_TOGG`) turn it
+  off until the keyboard restarts, and **Auto-mouse On** (`AM_ON`) turns it
+  back on, but not when it's off here. The switch then stays on and is marked
+  **turned off by key**. Switching auto-mouse off turns off a pointer layer
+  the ball turned on; one you hold or lock stays.
 - **Timeout**: how long the layer stays on after the ball stops. The lighting
   fade keeps its share of it (see [Lighting](lighting.md#auto-mouse-fade)).
 - **Movement debounce**, **Delay after typing** and **Movement threshold**
@@ -45,27 +52,46 @@ Sniping slows directional pointing modes too; scrolling modes ignore it.
 There are 32 pointing slots. The screen works like Macros: the modes you have
 are listed on the left by name and slot number, with their colour. **+ New
 mode** opens the first empty slot, and **Show all 32 slots** shows the empty
-ones too. An empty slot in amber still has keys pointing at it.
+ones too. **Search by name** finds a mode by its name or slot number, through
+every slot. An empty slot in amber still has keys pointing at it.
+
+Drag a slot onto another to swap the two. A mode moves with everything that
+is its own: its settings, its link, its colour and accents on Lighting, and
+every key, behaviour and combo that started it still starts it, under its new
+number, as does a key you chose to place and have not yet placed; a combo you
+were building closes. From the keyboard, focus a slot and press Shift+Space to hold it, then
+Shift+Space on the other; Escape lets go. Review lists the swaps as one
+**Pointing mode order** change.
 
 Each slot has two keys: one that runs the mode while it is held, and one that
 locks it on until pressed again. The picker shows them as **Hold** and
-**Lock** under Pointing modes.
+**Lock** under Pointing modes. A lock key with a behaviour of its own still
+locks from an empty Tap.
 
 The mode's name is the editor's title: click it to rename, up to 32 bytes
-(an accented letter takes two). **Place on a key…** beside it puts the
+(an accented letter takes two). The tag beside it names the slot, such as
+**Pointing mode 0**, which is also what the mode is called until you name it. **Place on a key →** beside it puts the
 mode's hold key on a key you pick on the board. **Duplicate** copies the mode
 into the first empty slot, and **Clear mode** empties the slot.
 
-The editor runs in four steps, top to bottom.
+Under the title, chips name the layers that start the mode and how: a key, a
+behaviour, a combo, or the layer itself when the mode is linked to it
+(**starts it**). Click one to see it on the Keymap screen's **Pointing modes**
+tab. An empty slot shows the keys still bound to it, which do nothing until it
+holds a mode.
+
+The editor runs in four steps, top to bottom. The ⓘ beside a step's title
+says what each of its choices does; a click keeps it open.
 
 ### Starting a mode
 
-An empty slot asks what the trackball should do: **Scroll** or **Send keys**.
-Pick one and the slot holds a new mode that moves that way. Or pick a mode
+An empty slot shows the editor's first step, **What the ball does**: **Scroll**
+or **Send keys**. Pick one and the slot holds a new mode that moves that way,
+with the rest of the steps below. Or pick a mode
 you already have under **Or copy a mode** and choose **Copy into this slot**.
 
 A key can point at an empty slot. It just does nothing until the slot holds a
-mode, and its key on the board reads by the slot's number, such as **Slot 6 ·
+mode, and its key on the board reads by the slot's number, such as **Pointing mode 6 ·
 hold (empty)**. So you can lay out the keys first and fill in the modes later,
 and clearing a slot doesn't break the keys that use it.
 
@@ -118,8 +144,8 @@ For a scrolling mode:
 
 ### 3. What starts it
 
-**Its keys** shows the mode's hold and lock keys, by the mode's name, and
-where they sit on the board.
+**Its keys** shows the mode's hold and lock keys, by the mode's name. Where
+they sit is in the chips under the title.
 
 Then the layers. A layer the mode is linked to lends it its keys, whatever
 they are: clicks, modifiers, layer keys, behaviours. This is where a mode gets
@@ -168,7 +194,7 @@ While a mode runs, however it started, its colour paints beneath the lowest
 layer in either list that is on: those layers' own colours show over it, so
 a layer coloured to light only its mapped keys shows those keys on the mode's
 colour, and any higher layer covers both. To show only the layer, colour it
-on all keys. With none of them on, or with no link, a mode paints over the
+on all LEDs. With none of them on, or with no link, a mode paints over the
 layers as before.
 
 When the mode's key turns on a layer below the pointer layer and the mode
@@ -206,13 +232,14 @@ that start it, since a layer starts only one mode; set those on the copy.
 **Advanced** holds the finer settings and stays open as you move between
 slots:
 
-- **Distance**: how far the ball moves before a direction sends, shown in millimetres at
-  the mode's DPI. With **Every step**, one key per this distance; with **Once
-  per movement**, how far it must go before the key is sent at all.
+- **Distance**: how far the ball moves before a direction sends, shown under
+  each field in millimetres at the mode's DPI. Its ⓘ says what the distance
+  is: with **Every step**, one key per this distance; with **Once per
+  movement**, how far it must go before the key is sent at all.
 - **Held modifiers**: what each direction does when you are already holding
   modifiers. **Inherit modifiers** adds them, **Ignore** leaves out the ones
   you pick, and **Exact shortcut** sends only its own. A macro always inherits.
-- **Scroll tuning** for scrolling modes. Hover a setting for what it does:
+- **Scroll tuning** for scrolling modes. Its ⓘ says what each setting does:
   - **Horizontal** and **Vertical activation threshold**: how far the ball
     must move on an axis before a scroll can use it. When both axes are below
     their thresholds, the scroll lets go of its axis.

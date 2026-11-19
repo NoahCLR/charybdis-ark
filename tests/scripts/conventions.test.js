@@ -36,17 +36,17 @@ const STYLESHEET_ALLOWED = [
 ];
 const stylesheetLiterals = (css) => {
     const found = [];
-    const derived = (part) => /^(0|50%|inherit|var\(--[\w-]+\))$/.test(part) || /^calc\(.*var\(--[\w-]+\)/.test(part);
+    const derived = (part) => /^(0|50%|auto|inherit|var\(--[\w-]+(,\s*0(px)?)?\))$/.test(part) || /^(calc|max|min)\(.*var\(--[\w-]+\)/.test(part);
     for (const [, selectorText, body] of css.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
         const selector = selectorText.trim().replace(/\s+/g, " ");
         if (selector.startsWith(":root")) continue;
         for (const [, property, raw] of body.matchAll(/(?:^|;)\s*([\w-]+)\s*:\s*([^;]+)/g)) {
             const value = raw.trim();
             if (STYLESHEET_ALLOWED.some(allowed => allowed.selector.test(selector) && allowed.property.test(property))) continue;
-            const parts = value.match(/calc\([^()]*(?:\([^()]*\)[^()]*)*\)|var\([^()]*\)|[^\s]+/g) || [];
+            const parts = value.match(/(?:calc|max|min)\([^()]*(?:\([^()]*\)[^()]*)*\)|var\([^()]*\)|[^\s]+/g) || [];
             const literal = property === "font"
                 ? value !== "inherit" && /\d/.test(value.replace(/var\([^()]*\)/g, "").replace(/\/\S+/, ""))
-                : /^(font-size|font-weight|z-index|border(-[a-z]+)*-radius)$/.test(property) ? !parts.every(derived)
+                : /^(font-size|font-weight|z-index|border(-[a-z]+)*-radius|padding(-[a-z]+)*|margin(-[a-z]+)*|(row-|column-)?gap)$/.test(property) ? !parts.every(derived)
                 : /#[\da-f]{3,8}\b|\b(rgb|hsl)a?\(/i.test(value);
             if (literal) found.push(`${selector} { ${property}: ${value} }`);
         }
@@ -54,15 +54,18 @@ const stylesheetLiterals = (css) => {
     return found;
 };
 
-test("the stylesheet writes no raw size, weight, radius, layer or colour outside its tokens", () => {
+test("the stylesheet writes no raw size, weight, radius, layer, spacing or colour outside its tokens", () => {
     assert.deepEqual(stylesheetLiterals(read("webview/styles.css")), []);
     // The check sees what it is meant to.
     assert.deepEqual(stylesheetLiterals(`:root { --fs-md: 12.5px; --x: #fff; }
         .a { font-size: 12px; border-radius: 0 6px; z-index: 3; font: 600 11px/1 var(--sans); color: rgba(0,0,0,.5); }
         .b { font-size: var(--fs-md); border-radius: calc(var(--r-sheet) - 1px) 0; z-index: calc(var(--z-popover) + 1); font: var(--fs-md)/22px var(--mono); }
-        .kc-badge { font-size: 9px; }`), [
+        .kc-badge { font-size: 9px; }
+        .c { padding: 6px 8px; margin-left: -3px; gap: 4px 12px; }
+        .d { padding: 0 auto var(--sp-2); margin: calc(-1 * var(--sp-1)); gap: var(--sp-1) var(--sp-3); padding-top: max(var(--sp-8), env(safe-area-inset-top)); }`), [
         ".a { font-size: 12px }", ".a { border-radius: 0 6px }", ".a { z-index: 3 }",
         ".a { font: 600 11px/1 var(--sans) }", ".a { color: rgba(0,0,0,.5) }",
+        ".c { padding: 6px 8px }", ".c { margin-left: -3px }", ".c { gap: 4px 12px }",
     ]);
 });
 
@@ -195,8 +198,14 @@ test("semantic domain lookups do not use a position's stored keycode name", () =
     assert.deepEqual(violations, []);
 });
 
-test("the page's backup chooser holds a file to the backup's byte limit", () => {
-    assert.match(read("web/web-shell.mjs"), /file\.size > FILE_MAX_BYTES\b/);
+// A chosen file is held to its kind's byte limit: a backup's unless the
+// chooser was opened for an autocorrect list, which has its own.
+test("the page's chooser holds a file to its kind's byte limit, a backup's by default", () => {
+    const shell = read("web/web-shell.mjs");
+    assert.match(shell, /const BACKUP_FILE = Object\.freeze\(\{[^}]*\bmax: FILE_MAX_BYTES\b/);
+    assert.match(shell, /const LIST_FILE = Object\.freeze\(\{[^}]*\bmax: LIST_FILE_MAX_BYTES\b/);
+    assert.match(shell, /readProfileFile\(file, kind = BACKUP_FILE\)/);
+    assert.match(shell, /file\.size > kind\.max\b/);
 });
 
 // Source with its comments blanked, so a rule can match across lines while
@@ -265,6 +274,7 @@ const EDITOR_RUNNERS = {
     editMacro: ["core/model/macro-editor.js", "core/model/draft-editor.js"],
     editCustomKey: ["core/model/custom-key-editor.js", "core/model/draft-editor.js"],
     editKeyboardName: ["core/model/keyboard-name.js", "core/model/draft-editor.js"],
+    editSlots: ["core/model/slot-editor.js", "core/model/draft-editor.js"],
     PROFILE_EDITS: ["core/model/device-profile-edits.js", "core/model/draft-editor.js"],
     editKeyBehaviors: ["core/model/key-behavior-edits.js", "core/model/device-profile-edits.js", "tests/model/key-behavior-edits.test.js"],
 };
@@ -374,7 +384,7 @@ test("the posting check catches an object assembled inline", () => {
     }
     for (const sample of ["post(edits.setKey(layer.name, index, keycode));", "post(controls.control(\"refresh\"));",
         "if (message) post(message);", "post(leave.message);", "postLeavingDemo(chooseKeyboard());",
-        "post(edits.keyFeedback(feedback, null, null, {locality: value}));", "post(live ? controls.saveDraft(true) : controls.applyDraft(true));",
+        "post(edits.keyFeedback(feedback, null, null, {tapCommitMode: value}));", "post(live ? controls.saveDraft(true) : controls.applyDraft(true));",
         "post(edits.settingsSection(section, (field) => { return field.macro === \"x\"; }));", "post(controls.control(\"{\"));"]) {
         assert.deepEqual(postsInlineObjects(sample), [], sample);
     }
@@ -418,8 +428,8 @@ const KEY_TABLE_ALLOWED = [
     // of the whole table, which reads no spelling.
     {file: "webview/ui/marks.mjs", line: "const keycodes = marker?.kind === \"layer\" ? Object.entries(model?.qmkKeyLayers || {}).flatMap(([keycode, layer]) => layer === marker.layer ? [keycode] : [])"},
     // Whether the host layout prints legends of its own at all, to explain
-    // them under the board: the table's presence, which reads no key.
-    {file: "webview/ui/picker.mjs", line: "${model?.hostLayoutLegends ? `<p class=\"note pk-note\">Shift above; ${esc(vocabulary(model).thirdLevel)} on the right. ◌ marks a dead key: press it, then a letter.</p>` : \"\"}"},
+    // them in the picker's info mark: the table's presence, which reads no key.
+    {file: "webview/ui/picker.mjs", line: "const rows = section.kind === \"board\" && model?.hostLayoutLegends"},
 ];
 
 test("the key table check catches a keycode-keyed table read outside the key identity", () => {
@@ -502,10 +512,8 @@ const LAYER_LITERAL_ALLOWED = [
     // The interface's copies, pinned by tests/view/enum-drift.test.mjs.
     {file: "webview/view/layout.mjs", line: "export const LAYERS = 16, ALL_LAYERS = 2 ** LAYERS - 1;"},
     {file: "webview/view/keycode-expression.mjs", line: "export const LAYER_LOCK_BASE = 0x7ec0, LAYER_LOCK_SLOTS = 16;"},
-    // 16-bit fields that hold no layers: a transaction's sequence number and
-    // the firmware version's major part.
+    // A 16-bit field that holds no layers: a transaction's sequence number.
     {file: "core/session/candidate-upload-coordinator.js", line: "const sequence = (baseline.operationSequence + admitted) & 0xffff;"},
-    {file: "core/session/firmware-support.js", line: "version: known ? `${(/** @type {number} */ (version) >>> 16) & 0xffff}.${(/** @type {number} */ (version) >>> 8) & 0xff}.${/** @type {number} */ (version) & 0xff}` : null,"},
 ];
 
 test("the layer check catches a layer count or mask written as a number", () => {
@@ -610,4 +618,39 @@ test("the interface keeps no table of words of its own", () => {
     assert.deepEqual(violations, [], "put the words in core/model/vocabulary.js and read them from model.vocabulary");
     const found = new Set(sources("webview").map(posix).flatMap(file => wordTables(read(file)).map(name => `${file}#${name}`)));
     assert.deepEqual([...WORD_TABLES_ALLOWED].filter(table => !found.has(table)), [], "drop an allowed table the check no longer finds");
+});
+
+// A tip is one thing wherever it opens: a data-tip, shown by
+// webview/ui/hover.mjs at the pointer (D-L80), in one face at one delay. A
+// title attribute is the browser's own tip, opening where and when the browser
+// decides, so no interface module writes one, and no module but hover.mjs
+// makes a tip of its own.
+const tipOfItsOwn = [
+    /\stitle=["'`]/g,
+    /\.title\s*=[^=]/g,
+    /\b(?:setAttribute|dataset)\s*\(\s*["'`]title["'`]/g,
+    /\brole\s*=\s*["'`]tooltip["'`]/g,
+    /\bclass\s*=\s*["'`]tip["'`]/g,
+];
+const makesTipOfItsOwn = source => {
+    const code = uncommented(source);
+    return [...new Set(tipOfItsOwn.flatMap(pattern => Array.from(code.matchAll(pattern), match => lineAt(code, match.index))))];
+};
+
+test("the tip check catches a module making a tip of its own", () => {
+    for (const sample of ["`<span class=\"name\" title=\"${esc(copy.name)}\">`", "`<a href=\"${url}\" title='The commit'>`",
+        "node.title = words;", "button.setAttribute(\"title\", words);", "`<div role=\"tooltip\"></div>`", "`<div class=\"tip\" hidden></div>`"]) {
+        assert.equal(makesTipOfItsOwn(sample).length, 1, sample);
+    }
+    for (const sample of ["`<span data-tip=\"${esc(copy.name)}\">`", "const title = check.title;", "function groupHeader({id, title = \"\", tip = \"\"}) {", "if (a.title === b.title) return;",
+        "`<h3>${esc(section.title)}</h3>`", "// a title= attribute is the browser's tip", "Object.freeze({title: \"Ark needs Chrome or Edge\"})",
+        "`<div class=\"tips\">`", "`<div class=\"hc-tip\">`"]) {
+        assert.deepEqual(makesTipOfItsOwn(sample), [], sample);
+    }
+});
+
+test("every tip is a data-tip shown by hover.mjs, never the browser's title", () => {
+    const violations = ["webview", "web"].flatMap(sources).filter(file => file !== path.join("webview", "ui", "hover.mjs"))
+        .flatMap(file => makesTipOfItsOwn(read(file)).map(line => `${file}:${line}`));
+    assert.deepEqual(violations, [], "give the control a data-tip; webview/ui/hover.mjs shows it at the pointer");
 });

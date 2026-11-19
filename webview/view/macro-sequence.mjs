@@ -1,8 +1,10 @@
 // @ts-check
 // Reading, diagnosing and moving the editor's sequence without changing its
 // encoding. Focus IDs belong to the editor; moves preserve every step object.
-import {describeStep} from "./macro.mjs";
+import {describeStep, ordinaryKey} from "./macro.mjs";
 import {keyIdentity} from "./key-identity.mjs";
+import {vocabulary} from "./vocabulary.mjs";
+import {macroProblemWords, overfillsReport} from "../../rules/macro-payload.mjs";
 /** @typedef {import('./types.js').MacroStep} Step */
 /** @typedef {Partial<import('../../contracts/panel.js').PublishedModel> | null} Model */
 
@@ -21,16 +23,22 @@ export function sequenceIssues(steps, model, label = key => key) {
     const issues = steps.map(() => "");
     /** @type {Map<string, {index: number, key: string}>} */
     const held = new Map();
+    // The report's six key slots (firmware D-F65): known only once the model
+    // names the modifiers, as the step editor's reading is.
+    const ordinary = ordinaryKey(model?.macroPayloadModifierKeycodes);
+    const full = macroProblemWords({code: "reportFull"}, vocabulary(model).macroProblems);
     steps.forEach((step, index) => {
+        const ids = "keys" in step ? step.keys.map(key => keyIdentity(model, key).name) : [];
+        if (overfillsReport(held.keys(), {...step, ids}, ordinary)) issues[index] ||= full;
         if (!("keys" in step)) return;
-        for (const key of step.keys) {
-            const id = keyIdentity(model, key).name;
+        step.keys.forEach((key, at) => {
+            const id = ids[at];
             if (step.kind === "release") {
                 if (!held.delete(id)) issues[index] ||= `${label(key)} is released before it is pressed. Move its release after its press.`;
             } else if (held.has(id)) {
                 issues[index] ||= `${label(key)} is already held. Release it before pressing or tapping it again.`;
             } else if (step.kind === "press") held.set(id, {index, key});
-        }
+        });
     });
     for (const {index, key} of held.values()) issues[index] ||= `Release ${label(key)} before the macro ends.`;
     return issues;

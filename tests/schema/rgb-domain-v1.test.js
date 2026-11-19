@@ -56,7 +56,7 @@ function assertCode(code, callback) {
 
 function remapGroupIds(profile, mapping) {
     for (const group of profile.groups) group.id = mapping[group.id];
-    for (const table of [profile.layerGroupRows, profile.pdModeGroupRows, profile.comboGroupRows, profile.keyGroupRows]) {
+    for (const table of [profile.layerGroupRows, profile.pdModeGroupRows, profile.comboGroupRows, profile.keyGroupRows, profile.autocorrectGroupRows]) {
         for (const row of table) row.groupId = mapping[row.groupId];
     }
 }
@@ -67,14 +67,14 @@ test("representative RGB payload and whole-profile blob match the shared C/JavaS
     assert.equal(payload.toString("hex"), golden.payloadHex);
     assert.deepEqual(decodeRgbDomainV1(payload, golden.codecOptions), golden.profile);
 
-    const blob = encodeProfileBlob({schema: {major: 4, minor: 3}, domains: [createRgbDomainV1(golden.profile, golden.codecOptions)]});
+    const blob = encodeProfileBlob({schema: {major: 4, minor: 8}, domains: [createRgbDomainV1(golden.profile, golden.codecOptions)]});
     assert.equal(blob.toString("hex"), golden.blobHex);
     assert.equal(fnv1a32(blob), Number.parseInt(golden.fnv1a32, 16));
     assert.equal(crc32(blob), Number.parseInt(golden.crc32, 16));
     const decoded = decodeProfileBlob(blob);
     assert.equal(decoded.domains.length, 1);
     assert.equal(decoded.domains[0].id, PROFILE_DOMAIN_IDS.RGB);
-    assert.equal(decoded.domains[0].version, 4);
+    assert.equal(decoded.domains[0].version, 7);
     assert.deepEqual(decodeRgbDomainV1(decoded.domains[0].payload, golden.codecOptions), golden.profile);
 });
 
@@ -97,14 +97,19 @@ test("identity tables canonicalize while renderer row order stays authored", () 
 test("decoder rejects noncanonical headers, geometry, dictionary order, and bitmap bits", () => {
     const golden = fixture();
     const valid = encodeRgbDomainV1(golden.profile, golden.codecOptions);
-    for (const offset of [1, 14, 15]) {
+    // Byte 14 counts the replacement feedback rows (format 5); 1 and 15 stay reserved.
+    for (const offset of [1, 15]) {
         const reserved = Buffer.from(valid);
         reserved[offset] = 1;
         assertCode("RESERVED_BITS", () => decodeRgbDomainV1(reserved, golden.codecOptions));
     }
     const stageBit = Buffer.from(valid);
-    stageBit[2] |= 0x20;
+    stageBit[2] |= 0x40;
     assertCode("RESERVED_BITS", () => decodeRgbDomainV1(stageBit, golden.codecOptions));
+    // Bit 5 is replacement feedback, which this build does not compile.
+    const uncompiledStage = Buffer.from(valid);
+    uncompiledStage[2] |= 0x20;
+    assertCode("UNSUPPORTED_STAGE", () => decodeRgbDomainV1(uncompiledStage, golden.codecOptions));
     for (const [offset, value] of [[12, 57], [13, 7]]) {
         const geometry = Buffer.from(valid);
         geometry[offset] = value;
@@ -155,7 +160,7 @@ test("complete RGB surfaces and negotiated feature inclusion are enforced", () =
     missingPdMode.pdModeColors.pop();
     assertCode("INCOMPLETE_SURFACE", () => encodeRgbDomainV1(missingPdMode, golden.codecOptions));
     const missingTapColor = clone(golden.profile);
-    missingTapColor.keyFeedback.tapBranchColors.pop();
+    missingTapColor.keyFeedback.tapBranches.pop();
     assertCode("INCOMPLETE_SURFACE", () => encodeRgbDomainV1(missingTapColor, golden.codecOptions));
 
     const unsupportedEnable = clone(golden.profile);
@@ -178,14 +183,19 @@ test("complete RGB surfaces and negotiated feature inclusion are enforced", () =
     layerOnly.comboFeedback = {color: {h: 0, s: 0, v: 0}, locality: 0};
     layerOnly.comboGroupRows = [];
     layerOnly.keyFeedback = {
-        tapBranchColors: [],
+        tapBranches: [],
         tapCommittedColor: {h: 0, s: 0, v: 0},
+        tapCommittedLocality: 0,
         holdActiveColor: {h: 0, s: 0, v: 0},
+        holdActiveLocality: 0,
         longHoldActiveColor: {h: 0, s: 0, v: 0},
+        longHoldActiveLocality: 0,
         tapCommitMode: 0,
-        locality: 0,
     };
     layerOnly.keyGroupRows = [];
+    layerOnly.autocorrectFeedback = {textColor: {h: 0, s: 0, v: 0}, textLocality: 0, macroColor: {h: 0, s: 0, v: 0}, macroLocality: 0,
+        undoColor: {h: 0, s: 0, v: 0}, undoLocality: 0, leadingColor: {h: 0, s: 0, v: 0}, leadingLocality: 0};
+    layerOnly.autocorrectGroupRows = [];
     const layerOptions = {...golden.codecOptions, compiledStageMask: RGB_STAGE_BITS.LAYER};
     assert.deepEqual(decodeRgbDomainV1(encodeRgbDomainV1(layerOnly, layerOptions), layerOptions), layerOnly);
 });
@@ -193,25 +203,46 @@ test("complete RGB surfaces and negotiated feature inclusion are enforced", () =
 test("fixed v1 group, row, tap-color, LED, and payload boundaries are enforced", () => {
     const golden = fixture();
     const maximum = clone(golden.profile);
-    maximum.groups = Array.from({length: RGB_DOMAIN_V1.MAX_GROUPS}, (_, id) => ({id, leds: id === 0 ? Array.from({length: 58}, (unused, led) => led) : [id - 1]}));
-    maximum.layerGroupRows = Array.from({length: RGB_DOMAIN_V1.MAX_STAGE_GROUP_ROWS}, () => ({selector: 255, color: {h: 0, s: 0, v: 0}, groupId: 0}));
-    maximum.pdModeGroupRows = [];
+    // Firmware D-F63: 128 LED sets, 255 rows in one table, 640 in all.
+    const ledsOf = (/** @type {number} */ id) => Array.from({length: 7}, (unused, led) => led).filter((led) => (id >> led) & 1);
+    maximum.groups = Array.from({length: RGB_DOMAIN_V1.MAX_GROUPS}, (_, id) => ({id, leds: id === 0 ? Array.from({length: 58}, (unused, led) => led) : ledsOf(id)}));
+    const rows = (/** @type {number} */ length) => Array.from({length}, (unused, row) => ({selector: 255, color: {h: 0, s: 0, v: 0}, groupId: row % RGB_DOMAIN_V1.MAX_GROUPS}));
+    const keyRows = (/** @type {number} */ length) => Array.from({length}, (unused, row) => ({semantic: 255, color: {h: 0, s: 0, v: 0}, groupId: row % RGB_DOMAIN_V1.MAX_GROUPS}));
+    const rest = RGB_DOMAIN_V1.MAX_STAGE_GROUP_ROWS - 2 * RGB_DOMAIN_V1.MAX_TABLE_GROUP_ROWS;
+    maximum.layerGroupRows = rows(RGB_DOMAIN_V1.MAX_TABLE_GROUP_ROWS);
+    maximum.pdModeGroupRows = rows(RGB_DOMAIN_V1.MAX_TABLE_GROUP_ROWS);
     maximum.comboGroupRows = [];
-    maximum.keyGroupRows = [];
+    maximum.keyGroupRows = keyRows(rest);
     const maximumBytes = encodeRgbDomainV1(maximum, golden.codecOptions);
     const maximumDecoded = decodeRgbDomainV1(maximumBytes, golden.codecOptions);
     assert.equal(maximumDecoded.groups.length, RGB_DOMAIN_V1.MAX_GROUPS);
-    assert.equal(maximumDecoded.layerGroupRows.length, RGB_DOMAIN_V1.MAX_STAGE_GROUP_ROWS);
+    assert.equal(maximumDecoded.layerGroupRows.length, RGB_DOMAIN_V1.MAX_TABLE_GROUP_ROWS);
+    assert.equal(maximumDecoded.layerGroupRows.length + maximumDecoded.pdModeGroupRows.length + maximumDecoded.keyGroupRows.length, RGB_DOMAIN_V1.MAX_STAGE_GROUP_ROWS);
     assert.deepEqual(maximumDecoded.groups.find((group) => group.leds.length === 58).leds, Array.from({length: 58}, (unused, led) => led));
 
     const tooManyGroups = clone(golden.profile);
     tooManyGroups.groups = Array.from({length: RGB_DOMAIN_V1.MAX_GROUPS + 1}, (_, id) => ({id, leds: [id]}));
     assertCode("CAPACITY_EXCEEDED", () => encodeRgbDomainV1(tooManyGroups, golden.codecOptions));
-    const tooManyRows = clone(golden.profile);
-    tooManyRows.layerGroupRows = Array.from({length: RGB_DOMAIN_V1.MAX_STAGE_GROUP_ROWS + 1}, () => ({selector: 255, color: {h: 0, s: 0, v: 0}, groupId: 0}));
-    assertCode("CAPACITY_EXCEEDED", () => encodeRgbDomainV1(tooManyRows, golden.codecOptions));
+    const tooManyInTable = clone(maximum);
+    tooManyInTable.layerGroupRows = rows(RGB_DOMAIN_V1.MAX_TABLE_GROUP_ROWS + 1);
+    tooManyInTable.keyGroupRows = [];
+    assert.throws(() => encodeRgbDomainV1(tooManyInTable, golden.codecOptions), (error) => error.code === "CAPACITY_EXCEEDED" && error.limit === "lightingTableGroupRows" && error.most === RGB_DOMAIN_V1.MAX_TABLE_GROUP_ROWS);
+    const tooManyRows = clone(maximum);
+    tooManyRows.keyGroupRows = keyRows(rest + 1);
+    assert.throws(() => encodeRgbDomainV1(tooManyRows, golden.codecOptions), (error) => error.code === "CAPACITY_EXCEEDED" && error.limit === "lightingGroupRows" && error.most === RGB_DOMAIN_V1.MAX_STAGE_GROUP_ROWS);
+    // A keyboard that reports smaller ceilings (firmware before D-F63) holds
+    // a profile to them.
+    const olderKeyboard = {...golden.codecOptions, maxGroups: 16, maxTableGroupRows: 32, maxGroupRows: 32};
+    assert.throws(() => encodeRgbDomainV1(maximum, olderKeyboard), (error) => error.code === "CAPACITY_EXCEEDED" && error.limit === "lightingGroups" && error.most === 16);
+    const olderRows = clone(maximum);
+    olderRows.groups = maximum.groups.slice(0, 16);
+    olderRows.layerGroupRows = rows(20).map((row) => ({...row, groupId: row.groupId % 16}));
+    olderRows.pdModeGroupRows = rows(13).map((row) => ({...row, groupId: row.groupId % 16}));
+    olderRows.keyGroupRows = [];
+    assert.throws(() => encodeRgbDomainV1(olderRows, olderKeyboard), (error) => error.code === "CAPACITY_EXCEEDED" && error.limit === "lightingGroupRows" && error.most === 32);
+    assert.throws(() => encodeRgbDomainV1(maximum, {...golden.codecOptions, maxGroupRows: 641}), RangeError);
     const tooManyTapColors = clone(golden.profile);
-    tooManyTapColors.keyFeedback.tapBranchColors.push({h: 0, s: 0, v: 0});
+    tooManyTapColors.keyFeedback.tapBranches.push({color: {h: 0, s: 0, v: 0}, locality: 0});
     assertCode("CAPACITY_EXCEEDED", () => encodeRgbDomainV1(tooManyTapColors, golden.codecOptions));
     const badLed = clone(golden.profile);
     badLed.groups[0].leds = [58];
@@ -228,11 +259,17 @@ test("decoder rejects header count overflow, truncation, and trailing bytes", ()
     groupOverflow[4] = RGB_DOMAIN_V1.MAX_GROUPS + 1;
     assertCode("CAPACITY_EXCEEDED", () => decodeRgbDomainV1(groupOverflow, golden.codecOptions));
     const rowOverflow = Buffer.from(valid);
-    rowOverflow[6] = RGB_DOMAIN_V1.MAX_STAGE_GROUP_ROWS;
-    rowOverflow[8] = 1;
-    rowOverflow[9] = 0;
+    rowOverflow[6] = RGB_DOMAIN_V1.MAX_TABLE_GROUP_ROWS;
+    rowOverflow[8] = RGB_DOMAIN_V1.MAX_TABLE_GROUP_ROWS;
+    rowOverflow[9] = RGB_DOMAIN_V1.MAX_STAGE_GROUP_ROWS + 1 - 2 * RGB_DOMAIN_V1.MAX_TABLE_GROUP_ROWS;
     rowOverflow[11] = 0;
     assertCode("CAPACITY_EXCEEDED", () => decodeRgbDomainV1(rowOverflow, golden.codecOptions));
+    const olderOverflow = Buffer.from(valid);
+    olderOverflow[6] = 33;
+    olderOverflow[8] = 0;
+    olderOverflow[9] = 0;
+    olderOverflow[11] = 0;
+    assertCode("CAPACITY_EXCEEDED", () => decodeRgbDomainV1(olderOverflow, {...golden.codecOptions, maxGroupRows: 32}));
     assertCode("TRUNCATED", () => decodeRgbDomainV1(valid.subarray(0, valid.length - 1), golden.codecOptions));
     assertCode("TRAILING_BYTES", () => decodeRgbDomainV1(Buffer.concat([valid, Buffer.from([0])]), golden.codecOptions));
     assertCode("TRUNCATED", () => decodeRgbDomainV1(Buffer.alloc(RGB_DOMAIN_V1.HEADER_SIZE - 1), golden.codecOptions));

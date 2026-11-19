@@ -2,27 +2,30 @@
 // The layer tabs, and the swatch a layer shows its colour with.
 
 // Selector assertions refer to elements created by this module's authored markup.
-import {css, isOff, label as hsvLabel} from "../lib/colour.mjs";
+import {css, label as hsvLabel} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {scrollMotion} from "../lib/scroll.mjs";
 import {currentView, getModel, render, showLayer, state, toggleLayerOn} from "../store.mjs";
 import {layerCalled} from "../view/vocabulary.mjs";
-import {layerColourRow, stageEnabled} from "../view/lighting.mjs";
+import {isPassthrough, layerColourRow, stageEnabled, swatchFor} from "../view/lighting.mjs";
 import {draftMarks} from "../view/review.mjs";
+import {editWords} from "../view/edit-mode.mjs";
 import {modifierKey} from "../view/shortcuts.mjs";
 import {foldEmptyLayers} from "../view/empty-layers.mjs";
 import {emptyLayersButton, emptyLayersShown} from "./empty-layers.mjs";
 import {rovingTabs} from "../lib/tabs.mjs";
 
 // A layer's swatch and how it is lit, the same wherever its colour is shown,
-// and the colour its mark wears (ui/marks.mjs): a layer whose colour is off, or
-// whose stage is off, shows as unlit.
+// and the colour its mark wears (ui/marks.mjs): a layer whose stage is off,
+// or that was never read, shows as unlit; one that is passthrough is hatched
+// where its stage is on (view/lighting.mjs swatchFor). An off colour is
+// drawn as the black it stores.
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {Pick<import("../../contracts/panel.js").Layer, "index"> & Partial<import("../../contracts/panel.js").Layer>} layer @param {string} [className] */
 export function layerSwatch(model, layer, className = "") {
     const row = layerColourRow(model, layer.index);
-    const lit = stageEnabled(model, "layers") && row && !isOff(row.color);
+    const lit = stageEnabled(model, "layers") && row && !isPassthrough(row.color);
     return {
-        html: `<span class="${className ? `${esc(className)} ` : ""}swatch ${lit ? "" : "swatch-off"}" style="${lit ? `background:${css(row.color)}` : ""}"></span>`,
+        html: `<span class="${className ? `${esc(className)} ` : ""}swatch ${swatchFor(lit ? "lit" : stageEnabled(model, "layers") && row ? "passthrough" : "unlit")}" style="${lit ? `background:${css(row.color)}` : ""}"></span>`,
         tip: `${layerCalled(layer)} · ${lit ? hsvLabel(row.color) : "no layer colour"}`,
         colour: lit ? css(row.color) : null,
     };
@@ -61,9 +64,11 @@ export function layerBar(trailing = "") {
             : ` · ${ADD_KEY}-click to preview with the layers on`;
         // A layer on under the top one is tinted with its own light, so the
         // set reads at a glance without being mistaken for the picked tab.
-        const tint = on && swatch.colour ? ` style="--tab-tint:${swatch.colour}"` : "";
-        return `<button class="layer-tab${on ? " on" : ""}"${tint} role="tab" id="layer-tab-${esc(index)}" data-layer="${esc(index)}" aria-selected="${state.layer === index}"
-            data-tip="${esc(swatch.tip)}${drafted.has(layer.index) ? " · changed in your draft" : ""}${esc(how)}">${swatch.html}
+        // Every lit tab carries its light, which it glows with while a
+        // dragged key is held over it (ui/board-drag.mjs).
+        const light = swatch.colour ? ` style="--tab-light:${swatch.colour}${on ? `;--tab-tint:${swatch.colour}` : ""}"` : "";
+        return `<button class="layer-tab${on ? " on" : ""}"${light} role="tab" id="layer-tab-${esc(index)}" data-layer="${esc(index)}" aria-selected="${state.layer === index}"
+            data-tip="${esc(swatch.tip)}${drafted.has(layer.index) ? ` · ${esc(editWords(model?.draft).after)}` : ""}${esc(how)}">${swatch.html}
             <span>${esc(layerCalled(layer))}</span>${layerCalled(layer) === layer.name ? "" : `<span class="idx">${esc(layer.index)}</span>`}${drafted.has(layer.index) ? '<i class="draft-dot"></i>' : ""}</button>`;
     }).join("");
     const node = el(`<div class="layerbar-wrap"><div class="layer-tabs" id="layer-tabs" role="tablist" aria-label="Layers">${tabs}${trailing}</div></div>`);

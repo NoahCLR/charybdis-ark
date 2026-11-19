@@ -3,7 +3,8 @@ import {keyFace} from "./keyface.mjs";
 import {keyIdentity} from "./key-identity.mjs";
 import {downTheStack} from "./layer-resolution.mjs";
 import {comboJoins} from "./participation.mjs";
-import {layerCalled, listed} from "./vocabulary.mjs";
+import {phrasesListed} from "./vocabulary.mjs";
+/** @typedef {import("./vocabulary.mjs").Phrase} Phrase */
 import {comboInputIsKey as inputIsKey, comboKeysAmong, comboTouches, inputOn, inputPressed} from "../../rules/combo-inputs.mjs";
 /** @typedef {import("../../contracts/panel.js").ComboView} ComboView */
 /** @typedef {import("../../contracts/panel.js").Layer} Layer */
@@ -108,12 +109,13 @@ function comboUses(view, combo, keys) {
     const chord = covered.size >= (combo.inputs || []).length;
     // Only keys whose input no other key covers keep the chord from forming.
     const blocking = judged.filter((row) => !row.joins && !covered.has(row.input));
-    /** @param {typeof judged[number]} row */
+    /** @param {typeof judged[number]} row @returns {Phrase} */
     const keyOnLayer = ({input, layer}) => {
         const supplier = stack.find((candidate) => candidate.index === layer);
-        return `${combo.inputDisplays?.[(combo.inputs || []).indexOf(input)] || input} on ${layerCalled(supplier)}`;
+        return [`${combo.inputDisplays?.[(combo.inputs || []).indexOf(input)] || input} on `, {layer: supplier}];
     };
-    const blockedWords = `its other key${blocking.length === 1 ? "" : "s"} ${listed(blocking.map(keyOnLayer))} cannot join it, so it never forms`;
+    /** @type {Phrase} */
+    const blockedWords = [`its other key${blocking.length === 1 ? "" : "s"} `, ...phrasesListed(blocking.map(keyOnLayer)), " cannot join it, so it never forms"];
     return new Map(judged.map(({key, joins, reasons}) => [key.position.layoutIndex,
         joins && !chord ? {fires: false, reasons: [blockedWords]} : {fires: joins, reasons}]));
 }

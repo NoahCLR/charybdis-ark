@@ -26,3 +26,9 @@ export function slotBank(slots, {inUse, free, keep, matches, searching, open}) {
 // The disclosure's words, for a bank of `count` slots.
 /** @param {number} count */
 export const allSlotsLabel = (count) => `Show all ${count} slots`;
+
+// What a group of empty slots is called where a list groups what it lists
+// (Lighting's pointing modes, a grouped table's band), as its layer list's
+// empty layers are (view/empty-layers.mjs), and what they are.
+export const EMPTY_SLOTS_TITLE = "Empty slots";
+export const EMPTY_SLOTS_TIP = "The slots with no pointing mode in them.";

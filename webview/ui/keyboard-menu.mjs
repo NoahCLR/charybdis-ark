@@ -11,10 +11,11 @@
 // on the button.
 
 // Selector assertions refer to elements created by this module's authored markup.
+import {menuKey} from "../lib/menu-keys.mjs";
 import * as controls from "../view/controls.mjs";
 import {esc, watchPressOutside} from "../lib/dom.mjs";
 import {getModel, post, postLeavingDemo, render, state} from "../store.mjs";
-import {NOT_STORED_TIP, SETTLE_TIP, keyboardControl} from "../view/keyboard-menu.mjs";
+import {NOT_STORED_RISK, SETTLE_TIP, keyboardControl} from "../view/keyboard-menu.mjs";
 import {chooseKeyboard, forgetKeyboard} from "../view/shell-panel.mjs";
 import {chooseMode} from "./edit-mode.mjs";
 
@@ -34,12 +35,12 @@ export function keyboardMenu() {
         <span class="rail-keyboard-text"><span class="rail-product">${esc(control.name)}</span>${mode ? `
             <span class="rail-mode" data-tip="${esc(mode.detail)}">${esc(mode.label)}${mode.warn ? ` <i class="dot warn" data-tip="${esc(mode.warn)}"></i>` : ""}</span>` : ""}</span>`;
     // What the dot says on hover, said to a screen reader as the button's description.
-    const status = `<span class="sr" id="rail-keyboard-status">${esc([dot.tip, mode?.warn].filter(Boolean).join(" "))}</span>`;
+    const status = `<span class="sr" id="rail-keyboard-status">${esc([dot.tip, mode?.warn, control.edits?.notStored ? NOT_STORED_RISK : ""].filter(Boolean).join(" "))}</span>`;
     if (!control.opens) return `<div class="rail-keyboard-wrap"><div class="rail-keyboard">${inner}</div>${status}</div>`;
     return `<div class="rail-keyboard-wrap">
         <button class="rail-keyboard" id="rail-keyboard" data-act="keyboard-menu" aria-haspopup="menu" aria-expanded="${open}"
             ${open ? 'aria-controls="rail-menu"' : ""} aria-describedby="rail-keyboard-status" ${control.disabled ? "disabled" : ""}>
-            ${inner}<span class="rail-chevron" aria-hidden="true">▾</span></button>
+            ${inner}<svg class="rail-chevron" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 3.5l3 3 3-3"/></svg></button>
         ${status}${open ? menu(control) : ""}</div>`;
 }
 
@@ -57,8 +58,8 @@ function menu(control) {
             ${tick(choice.current)}<span class="rail-menu-text">${esc(choice.label)}${choice.hint ? `<span class="rail-menu-hint">${esc(choice.hint)}</span>` : ""}</span></button>`).join("")}
         ${edits.settle ? `<button class="rail-menu-item" role="menuitem" tabindex="-1" id="rail-menu-settle" data-act="edit-mode-settle" data-tip="${esc(SETTLE_TIP)}">
             <span class="rail-menu-tick" aria-hidden="true"><i class="dot warn"></i></span><span class="rail-menu-text">Settle<span class="rail-menu-hint">Store this mode on both halves</span></span></button>` : ""}
-        ${edits.notStored ? `<div class="rail-menu-note" role="none" data-tip="${esc(NOT_STORED_TIP)}"><span class="rail-menu-tick"><i class="dot warn"></i></span>
-            <span>Not stored on the keyboard yet</span></div>` : ""}</div>`);
+        ${edits.notStored ? `<div class="rail-menu-note" role="none"><span class="rail-menu-tick"><i class="dot warn"></i></span>
+            <span class="rail-menu-text">Not stored on the keyboard yet<span class="rail-menu-hint">${esc(NOT_STORED_RISK)}</span></span></div>` : ""}</div>`);
     if (control.keyboards.length) sections.push(`${heading("rail-menu-keyboards", "Keyboard")}<div role="group" aria-labelledby="rail-menu-keyboards">
         ${control.keyboards.map((entry) => `<button class="rail-menu-item" role="menuitemradio" aria-checked="${entry.current ? "true" : "false"}" tabindex="-1"
             id="rail-menu-device-${esc(entry.id)}" data-act="select-device" data-device="${esc(entry.id)}">
@@ -87,16 +88,7 @@ export function bindKeyboardMenu(node) {
     const list = /** @type {HTMLElement | null} */ (node.querySelector("#rail-menu"));
     if (!list) return;
     list.addEventListener("keydown", (event) => {
-        const items = [.../** @type {NodeListOf<HTMLElement>} */ (list.querySelectorAll(ITEMS))];
-        const at = items.indexOf(/** @type {HTMLElement} */ (document.activeElement));
-        const step = /** @type {Record<string, number>} */ ({ArrowDown: 1, ArrowUp: -1})[event.key];
-        if (step) items[(at + step + items.length) % items.length]?.focus();
-        else if (event.key === "Home") items[0]?.focus();
-        else if (event.key === "End") items[items.length - 1]?.focus();
-        else if (event.key === "Escape" || event.key === "Tab") { closeKeyboardMenu(); render(); focusButton(); }
-        else return;
-        event.preventDefault();
-        event.stopPropagation();
+        menuKey(event, [.../** @type {NodeListOf<HTMLElement>} */ (list.querySelectorAll(ITEMS))], () => { closeKeyboardMenu(); render(); focusButton(); });
     });
     list.addEventListener("click", (event) => {
         const item = /** @type {HTMLButtonElement | null} */ (/** @type {Element} */ (event.target).closest('[role^="menuitem"]'));

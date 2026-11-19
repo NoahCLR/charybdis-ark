@@ -9,13 +9,14 @@
 import {esc} from "../../lib/dom.mjs";
 import {keyMeaning, keyName} from "../../view/keyface.mjs";
 import {placementsOf, reachText} from "../../view/reach.mjs";
+import {pointingPlacements} from "../../view/pointing-reach.mjs";
 import {tabReach} from "../../view/tab-reach.mjs";
 import {keyIdentity} from "../../view/key-identity.mjs";
 import {customKeyOf, shortcutLayerList, shortcutLayerTag} from "../../view/custom-key.mjs";
 import {getModel, layers, render, state} from "../../store.mjs";
 import {placementChips, placementOpening, setReachGroupOpen} from "../../view/reach-groups.mjs";
 import {layerSwatch} from "../layerbar.mjs";
-import {actionMarked, comboBadge, comboInputsMarked, keyNameMarked, layerTagged, marked} from "../marks.mjs";
+import {actionMarked, comboBadge, comboInputsMarked, keyNameMarked, layerMarked, layerTagged, marked} from "../marks.mjs";
 import {tierName, layerCalled} from "../../view/vocabulary.mjs";
 import {behaviourRowId} from "./behaviour-selection.mjs";
 
@@ -29,26 +30,45 @@ export function reachHighlight(view) {
         : state.reachRow[/** @type {keyof typeof state.reachRow} */ (state.tab)]);
 }
 
-// The layers a macro or custom key is placed on, each a chip in its layer
-// colour naming how it is reached there, "" where it is placed nowhere; a
-// click shows that layer in its Keymap tab (showPlacements).
-/** @param {Model} model @param {"macros" | "customKeys"} tab @param {string} keycode */
-export const placementChipsMarkup = (model, tab, keycode) => placementChips(placementsOf(model, tab, keycode)).map(({layer, at, how}) => {
+/** @typedef {"macros" | "customKeys" | "pointing"} PlacementTab */
+// Where a macro, custom key or pointing mode is placed. A pointing mode is
+// named by its slot's id, as the Pointing tab's rows are.
+/** @param {Model} model @param {PlacementTab} tab @param {string} name */
+function placementsFor(model, tab, name) {
+    if (tab !== "pointing") return placementsOf(model, tab, name);
+    const slot = (model?.pdModes || []).find((entry) => String(entry.id) === name);
+    return slot ? pointingPlacements(model, slot) : [];
+}
+
+// The layers a macro, custom key or pointing mode is placed on, each a chip
+// in its layer colour naming how it is reached there, "" where it is placed
+// nowhere; a click shows that layer in its Keymap tab (showPlacements).
+/** @param {Model} model @param {PlacementTab} tab @param {string} keycode */
+export const placementChipsMarkup = (model, tab, keycode) => placementChips(placementsFor(model, tab, keycode)).map(({layer, at, how}) => {
     const swatch = layerSwatch(model, layer);
     return `<button class="layer-chip link" data-goto-layer="${esc(at)}"
             data-tip="${esc(swatch.tip)} · reached by ${esc(how)} · show on the board">${swatch.html}
             <span>${esc(layerCalled(layer))}</span><span class="idx">${esc(how)}</span></button>`;
 }).join("");
 
+// The first row of a macro's, custom key's or pointing mode's editor: the
+// chips of the layers it is placed on, or that it is placed nowhere yet.
+/** @param {Model} model @param {PlacementTab} tab @param {string} keycode @param {string} unplaced the tip of "Not placed yet" */
+export function placedOnMarkup(model, tab, keycode, unplaced) {
+    const chips = placementChipsMarkup(model, tab, keycode);
+    return chips ? `<div class="row layer-chips" aria-label="Used on layers" data-placed-on>${chips}</div>`
+        : `<span class="note" data-placed-on data-tip="${esc(unplaced)}">Not placed yet</span>`;
+}
+
 // Each placement chip in `node` opens Keymap on its layer, in the tab for
 // what is placed, on the row of the route that reaches it there, its first
 // key picked.
-/** @param {ParentNode} node @param {"macros" | "customKeys"} tab @param {string} keycode */
+/** @param {ParentNode} node @param {PlacementTab} tab @param {string} keycode */
 export const showPlacements = (node, tab, keycode) => /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-goto-layer]"))
     .forEach((button) => button.addEventListener("click", () => openPlacement(tab, keycode, Number(button.dataset.gotoLayer))));
-/** @param {"macros" | "customKeys"} tab @param {string} keycode @param {number} at */
+/** @param {PlacementTab} tab @param {string} keycode @param {number} at */
 function openPlacement(tab, keycode, at) {
-    const opening = placementOpening(placementsOf(getModel(), tab, keycode), keycode, at);
+    const opening = placementOpening(placementsFor(getModel(), tab, keycode), keycode, at);
     if (!opening) return;
     Object.assign(state, {screen: "keys", tab, layer: opening.layer, placement: null});
     if (opening.selected !== undefined) state.selected = opening.selected;
@@ -58,14 +78,18 @@ function openPlacement(tab, keycode, at) {
 }
 
 // Where a reach came from, in the words of the thing that reaches it. A
-// transparent key can be answered by more than one layer, so each is named —
-// the default layer always answers, any other only while it is held too.
+// transparent key can be answered by more than one layer, so each is named,
+// by its mark — the default layer always answers, any other only while it is
+// held too.
 /** @param {{layer: import("../../../contracts/panel.js").Layer | null, whileHeld?: boolean}} entry */
 export const sourceLabel = (entry) =>
-    esc(layerCalled(entry.layer)) + (entry.whileHeld ? " when held" : "");
+    layerMarked(getModel(), entry.layer) + (entry.whileHeld ? " when held" : "");
 
-// The keys are named as the board names them; a combo's row already names
-// its inputs, so it says only where they come from (reachText).
+// Reached by says where to press, so a key reads by its name and marks on
+// every route, never its keycode: the row's first column carries that, and
+// the hover card has any key's. The keys are named as the board names them; a
+// combo's row already names its inputs, so it says only where they come from
+// (reachText).
 // A key whose own behaviour also reaches the row says which of its cells
 // does, after its name (`branches`), rather than naming the key twice.
 /** @param {import("../../view/keyface-types.js").ResolvedKey[]} keys @param {{names?: boolean, branches?: (keycode: string) => string}} [options] */
@@ -74,23 +98,8 @@ export const keysReach = (keys, {names = true, branches} = {}) => {
     const named = names ? [...new Set(keys.map((entry) => keyNameMarked(model, keyName(entry.position, model), keyMeaning(entry.position))
         + (branches?.(keyMeaning(entry.position)) || "")))] : [];
     const sources = [...new Set(keys.filter((entry) => entry.fellThrough).map(sourceLabel))];
-    const matched = [...new Set(keys.filter((entry) => entry.reference).map((entry) => esc(layerCalled(entry.layer))))];
+    const matched = [...new Set(keys.filter((entry) => entry.reference).map((entry) => layerMarked(model, entry.layer)))];
     return reachText({named, sources, matched}, {names});
-};
-// A behaviour that only answers through a transparent key still fires its
-// branches, so it belongs here — named with the layer that holds it, because
-// that is the part this layer does not store.
-// A branch names the behaviour it comes from, the cell that fires (key, then
-// cell, as a key's own behaviour reads), and what it sends — but only when that
-// differs from what the row is already titled with. A macro row is
-// its own macro, so repeating it would be noise; a pointing mode is a slot, and
-// which of its two keycodes a branch sends is the whole point.
-// A key named in a reach reads as it does in the table's first column: its
-// name, with the keycode beside it when the two differ.
-/** @param {Model} model @param {string} keycode */
-const namedKey = (model, keycode) => {
-    const label = keyIdentity(model, keycode).label;
-    return label === String(keycode) ? esc(label) : `${actionMarked(model, keycode, label)} <code class="dim">${esc(keycode)}</code>`;
 };
 // The cells a branch sits in, as Review and the grid head them: the branch's
 // badge, the tier's dot and the tier's name, "2× ● hold". Any of them sends it, so
@@ -98,13 +107,21 @@ const namedKey = (model, keycode) => {
 /** @param {Model} model @param {import("../../view/keyface-types.js").BranchCell[]} cells */
 const cellsMarked = (model, cells) => cells
     .map((cell) => marked(model, {kind: "tier", ...cell}, tierName(model, cell.tier).toLowerCase())).join(" or ");
+// A behaviour that only answers through a transparent key still fires its
+// branches, so it belongs here — named with the layer that holds it, because
+// that is the part this layer does not store.
+// A branch names the behaviour it comes from, the cell that fires (key, then
+// cell, as a key's own behaviour reads), and what it sends — but only when that
+// differs from what the row is already titled with. A macro row is
+// its own macro, so repeating it would be noise; a pointing mode is a slot, and
+// whether a branch holds it or locks it on is the whole point.
 /** @param {Model} model @param {ReachEntry} entry @param {{action: string}} route @param {boolean} showSends */
 const sendsOf = (model, entry, route, showSends) => showSends && route.action && String(entry.name) !== String(route.action)
-    ? `sends ${namedKey(model, route.action)}` : "";
+    ? `sends ${actionMarked(model, route.action)}` : "";
 /** @param {Model} model @param {ReachEntry} entry */
 const branchReach = (model, entry, showSends = true) => entry.behaviours.map((row) => {
     const sent = sendsOf(model, entry, row, showSends);
-    return `from ${namedKey(model, row.keycode)} · ${cellsMarked(model, row.cells)}${sent ? ` ${sent}` : ""}`
+    return `from ${actionMarked(model, row.keycode)} · ${cellsMarked(model, row.cells)}${sent ? ` ${sent}` : ""}`
         + (row.layer ? ` · on ${sourceLabel(row)}` : "");
 }).join(", ");
 
@@ -116,7 +133,7 @@ export const comboReach = (model, entry, showSends = true) => entry.combos.map((
     const sources = [...new Set(keys.filter((key) => key.fellThrough).map(sourceLabel))];
     const sent = sendsOf(model, entry, {action}, showSends);
     return `${comboBadge(model, combo.badge)} ${comboInputsMarked(model, combo)}`
-        + (via ? ` · through ${namedKey(model, via)} · ${cellsMarked(model, cells)}${sent ? ` ${sent}` : ""}` : sent ? ` · ${sent}` : "")
+        + (via ? ` · through ${actionMarked(model, via)} · ${cellsMarked(model, cells)}${sent ? ` ${sent}` : ""}` : sent ? ` · ${sent}` : "")
         + (sources.length ? ` · on ${sources.join(", ")}` : "");
 }).join(", ");
 
@@ -199,4 +216,4 @@ export const layersOfMask = (mask) => layers().filter((layer) => mask & 2 ** lay
 // Layers by their marks, as the Pointing modes tab names a link's layers.
 /** @param {Model} model @param {import("../../../contracts/panel.js").Layer[]} list */
 export const layersNamed = (model, list) =>
-    list.map((layer) => marked(model, {kind: "layer", layer: layer.index}, layerCalled(layer))).join(", ");
+    list.map((layer) => layerMarked(model, layer)).join(", ");

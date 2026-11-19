@@ -21,6 +21,15 @@ test("a restore says what the keyboard would refuse before anything is sent", ()
     assert.throws(() => checkRestorable(misplaced, accepts, CURRENT_CAPABILITIES), {code: "PLACEMENT_REFUSED", message: /^C0: .* Fix it before saving this profile\.$/});
 });
 
+test("a restore says so of a lighting colour brighter than the keyboard's limit", () => {
+    const {editProfileDomains} = require("../../core/model/portable-profile");
+    const profile = editProfileDomains(document(), {}, open => {open("rgb").layerColors[1].color.v = 255;});
+    const {effect} = baseLighting(validateSnapshot(profile).settings.values);
+    assert.throws(() => checkRestorable(profile, {limits: {brightnessMax: 200}, options: {effects: [{id: effect}]}}, CURRENT_CAPABILITIES),
+        {code: "SETTINGS_LIMIT_EXCEEDED", message: "Layer colours: Numbers colour stores brightness 255; the keyboard accepts at most 200. Lower it before restoring this profile."});
+    assert.equal(checkRestorable(profile, {limits: {brightnessMax: 255}, options: {effects: [{id: effect}]}}, CURRENT_CAPABILITIES), undefined);
+});
+
 test("a profile the keyboard cannot take at all is refused before its lighting is looked at", () => {
     const refusesAll = {limits: {brightnessMax: 0}, options: {effects: []}};
     assert.throws(() => checkRestorable({...document(), profile: "AAAA"}, refusesAll, CURRENT_CAPABILITIES),

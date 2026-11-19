@@ -320,21 +320,33 @@ async function readEditMode(connection, options) {
 }
 
 // The toggles' stored masters and runtime overrides, then QMK's live values
-// in the settings scalars' encodings.
-/** @param {Buffer} page @returns {import("./types.js").RuntimeRead} */
+// in the settings scalars' encodings, then the auto-mouse override (firmware
+// D-F66), whose stored setting is settings readback's, not this page's.
+/** @param {Buffer} page @returns {Omit<import("./types.js").RuntimeRead, "autocorrect">} */
 function decodeRuntimePage(page) {
-    if (page.length !== 24) throw new ProfileEditProtocolError("MALFORMED_RESPONSE", "The runtime page has 24 bytes.");
-    if (page.subarray(0, 4).some(byte => byte > 1)) throw new ProfileEditProtocolError("NONCANONICAL_RESPONSE", "Toggle bytes are 0 or 1.");
+    if (page.length !== 25) throw new ProfileEditProtocolError("MALFORMED_RESPONSE", "The runtime page has 25 bytes.");
+    if (page.subarray(0, 4).some(byte => byte > 1) || page[24] > 1) throw new ProfileEditProtocolError("NONCANONICAL_RESPONSE", "Toggle bytes are 0 or 1.");
     return {
         combos: {master: page[0] === 1, override: page[1] === 1},
         behaviours: {master: page[2] === 1, override: page[3] === 1},
+        autoMouse: {override: page[24] === 1},
         live: {defaultDpi: page.readUInt16LE(4), snipingDpi: page.readUInt16LE(6), rgbMode: page.readUInt32LE(8), rgbColor: page.readUInt32LE(12),
             defaultLayers: page.readUInt32LE(16), keymapOptions: page.readUInt32LE(20)},
     };
 }
-/** @param {import("../transport/types.js").RequestConnection} connection @param {import("./types.js").ReadOptions & {nextRequestId: () => number}} options */
+// Page 1: the overrides that came after page 0 was full (firmware
+// live-edits.md), so far the autocorrect override, whose stored switch is
+// key option 12 of settings readback.
+/** @param {Buffer} page @returns {Pick<import("./types.js").RuntimeRead, "autocorrect">} */
+function decodeRuntimeOverridesPage(page) {
+    if (page.length !== 1) throw new ProfileEditProtocolError("MALFORMED_RESPONSE", "The runtime overrides page has 1 byte.");
+    if (page[0] > 1) throw new ProfileEditProtocolError("NONCANONICAL_RESPONSE", "Toggle bytes are 0 or 1.");
+    return {autocorrect: {override: page[0] === 1}};
+}
+/** @param {import("../transport/types.js").RequestConnection} connection @param {import("./types.js").ReadOptions & {nextRequestId: () => number}} options @returns {Promise<import("./types.js").RuntimeRead>} */
 async function readRuntime(connection, options) {
-    return decodeRuntimePage(await getPage(connection, PROFILE_EDIT_V1.VALUE_RUNTIME, 0, options));
+    const toggles = decodeRuntimePage(await getPage(connection, PROFILE_EDIT_V1.VALUE_RUNTIME, 0, options));
+    return {...toggles, ...decodeRuntimeOverridesPage(await getPage(connection, PROFILE_EDIT_V1.VALUE_RUNTIME, 1, options))};
 }
 
 /** @param {Buffer} page @returns {import("./types.js").ActiveProfileMetadata} */
@@ -379,5 +391,5 @@ async function readActiveProfile(connection, options) {
 module.exports = {PROFILE_EDIT_V1, EDIT_RESULT, EDIT_RESULT_NAMES, EDIT_PHASE, EDIT_FLAGS, EDIT_MODE, isEditMode,
     buildEditBeginRequest, buildEditSpliceRequest, buildEditDataRequest, buildEditCommitRequest, buildEditAbortRequest,
     buildSaveRequest, buildRevertRequest, buildEditModeRequest, buildRestartRequest, decodeEditReply, sendEditRequest,
-    decodeEditStatusPages, decodeAutoSavePage, decodeSafeBoundaryPage, readEditStatus, readSafeBoundaryReasons, readEditProgress, decodeEditModePage, readEditMode, decodeRuntimePage, readRuntime,
+    decodeEditStatusPages, decodeAutoSavePage, decodeSafeBoundaryPage, readEditStatus, readSafeBoundaryReasons, readEditProgress, decodeEditModePage, readEditMode, decodeRuntimePage, decodeRuntimeOverridesPage, readRuntime,
     decodeActiveMetadata, readActiveProfile};

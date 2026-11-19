@@ -1,8 +1,8 @@
 # Backups
 
 A backup is one file that holds everything the keyboard stores: keys,
-layers, behaviours, combos, macros, custom keys, pointing modes, lighting,
-settings and the keyboard's name. It holds the complete profile, so importing
+layers, behaviours, combos, macros, the text replacement list, custom keys,
+pointing modes, lighting, settings and the keyboard's name. It holds the complete profile, so importing
 it doesn't depend on what the keyboard had before.
 
 Everything here is on the **Backups** screen. It needs a keyboard on current
@@ -49,11 +49,76 @@ copy's **Use as draft** wait until Ark has read the keyboard's complete
 profile. If it can't, read the keyboard again (see
 [Connecting](connecting.md#reading-the-keyboard)).
 
+## Import a VIA layout
+
+Coming from VIA? Save your layout there (**Save + Load**, **Save Current
+Layout**), then choose or drop that `.layout.json` file on the **Import
+profile** card here, as you would a backup. It opens the same sheet, titled
+"Use this VIA layout as your draft?".
+
+A VIA layout holds keys and macros only, so it changes only those:
+
+- its layers replace Base and the layers after it, as many as the file has,
+  and every layer above them is emptied (all transparent),
+- its macros fill the first macro slots, and every slot above them is
+  emptied,
+- layer and macro names are cleared, since they named what was there before,
+  and so is everything else set per layer: combo matching, the keys taken out
+  of behaviours or combos, default layers, auto-sniping layers, and which
+  layers use behaviours and combos (all of them again). The layers the file
+  doesn't fill also lose their colours and accents; the ones it fills keep
+  theirs.
+- the pointer layer (Auto-mouse's) becomes the file's highest layer above
+  Base with mouse buttons, where VIA keymaps keep them; if no layer has any,
+  Auto-mouse is turned off. Pointing modes stop being started by layers the
+  file empties. The sheet says when the pointer layer moved or Auto-mouse
+  turned off.
+
+Importing a VIA layout is a fresh start, so by default your draft's
+behaviours, combos and custom keys go too. When your draft has any, the
+sheet asks "Start from a blank slate?" with a switch for each, all on to
+begin with; turn one off to keep that kind:
+
+- **Remove the draft's behaviours**: the behaviours on ordinary keys.
+- **Remove the draft's combos**: every combo. Combo timing is a setting, so it
+  stays.
+- **Remove the draft's custom keys, with their behaviours**: each custom key's
+  name, shortcut and behaviour, as **Clear** in Keys does.
+
+Each switch updates the sheet's counts at once, so they always say what
+**Use as draft** does. Whatever you keep still turns on the layers it turned
+on, so those layers stay listed instead of folding away as empty layers.
+Pointing modes, the rest of lighting and settings, and the text replacement
+list stay as your draft has them.
+
+Whatever you keep that plays a macro (a replacement, a pointing mode's
+direction, a behaviour or a combo) plays it by its slot, so after the import
+it plays the file's macro in that slot, or nothing where the file leaves the
+slot empty. The sheet names each one with what it will play, such as "the
+replacement for “sig” plays this file's Macro 3". After **Use as draft**,
+Review says the same as a notice, "What the VIA import kept plays the macros
+it brought", for each one whose slot now holds other steps than the
+keyboard's, until you save, undo the import or discard those macros.
+
+A key Ark doesn't know or can't place, a custom key from older Ark firmware
+(which does nothing on current firmware), or a macro it can't type, is left
+empty, and the sheet lists each with why ("Left empty: 1 key and 1 macro Ark
+cannot bring from this file"). Everything else in the file still comes. Ark
+refuses a layout for another keyboard (its layers don't have the 4x6's 60
+keys) or with more layers than the keyboard holds.
+
+A VIA layout comes into your draft, so it needs the keyboard's complete
+profile read first. **Undo** takes the whole import back.
+
 ## Recovery copies
 
 Before every save and before leaving Live edit, Ark saves a recovery copy of
 what the keyboard held, and it doesn't save anything if it can't save one. A
-restart with unsaved edits keeps a copy of those edits the same way.
+restart with unsaved edits keeps a copy of those edits the same way. When the
+browser won't keep the copy, Ark says why: its storage for the page is full
+(delete copies you no longer need here, or free some of the browser's
+storage), the browser is set not to let the page save data (allow it in the
+browser's settings), or its storage can't be opened.
 
 Each copy is named by what made it, the keyboard it came from and when, for
 example "Before saving live edits · Noah's Charybdis · 23 Oct 2026, 14:02". A
@@ -72,10 +137,11 @@ you want to keep.
 
 ## Firmware updates
 
-A backup imports onto the same firmware release. Ark works with the current
-firmware only and converts nothing: when a firmware update changes how the
-profile is stored, the keyboard starts from its compiled defaults and older
-backups no longer import. Check the firmware's release notes before updating,
+A backup imports onto any firmware release that stores the profile the same
+way. Ark works with the current firmware only and converts nothing: when a
+firmware update changes how the profile is stored, or the actions a key can
+hold, the keyboard starts from its compiled defaults and older backups no
+longer import. A release that changes neither keeps both. Check the firmware's release notes before updating,
 and export a fresh backup afterwards.
 
 To go back to the profile you had before your changes, import a backup made

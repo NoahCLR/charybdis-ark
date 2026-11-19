@@ -36,7 +36,7 @@ test("the demo's controls post these messages", () => {
     assert.deepEqual(openDemoProfile(), {type: "openDemoProfile"});
     assert.deepEqual(leaveDemo(), {type: "leaveDemo"});
     assert.match(DEMO_WORDS.status, /Demo · no keyboard/);
-    assert.match(DEMO_WORDS.banner, /No keyboard is connected/);
+    assert.match(DEMO_WORDS.banner, /Edits stay in this tab/);
 });
 
 test("leaving the demo asks first only when edits would be lost, and then says so in what it posts", () => {

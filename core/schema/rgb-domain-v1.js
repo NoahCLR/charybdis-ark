@@ -16,17 +16,25 @@ const {PROFILE_BLOB_V1} = require("./profile-blob-v1");
 
 const RGB_DOMAIN_V1 = Object.freeze({
     DOMAIN_ID: PROFILE_DOMAIN_IDS.RGB,
-    // Format 4, the only one the keyboard stores: a colour row per pointing
-    // slot, 32 of them, and per layer of the sixteen-layer bank (D-F14).
+    // Format 7, the only one the keyboard stores: a colour row per pointing
+    // slot, 32 of them, and per layer of the sixteen-layer bank (D-F14), the
+    // replacement feedback stage, its record and rows at the payload's end
+    // (firmware D-F70), and a locality for every feedback case, each tap
+    // branch a case of its own (firmware D-F73).
     DOMAIN_VERSION: PROFILE_DOMAIN_VERSIONS[PROFILE_DOMAIN_IDS.RGB],
     FORMAT_VERSION: PROFILE_DOMAIN_VERSIONS[PROFILE_DOMAIN_IDS.RGB],
     POINTING_SLOTS: POINTING_SLOT_COUNT,
     HEADER_SIZE: 16,
     PHYSICAL_LED_COUNT: 58,
     LED_BITMAP_SIZE: 8,
-    MAX_GROUPS: 16,
+    // The format's ceilings (firmware D-F63): 128 LED sets, and 640 group rows
+    // across the five tables, at most 255 in one (its count is a header byte).
+    // A keyboard reports its own on its capability pages; the codec holds a
+    // profile to those it is given (RgbOptions).
+    MAX_GROUPS: 128,
     MAX_LOGICAL_LAYERS: LAYERS,
-    MAX_STAGE_GROUP_ROWS: 32,
+    MAX_TABLE_GROUP_ROWS: 255,
+    MAX_STAGE_GROUP_ROWS: 640,
     MAX_TAP_BRANCH_COLORS: 4,
     // The domain's own offsets are 16 bits (unchanged by schema 4, firmware
     // D-F28), so its payload stays within 65,535 bytes whatever the blob's.
@@ -40,6 +48,9 @@ const RGB_STAGE_BITS = Object.freeze({
     POINTING_MODE: 1 << 2,
     COMBO: 1 << 3,
     KEY_BEHAVIOR: 1 << 4,
+    // Replacement feedback (firmware D-F70): the firmware's code calls the
+    // stage autocorrect feedback, as Ark's code calls the feature.
+    AUTOCORRECT: 1 << 5,
 });
 const RGB_STAGE_MASK_ALL = Object.values(RGB_STAGE_BITS).reduce((mask, bit) => mask | bit, 0);
 
@@ -63,12 +74,47 @@ const RGB_TAP_COMMIT_MODES = Object.freeze({
     KEY_FEEDBACK_TAP_COMMIT_OFF: 0,
     KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS: 1,
 });
+// What a behaviour feedback group row lights for (firmware D-F73): the tap
+// branch pending for tap count 2, the three tiers, kept at 1 to 3, the tap
+// branches for tap counts 3, 4 and 5 or more, any tap branch (firmware
+// D-F75), or every case.
 const RGB_KEY_SEMANTICS = Object.freeze({
-    KEY_FEEDBACK_GROUP_TAP_BRANCH_PENDING: 0,
+    KEY_FEEDBACK_GROUP_TAP_COUNT_2: 0,
     KEY_FEEDBACK_GROUP_TAP_COMMITTED: 1,
     KEY_FEEDBACK_GROUP_HOLD_ACTIVE: 2,
     KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE: 3,
+    KEY_FEEDBACK_GROUP_TAP_COUNT_3: 4,
+    KEY_FEEDBACK_GROUP_TAP_COUNT_4: 5,
+    KEY_FEEDBACK_GROUP_TAP_COUNT_5: 6,
+    KEY_FEEDBACK_GROUP_TAP_BRANCH_ANY: 7,
     KEY_FEEDBACK_GROUP_ALL: RGB_DOMAIN_V1.SELECTOR_ALL,
+});
+// The semantic each tap branch's accents name, by the branch's index (tap
+// count 2 first); the last stands for every deeper tap count too.
+const RGB_TAP_BRANCH_SEMANTICS = Object.freeze([
+    RGB_KEY_SEMANTICS.KEY_FEEDBACK_GROUP_TAP_COUNT_2,
+    RGB_KEY_SEMANTICS.KEY_FEEDBACK_GROUP_TAP_COUNT_3,
+    RGB_KEY_SEMANTICS.KEY_FEEDBACK_GROUP_TAP_COUNT_4,
+    RGB_KEY_SEMANTICS.KEY_FEEDBACK_GROUP_TAP_COUNT_5,
+]);
+// What a replacement feedback group row lights for: an input replaced with
+// text, one replaced by its macro, a replacement undone, the leader waiting
+// (firmware D-F72), or every case.
+const RGB_AUTOCORRECT_SEMANTICS = Object.freeze({
+    AUTOCORRECT_FEEDBACK_GROUP_TEXT: 0,
+    AUTOCORRECT_FEEDBACK_GROUP_MACRO: 1,
+    AUTOCORRECT_FEEDBACK_GROUP_UNDO: 2,
+    AUTOCORRECT_FEEDBACK_GROUP_LEADING: 3,
+    AUTOCORRECT_FEEDBACK_GROUP_ALL: RGB_DOMAIN_V1.SELECTOR_ALL,
+});
+// The owner an LED group row names when its selector is SELECTOR_ALL, by the
+// table it sits in: it lights for every layer, pointing mode, behaviour
+// state or replacement flash. Core reads and writes owners by these names.
+const RGB_EVERY_OWNER = Object.freeze({
+    layer: "RGB_LAYER_GROUP_ALL",
+    pdMode: "RGB_POINTING_MODE_GROUP_ALL",
+    keyBehavior: "KEY_FEEDBACK_GROUP_ALL",
+    autocorrect: "AUTOCORRECT_FEEDBACK_GROUP_ALL",
 });
 /** @type {Readonly<Record<string, number>>} */
 const RGB_POINTING_MODE_IDS = Object.freeze({
@@ -100,10 +146,11 @@ function encodeRgbDomainV1(profile, options = {}) {
     header[7] = value.pdModeColors.length;
     header[8] = value.pdModeGroupRows.length;
     header[9] = value.comboGroupRows.length;
-    header[10] = value.keyFeedback.tapBranchColors.length;
+    header[10] = value.keyFeedback.tapBranches.length;
     header[11] = value.keyGroupRows.length;
     header[12] = RGB_DOMAIN_V1.PHYSICAL_LED_COUNT;
     header[13] = RGB_DOMAIN_V1.LED_BITMAP_SIZE;
+    header[14] = value.autocorrectGroupRows.length;
 
     const chunks = [header];
     for (const group of value.groups) {
@@ -136,8 +183,8 @@ function encodeRgbDomainV1(profile, options = {}) {
     for (const row of value.comboGroupRows) {
         chunks.push(Buffer.from([row.color.h, row.color.s, row.color.v, row.groupId]));
     }
-    for (const color of value.keyFeedback.tapBranchColors) {
-        chunks.push(Buffer.from([color.h, color.s, color.v]));
+    for (const branch of value.keyFeedback.tapBranches) {
+        chunks.push(Buffer.from([branch.color.h, branch.color.s, branch.color.v, branch.locality]));
     }
     chunks.push(Buffer.from([
         value.keyFeedback.tapCommittedColor.h,
@@ -150,9 +197,32 @@ function encodeRgbDomainV1(profile, options = {}) {
         value.keyFeedback.longHoldActiveColor.s,
         value.keyFeedback.longHoldActiveColor.v,
         value.keyFeedback.tapCommitMode,
-        value.keyFeedback.locality,
+        value.keyFeedback.tapCommittedLocality,
+        value.keyFeedback.holdActiveLocality,
+        value.keyFeedback.longHoldActiveLocality,
     ]));
     for (const row of value.keyGroupRows) {
+        chunks.push(Buffer.from([row.semantic, row.color.h, row.color.s, row.color.v, row.groupId]));
+    }
+    chunks.push(Buffer.from([
+        value.autocorrectFeedback.textColor.h,
+        value.autocorrectFeedback.textColor.s,
+        value.autocorrectFeedback.textColor.v,
+        value.autocorrectFeedback.macroColor.h,
+        value.autocorrectFeedback.macroColor.s,
+        value.autocorrectFeedback.macroColor.v,
+        value.autocorrectFeedback.undoColor.h,
+        value.autocorrectFeedback.undoColor.s,
+        value.autocorrectFeedback.undoColor.v,
+        value.autocorrectFeedback.leadingColor.h,
+        value.autocorrectFeedback.leadingColor.s,
+        value.autocorrectFeedback.leadingColor.v,
+        value.autocorrectFeedback.textLocality,
+        value.autocorrectFeedback.macroLocality,
+        value.autocorrectFeedback.undoLocality,
+        value.autocorrectFeedback.leadingLocality,
+    ]));
+    for (const row of value.autocorrectGroupRows) {
         chunks.push(Buffer.from([row.semantic, row.color.h, row.color.s, row.color.v, row.groupId]));
     }
 
@@ -176,7 +246,7 @@ function decodeRgbDomainV1(value, options = {}) {
     if (bytes[0] !== RGB_DOMAIN_V1.FORMAT_VERSION) {
         throw rgbError("INVALID_VERSION", `RGB payload format ${bytes[0]} is not supported.`);
     }
-    if (bytes[1] !== 0 || bytes[14] !== 0 || bytes[15] !== 0) {
+    if (bytes[1] !== 0 || bytes[15] !== 0) {
         throw rgbError("RESERVED_BITS", "RGB payload header reserved bytes must be zero.");
     }
     if (bytes[12] !== RGB_DOMAIN_V1.PHYSICAL_LED_COUNT || bytes[13] !== RGB_DOMAIN_V1.LED_BITMAP_SIZE) {
@@ -192,6 +262,7 @@ function decodeRgbDomainV1(value, options = {}) {
         comboGroups: bytes[9],
         branchColors: bytes[10],
         keyGroups: bytes[11],
+        autocorrectGroups: bytes[14],
     };
     assertHeaderCounts(counts, limits);
     const reader = new Reader(bytes, RGB_DOMAIN_V1.HEADER_SIZE);
@@ -249,19 +320,46 @@ function decodeRgbDomainV1(value, options = {}) {
             groupId: reader.groupId(counts.groups, "comboGroupRows", index),
         });
     }
-    const tapBranchColors = [];
+    const tapBranches = [];
     for (let index = 0; index < counts.branchColors; index += 1) {
-        tapBranchColors.push(reader.hsv(limits, "keyFeedback.tapBranchColors", index, "color"));
+        tapBranches.push({
+            color: reader.hsv(limits, "keyFeedback.tapBranches", index, "color"),
+            locality: reader.enumValue(4, "keyFeedback.tapBranches", index, "locality"),
+        });
     }
+    // The tiers' colours and the tap-commit policy, then a locality per tier.
+    const tapCommittedColor = reader.hsv(limits, "keyFeedback", 0, "tapCommittedColor");
+    const holdActiveColor = reader.hsv(limits, "keyFeedback", 0, "holdActiveColor");
+    const longHoldActiveColor = reader.hsv(limits, "keyFeedback", 0, "longHoldActiveColor");
+    const tapCommitMode = reader.enumValue(1, "keyFeedback", 0, "tapCommitMode");
     const keyFeedback = {
-        tapBranchColors,
-        tapCommittedColor: reader.hsv(limits, "keyFeedback", 0, "tapCommittedColor"),
-        holdActiveColor: reader.hsv(limits, "keyFeedback", 0, "holdActiveColor"),
-        longHoldActiveColor: reader.hsv(limits, "keyFeedback", 0, "longHoldActiveColor"),
-        tapCommitMode: reader.enumValue(1, "keyFeedback", 0, "tapCommitMode"),
-        locality: reader.enumValue(4, "keyFeedback", 0, "locality"),
+        tapBranches,
+        tapCommittedColor,
+        tapCommittedLocality: reader.enumValue(4, "keyFeedback", 0, "tapCommittedLocality"),
+        holdActiveColor,
+        holdActiveLocality: reader.enumValue(4, "keyFeedback", 0, "holdActiveLocality"),
+        longHoldActiveColor,
+        longHoldActiveLocality: reader.enumValue(4, "keyFeedback", 0, "longHoldActiveLocality"),
+        tapCommitMode,
     };
     const keyGroupRows = readGroupRows(reader, counts.keyGroups, counts.groups, (semantic, row) => assertKeySemantic(semantic, "keyGroupRows", row), "keyGroupRows", limits, "semantic");
+    // The four colours in semantic order, then a locality per case in the
+    // same order.
+    const textColor = reader.hsv(limits, "autocorrectFeedback", 0, "textColor");
+    const macroColor = reader.hsv(limits, "autocorrectFeedback", 0, "macroColor");
+    const undoColor = reader.hsv(limits, "autocorrectFeedback", 0, "undoColor");
+    const leadingColor = reader.hsv(limits, "autocorrectFeedback", 0, "leadingColor");
+    const autocorrectFeedback = {
+        textColor,
+        textLocality: reader.enumValue(4, "autocorrectFeedback", 0, "textLocality"),
+        macroColor,
+        macroLocality: reader.enumValue(4, "autocorrectFeedback", 0, "macroLocality"),
+        undoColor,
+        undoLocality: reader.enumValue(4, "autocorrectFeedback", 0, "undoLocality"),
+        leadingColor,
+        leadingLocality: reader.enumValue(4, "autocorrectFeedback", 0, "leadingLocality"),
+    };
+    const autocorrectGroupRows = readGroupRows(reader, counts.autocorrectGroups, counts.groups, (semantic, row) => assertAutocorrectSemantic(semantic, "autocorrectGroupRows", row), "autocorrectGroupRows", limits, "semantic");
     if (reader.offset !== bytes.length) {
         throw rgbError("TRAILING_BYTES", `RGB domain has ${bytes.length - reader.offset} trailing byte${bytes.length - reader.offset === 1 ? "" : "s"}.`);
     }
@@ -279,6 +377,8 @@ function decodeRgbDomainV1(value, options = {}) {
         comboGroupRows,
         keyFeedback,
         keyGroupRows,
+        autocorrectFeedback,
+        autocorrectGroupRows,
     };
     return canonical(bytes, normalizeProfile(decoded, limits), value => encodeRgbDomainV1(value, limits),
         () => rgbError("NONCANONICAL", "RGB domain does not use its canonical representation."));
@@ -298,7 +398,7 @@ function normalizeProfile(profile, limits) {
         throw rgbError("INVALID_VERSION", `RGB payload format ${profile.formatVersion} is not supported.`);
     }
     const stageEnableMask = assertStageMask(profile.stageEnableMask, limits.compiledStageMask, "stageEnableMask");
-    const groupState = normalizeGroups(requiredArray(profile.groups, "groups"));
+    const groupState = normalizeGroups(requiredArray(profile.groups, "groups"), limits);
     const groups = groupState.groups;
     const layerColors = requiredArray(profile.layerColors, "layerColors").map((row, index) => ({
         layerId: assertU8(row?.layerId, `layerColors[${index}].layerId`),
@@ -335,9 +435,26 @@ function normalizeProfile(profile, limits) {
     const comboGroupRows = normalizeComboRows(profile.comboGroupRows, groupState, limits);
     const keyFeedback = normalizeKeyFeedback(profile.keyFeedback, limits);
     const keyGroupRows = normalizeGroupRows(profile.keyGroupRows, groupState, limits, "keyGroupRows", (semantic, row) => assertKeySemantic(semantic, "keyGroupRows", row), "semantic");
-    const groupRowCount = layerGroupRows.length + pdModeGroupRows.length + comboGroupRows.length + keyGroupRows.length;
-    if (groupRowCount > RGB_DOMAIN_V1.MAX_STAGE_GROUP_ROWS) {
-        throw rgbError("CAPACITY_EXCEEDED", `RGB stage group rows total ${groupRowCount}; maximum is ${RGB_DOMAIN_V1.MAX_STAGE_GROUP_ROWS}.`, {limit: "lightingGroupRows", most: RGB_DOMAIN_V1.MAX_STAGE_GROUP_ROWS});
+    const replacement = profile.autocorrectFeedback;
+    const autocorrectFeedback = {
+        textColor: normalizeHsv(replacement?.textColor, limits, "autocorrectFeedback", 0, "textColor"),
+        textLocality: assertEnum(replacement?.textLocality, 4, "autocorrectFeedback", 0, "textLocality"),
+        macroColor: normalizeHsv(replacement?.macroColor, limits, "autocorrectFeedback", 0, "macroColor"),
+        macroLocality: assertEnum(replacement?.macroLocality, 4, "autocorrectFeedback", 0, "macroLocality"),
+        undoColor: normalizeHsv(replacement?.undoColor, limits, "autocorrectFeedback", 0, "undoColor"),
+        undoLocality: assertEnum(replacement?.undoLocality, 4, "autocorrectFeedback", 0, "undoLocality"),
+        leadingColor: normalizeHsv(replacement?.leadingColor, limits, "autocorrectFeedback", 0, "leadingColor"),
+        leadingLocality: assertEnum(replacement?.leadingLocality, 4, "autocorrectFeedback", 0, "leadingLocality"),
+    };
+    const autocorrectGroupRows = normalizeGroupRows(profile.autocorrectGroupRows, groupState, limits, "autocorrectGroupRows", (semantic, row) => assertAutocorrectSemantic(semantic, "autocorrectGroupRows", row), "semantic");
+    for (const [table, rows] of /** @type {const} */ ([["layerGroupRows", layerGroupRows], ["pdModeGroupRows", pdModeGroupRows], ["comboGroupRows", comboGroupRows], ["keyGroupRows", keyGroupRows], ["autocorrectGroupRows", autocorrectGroupRows]])) {
+        if (rows.length > limits.maxTableGroupRows) {
+            throw rgbError("CAPACITY_EXCEEDED", `RGB ${table} count ${rows.length}; maximum is ${limits.maxTableGroupRows}.`, {table, limit: "lightingTableGroupRows", most: limits.maxTableGroupRows});
+        }
+    }
+    const groupRowCount = layerGroupRows.length + pdModeGroupRows.length + comboGroupRows.length + keyGroupRows.length + autocorrectGroupRows.length;
+    if (groupRowCount > limits.maxGroupRows) {
+        throw rgbError("CAPACITY_EXCEEDED", `RGB stage group rows total ${groupRowCount}; maximum is ${limits.maxGroupRows}.`, {limit: "lightingGroupRows", most: limits.maxGroupRows});
     }
     const normalized = {
         formatVersion: RGB_DOMAIN_V1.FORMAT_VERSION,
@@ -352,6 +469,8 @@ function normalizeProfile(profile, limits) {
         comboGroupRows,
         keyFeedback,
         keyGroupRows,
+        autocorrectFeedback,
+        autocorrectGroupRows,
     };
     assertCompiledSurfaces(normalized, limits);
     return normalized;
@@ -376,11 +495,18 @@ function normalizeOptions(options = {}) {
         throw new RangeError(`supportedPdModeIds must contain at most ${maxPdModes} unique ids.`);
     }
     const knownPdModeIds = new Set(Object.values(RGB_POINTING_MODE_IDS).filter(id => id < maxPdModes));
+    // The keyboard's own ceilings, within the format's.
+    const maxGroups = optionCeiling(options.maxGroups, RGB_DOMAIN_V1.MAX_GROUPS, "maxGroups");
+    const maxTableGroupRows = optionCeiling(options.maxTableGroupRows, RGB_DOMAIN_V1.MAX_TABLE_GROUP_ROWS, "maxTableGroupRows");
+    const maxGroupRows = optionCeiling(options.maxGroupRows, RGB_DOMAIN_V1.MAX_STAGE_GROUP_ROWS, "maxGroupRows");
     if (supportedPdModeIds.some((id) => !knownPdModeIds.has(id))) {
         throw new RangeError("supportedPdModeIds contains an id outside the Profile Wire v1 pointing mode registry.");
     }
     return {
         maxPdModes,
+        maxGroups,
+        maxTableGroupRows,
+        maxGroupRows,
         compiledStageMask: assertStageMask(options.compiledStageMask === undefined ? RGB_STAGE_MASK_ALL : options.compiledStageMask, RGB_STAGE_MASK_ALL, "compiledStageMask"),
         logicalLayerCount,
         maxLogicalLayers,
@@ -391,10 +517,19 @@ function normalizeOptions(options = {}) {
     };
 }
 
-/** @param {readonly {id: number, leds: number[]}[]} input */
-function normalizeGroups(input) {
-    if (input.length > RGB_DOMAIN_V1.MAX_GROUPS) {
-        throw rgbError("CAPACITY_EXCEEDED", `RGB group count ${input.length}; maximum is ${RGB_DOMAIN_V1.MAX_GROUPS}.`, {table: "groups", limit: "lightingGroups", most: RGB_DOMAIN_V1.MAX_GROUPS});
+/** @param {unknown} value @param {number} format @param {string} name */
+function optionCeiling(value, format, name) {
+    if (value === undefined) return format;
+    if (!Number.isInteger(value) || /** @type {number} */ (value) < 0 || /** @type {number} */ (value) > format) {
+        throw new RangeError(`${name} must be an integer from 0 to ${format}.`);
+    }
+    return /** @type {number} */ (value);
+}
+
+/** @param {readonly {id: number, leds: number[]}[]} input @param {Limits} limits */
+function normalizeGroups(input, limits) {
+    if (input.length > limits.maxGroups) {
+        throw rgbError("CAPACITY_EXCEEDED", `RGB group count ${input.length}; maximum is ${limits.maxGroups}.`, {table: "groups", limit: "lightingGroups", most: limits.maxGroups});
     }
     const groupsByInputId = input.map((group, index) => {
         const leds = normalizeLeds(group?.leds, "groups", index);
@@ -445,20 +580,25 @@ function normalizeComboRows(input, groupState, limits) {
 
 /** @param {Partial<import("./types.js").RgbKeyFeedback> | undefined} value @param {Limits} limits */
 function normalizeKeyFeedback(value, limits) {
-    const branches = requiredArray(value?.tapBranchColors, "keyFeedback.tapBranchColors");
+    const branches = requiredArray(value?.tapBranches, "keyFeedback.tapBranches");
     if (branches.length > limits.tapBranchColorCount) {
-        throw rgbError("CAPACITY_EXCEEDED", `Key-feedback tap-branch color count ${branches.length}; maximum is ${limits.tapBranchColorCount}.`, {table: "keyFeedback.tapBranchColors"});
+        throw rgbError("CAPACITY_EXCEEDED", `Key-feedback tap-branch count ${branches.length}; maximum is ${limits.tapBranchColorCount}.`, {table: "keyFeedback.tapBranches"});
     }
     if ((limits.compiledStageMask & RGB_STAGE_BITS.KEY_BEHAVIOR) !== 0 && branches.length !== limits.tapBranchColorCount) {
-        throw rgbError("INCOMPLETE_SURFACE", `Key-feedback tap-branch colors must contain exactly ${limits.tapBranchColorCount} compiled entries.`, {table: "keyFeedback.tapBranchColors"});
+        throw rgbError("INCOMPLETE_SURFACE", `Key-feedback tap branches must contain exactly ${limits.tapBranchColorCount} compiled entries.`, {table: "keyFeedback.tapBranches"});
     }
     return {
-        tapBranchColors: branches.map((color, index) => normalizeHsv(color, limits, "keyFeedback.tapBranchColors", index, "color")),
+        tapBranches: branches.map((branch, index) => ({
+            color: normalizeHsv(branch?.color, limits, "keyFeedback.tapBranches", index, "color"),
+            locality: assertEnum(branch?.locality, 4, "keyFeedback.tapBranches", index, "locality"),
+        })),
         tapCommittedColor: normalizeHsv(value?.tapCommittedColor, limits, "keyFeedback", 0, "tapCommittedColor"),
+        tapCommittedLocality: assertEnum(value?.tapCommittedLocality, 4, "keyFeedback", 0, "tapCommittedLocality"),
         holdActiveColor: normalizeHsv(value?.holdActiveColor, limits, "keyFeedback", 0, "holdActiveColor"),
+        holdActiveLocality: assertEnum(value?.holdActiveLocality, 4, "keyFeedback", 0, "holdActiveLocality"),
         longHoldActiveColor: normalizeHsv(value?.longHoldActiveColor, limits, "keyFeedback", 0, "longHoldActiveColor"),
+        longHoldActiveLocality: assertEnum(value?.longHoldActiveLocality, 4, "keyFeedback", 0, "longHoldActiveLocality"),
         tapCommitMode: assertEnum(value?.tapCommitMode, 1, "keyFeedback", 0, "tapCommitMode"),
-        locality: assertEnum(value?.locality, 4, "keyFeedback", 0, "locality"),
     };
 }
 
@@ -485,18 +625,30 @@ function assertCompiledSurfaces(profile, limits) {
     if ((compiled & RGB_STAGE_BITS.COMBO) === 0 && (profile.comboGroupRows.length || profile.comboFeedback.locality !== 0 || !isBlack(profile.comboFeedback.color))) {
         throw rgbError("UNSUPPORTED_STAGE_DATA", "Combo RGB data must be canonical zero when the stage is not compiled.");
     }
-    if ((compiled & RGB_STAGE_BITS.KEY_BEHAVIOR) === 0 && (profile.keyGroupRows.length || profile.keyFeedback.tapBranchColors.length || profile.keyFeedback.tapCommitMode !== 0 || profile.keyFeedback.locality !== 0 || !isBlack(profile.keyFeedback.tapCommittedColor) || !isBlack(profile.keyFeedback.holdActiveColor) || !isBlack(profile.keyFeedback.longHoldActiveColor))) {
+    const key = profile.keyFeedback;
+    if ((compiled & RGB_STAGE_BITS.KEY_BEHAVIOR) === 0 && (profile.keyGroupRows.length || key.tapBranches.length || key.tapCommitMode !== 0
+        || key.tapCommittedLocality !== 0 || key.holdActiveLocality !== 0 || key.longHoldActiveLocality !== 0
+        || !isBlack(key.tapCommittedColor) || !isBlack(key.holdActiveColor) || !isBlack(key.longHoldActiveColor))) {
         throw rgbError("UNSUPPORTED_STAGE_DATA", "Key-feedback RGB data must be canonical zero when the stage is not compiled.");
+    }
+    const replacement = profile.autocorrectFeedback;
+    if ((compiled & RGB_STAGE_BITS.AUTOCORRECT) === 0 && (profile.autocorrectGroupRows.length
+        || replacement.textLocality !== 0 || replacement.macroLocality !== 0 || replacement.undoLocality !== 0 || replacement.leadingLocality !== 0
+        || !isBlack(replacement.textColor) || !isBlack(replacement.macroColor) || !isBlack(replacement.undoColor) || !isBlack(replacement.leadingColor))) {
+        throw rgbError("UNSUPPORTED_STAGE_DATA", "Replacement-feedback RGB data must be canonical zero when the stage is not compiled.", {table: "autocorrectFeedback", row: 0, field: "textColor"});
     }
 }
 
-/** @param {{groups: number, layerColors: number, pdColors: number, branchColors: number, layerGroups: number, pdGroups: number, comboGroups: number, keyGroups: number}} counts @param {Limits} limits */
+/** @param {{groups: number, layerColors: number, pdColors: number, branchColors: number, layerGroups: number, pdGroups: number, comboGroups: number, keyGroups: number, autocorrectGroups: number}} counts @param {Limits} limits */
 function assertHeaderCounts(counts, limits) {
-    if (counts.groups > RGB_DOMAIN_V1.MAX_GROUPS || counts.layerColors > limits.maxLogicalLayers || counts.pdColors > limits.maxPdModes || counts.branchColors > limits.tapBranchColorCount) {
+    if (counts.groups > limits.maxGroups || counts.layerColors > limits.maxLogicalLayers || counts.pdColors > limits.maxPdModes || counts.branchColors > limits.tapBranchColorCount) {
         throw rgbError("CAPACITY_EXCEEDED", "RGB payload header count exceeds a fixed v1 capacity.");
     }
-    if (counts.layerGroups + counts.pdGroups + counts.comboGroups + counts.keyGroups > RGB_DOMAIN_V1.MAX_STAGE_GROUP_ROWS) {
-        throw rgbError("CAPACITY_EXCEEDED", `RGB stage group rows exceed ${RGB_DOMAIN_V1.MAX_STAGE_GROUP_ROWS}.`);
+    if ([counts.layerGroups, counts.pdGroups, counts.comboGroups, counts.keyGroups, counts.autocorrectGroups].some((rows) => rows > limits.maxTableGroupRows)) {
+        throw rgbError("CAPACITY_EXCEEDED", `An RGB group-row table exceeds ${limits.maxTableGroupRows} rows.`);
+    }
+    if (counts.layerGroups + counts.pdGroups + counts.comboGroups + counts.keyGroups + counts.autocorrectGroups > limits.maxGroupRows) {
+        throw rgbError("CAPACITY_EXCEEDED", `RGB stage group rows exceed ${limits.maxGroupRows}.`);
     }
 }
 
@@ -626,7 +778,13 @@ function assertPdSelector(value, limits, table, row) {
 
 /** @param {number} value @param {string} table @param {number} row */
 function assertKeySemantic(value, table, row) {
-    if (value !== RGB_DOMAIN_V1.SELECTOR_ALL && value > RGB_KEY_SEMANTICS.KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE) throw rgbError("INVALID_SELECTOR", `${table}[${row}] semantic ${value} is unknown.`, {table, row, field: "semantic"});
+    if (value !== RGB_DOMAIN_V1.SELECTOR_ALL && value > RGB_KEY_SEMANTICS.KEY_FEEDBACK_GROUP_TAP_BRANCH_ANY) throw rgbError("INVALID_SELECTOR", `${table}[${row}] semantic ${value} is unknown.`, {table, row, field: "semantic"});
+    return value;
+}
+
+/** @param {number} value @param {string} table @param {number} row */
+function assertAutocorrectSemantic(value, table, row) {
+    if (value !== RGB_DOMAIN_V1.SELECTOR_ALL && value > RGB_AUTOCORRECT_SEMANTICS.AUTOCORRECT_FEEDBACK_GROUP_LEADING) throw rgbError("INVALID_SELECTOR", `${table}[${row}] semantic ${value} is unknown.`, {table, row, field: "semantic"});
     return value;
 }
 
@@ -706,13 +864,17 @@ function rgbError(code, message, details = {}) {
 }
 
 module.exports = {
+    RGB_AUTOCORRECT_SEMANTICS,
     RGB_AUTOMOUSE_MODES,
     RGB_DOMAIN_V1,
+    RGB_EVERY_OWNER,
     RGB_KEY_SEMANTICS,
     RGB_LAYER_MODES,
     RGB_LOCALITIES,
     RGB_POINTING_MODE_IDS,
     RGB_STAGE_BITS,
+    RGB_STAGE_MASK_ALL,
+    RGB_TAP_BRANCH_SEMANTICS,
     RGB_TAP_COMMIT_MODES,
     RgbDomainProtocolError,
     createRgbDomainV1,

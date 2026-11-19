@@ -4,7 +4,8 @@
 // against the step before it).
 
 import {DISCLOSURE, esc} from "../lib/dom.mjs";
-import {css, isOff} from "../lib/colour.mjs";
+import {css} from "../lib/colour.mjs";
+import {isPassthrough, swatchFor} from "../view/lighting.mjs";
 import {FIELDS_SHOWN} from "../view/review.mjs";
 import {keyNameMarked, mark, marked, valueMarked} from "./marks.mjs";
 import {tierName} from "../view/vocabulary.mjs";
@@ -13,7 +14,7 @@ import {tierName} from "../view/vocabulary.mjs";
 // off colour is drawn off, as it is everywhere else.
 /** @param {import("../../contracts/edits.js").Colour | null | undefined} colour */
 const swatch = (colour) => colour
-    ? `<i class="rv-swatch ${isOff(colour) ? "swatch-off" : ""}" style="${isOff(colour) ? "" : `background:${css(colour)}`}"></i>` : "";
+    ? `<i class="rv-swatch ${swatchFor(isPassthrough(colour) ? "passthrough" : "lit")}" style="${isPassthrough(colour) ? "" : `background:${css(colour)}`}"></i>` : "";
 // Everything with a colour of its own carries its mark, drawn as every
 // editor draws it (ui/marks.mjs): a tier's dot, a branch badge, a layer's
 // or pointing mode's icon in its colour, a combo badge, a stage's on/off dot.
@@ -59,7 +60,7 @@ const fields = (model, item) => {
     const head = item.fields.slice(0, FIELDS_SHOWN), rest = item.fields.slice(FIELDS_SHOWN);
     const row = field(model, item.fields.some((entry) => entry.labelMark));
     return `<div class="rv-fields">${head.map(row).join("")}${rest.length
-        ? `<details class="rv-more"><summary>${DISCLOSURE}Show all ${item.fields.length}</summary><div class="rv-fields">${rest.map(row).join("")}</div></details>` : ""}</div>`;
+        ? `<details class="rv-more"><summary class="disclose">${DISCLOSURE}<span>Show all ${item.fields.length}</span></summary><div class="rv-fields">${rest.map(row).join("")}</div></details>` : ""}</div>`;
 };
 
 // A behaviour is titled by its key's name, named as every surface names that

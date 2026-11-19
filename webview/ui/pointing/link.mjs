@@ -10,9 +10,9 @@ import {el, esc} from "../../lib/dom.mjs";
 import {LINK_ENDS} from "../../view/pointing-config.mjs";
 import {listed} from "../../view/vocabulary.mjs";
 import {linkIgnored, linkRows, pointerLayerCovers, withLayer} from "../../view/pointing-link.mjs";
-import {emptyLayers} from "../../view/empty-layers.mjs";
-import {marked} from "../marks.mjs";
-import {tipFor, words} from "./common.mjs";
+import {EMPTY_LAYERS_TITLE, emptyLayers} from "../../view/empty-layers.mjs";
+import {layerMarked, marked} from "../marks.mjs";
+import {choicesPart, tipFor, words} from "./common.mjs";
 import {keysRow} from "./keys-and-light.mjs";
 import {choiceField, choiceValue} from "../segmented.mjs";
 
@@ -20,16 +20,27 @@ import {choiceField, choiceValue} from "../segmented.mjs";
 /** @typedef {import("../../view/pointing-link.mjs").LinkRow} LinkRow */
 /** @typedef {import("../../../contracts/panel.js").PublishedModel} Model */
 
+// The step's rows, as it heads them.
+const ROWS = {keys: "Its keys", layers: "Layers"};
+
+// What the step's lists and its ending mean, read once in the step's info
+// mark (D-L96): the ending only while layers start the mode, as its field is.
+/** @param {Model} model @param {import("../surface-types.js").PresentedSlot} slot */
+export const startInfo = (model, slot) => ({
+    rows: [{term: ROWS.layers, says: tipFor(model, "linkedLayers")}, {term: words(model).linkLabels.keyTurnsOnShort, says: tipFor(model, "linkTurnsOn")}],
+    parts: slot.linkedLayers ? [choicesPart(model, "linkEnds", words(model).linkLabels.endsWhen)] : [],
+});
+
 /** @param {Model} model @param {import("../surface-types.js").PresentedSlot} slot @param {FormControls} controls @param {() => void} stage */
 export function startStep(model, slot, {form, disabled}, stage) {
     const P = words(model), L = P.linkLabels;
     const rows = linkRows(model, slot);
     const node = el(`<div class="pd-starts stack">
-        <div class="pd-row"><span class="pd-row-l">Its keys</span></div>
-        <div class="pd-row" data-tip="${esc(tipFor(model, "linkedLayers"))}"><span class="pd-row-l" id="pd-starts-${esc(slot.id)}">Layers</span></div>
-        <div class="pd-row" data-tip="${esc(tipFor(model, "linkTurnsOn"))}"><span class="pd-row-l" id="pd-turns-${esc(slot.id)}">${esc(L.keyTurnsOnShort)}</span></div></div>`);
+        <div class="pd-row"><span class="pd-row-l">${esc(ROWS.keys)}</span></div>
+        <div class="pd-row"><span class="pd-row-l" id="pd-starts-${esc(slot.id)}">${esc(ROWS.layers)}</span></div>
+        <div class="pd-row"><span class="pd-row-l" id="pd-turns-${esc(slot.id)}">${esc(L.keyTurnsOnShort)}</span></div></div>`);
     const [keys, starts, turns] = /** @type {HTMLElement[]} */ ([...node.querySelectorAll(".pd-row")]);
-    keys.append(keysRow(model, slot));
+    keys.append(keysRow(slot));
     let linked = slot.linkedLayers, turnsOn = slot.linkTurnsOn;
     form.linkedLayers = () => linked;
     form.linkTurnsOn = () => turnsOn;
@@ -42,18 +53,18 @@ export function startStep(model, slot, {form, disabled}, stage) {
     // What ends a mode its layers started, so only beside layers that start it.
     if (slot.linkedLayers) {
         const ends = el(`<div class="pd-row"><span class="pd-row-l" aria-hidden="true">${esc(L.endsWhen)}</span>${choiceField({label: L.linkEnds, f: `pointing:${slot.id}:linkEnds`,
-            choices: P.linkEnds, current: slot.linkEnds, disabled: Boolean(disabled), hideLabel: true,
-            tip: tipFor(model, "linkEnds")})}</div>`);
+            choices: P.linkEnds, current: slot.linkEnds, disabled: Boolean(disabled), hideLabel: true})}</div>`);
         form.linkEnds = () => Number(choiceValue(ends) || LINK_ENDS.NOTHING);
         node.append(ends);
     }
 
     const ignored = linkIgnored(model, slot);
     if (ignored) node.append(el(`<div class="callout warn" role="note">${esc(ignored)} Remove it.</div>`));
+    // The layers are named by their marks; the words around them are the app's own.
     const covers = pointerLayerCovers(model, slot);
     if (covers) {
-        const names = listed(covers.covered);
-        node.append(el(`<div class="callout warn" role="note">${esc(`${covers.pointer}, the pointer layer, sits above ${names}. This mode keeps the pointer layer on while its key runs it, so the pointer layer's keys cover ${names}'s wherever they are not transparent. Have its key turn on a layer above ${covers.pointer}, or choose Return to the typing layer under While it runs.`)}</div>`));
+        const pointer = layerMarked(model, covers.pointer), names = listed(covers.covered.map((layer) => layerMarked(model, layer)));
+        node.append(el(`<div class="callout warn" role="note">${pointer}, the pointer layer, sits above ${names}. This mode keeps the pointer layer on while its key runs it, so the pointer layer's keys cover ${names}'s wherever they are not transparent. Have its key turn on a layer above ${pointer}, or choose Return to the typing layer under While it runs.</div>`));
     }
     return node;
 }
@@ -77,7 +88,7 @@ function layerChips(model, rows, which, {disabled, empties, labelledBy, id, chan
         ${on.length ? "" : `<span class="note">None</span>`}
         ${off.length ? `<select class="input pd-add" data-f="${esc(id)}:add" aria-label="Add a layer" ${esc(disabled)}>
             <option value="">+ Add layer</option>${shown.map(option).join("")}
-            ${folded.length ? `<optgroup label="Empty layers">${folded.map(option).join("")}</optgroup>` : ""}</select>` : ""}
+            ${folded.length ? `<optgroup label="${esc(EMPTY_LAYERS_TITLE)}">${folded.map(option).join("")}</optgroup>` : ""}</select>` : ""}
     </div>`);
     node.querySelectorAll("[data-remove]").forEach((button) => button.addEventListener("click", () =>
         change(Number(/** @type {HTMLElement} */ (button).dataset.remove), false)));

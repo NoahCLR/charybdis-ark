@@ -90,7 +90,7 @@ function editableDomains(state) {
         busy: Boolean(state.busy), behaviors: Boolean(mask & PROFILE_WIRE_DOMAINS.KEY_BEHAVIORS) && complete,
         pointing: Boolean(mask & PROFILE_WIRE_DOMAINS.PD_MODES) && complete,
         combos: Boolean(mask & PROFILE_WIRE_DOMAINS.COMBOS) && committed && !state.busy,
-        macros: Boolean(state.macroView) && currentLayers, settings: Boolean(state.settingsView) && currentLayers,
+        macros: Boolean(state.macroView) && currentLayers, autocorrect: Boolean(state.autocorrectView) && currentLayers, settings: Boolean(state.settingsView) && currentLayers,
         customKeys: Boolean(state.customKeyView) && !state.busy,
     };
 }
@@ -169,9 +169,22 @@ function evaluateLiveMutationCompatibility(capabilities, compatibility, connecte
     };
 }
 
-// What the connected firmware says about itself, for the Keyboard screen and
-// Settings' "Built into this firmware": its version (the capability u32, major.minor.patch
-// in its top three bytes), whether this Ark works with it, and the ceilings it
+// The firmware version names the firmware release the build includes
+// (firmware D-F77): the year in bits 31-16, the month in bits 15-8, then the
+// release's .N (0-7) above a five-bit day. A value that names no date (firmware
+// from before release numbers reported 0x00010000) is said as such, never as a
+// made-up date.
+const UNNUMBERED_FIRMWARE = "from before release numbers";
+/** @param {number} version */
+function firmwareRelease(version) {
+    const year = version >>> 16, month = (version >>> 8) & 0xff, n = (version >>> 5) & 0x7, day = version & 0x1f;
+    if (year < 2000 || month < 1 || month > 12 || day < 1) return UNNUMBERED_FIRMWARE;
+    const two = (/** @type {number} */ value) => String(value).padStart(2, "0");
+    return `v${year}.${two(month)}.${two(day)}${n ? `.${n}` : ""}`;
+}
+
+// What the connected firmware says about itself, for the Keyboard screen: the
+// release it includes, whether this Ark works with it, and the ceilings it
 // was compiled with. Only what the keyboard reports, or Ark's own schema
 // limits; never a guess. Nothing without capabilities.
 /** @param {Partial<Caps> | null | undefined} capabilities */
@@ -182,7 +195,7 @@ function firmwareView(capabilities) {
     /** @param {unknown} value */
     const count = value => Number.isInteger(value) ? /** @type {number} */ (value) : null;
     return {
-        version: known ? `${(/** @type {number} */ (version) >>> 16) & 0xffff}.${(/** @type {number} */ (version) >>> 8) & 0xff}.${/** @type {number} */ (version) & 0xff}` : null,
+        version: known ? firmwareRelease(/** @type {number} */ (version)) : null,
         versionWord: known ? `0x${/** @type {number} */ (version).toString(16).toUpperCase().padStart(8, "0")}` : null,
         defaultsDigest: Number.isInteger(capabilities.compiledDefaultDigest) ? `0x${/** @type {number} */ (capabilities.compiledDefaultDigest).toString(16).toUpperCase().padStart(8, "0")}` : null,
         worksWithArk: canApply(capabilities),

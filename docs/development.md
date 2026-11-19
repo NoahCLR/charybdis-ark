@@ -146,6 +146,11 @@ them:
 - `scripts/generate-host-layouts.js` (`npm run host-layouts`) regenerates
   `core/data/host-layouts.json` from the pinned firmware fixture;
   `tests/data/host-layouts.test.js` checks it still reproduces.
+- `scripts/generate-autocorrect-words.js` (`npm run autocorrect-words`)
+  regenerates `core/data/autocorrect-words.json`, the characters an
+  autocorrect typo may hold and what each folds to, from the pinned firmware
+  fixture; `tests/data/autocorrect-words.test.js` checks it still reproduces.
+  `npm run upstream` runs both generators.
 
 node-hid is an optional dependency, so a native build that fails never stops
 the page's `npm ci`; without it the probe says so and stops. Which adapter
@@ -243,7 +248,10 @@ durability, split scheduling or a physical interruption. A successful
 Run `npm run preview`, serve the folder (`node scripts/serve.js . --port 8972`)
 and open `preview/index.html`. The page stands in for the web shell: it
 answers the panel's `ready` with one fixture model, turns the theme toggle,
-and logs every edit posted back. `?shell=` answers in other states (no
+and logs every edit posted back. It applies none of them. Two checks it does
+answer, by the production rules, since their screens wait on them: a macro's
+steps, and a text replacement edit, which the Text replacement screen posts
+only once its check has passed (`scripts/preview-macro-shell.mjs`). `?shell=` answers in other states (no
 keyboard, a browser without WebHID, the demo, a live keyboard; each is
 commented in `scripts/preview.js`), `?theme=light` starts in the light theme,
 and `?screen=lighting` opens a screen. `npm run preview -- --multiple` adds a
@@ -294,9 +302,9 @@ that is not on its published trunk. No automated check is hardware acceptance.
 
 A branch is tried through its pull request's preview: Cloudflare Pages builds
 every pull request's head and serves the branch at its Branch Preview URL,
-which follows the branch's latest build, given in Cloudflare's comment or
-check on the pull request. Open that **Try this PR** link in Chrome or Edge
-once the build has succeeded and the page's footer shows the head's commit
+which follows the branch's latest build. Open that **Try this PR** link in
+Chrome or Edge; the page's footer shows which commit it serves, so it is the
+head once the footer shows the head's commit
 ([publishing the web page](#publishing-the-web-page)).
 The preview has its own origin, so its recovery copies and remembered
 keyboard are its own; close any other Ark tab first, since one tab holds the
@@ -330,7 +338,8 @@ The shell runs `core/` and the interface through the shared panel loop; what
 it offers reaches the interface as `model.shell`. What it does, and why, is
 in the file comments of `web/`: the click-time `gesture` path Chrome's
 keyboard picker and file chooser need (`web/panel-channel.mjs`), the Web Lock
-that makes a second tab wait, the `beforeunload` warning, the worker clock
+that makes a second tab wait and the tabs' own turn-taking where the browser
+refuses it (`web/tab-turn.mjs`), the `beforeunload` warning, the worker clock
 that background tabs do not throttle, recovery copies in IndexedDB, and the
 phone notice (`web/phone.mjs`). A browser shell needs a secure context
 (HTTPS or localhost) for WebHID and the draft's `crypto.randomUUID()`.
@@ -368,11 +377,21 @@ stand in for `verify` or release CI. `npm run check` already holds the
 static-output contract (`tests/scripts/web-build.test.js`,
 `tests/scripts/check-static-site.test.js`).
 
-A pull request handoff includes a **Try this PR** link only once that head's
-Cloudflare build has succeeded and the page's footer shows that commit. The
-link is the Branch Preview URL from Cloudflare's pull request comment or
-check, which follows the branch, so the same link stays current as the
-branch moves; never build the address from the branch name yourself.
+Every pull request handoff includes a **Try this PR** link: the branch's
+Branch Preview URL, which follows the branch, so the same link stays current
+as the branch moves. It is never a commit's own
+`https://<hash>.charybdis-ark.pages.dev` address. The address follows from the
+branch name, so it is given before Cloudflare has finished building:
+`https://<alias>.charybdis-ark.pages.dev`, the alias being the branch name
+lowercased, each character outside `a-z0-9` replaced with `-`, cut to 28
+characters, and a `-` left at the end of the cut dropped (`fix/combo-inputs-wrap`
+is `fix-combo-inputs-wrap`, `refactor/keycode-layout-one-home` is
+`refactor-keycode-layout-one`). The handoff also gives the state of the
+head's build in the `Cloudflare Pages` check: done, so the footer shows the
+head's commit; still building, so until it finishes the link shows the
+branch's previous build, or does not load yet on a new branch; or failed.
+Where Cloudflare's comment or check reports a different Branch Preview URL,
+Cloudflare's address is the one to use.
 
 **Cloudflare project settings (Noah).** In the `charybdis-ark` project,
 connect `NoahCLR/charybdis-ark` with production branch `main`, framework
@@ -545,6 +564,7 @@ What can break Ark, and what checks it:
 | Stored profile format (blob, domains, settings, compiled defaults) | firmware `lib/profile/schema/` | schema version | the bridge's runners; agreement (fixtures equal) |
 | Action vocabulary and action-ABI digest | firmware, and BK keycode values | digest against `KNOWN_ACTION_ABIS` | agreement |
 | Keycode catalog and layout | BK | Ark's pinned BK inputs | agreement (files equal at firmware's BK pin); `npm run keycodes -- --check` |
-| Keymap and macro domains | firmware profile codecs and config | domain versions and capability capacities | golden codecs; candidate and macro-domain runners |
+| Keymap, macro and autocorrect domains | firmware profile codecs and config | domain versions and capability capacities | golden codecs; candidate, macro-domain and autocorrect-domain runners |
 | Keyboard options (RGB effects and order, LED flags) | BK's RGB matrix and firmware config | reported at runtime | `qmk_portable_editor` runner |
+| Lighting drawing (stage order and painting, LED by LED) | firmware RGB render path | the drawing cases (`rgb_render_v1.json`, pinned) | `tests/view/drawing-cases.test.mjs` (D-L99); agreement (fixtures equal) |
 | Behaviour on the keyboard | firmware | nothing | keyboard checks only |

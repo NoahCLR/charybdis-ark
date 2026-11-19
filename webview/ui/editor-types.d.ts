@@ -2,8 +2,8 @@ export interface PickerOptions {
     title: string;
     context?: string;
     contextKeycode?: string;
-    /** A layout key's layer, by its name: the header then names the key on it ("For Esc on Base"), never its layout index. */
-    onLayer?: string;
+    /** A layout key's layer, by its index: the header then names the key on it by the layer's mark ("For Esc on ▦ Base"), never its layout index. */
+    onLayer?: number;
     seed?: string[];
     mode?: 'single' | 'list';
     allowedKeys?: string[] | null;
@@ -12,6 +12,8 @@ export interface PickerOptions {
     /** A custom key's shortcut: modifiers from either side, mixed, an optional key and any layers (firmware D-F26), handed to `onShortcut`. */
     shortcut?: {mods: number; layers?: number; layerKind?: number} | null;
     maxKeys?: number;
+    /** Whether a list is held to the report's key slots, as a macro's chord is: six keys besides its modifiers (firmware D-F65). */
+    heldToReport?: boolean;
     onPick?: (expression: string) => void;
     onShortcut?: (shortcut: import('../../contracts/panel.js').CustomKeyShortcut) => void;
     /** Takes modifiers no keycode can hold as an unused custom key's shortcut: its keycode, the shortcut and a name. */

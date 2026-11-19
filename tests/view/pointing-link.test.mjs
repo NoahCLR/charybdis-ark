@@ -2,6 +2,7 @@
 // (model.pdModeEditing.linkTargets).
 import assert from "node:assert/strict";
 import test from "node:test";
+import {layerCalled} from "../../webview/view/vocabulary.mjs";
 import {createRequire} from "node:module";
 import {linkIgnored, linkRows, pointerLayerCovers} from "../../webview/view/pointing-link.mjs";
 
@@ -62,8 +63,11 @@ test("a stored layer the keyboard now ignores stays switchable off, and is said 
 });
 
 test("the layers the core says the pointer layer covers, named", () => {
-    assert.deepEqual(pointerLayerCovers(model(), {pointerCovers: 1 << 3}), {pointer: "Pointer", covered: ["Navigation"]});
-    assert.deepEqual(pointerLayerCovers(model(), {pointerCovers: 0b1010}), {pointer: "Pointer", covered: ["Numbers", "Navigation"]});
+    /** @param {ReturnType<typeof pointerLayerCovers>} covers */
+    const named = (covers) => covers && {pointer: layerCalled(covers.pointer), covered: covers.covered.map(layerCalled)};
+    assert.deepEqual(named(pointerLayerCovers(model(), {pointerCovers: 1 << 3})), {pointer: "Pointer", covered: ["Navigation"]});
+    assert.deepEqual(named(pointerLayerCovers(model(), {pointerCovers: 0b1010})), {pointer: "Pointer", covered: ["Numbers", "Navigation"]});
     assert.equal(pointerLayerCovers(model(), {pointerCovers: 0}), null);
     assert.equal(pointerLayerCovers(model(), {}), null);
+    assert.deepEqual(pointerLayerCovers(model(), {pointerCovers: 0b1010})?.covered.map((layer) => layer?.index), [1, 3], "the layers themselves, for the editor to mark");
 });
