@@ -45,7 +45,7 @@ test("WinCompose setup links follow the effective Windows host and enabled Unico
         const {snapshot} = hostMacros(word, []);
         snapshot.hostOs.detected = detected;
         const host = settingsEditorView(snapshot).sections.find(section => section.id === "host");
-        assert.deepEqual(host.githubLink, visible ? {label: "WinCompose on GitHub", url: "https://github.com/samhocevar/wincompose"} : undefined,
+        assert.deepEqual(host.githubLink, visible ? {label: "WinCompose on GitHub", url: "https://github.com/ell1010/wincompose"} : undefined,
             `Host word ${word}, detected ${detected}`);
     }
 });
