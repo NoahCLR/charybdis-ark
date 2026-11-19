@@ -282,7 +282,7 @@ The same kind of control looks and sits the same on every screen.
   (`browser-tests/macro-ux.spec.js`,
   `browser-tests/custom-key-behaviour.spec.js`,
   `browser-tests/pointing-controls.spec.js`).
-- A Settings screen (Behaviours, Combos, Pointer, Typing) draws its
+- A Settings screen (Behaviours, Combos, Typing, Pointer) draws its
   sections as open cards, none folding, and offers no search
   (`tests/view/settings-layout.test.mjs`,
   `browser-tests/settings-screens.spec.js`).

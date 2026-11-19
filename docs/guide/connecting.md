@@ -114,10 +114,10 @@ The column on the left is the rail. From the top:
   While the keyboard is busy the button waits. With no keyboard, or in the
   demo, its menu offers only **Choose keyboard…**.
 - The screens: **Keymap**, **Lighting**, **Macros**, **Custom keys** and
-  **Pointing modes** under Configure; **Behaviours**, **Combos**, **Pointer**
-  and **Typing** under Settings, each showing all its settings at once;
+  **Pointing modes** under Configure; **Behaviours**, **Combos**, **Typing**
+  and **Pointer** under Settings, each showing all its settings at once;
   **Backups** and **Keyboard** under Keyboard. Elsewhere Ark calls those four
-  Behaviour settings, Combo settings, Pointer settings and Typing settings.
+  Behaviour settings, Combo settings, Typing settings and Pointer settings.
 - Messages from Ark, each with ✕ to dismiss it. A long one scrolls in its own
   box rather than hiding the screens above it.
 - **Draft history**, with undo and redo arrows and a count of the steps so far.

@@ -326,7 +326,7 @@ const SETTINGS_SECTIONS = Object.freeze({
 // A Settings screen as anything but the rail names it. The rail lists
 // "Pointer" under Settings; a link, a tip or a fix that sends a person
 // there has no rail around it, so it says "Pointer settings".
-const SETTINGS_SCREENS = Object.freeze({behaviours: "Behaviour settings", combos: "Combo settings", pointer: "Pointer settings", host: "Typing settings"});
+const SETTINGS_SCREENS = Object.freeze({behaviours: "Behaviour settings", combos: "Combo settings", host: "Typing settings", pointer: "Pointer settings"});
 
 // Where a person finds a settings section, as a note core writes names it:
 // the Settings screen as it is named outside the rail, then the section's
