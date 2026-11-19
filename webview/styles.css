@@ -982,35 +982,21 @@ button.tier:hover { background: var(--surface-3); }
 .bench-tabs button[role="tab"].off { color: var(--text-3); }
 /* The step between two stages sits on their labels' middle line. */
 .bench-tabs .tab-sep { width: 1px; height: 18px; align-self: center; background: var(--line-2); margin: 0 var(--sp-2); }
-/* Each stage tab is exactly as wide as its label in the picked weight, with
-   less padding than the Keymap tabs and no gap between a tab and the step
-   beside it, so the seven stages and All accents fit a 1440px window; a
-   narrower one scrolls them. */
+/* Each stage tab is as wide as its label in the picked weight, whatever font
+   the system draws it in: the label's text is laid again, bold and unseen,
+   under itself, so picking a tab moves none. Lighting's tabs have less
+   padding than the Keymap's and no gap between a tab and the step beside it.
+   Where the names do not all fit, each tab reads by its short word (its stage
+   bar names it whole): fitStageWords, webview/ui/lighting.mjs, measures. */
 .bench-tabs button[data-ltab] { padding: 0 var(--sp-1); gap: var(--sp-1); }
 .lighting-bench .bench-tablist { gap: 0; }
 .lighting-bench .tab-sep { margin: 0 var(--sp-1); }
-.bench-tabs [data-ltab="base"] { width: 146px; }
-.bench-tabs [data-ltab="layers"] { width: 116px; }
-.bench-tabs [data-ltab="auto"] { width: 139px; }
-.bench-tabs [data-ltab="pd"] { width: 128px; }
-.bench-tabs [data-ltab="combo"] { width: 137px; }
-.bench-tabs [data-ltab="key"] { width: 155px; }
-.bench-tabs [data-ltab="autocorrect"] { width: 173px; }
-.bench-tabs [data-ltab="accents"] { width: 77px; }
-/* Where the window is too narrow for every stage's whole name, each tab
-   reads by its short word (its stage bar names it whole), at widths of their
-   own, so the strip still fits and nothing moves as a tab is picked. */
+.bench-tabs .tab-label [data-text] { display: inline-grid; }
+.bench-tabs .tab-label [data-text]::after { content: attr(data-text) / ""; font-weight: var(--fw-strong); height: 0; visibility: hidden; overflow: hidden; }
 .bench-tabs .tab-label .short { display: none; }
+.bench-tabs.short-words [data-ltab] .tab-label .long { display: none; }
+.bench-tabs.short-words [data-ltab] .tab-label .short { display: inline-grid; }
 @container content (max-width: 1153px) { /* window 1400 */
-  .bench-tabs [data-ltab] .tab-label .long { display: none; }
-  .bench-tabs [data-ltab] .tab-label .short { display: inline; }
-  .bench-tabs [data-ltab="base"] { width: 107px; }
-  .bench-tabs [data-ltab="layers"] { width: 74px; }
-  .bench-tabs [data-ltab="auto"] { width: 109px; }
-  .bench-tabs [data-ltab="pd"] { width: 84px; }
-  .bench-tabs [data-ltab="combo"] { width: 84px; }
-  .bench-tabs [data-ltab="key"] { width: 102px; }
-  .bench-tabs [data-ltab="autocorrect"] { width: 113px; }
   /* A narrower list leaves where it paints room for its whole choice. */
   .workbench .stage .tab-split.reach-split { grid-template-columns: 280px minmax(0, 1fr); }
   /* The stage bar keeps one line: the tab above already names the stage,
@@ -1186,8 +1172,10 @@ button.tier:hover { background: var(--surface-3); }
 .combo-builder > .card-b { padding: var(--sp-3); display: grid; gap: var(--sp-3); }
 /* Use this combo heads the form with Layers it runs on on its row, kept to
    the builder's right edge; its panel opens from that edge, so it stays
-   inside the builder (participation.mjs). */
-.combo-builder .def-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-3) var(--sp-6); }
+   inside the builder (participation.mjs). The two need only a small gap
+   between them, so the row holds in the builder's narrowest column with a
+   wider font than the Mac's. */
+.combo-builder .def-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-3); }
 .combo-builder .def-layers { margin-left: auto; }
 .combo-builder .def-pop { left: auto; right: 0; }
 .combo-inputs { gap: var(--sp-2); flex-wrap: wrap; }

@@ -385,9 +385,12 @@ The same kind of control looks and sits the same on every screen.
   without saying so: an end with more tabs past it fades, and while it does
   not fit an arrow at each end, outside what scrolls, moves it a page; Rename &
   reorder stays outside it (`keepInView`, `webview/ui/layerbar.mjs`).
-  Lighting's stage tabs and All accents fit a 1440px window by their names,
-  and a 1280px one by their short words (`stages[].short`), the stage bar
-  naming the stage whole; widths are fixed, so picking a tab moves none.
+  Lighting's stage tabs and All accents read by their names where every name
+  fits the strip, in the font the system draws, and otherwise by their short
+  words (`stages[].short`), the stage bar naming the stage whole; with the
+  Mac's font that is a 1440px window by names and a 1280px one by short words.
+  Each tab is as wide as its label in bold, so picking a tab moves none
+  (`fitStageWords`, `webview/ui/lighting.mjs`; D-L103).
 - A Keymap workbench tab's own actions sit in its body, by what they open:
   New combo heads the combo builder's column, centred on the table's first
   group band, and stays put when the builder opens under it. The tab bar carries only a tab's way to its screen, centred on the bar

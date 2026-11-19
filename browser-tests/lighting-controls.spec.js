@@ -1,7 +1,7 @@
 // @ts-check
 "use strict";
 const {test, expect} = require("@playwright/test");
-const {openControls, clearPosts, posted, expectPost, change, publishAccepted} = require("./control-preview");
+const {openControls, wideFont, clearPosts, posted, expectPost, change, publishAccepted} = require("./control-preview");
 
 const body = page => page.locator("#benchBody");
 const channel = (page, index) => body(page).locator(`[data-channel="${index}"]`);
@@ -763,6 +763,24 @@ test("every stage tab and All accents fit a 1440px window, whichever stage is se
         expect(await strip.evaluate(list => list.scrollWidth - list.clientWidth), `${stage}: the strip does not scroll`).toBeLessThanOrEqual(0);
         expect(await strip.locator(".tab-label").evaluateAll(labels => labels.filter(label => label.scrollWidth > label.clientWidth).map(label => label.textContent)),
             `${stage}: no name is cut`).toEqual([]);
+    }
+});
+
+// In a wider font the tabs keep the same promise, reading by their short
+// words where the names do not all fit, and picking a tab still moves none.
+test("in a font wider than the Mac's, the stage tabs fit a 1440px window with no name cut, and picking one moves none", async ({page}) => {
+    await page.setViewportSize({width: 1440, height: 900});
+    await openControls(page, "lighting", {stage: "layers", layer: 0}, "dark", "shell=demo");
+    await wideFont(page);
+    const strip = page.locator(".lighting-bench .bench-tablist");
+    const places = () => strip.locator('[role="tab"]').evaluateAll(tabs => tabs.map(tab => [tab.getBoundingClientRect().left, tab.getBoundingClientRect().width]));
+    const before = await places();
+    for (const stage of ["autocorrect", "accents", "base"]) {
+        await page.locator(`[data-ltab="${stage}"]`).click();
+        expect(await strip.evaluate(list => list.scrollWidth - list.clientWidth), `${stage}: the strip does not scroll`).toBeLessThanOrEqual(0);
+        expect(await strip.locator(".tab-label").evaluateAll(labels => labels.filter(label => label.scrollWidth > label.clientWidth).map(label => label.textContent)),
+            `${stage}: no name is cut`).toEqual([]);
+        expect(await places(), `${stage}: no tab moved`).toEqual(before);
     }
 });
 

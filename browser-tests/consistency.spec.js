@@ -1,7 +1,7 @@
 // @ts-check
 "use strict";
 const {test, expect} = require("@playwright/test");
-const {openControls, posted} = require("./control-preview");
+const {openControls, posted, wideFont} = require("./control-preview");
 
 // The same kind of control looks and behaves the same on every screen
 // (docs/spec/interface-contracts.md, Shared controls).
@@ -289,6 +289,20 @@ test("a combo's Layers it runs on sits on the Use this combo row, kept to the bu
         const {right} = await panelEdges(panel);
         expect(Math.abs(right - at.right), `panel from the button's right at ${width}`).toBeLessThanOrEqual(1);
     }
+});
+
+test("in a font wider than the Mac's, a combo's Layers it runs on still sits on the Use this combo row at 1024", async ({page}) => {
+    await page.setViewportSize({width: 1024, height: 1000});
+    const row = PANEL_EDITORS[0];
+    await openControls(page, row.screen, row.state);
+    await wideFont(page);
+    await page.getByRole("button", {name: row.opensWith, exact: true}).click();
+    const at = await page.locator(row.editor).evaluate(builder => {
+        const middle = (/** @type {Element} */ node) => { const box = node.getBoundingClientRect(); return box.top + box.height / 2; };
+        return {use: middle(/** @type {Element} */ (/** @type {Element} */ (builder.querySelector("[data-definition-enabled]")).closest(".sw"))),
+            layers: middle(/** @type {Element} */ (builder.querySelector('[data-act="definition-layers"]')))};
+    });
+    expect(Math.abs(at.use - at.layers), "one row").toBeLessThanOrEqual(1);
 });
 
 test("Layers it runs on shows whole with its empty layers unfolded, never cut off by the workbench", async ({page}) => {

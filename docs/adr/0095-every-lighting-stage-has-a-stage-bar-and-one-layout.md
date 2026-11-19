@@ -69,7 +69,8 @@ existing columns, and tidying only) he picked the stage bar: "B looks good".
   from the stages on each render, so an accent editor that grew it gives the
   room back. A passthrough colour keeps its square and fields, dimmed under
   what it means. The tabs keep fixed widths, reading by short words where the
-  window is too narrow for the names.
+  window is too narrow for the names. (D-L103 sizes them to their names in
+  bold instead, and reads by short words where the names do not fit.)
 
 This amends D-L89 and D-L93 where they place the switch on the section that
 says where or when the stage paints, and D-L93's "the two sections share the
