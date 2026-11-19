@@ -18,8 +18,8 @@
 // which only means something with Functions.
 //
 // Beyond that the folder must hold exactly what scripts/build-web.js writes:
-// index.html, _headers and content-hashed .js and .css files, as plain files,
-// no folders or links. _headers must mark exactly those hashed files immutable
+// index.html, _headers and content-hashed .js, .css, icon (.svg, .png) and
+// .webmanifest files, as plain files, no folders or links. _headers must mark exactly those hashed files immutable
 // and keep the page itself out of the cache, and keep every file out of search
 // engines, and send every file EVERY_FILE's headers. The page's Content
 // Security Policy must be in force both ways: in index.html's <meta> tag and as
@@ -29,7 +29,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
-const HASHED = /^[a-z]+-[A-Z0-9]{8}\.(js|css)$/;
+const HASHED = /^[a-z][a-z0-9]*-[A-Z0-9]{8}\.(js|css|svg|png|webmanifest)$/;
 const SERVER_CODE = ["_worker.js", "functions", "_routes.json"];
 // What any policy the page carries must say; only a header can say who may
 // frame it. The trusted-types directive names exactly the policies the page

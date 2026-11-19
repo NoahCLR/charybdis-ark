@@ -8,10 +8,17 @@ both halves. It works with the current firmware only.
 ## Where Ark runs
 
 Ark is a web page. Open <https://ark.ncleroy.dev> in Chrome or Edge on your
-computer. There is nothing to install. The page reaches the keyboard over
-WebHID, which only Chrome and Edge have, and only over HTTPS. In another
+computer; you don't need to install anything. The page reaches the keyboard
+over WebHID, which only Chrome and Edge have, and only over HTTPS. In another
 browser the page says Ark needs Chrome or Edge and offers only the demo. On a
 phone it shows a short notice instead: a phone can't reach the keyboard.
+
+To open Ark like an app, in its own window with the keyboard as its icon, save
+the page as one: in Chrome or Edge, **Install** from the address bar or the
+browser's menu. Safari can add it to the Dock or a home screen too, but only
+Chrome and Edge reach the keyboard. The app is the same page: it loads the
+newest Ark each time it opens, and remembers the same keyboard and recovery
+copies.
 
 ## On Linux
 

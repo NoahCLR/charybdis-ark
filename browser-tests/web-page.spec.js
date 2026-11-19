@@ -29,7 +29,8 @@ async function withKeyboard(context, baseURL, keyboards = 1, keyboard = fakeKeyb
         usagePage: QMK_RAW_HID_USAGE_PAGE, usage: QMK_RAW_HID_USAGE, bridge: "__fakeKeyboard", keyboards});
     const requests = [];
     context.on("request", (request) => requests.push(request.url()));
-    // Nothing but the page's own files: no fetch, no connection, no manifest.
+    // Nothing but the page's own files: no fetch, no connection, and never the
+    // build's manifest beside the site (dist/web-manifest.json).
     const ownFilesOnly = () => {
         const elsewhere = requests.filter((url) => !url.startsWith(new URL("/dist/web/", baseURL).href) && !url.startsWith("blob:"));
         expect(elsewhere).toEqual([]);

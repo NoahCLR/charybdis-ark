@@ -284,7 +284,8 @@ imports the same way, bringing its keys and macros.
    then flash both halves from the
    [latest firmware release](https://github.com/NoahCLR/charybdis-4x6/releases/latest).
 2. Open <https://ark.ncleroy.dev> in Chrome or Edge on a computer. The
-   page loads the newest Ark each time it opens.
+   page loads the newest Ark each time it opens. To keep it in its own
+   window, install it from the address bar as an app.
 3. Click **Choose keyboard…** and select the keyboard. From then on the page
    connects to it whenever it opens.
 4. In **Typing**, set your computer's system and keyboard layout, so keys and

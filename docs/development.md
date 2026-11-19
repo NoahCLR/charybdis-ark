@@ -317,7 +317,9 @@ The web page (D-L71) runs `core/` and the panel in Chrome or Edge.
 `dist/web/`; the file list, content hashing, version stamp (`ARK_COMMIT`
 overrides git), Content Security Policy (`POLICY`, written once) and
 `_headers` are described at the top of `scripts/build-web.js` and
-`web/_headers`. `dist/web-manifest.json`, beside the site, maps hashed names
+`web/_headers`. The page's icons and web app manifest are hashed files too,
+drawn from the board's geometry by `scripts/web-icon.js` (D-L104).
+`dist/web-manifest.json`, beside the site, maps hashed names
 for tests and is never published. The bundles are minified with their names
 kept, so a stack still names the source's functions; a test asks the build
 for each bundle's inputs rather than reading them out of the output.

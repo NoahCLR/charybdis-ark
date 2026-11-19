@@ -30,12 +30,15 @@ test("every file the build writes is named by its content, and the manifest besi
         /** @type {Partial<Record<"worker" | "panel" | "core", string[]>>} */
         const inputs = {};
         const manifest = await buildWeb({outdir, build, inputs});
-        assert.deepEqual(Object.keys(manifest).sort(), ["core", "panel", "shell", "styles", "worker"]);
+        assert.deepEqual(Object.keys(manifest).sort(), ["core", "favicon", "icon192", "icon512", "manifest", "maskable", "panel", "shell", "styles", "touch", "worker"]);
         assert.match(manifest.core, /^core-[A-Z0-9]{8}\.js$/);
         assert.match(manifest.shell, /^shell-[A-Z0-9]{8}\.js$/);
         assert.match(manifest.worker, /^worker-[A-Z0-9]{8}\.js$/);
         assert.match(manifest.panel, /^panel-[A-Z0-9]{8}\.js$/);
         assert.match(manifest.styles, /^styles-[A-Z0-9]{8}\.css$/);
+        assert.match(manifest.favicon, /^favicon-[A-Z0-9]{8}\.svg$/);
+        for (const name of ["touch", "icon192", "icon512", "maskable"]) assert.match(manifest[name], new RegExp(`^${name}-[A-Z0-9]{8}\\.png$`));
+        assert.match(manifest.manifest, /^manifest-[A-Z0-9]{8}\.webmanifest$/);
         assert.deepEqual(JSON.parse(fs.readFileSync(path.join(root, "web-manifest.json"), "utf8")), manifest, "the manifest is beside the site, never published");
         const written = fs.readdirSync(outdir).sort();
         const chunks = written.filter((name) => /^chunk-[A-Z0-9]{8}\.js$/.test(name));
@@ -108,6 +111,51 @@ test("the page names its files itself, carries its policy, and says what it was 
         assert.ok(shell.includes('"abc123"'), "the shell carries the build it was made from");
         for (const file of [manifest.shell, manifest.panel, ...fs.readdirSync(outdir).filter((name) => name.startsWith("chunk-"))]) {
             assert.doesNotMatch(fs.readFileSync(path.join(outdir, file), "utf8"), /\bfetch\(|XMLHttpRequest|WebSocket|EventSource|sendBeacon/, file);
+        }
+    } finally {
+        fs.rmSync(root, {recursive: true, force: true});
+    }
+});
+
+// A PNG's width, height and colour type, from its IHDR chunk.
+const pngHeader = (bytes) => ({
+    signature: bytes.subarray(0, 8).toString("hex"),
+    width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20), colour: bytes[25],
+});
+
+test("the page carries the board as its icon, and a manifest a browser saves it as a web app by", async () => {
+    const root = temporary();
+    const outdir = path.join(root, "web");
+    try {
+        const manifest = await buildWeb({outdir, build: {version: "1.2.3", commit: "abc123"}});
+        const page = fs.readFileSync(path.join(outdir, "index.html"), "utf8");
+        assert.ok(page.includes(`<link rel="icon" href="./${manifest.favicon}" type="image/svg+xml">`));
+        assert.ok(page.includes(`<link rel="apple-touch-icon" href="./${manifest.touch}">`), "Safari's Add to Home Screen and Dock read this");
+        assert.ok(page.includes(`<link rel="manifest" href="./${manifest.manifest}">`));
+        const policy = unescape(page.match(/http-equiv="Content-Security-Policy" content="([^"]+)"/)[1]).split("; ");
+        assert.ok(policy.includes("img-src 'self'") && policy.includes("manifest-src 'self'"), "the policy lets the page load its own icon and manifest");
+
+        // The favicon is the board: all 56 keys and the trackball, white on black.
+        const svg = fs.readFileSync(path.join(outdir, manifest.favicon), "utf8");
+        assert.equal((svg.match(/<rect /g) || []).length, 57, "a background and 56 keys");
+        assert.equal((svg.match(/<circle /g) || []).length, 1, "the trackball");
+        assert.match(svg, /^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg" viewBox="[-\d. ]+">/);
+
+        const app = JSON.parse(fs.readFileSync(path.join(outdir, manifest.manifest), "utf8"));
+        assert.equal(app.name, "Charybdis Ark");
+        assert.equal(app.short_name, "Ark");
+        assert.equal(app.display, "standalone");
+        assert.equal(app.start_url, "./");
+        // Chrome installs a page whose manifest has a 192 and a 512 icon; the
+        // maskable one is what Android's launcher crops to its own shape.
+        assert.deepEqual(app.icons.map((icon) => [icon.src, icon.sizes, icon.purpose]), [
+            [`./${manifest.icon192}`, "192x192", "any"],
+            [`./${manifest.icon512}`, "512x512", "any"],
+            [`./${manifest.maskable}`, "512x512", "maskable"],
+        ]);
+        for (const [name, size] of [["touch", 180], ["icon192", 192], ["icon512", 512], ["maskable", 512]]) {
+            const header = pngHeader(fs.readFileSync(path.join(outdir, manifest[name])));
+            assert.deepEqual(header, {signature: "89504e470d0a1a0a", width: size, height: size, colour: 0}, `${name} is a ${size}px greyscale PNG`);
         }
     } finally {
         fs.rmSync(root, {recursive: true, force: true});
