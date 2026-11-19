@@ -984,18 +984,10 @@ button.tier:hover { background: var(--surface-3); }
 .bench-tabs .tab-sep { width: 1px; height: 18px; align-self: center; background: var(--line-2); margin: 0 var(--sp-2); }
 /* Each stage tab is as wide as its label in the picked weight, whatever font
    the system draws it in: the label's text is laid again, bold and unseen,
-   under itself, so picking a tab moves none. Lighting's tabs have less
-   padding than the Keymap's and no gap between a tab and the step beside it.
-   Where the names do not all fit, each tab reads by its short word (its stage
-   bar names it whole): fitStageWords, webview/ui/lighting.mjs, measures. */
-.bench-tabs button[data-ltab] { padding: 0 var(--sp-1); gap: var(--sp-1); }
-.lighting-bench .bench-tablist { gap: 0; }
-.lighting-bench .tab-sep { margin: 0 var(--sp-1); }
+   under itself, so picking a tab moves none. They keep the Keymap's padding
+   and gaps, as the layer tabs do, and read by their short words (D-L105). */
 .bench-tabs .tab-label [data-text] { display: inline-grid; }
 .bench-tabs .tab-label [data-text]::after { content: attr(data-text) / ""; font-weight: var(--fw-strong); height: 0; visibility: hidden; overflow: hidden; }
-.bench-tabs .tab-label .short { display: none; }
-.bench-tabs.short-words [data-ltab] .tab-label .long { display: none; }
-.bench-tabs.short-words [data-ltab] .tab-label .short { display: inline-grid; }
 @container content (max-width: 1153px) { /* window 1400 */
   /* A narrower list leaves where it paints room for its whole choice. */
   .workbench .stage .tab-split.reach-split { grid-template-columns: 280px minmax(0, 1fr); }

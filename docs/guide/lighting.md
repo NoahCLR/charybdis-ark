@@ -32,9 +32,10 @@ Lighting is painted in seven stages, each over the one before it:
 
 Each stage's tab shows the colour it paints for what it has picked: hatched
 when that colour is passthrough, dark and struck through when it is off, and
-hollow while the stage paints nothing. In a narrow window the tabs read by a
-short word (**Background**, **Layers**, **Auto-mouse**, **Pointing**,
-**Combos**, **Behaviours**, **Replacement**).
+hollow while the stage paints nothing. The tabs read by a short word
+(**Background**, **Layers**, **Auto-mouse**, **Pointing modes**, **Combos**,
+**Behaviours**, **Text replacements**); the stage bar below names the stage
+in full.
 
 Every stage is laid out the same way, so switching tabs moves nothing they
 share. Across its top, the **stage bar** holds what is the whole stage's:

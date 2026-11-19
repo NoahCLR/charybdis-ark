@@ -678,10 +678,10 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
         {id: "base", label: "Background effect", short: "Background"},
         {id: "layers", label: "Layer colours", short: "Layers", bit: RGB_STAGE_BITS.LAYER},
         {id: "auto", label: "Auto-mouse fade", short: "Auto-mouse", bit: RGB_STAGE_BITS.AUTOMOUSE},
-        {id: "pd", label: "Pointing modes", short: "Pointing", bit: RGB_STAGE_BITS.POINTING_MODE},
+        {id: "pd", label: "Pointing modes", short: "Pointing modes", bit: RGB_STAGE_BITS.POINTING_MODE},
         {id: "combo", label: "Combo feedback", short: "Combos", bit: RGB_STAGE_BITS.COMBO},
         {id: "key", label: "Behaviour feedback", short: "Behaviours", bit: RGB_STAGE_BITS.KEY_BEHAVIOR},
-        {id: "autocorrect", label: "Replacement feedback", short: "Replacement", bit: RGB_STAGE_BITS.AUTOCORRECT},
+        {id: "autocorrect", label: "Replacement feedback", short: "Text replacements", bit: RGB_STAGE_BITS.AUTOCORRECT},
     ],
     // Lighting's last tab, which lists every stage's accents and is no stage.
     allAccents: "All accents",

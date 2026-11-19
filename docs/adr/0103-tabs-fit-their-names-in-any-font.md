@@ -2,6 +2,8 @@
 
 Cited as D-L103. Amends D-L95 where it says the stage tabs keep fixed widths.
 
+Amended 2026-11-20 (D-L105): the stage tabs read by their short words at every width, with the layer tabs' padding, so the measure that chose between names and short words (`fitStageWords`) is gone. Each tab is still as wide as its word in bold.
+
 Lighting's stage tabs had fixed widths in pixels, set from their names in the
 Mac's system font, with a narrower set and short words below a 1400px window.
 Ark draws its text in the system's own font, and other systems draw it wider:
