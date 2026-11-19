@@ -181,9 +181,9 @@ _Avoid_: reset, wipe, factory reset (for this)
 **Screen**:
 One of Ark's top-level views chosen from the rail, in three groups: Keymap,
 Lighting, Macros, Text replacement, Custom keys and Pointing modes under
-Configure; Behaviours, Combos, Pointer and Typing under Settings; Backups and
+Configure; Behaviours, Combos, Typing and Pointer under Settings; Backups and
 Keyboard under Keyboard. Outside the rail, a Settings screen is named with "settings" after
-it (Behaviour settings, Combo settings, Pointer settings, Typing settings),
+it (Behaviour settings, Combo settings, Typing settings, Pointer settings),
 since nothing around a link or a tip says it is one.
 _Avoid_: page, tab, area (for this), surface, panel
 
