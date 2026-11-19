@@ -752,8 +752,27 @@ const openReplacement = (page, state = {}, theme = "dark") =>
     openControls(page, "lighting", {stage: "autocorrect", layer: 0, replacementRow: "textColor", ...state}, theme, "shell=demo");
 const flashPost = config => ({type: "updateAutocorrectFeedback", config: {...FLASH, ...config}});
 
-// The strip's widths are set so every stage fits a 1440px window with none
-// scrolled out of sight and no name cut short.
+// The stage tabs keep the layer tabs' padding and gaps, read by their short
+// words at any width (D-L105), and fit a 1440px window with none scrolled
+// out of sight and no name cut short.
+test("the stage tabs are spaced as the layer tabs are", async ({page}) => {
+    await openControls(page, "lighting", {stage: "combo", layer: 0}, "dark", "shell=demo");
+    const spacing = (selector) => page.locator(selector).first().evaluate((tab) => {
+        const style = getComputedStyle(tab);
+        return [style.paddingLeft, style.paddingRight, style.columnGap, getComputedStyle(/** @type {Element} */ (tab.parentElement)).columnGap];
+    });
+    expect(await spacing(".lighting-bench [data-ltab]")).toEqual(await spacing(".layer-tab"));
+});
+
+test("the stage tabs read by their short words in a wide window, each named whole for a screen reader and in its tip", async ({page}) => {
+    await page.setViewportSize({width: 1920, height: 900});
+    await openControls(page, "lighting", {stage: "combo", layer: 0}, "dark", "shell=demo");
+    const tabs = page.locator(".lighting-bench [data-ltab]");
+    await expect(tabs.locator(".tab-label")).toHaveText(["Background", "Layers", "Auto-mouse", "Pointing modes", "Combos", "Behaviours", "Text replacements", "All accents"]);
+    await expect(page.locator('[data-ltab="key"]')).toHaveAttribute("aria-label", "Behaviour feedback");
+    await expect(page.locator('[data-ltab="key"]')).toHaveAttribute("data-tip", /^Behaviour feedback · painted 6 of 7/);
+});
+
 test("every stage tab and All accents fit a 1440px window, whichever stage is selected", async ({page}) => {
     await page.setViewportSize({width: 1440, height: 900});
     for (const stage of ["autocorrect", "layers"]) {
@@ -766,10 +785,11 @@ test("every stage tab and All accents fit a 1440px window, whichever stage is se
     }
 });
 
-// In a wider font the tabs keep the same promise, reading by their short
-// words where the names do not all fit, and picking a tab still moves none.
-test("in a font wider than the Mac's, the stage tabs fit a 1440px window with no name cut, and picking one moves none", async ({page}) => {
-    await page.setViewportSize({width: 1440, height: 900});
+// In a wider font the tabs still fit, each as wide as its word, and picking
+// a tab moves none. Those words need a little more than 1440px there
+// (Windows' 1536px, a 1920px screen at 125%, holds them).
+test("in a font wider than the Mac's, the stage tabs fit a 1536px window with no name cut, and picking one moves none", async ({page}) => {
+    await page.setViewportSize({width: 1536, height: 900});
     await openControls(page, "lighting", {stage: "layers", layer: 0}, "dark", "shell=demo");
     await wideFont(page);
     const strip = page.locator(".lighting-bench .bench-tablist");
@@ -784,16 +804,11 @@ test("in a font wider than the Mac's, the stage tabs fit a 1440px window with no
     }
 });
 
-// Narrower, each tab reads by its short word, its stage bar naming it whole,
-// so the strip still fits a 1280px window and keeps one line.
-test("the stage tabs fit a 1280px window by their short words, and every stage bar keeps one line", async ({page}) => {
+// Narrower, every stage bar keeps one line; a strip too wide scrolls
+// (keepInView).
+test("at 1280px every stage bar keeps one line", async ({page}) => {
     await page.setViewportSize({width: 1280, height: 800});
     await openControls(page, "lighting", {stage: "key", layer: 0}, "dark", "shell=demo");
-    const strip = page.locator(".lighting-bench .bench-tablist");
-    expect(await strip.evaluate(list => list.scrollWidth - list.clientWidth), "the strip does not scroll").toBeLessThanOrEqual(0);
-    await expect(page.locator('[data-ltab="key"] .tab-label .short')).toBeVisible();
-    await expect(page.locator('[data-ltab="key"] .tab-label .short')).toHaveText("Behaviours");
-    await expect(page.locator('[data-ltab="key"]')).toHaveAttribute("aria-label", "Behaviour feedback");
     for (const stage of ["base", "layers", "auto", "pd", "combo", "key", "autocorrect", "accents"]) {
         await page.locator(`[data-ltab="${stage}"]`).click();
         expect(await body(page).locator(".stage-bar").evaluate((bar) => Math.round(bar.getBoundingClientRect().height)), stage).toBeLessThanOrEqual(42);
@@ -832,7 +847,8 @@ test("replacement feedback is the seventh stage, lists its four cases once, and 
     const tab = page.locator("#stage-tab-autocorrect");
     await expect(tab).toHaveAttribute("aria-selected", "true");
     await expect(tab.locator(".n")).toHaveText("7");
-    await expect(tab.locator(".tab-label .long")).toHaveText("Replacement feedback");
+    await expect(tab.locator(".tab-label")).toHaveText("Text replacements");
+    await expect(tab).toHaveAttribute("aria-label", "Replacement feedback");
     await expect(tab).toHaveAttribute("data-tip", "Replacement feedback · painted 7 of 7");
     const list = body(page).locator('[data-scroll-list="lighting-replacements"]');
     await expect(list.locator(".group-h .ttl")).toHaveText(["Cases"]);

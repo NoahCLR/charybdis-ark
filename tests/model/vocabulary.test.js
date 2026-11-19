@@ -129,7 +129,7 @@ test("each Behaviour feedback case says when it shows and how, once for each kin
 
 test("replacement feedback is named for what a person calls the feature, and never autocorrect", () => {
     const stage = VOCABULARY.stages.at(-1);
-    assert.deepEqual(stage, {id: "autocorrect", label: "Replacement feedback", short: "Replacement", bit: rgb.RGB_STAGE_BITS.AUTOCORRECT}, "the last stage painted, by the firmware's name for it in code and Ark's on screen");
+    assert.deepEqual(stage, {id: "autocorrect", label: "Replacement feedback", short: "Text replacements", bit: rgb.RGB_STAGE_BITS.AUTOCORRECT}, "the last stage painted, by the firmware's name for it in code and Ark's on screen");
     assert.deepEqual(VOCABULARY.replacementOwners.map(([, words]) => words), ["Every case", "Replaced with text", "Replaced by a macro", "Replacement undone", "Leader waiting"]);
     const read = [...VOCABULARY.replacementOwners.map(([, words]) => words), stage.label, ...Object.values(VOCABULARY.colourOff.autocorrect), ...Object.values(VOCABULARY.lightingLists.replacements),
         VOCABULARY.accents.autocorrect.when, VOCABULARY.accents.autocorrect.every, VOCABULARY.accents.autocorrect.stageColour];
