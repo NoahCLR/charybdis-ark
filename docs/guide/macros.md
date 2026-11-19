@@ -159,9 +159,11 @@ your computer's system, a warning under the button says so.
 - **ISO keyboard on macOS**: turn it on if macOS set this keyboard up as ISO.
   macOS then swaps the keys left of 1 and left of Z, and macros swap them too.
 - **Unicode playback** (Windows and Linux) types characters your layout can't,
-  such as emoji. On Windows it needs WinCompose running, with Right Alt as
-  Compose; Ark links to it. On Linux it uses Ctrl+Shift+U, which not every app
-  accepts.
+  such as emoji. On Windows it types Right Alt, U, the character's
+  hexadecimal code and Enter, so it needs a compose program running that
+  turns those into the character, with Right Alt as its Compose key.
+  WinCompose is one, and Ark links to it; others work the same way. On Linux
+  it uses Ctrl+Shift+U, which not every app accepts.
 
 On macOS, choose the **Unicode Hex Input** layout for emoji and other
 characters your layout can't type, and make it your Mac's input source. While

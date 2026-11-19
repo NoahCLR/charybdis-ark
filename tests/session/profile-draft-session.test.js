@@ -554,7 +554,7 @@ function unicodeDraft(detected = 1) {
     return {snapshot, caps, draft:new ProfileDraftSession(snapshot, 'board', caps)};
 }
 test("Unicode survives real draft Review, history, undo/redo and an unrelated edit", () => {
-    // Windows, where Unicode playback is a switch: WinCompose enters what US cannot type.
+    // Windows, where Unicode playback is a switch: a compose program enters what US cannot type.
     const {draft,caps} = unicodeDraft(2);
     stage(draft,settings(draft,'host',{hostOs:'0',unicodeEnabled:true}));
     const text = ' café “hello” 🙂 e\u0301 👩‍💻 ';

@@ -72,6 +72,8 @@ for (const theme of ["dark", "light"]) {
         await host.locator('label.sw:has([data-macro="unicodeEnabled"])').click();
         expect((await stagePosted()).fields).toContainEqual({macro: "unicodeEnabled", enabled: true});
         await expect(link).toBeVisible();
+        // WinCompose is one compose program among others, not the only one.
+        await expect(host).toContainText("Needs a compose program running that types a character from Right Alt, U, its hexadecimal code and Enter, such as WinCompose.");
         await expect(link).toHaveAttribute("href", "https://github.com/ell1010/wincompose");
         await expect(link.locator("svg")).toHaveAttribute("aria-hidden", "true");
         expect(await link.locator("svg").evaluate(icon => ({width: icon.getBoundingClientRect().width, height: icon.getBoundingClientRect().height, filled: getComputedStyle(icon).fill !== "none", stroke: getComputedStyle(icon).stroke}))).toEqual({width: 14, height: 14, filled: true, stroke: "none"});

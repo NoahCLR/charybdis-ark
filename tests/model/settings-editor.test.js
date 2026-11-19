@@ -49,6 +49,23 @@ test("WinCompose setup links follow the effective Windows host and enabled Unico
             `Host word ${word}, detected ${detected}`);
     }
 });
+// Unicode playback on Windows sends Right Alt, U, the hexadecimal code and
+// Enter; any compose program that takes them types it, so WinCompose is one
+// example among others, never the only program named as needed.
+test("Windows Unicode playback asks for a compose program, WinCompose one example", () => {
+    const {hostMacros} = require("../fixtures/host-macros");
+    const {VOCABULARY} = require("../../core/model/vocabulary");
+    const {snapshot} = hostMacros(0x102, []);
+    const field = settingsEditorView(snapshot).sections.find(section => section.id === "host").fields.find(field => field.macro === "unicodeEnabled");
+    const entry = VOCABULARY.unicodeEntry.find(([mode]) => mode === 2)[1];
+    for (const [where, text] of [["the switch's hint", field.hint], ["the macro editor's line", entry]]) {
+        assert.match(text, /compose program/, where);
+        assert.match(text, /Right Alt, U, (its|the character's) hexadecimal code and Enter/, `${where} says what the program must take`);
+        assert.match(text, /such as WinCompose/, `${where} names WinCompose as an example`);
+        assert.doesNotMatch(text, /needs WinCompose|install and run WinCompose/i, where);
+    }
+});
+
 function message(current, sectionId, updates = {}) {
     const section = settingsEditorView(current).sections.find(section => section.id === sectionId);
     return {type: "updateConfigDefaults", sectionId, fields: section.fields.map(field => field.kind === "toggle" ? {macro: field.macro, enabled: updates[field.macro] ?? field.enabled} : {macro: field.macro, value: updates[field.macro] ?? field.value})};

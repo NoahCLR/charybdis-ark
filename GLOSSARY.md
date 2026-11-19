@@ -289,6 +289,14 @@ which, and shows the macro's text when that is all it is.
 _Avoid_: simulator, test box; preview (for the section: the preview is the
 line under its box)
 
+**Compose program**:
+A Windows program that types a character from its Compose key, U, the
+character's hexadecimal code and Enter. Unicode playback on Windows sends that
+sequence with Right Alt as the Compose key, so it needs one running. Ark names
+WinCompose as one example and links to it, and says others work the same way
+without naming them.
+_Avoid_: WinCompose (for any such program), input method, IME
+
 **Area**:
 The part of the profile Review groups its changes under, mostly one screen's,
 and named as that screen is: Pointer is what Pointer settings edits. Settings
