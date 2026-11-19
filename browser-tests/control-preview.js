@@ -16,6 +16,14 @@ async function openControls(page, screen, state = {}, theme = "dark", search = "
     }, state);
 }
 
+// Draws the interface in a font wider than the Mac's, as Linux (DejaVu Sans)
+// or Windows may, and draws it again, so a layout measured in one font is
+// held to fit any.
+const wideFont = page => page.evaluate(async () => {
+    document.head.append(Object.assign(document.createElement("style"), {textContent: ':root { --sans: Verdana, "DejaVu Sans", sans-serif; }'}));
+    (await import("/webview/store.mjs")).render();
+});
+
 const clearPosts = page => page.evaluate(() => {window.__posted.length = 0;});
 const posted = page => page.evaluate(() => window.__posted);
 
@@ -88,4 +96,4 @@ const behaviourSteps = (page, keycode) => page.evaluate(async (keycode) => {
     return getModel().keyBehaviors.find((entry) => entry.keycode === keycode)?.steps || [];
 }, keycode);
 
-module.exports = {openControls, clearPosts, posted, expectPost, change, publishAccepted, publishBehaviour, behaviourSteps};
+module.exports = {openControls, wideFont, clearPosts, posted, expectPost, change, publishAccepted, publishBehaviour, behaviourSteps};
