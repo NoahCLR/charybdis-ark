@@ -280,7 +280,7 @@ function settingsSections(snapshot, settings) {
     const layoutWord = id => VOCABULARY.hostLayouts.find(([value]) => value === id)?.[1];
     result.push({id: "host", area: AREA.settings, label: SECTION.host,
         ...(host.effective === 2 && host.unicodeEnabled
-            ? {githubLink: {label: "WinCompose on GitHub", url: "https://github.com/samhocevar/wincompose"}} : {}),
+            ? {githubLink: {label: "WinCompose on GitHub", url: "https://github.com/ell1010/wincompose"}} : {}),
         // Auto can follow detection onto another OS than the layout's; a
         // operating system chosen here carries the layout along (followHostOs).
         ...(!host.layoutFits
