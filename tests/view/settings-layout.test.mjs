@@ -14,11 +14,11 @@ const byId = (id) => sections.find((section) => section.id === id);
 const ids = (screen) => sectionsOn(sections, screen).map((section) => section.id);
 
 test("each Settings screen draws its sections in the order a person reads them", () => {
-    assert.deepEqual(Object.keys(SETTINGS_SCREENS), ["behaviours", "combos", "pointer", "host"]);
+    assert.deepEqual(Object.keys(SETTINGS_SCREENS), ["behaviours", "combos", "host", "pointer"]);
     assert.deepEqual(ids("behaviours"), ["behaviorSettings", "keyTiming"], "where behaviours run, then Tap & hold timing");
     assert.deepEqual(ids("combos"), ["comboSettings", "comboReferences"], "Combos, then Combo layer matching");
-    assert.deepEqual(ids("pointer"), ["normalPointerSpeed", "sniping", "autoMouse"], "everything filed under Pointer");
     assert.deepEqual(ids("host"), ["host", "autocorrect"], "Your computer, then Text replacement, which types through its layout");
+    assert.deepEqual(ids("pointer"), ["normalPointerSpeed", "sniping", "autoMouse"], "everything filed under Pointer");
     assert.deepEqual(sectionsOn(sections, "keys"), [], "a screen that is not a Settings one draws none");
 });
 

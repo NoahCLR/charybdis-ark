@@ -66,6 +66,15 @@ test("Timings opens the behaviour's timings in a panel that stays open while the
     expect(errors).toEqual([]);
 });
 
+test("a dual-role key's timings keep one width though its Tap / hold names a longer default", async ({page}) => {
+    await openControls(page, "keys", {tab: "behaviours", behaviourRow: "LT(3,KC_SLASH)", foldsOpen: ["behaviour:timings"]});
+    const panel = timings(page).locator(".def-pop");
+    await expect(panel.locator('[data-term="tapHoldTerm"]')).toHaveAttribute("placeholder", /· dual-role$/);
+    await expect(panel.locator('[data-term="multiTapTerm"]')).toHaveAttribute("placeholder", /· default$/);
+    const widths = await panel.locator("[data-term]").evaluateAll((fields) => fields.map((field) => field.getBoundingClientRect().width));
+    expect(new Set(widths).size).toBe(1);
+});
+
 test("a Tap / hold at or past the Long hold stays in its field, edged red with the reason, and the rail says core's refusal (D-L82)", async ({page}) => {
     await openControls(page, "keys", {tab: "behaviours", behaviourRow: "KC_LEFT_GUI"});
     await button(page).click();

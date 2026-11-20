@@ -36,7 +36,7 @@ export interface PanelState {
     /** The Text replacement screen's search, and the entry open in its editor, by its id (null: the first shown). */
     autocorrectSearch: string; autocorrectEntry: string | null;
     /** A replacement being made, or null: its kind, its text or macro slot, and its first input as typed so far. It joins the list with that input; `sent` once that is posted, the list it was posted against, and `made`, the id core's check said its entry would have. `label` is what core's check calls it, and `joins` the entry the list already has for it, as the check said, with core's sentence for it. `shown` while its editor is the one open. */
-    autocorrectNew: {kind: 'text' | 'macro'; text: string; macro: number | null; input?: string; fires?: import('../contracts/edits.js').AutocorrectTrigger; label?: string; joins?: {entry: string; said: string} | null; shown: boolean; sent?: string; made?: string; emptied?: {entry: string; sent?: string}} | null;
+    autocorrectNew: {kind: 'text' | 'macro'; text: string; macro: number | null; input?: string; fires?: import('../contracts/edits.js').AutocorrectTrigger; label?: string; joins?: {entry: string; said: string} | null; shown: boolean; sent?: string; made?: string; left?: boolean; emptied?: {entry: string; sent?: string}} | null;
     /** What is open in the editor of the entry with this id: Text or Macro picked there and not yet kept (`kind`), the field that adds inputs (`more`, `left` once it was left with an input on its way), or one input being written anew (`input`, with `typo`, its stored letters); `sent` once an edit from it is posted, the list it was posted against, and `follow`, the id core's check said the entry would then have. */
     autocorrectEdit: {entry: string; part: 'kind' | 'more' | 'input'; typo?: string; kind?: 'text' | 'macro'; left?: boolean; sent?: string; follow?: string} | null;
     /** Whether the Export menu is open. */
@@ -63,4 +63,8 @@ export interface PanelState {
     leaveDemo: {ask: {title: string; detail: string; confirm: string}; message: PanelCommand} | null;
     modeAsk: {mode: number; question: 'saveOrRevert' | 'sendOrDiscard'} | null;
     confirmChecks: number | null; picker: PickerState | null; notice: string; error: string;
+    /** The notice holds while its condition does, until the core takes it back (D-L106). */
+    noticeLasting: boolean;
+    /** The keyboard's own error as dismissed: hidden until it says something else. */
+    healthDismissed: string;
 }

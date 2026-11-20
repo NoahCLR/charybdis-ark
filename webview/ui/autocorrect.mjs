@@ -58,6 +58,7 @@ import {topbar} from "./frame.mjs";
 import {dialogFoot} from "./dialog-foot.mjs";
 import {openPicker} from "./picker.mjs";
 import {attachInfoMarks, infoMark} from "./info-mark.mjs";
+import {attachHostTyping, hostTyping} from "./host-typing.mjs";
 import {sectionPath, settingLabel} from "../view/settings-layout.mjs";
 import {marked, phraseMarked, replacementMark} from "./marks.mjs";
 import {titleText} from "./title-name.mjs";
@@ -324,7 +325,9 @@ export function screenAutocorrect() {
 }
 
 // What the core's answer leaves of the forms. A new replacement the list took
-// is the entry open from then on, with the field for its next input ready. An
+// is the entry open from then on, with the field for its next input ready,
+// unless its first input was kept by leaving its field: the focus stays where
+// it went then, and no field is opened to take it back. An
 // edit it took closes the field it came from, but for the field that adds
 // inputs, which stays for the next one unless it was left; an entry whose
 // replacement changed is followed to where it is now, which the check said
@@ -340,7 +343,7 @@ function settle(model, list) {
         state.autocorrectCheck = null;
         // Left for another replacement while it was on its way, it does not
         // take the editor back.
-        if (made && fresh.shown) Object.assign(state, {autocorrectEntry: made.id, autocorrectEdit: {entry: made.id, part: "more"}});
+        if (made && fresh.shown) Object.assign(state, {autocorrectEntry: made.id, autocorrectEdit: fresh.left ? null : {entry: made.id, part: "more"}});
     } else if (fresh?.sent && state.error) state.autocorrectNew = {...fresh, sent: undefined};
     // A replacement whose last input was removed waits as one being made.
     // Refused, it is the entry it was; once the removal lands it is asked
@@ -530,6 +533,16 @@ function replacementControls(model, f, value, canEdit, most, pending = "") {
         ${pending ? `<p class="note ac-macro-none" data-ac-pending>${esc(pending)}</p>` : ""}</div>`;
 }
 
+// How an editor ends: Try it, then, for a replacement that types text, the
+// layout it types through, as the macro editor ends. One that plays a macro
+// has no such line: its macro's own editor says that of the macro.
+/** @param {Model} model @param {List} list @param {Named["kind"]} kind */
+function editorEnd(model, list, kind) {
+    const tried = trySection(model, list);
+    return kind === "macro" ? [tried] : [tried, el(`<div class="stack macro-footer">${hostTyping(model, {id: "ac-info-typing", label: "How a replacement's text types",
+        subject: "Replacement text", what: "replacements", more: "A character the layout can't type can't be a replacement's text: Unicode entry is for macros."})}</div>`)];
+}
+
 // The counter under a replacement's text follows each keystroke.
 /** @param {HTMLElement} card @param {number} most */
 function countsBytes(card, most) {
@@ -640,8 +653,9 @@ function entryEditor(model, list, entry, canEdit) {
             ${entry.typos.map((typo) => typo.warnings.map((warning) => `<p class="note warn" data-ac-warning="${esc(typo.typo)}"><span class="mono">${esc(typo.input)}</span> ${esc(warning)}</p>`).join("")).join("")}
             <div data-ac-feedback="input" hidden></div>
         </div></div>`);
-    /** @type {HTMLElement} */ (card.querySelector(".card-b")).appendChild(trySection(model, list));
+    /** @type {HTMLElement} */ (card.querySelector(".card-b")).append(...editorEnd(model, list, value.kind));
     attachInfoMarks(card);
+    attachHostTyping(card);
     countsBytes(card, list.usage.correctionMax);
     const identity = () => identityOf(getModel());
     const target = replacementOf(entry);
@@ -774,14 +788,17 @@ function entryEditor(model, list, entry, canEdit) {
 // the input that puts it back. The screen makes one at a time: with another
 // begun and waiting in the bank, the replacement is deleted, and Undo takes
 // it back.
+// What a replacement being made is and how it fires, and the ⓘ marks: the
+// focus going to one from its first input keeps nothing yet.
+const REPLACEMENT_OWN = '[data-ac-text], [data-ac-macro], [data-act="ac-pick"], [name$=":kind"], [name$=":fires"], [data-info-mark]';
 const keepsEmptied = () => !state.autocorrectNew || !addedReplacement(state.autocorrectNew);
 const emptiesTip = () => keepsEmptied()
     ? "Its only input: the replacement leaves your list but stays open, for a new input that puts it back. Undo takes it back."
     : "Its only input: removing it deletes the replacement, as a new one waits in the list. Undo takes it back.";
 
 // A replacement being made: what it is, then its first input, which is what
-// puts it on the list, kept when Enter is pressed in it or the editor is left
-// from it; going back to the replacement's own fields keeps nothing yet. What
+// puts it on the list, kept when Enter is pressed in it or its field is left;
+// going back to the replacement's own fields, or to an ⓘ, keeps nothing yet. What
 // is typed for it stays with it while it waits in the bank. One the list
 // already has, which the core's check says, is offered to be opened.
 /** @param {Model} model @param {List} list @param {Fresh} fresh @param {boolean} canEdit */
@@ -813,8 +830,9 @@ function newEditor(model, list, fresh, canEdit) {
             <p class="note" data-ac-joins-with>${fresh.emptied ? "Its last input was removed, so it is off your list: give it an input to put it back." : "It joins your list with its first input."}</p>
             <div data-ac-feedback="new" hidden></div>`}
         </div></div>`);
-    /** @type {HTMLElement} */ (card.querySelector(".card-b")).appendChild(trySection(model, list));
+    /** @type {HTMLElement} */ (card.querySelector(".card-b")).append(...editorEnd(model, list, fresh.kind));
     attachInfoMarks(card);
+    attachHostTyping(card);
     countsBytes(card, list.usage.correctionMax);
     const first = /** @type {HTMLInputElement | null} */ (card.querySelector("[data-ac-first]"));
     // The add the editor names as it stands, with the first input typed so
@@ -828,12 +846,13 @@ function newEditor(model, list, fresh, canEdit) {
     // it, so it is asked about once that has landed.
     const ask = () => { if (canEdit && !current().sent && !current().emptied?.sent) check("new", addEdit()); };
     const discard = () => { Object.assign(state, {autocorrectNew: null, autocorrectCheck: null}); render(); focusLater('[data-act="ac-add"]'); };
-    // The first input, kept: the replacement joins the list with it.
-    const commit = () => {
+    // The first input, kept: the replacement joins the list with it. Kept
+    // by leaving its field, it does not take the focus back once it lands.
+    const commit = (left = false) => {
         const edit = addEdit();
         if (!edit || !current().input?.trim() || current().sent) return;
         whenChecked("new", edit, (answer) => {
-            state.autocorrectNew = {...current(), sent: identityOf(getModel()) || "", made: answer.entry};
+            state.autocorrectNew = {...current(), sent: identityOf(getModel()) || "", made: answer.entry, ...(left ? {left} : {})};
             keep(edit);
         });
     };
@@ -853,13 +872,15 @@ function newEditor(model, list, fresh, canEdit) {
             ask();
         } else if (input === first) { state.autocorrectNew = {...current(), input: input.value}; ask(); }
     });
-    // Left for something outside this editor (the bank, another screen), the
-    // first input is kept as Enter keeps it. A field a redraw threw away, or
-    // a window that lost the focus, has not been left.
+    // Left for anything but the replacement's own fields or an ⓘ (Try it's
+    // box, the bank, another screen, nothing at all), the first input is kept
+    // as Enter keeps it. A field a redraw threw away, or a window that lost
+    // the focus, has not been left.
     card.addEventListener("focusout", (event) => {
-        const to = /** @type {Node | null} */ (event.relatedTarget);
-        if (event.target !== first || !first?.isConnected || discarding || !document.hasFocus() || (to && card.contains(to))) return;
-        commit();
+        const to = /** @type {Element | null} */ (event.relatedTarget);
+        const back = to && card.contains(to) && to.closest(REPLACEMENT_OWN);
+        if (event.target !== first || !first?.isConnected || discarding || !document.hasFocus() || back) return;
+        commit(true);
     });
     card.addEventListener("change", (event) => {
         const input = /** @type {HTMLInputElement} */ (event.target);

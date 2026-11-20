@@ -98,10 +98,15 @@ and release steps. Every key you press goes into the take, Escape, Enter
 and Tab included. **Stop**, holding Escape for a second, or clicking outside
 the recorder finishes the take; so does switching slot or screen, or
 switching to another window. A chord you were in the middle of when you
-switched away (⌘Tab, Alt+Tab) is left out. The recorder's heading says **recording** while
-it captures, and **recorded** while **Clear take** can still put the slot back.
-The ⓘ beside **Record** sums up what a take does and what each option below
-changes.
+switched away (⌘Tab, Alt+Tab) is left out. While it captures, the steps
+are ringed in red, with **Recording** in their bottom-right corner and how
+to finish beside it, and the page scrolls down as they grow so **Stop**
+stays in view. The take is checked when it finishes, not after every key; afterwards the recorder's heading says **recorded**
+while **Clear take** can still put the slot back. The ⓘ beside the heading
+sums up what a take does and what each option changes.
+
+The options sit on the left of the recorder, **Record** (it turns into
+**Stop**) and **Clear take** on the right.
 
 - **Record delays** keeps the pauses longer than the time after each step,
   rounded to 5 ms. The wait before the first key is never recorded.
@@ -141,10 +146,11 @@ sums this up.
 ## Your computer
 
 Text is typed through your computer's keyboard layout, so Ark needs to know
-which one you use. Set it under **Your computer** on **Typing settings**; the
-button at the foot of the macro editor takes you there, and the ⓘ beside it
-says how text types with your setup. If the layout you chose isn't one for
-your computer's system, a warning under the button says so.
+which one you use. The foot of the macro editor names it ("Text types
+through the US layout"), and the ⓘ beside it says how text types with your
+setup. **Change in Typing settings** takes you to **Your computer** there and
+marks it for a moment. If the layout you chose isn't one for your computer's
+system, a warning under that line says so.
 
 - **Operating system**: **Auto** (what the keyboard detects over USB, named
   in the choice, such as **Auto (macOS detected)**), **macOS**, **Windows** or

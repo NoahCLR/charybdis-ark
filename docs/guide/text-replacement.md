@@ -145,7 +145,7 @@ A replacement that plays a macro can fire after Leader too. What the leader
 sends flashes as any replacement does (above), and one that sends nothing
 does not flash. While the leader
 waits, the keyboard can hold a colour of its own, **Leader waiting**, which
-you set on [Lighting's Replacement feedback tab](lighting.md#replacement-feedback).
+you set on [Lighting's **Text replacements** tab](lighting.md#replacement-feedback).
 
 The leader works with text replacement switched off, on Typing or by key. Ark
 warns before you apply a list with replacements that fire after Leader and no
@@ -216,6 +216,14 @@ what it was. Changing it to a replacement the list already has joins the
 two, and Ark says so under the field before you keep it: "“the” is already
 on your list: this one's inputs will join it."
 
+The editor ends, under **Try it**, with a line naming the
+[host layout](macros.md#your-computer) the text types through ("Replacement
+text types through the US layout"), as the macro editor does: its ⓘ says how
+text types, and **Change in Typing settings** takes you to **Your computer**
+and marks it for a moment. Replacement text types through that layout alone; a character it can't type, such as an emoji,
+can't be a replacement's text, since Unicode entry is for macros. A layout
+that isn't one for your computer's system is a warning under it.
+
 Or choose **Macro**. The macro's name shows in the field beside it;
 **Pick…**, or the field itself, opens the same picker a key's keycode is
 picked in, here with only your macros that have steps (an empty macro would
@@ -273,10 +281,12 @@ To give an input to another replacement, remove it here and add it there.
 3. Press Enter, type its first input, and press Enter again. Several inputs
    with spaces between them are all added.
 
-It joins your list with that first input, and stays open for more. Leaving
-the editor from that field, for another replacement or another screen, keeps
-the input as Enter does. Until then it waits at the top of the list as **not
-on your list yet**, with what you typed for it, and **Discard** lets it go.
+It joins your list with that first input, and stays open with a field for
+the next one. Leaving that field keeps the input too: for **Try it**, another
+replacement, another screen, or a click anywhere else, and the cursor stays
+where you went. Going back to the replacement itself, how it fires, or an ⓘ
+keeps nothing yet. Until then it waits at the top of the list as **not on
+your list yet**, with what you typed for it, and **Discard** lets it go.
 
 If the list already has that replacement, Ark says so and offers **Open it**
 instead: the list never holds the same replacement twice.

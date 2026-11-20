@@ -10,7 +10,6 @@ import {titleName, attachTitleName} from "../title-name.mjs";
 import {getModel, macroForm, post, render, setMacroForm, state} from "../../store.mjs";
 import {editGate} from "../../view/edit-gate.mjs";
 import * as edits from "../../view/edits.mjs";
-import {sectionPath} from "../../view/settings-layout.mjs";
 import {macroNamed, vocabulary, word} from "../../view/vocabulary.mjs";
 import {insertStep, sequenceEditor, saveSteps, focusSteps} from "./steps.mjs";
 import {inspectEdit, paintFeedback, matchingValidation, requestInspection} from "./validation.mjs";
@@ -19,6 +18,7 @@ import {recorder} from "./recorder.mjs";
 import {placedOnMarkup, showPlacements} from "../keys/reach.mjs";
 import {mark} from "../marks.mjs";
 import {attachInfoMarks, infoMark} from "../info-mark.mjs";
+import {attachHostTyping, hostTyping} from "../host-typing.mjs";
 /** @param {import("../../../contracts/panel.js").PublishedModel} model @param {MacroSlot} slot @param {boolean} canEdit */
 export function editor(model, slot, canEdit) {
     const form = macroForm(slot.keycode);
@@ -29,7 +29,7 @@ export function editor(model, slot, canEdit) {
     ensureMacroHistory(slot, parsed.error && !form.steps ? undefined : steps);
     const editable = canEdit && !state.recording && (!parsed.error || Boolean(form.steps));
     const rawOpen = Boolean(form.rawOpen || (parsed.error && !form.steps));
-    const wrap = el(`<div class="stack"></div>`), typing = typingWords(model);
+    const wrap = el(`<div class="stack"></div>`);
     const card = el(`<div class="card macro-editor-card" data-macro-editor="${esc(slot.keycode)}">
         <div class="card-h name-titlebar macro-titlebar"><span class="mark-lg">${mark(model, {kind: "macro"})}</span>${nameField(model, slot, canEdit)}
             <span class="tag">${esc(slot.defaultName)}</span>
@@ -53,21 +53,14 @@ export function editor(model, slot, canEdit) {
             <div data-macro-steps class="stack"></div>
             <div data-macro-feedback role="status" aria-live="polite"></div>
             <div class="stack macro-footer">
-            <div class="macro-utilities"><button class="btn tiny link" data-host-settings>${model.macroUnicode?.layoutName ? `${esc(model.macroUnicode.layoutName)} · ` : ""}${esc(vocabulary(model).settingsSections.host)} →</button>
-                ${infoMark({id: `macro-info-typing-${slot.keycode}`, label: "How a macro's text types", heading: "How text types", lead: typing.about})}
-            </div>
-            ${typing.warning ? `<p class="note warn" data-layout-warning>${esc(typing.warning)}</p>` : ""}
+            ${hostTyping(model, {id: `macro-info-typing-${slot.keycode}`, label: "How a macro's text types", what: "macros", more: model.macroUnicode?.entry || ""})}
             </div>
         </div></div>`);
     // Clear takes precedence over the change event caused by leaving a field.
     card.addEventListener("pointerdown", event => {
         if (/** @type {HTMLElement | null} */ (/** @type {Element} */ (event.target).closest('[data-act="clear"]'))) setMacroForm(slot.keycode, {cancelBlur: true});
     });
-    // The host section, on Typing settings.
-    /** @type {HTMLElement | null} */ (card.querySelector("[data-host-settings]"))?.addEventListener("click", () => {
-        Object.assign(state, {screen: "host", reveal: '.settings-group[data-section="host"]'});
-        render();
-    });
+    attachHostTyping(card);
     /** @type {HTMLElement} */ (card.querySelector("[data-protection]")).addEventListener("change", event => {
         event.stopPropagation();
         post(edits.macroProtectionMessage(slot.keycode, /** @type {"auto" | "on" | "off"} */ (/** @type {HTMLInputElement | HTMLSelectElement} */ (event.target).value), model.macroEditing.identity));
@@ -152,14 +145,3 @@ function nameField(model, slot, canEdit) {
 // in its layer colour and naming how. A click opens that layer in Keymap with
 // this macro picked in its Macros tab, on the row for the first of those
 // routes, so the board rings its keys and the table marks the row.
-
-// How a macro's text types, read once in the info mark by the Your computer button
-// (D-L96); a layout that is not the computer's is a warning on show.
-/** @param {Model} model */
-function typingWords(model) {
-    const {os, layout, layoutFits, layoutName, entry} = model?.macroUnicode || {mode: 0};
-    const warning = layoutFits === false
-        ? `Text types through ${word(vocabulary(model).hostLayouts, layout)}, chosen in ${sectionPath(model, "host")}, which is not a ${word(vocabulary(model).hostOs, os)} layout: macros may type the wrong characters until the layout matches the computer.` : "";
-    const typed = warning ? "" : `Text types through the ${layoutName} layout chosen in ${sectionPath(model, "host")}, accented letters included; keep that layout active on the computer. `;
-    return {warning, about: `${typed}${entry || ""}`.trim()};
-}

@@ -14,6 +14,12 @@
 //     worker-<hash>.js          the shell's clock (web/sleep-worker.js)
 //     panel-<hash>.js           the panel (webview/app.mjs)
 //     styles-<hash>.css         its styles
+//     favicon-<hash>.svg        the tab's icon: the board (scripts/web-icon.js, D-L104)
+//     touch-<hash>.png          the same at 180 px, for Safari's Add to Home Screen and Dock
+//     icon192-<hash>.png,       the same at 192 and 512 px, and at 512 px with the margin
+//     icon512-<hash>.png,       Android's launcher keeps, for Chrome's install
+//     maskable-<hash>.png
+//     manifest-<hash>.webmanifest  what a saved web app is called and shows
 //
 // Every file but index.html carries a hash of its content in its name, so a
 // release can never be served a previous release's file. index.html names them
@@ -33,10 +39,12 @@
 // bundle. The page passes the WebHID adapter to the device service itself.
 
 const {execFileSync} = require("node:child_process");
+const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
 const {builtinModules} = require("node:module");
 const esbuild = require("esbuild");
+const {iconPng, iconSvg, MASKABLE_MARGIN} = require("./web-icon");
 
 const APP_ROOT = path.resolve(__dirname, "..");
 const OUTDIR = path.join(APP_ROOT, "dist", "web");
@@ -54,11 +62,12 @@ const NATIVE_PACKAGES = ["node-hid"];
 const PACKAGES = {core: ["buffer", "base64-js", "ieee754"], panel: [], worker: []};
 
 // The page's policy: scripts, styles and the worker from the page's own origin,
-// the panel's inline style attributes, and no connection anywhere. Its HTML
+// the panel's inline style attributes, its icons and web app manifest from its
+// own origin too, and no connection anywhere. Its HTML
 // sinks take markup only through the panel's one policy (webview/lib/dom.mjs
 // html) and the worker's URL only through the page's (web/page.mjs).
 const POLICY = ["default-src 'none'", "script-src 'self'", "worker-src 'self'", "style-src 'self'",
-    "style-src-attr 'unsafe-inline'", "connect-src 'none'", "base-uri 'none'", "form-action 'none'",
+    "style-src-attr 'unsafe-inline'", "img-src 'self'", "manifest-src 'self'", "connect-src 'none'", "base-uri 'none'", "form-action 'none'",
     "require-trusted-types-for 'script'", "trusted-types ark-html ark-worker"];
 // Only a header can say who may frame the page; in a <meta> tag Chrome ignores
 // it and says so in the console.
@@ -188,6 +197,44 @@ function headersFile(hashedFiles) {
     return fill(fs.readFileSync(path.join(APP_ROOT, "web", "_headers"), "utf8"), "web/_headers", {csp: headerPolicy(), hashed});
 }
 
+// Writes `content` into `outdir` as `<name>-<hash>.<extension>`, the hash
+// eight characters of its content as esbuild's are, and returns the name.
+/** @param {string} outdir @param {string} name @param {string} extension @param {string | Buffer} content */
+function writeHashed(outdir, name, extension, content) {
+    const hash = BigInt(`0x${crypto.createHash("sha256").update(content).digest("hex")}`).toString(36).toUpperCase().padStart(8, "0").slice(0, 8);
+    const file = `${name}-${hash}.${extension}`;
+    fs.writeFileSync(path.join(outdir, file), content);
+    return file;
+}
+
+// The page's icons and the manifest that makes it a web app a browser can
+// save: the board on black (scripts/web-icon.js), named for what it is.
+/** @param {string} outdir */
+async function writeIcons(outdir) {
+    const icons = {
+        favicon: writeHashed(outdir, "favicon", "svg", await iconSvg()),
+        touch: writeHashed(outdir, "touch", "png", await iconPng(180)),
+        icon192: writeHashed(outdir, "icon192", "png", await iconPng(192)),
+        icon512: writeHashed(outdir, "icon512", "png", await iconPng(512)),
+        maskable: writeHashed(outdir, "maskable", "png", await iconPng(512, {margin: MASKABLE_MARGIN})),
+    };
+    const manifest = {
+        id: "./",
+        name: "Charybdis Ark",
+        short_name: "Ark",
+        start_url: "./",
+        scope: "./",
+        display: "standalone",
+        background_color: "#000000",
+        icons: [
+            {src: `./${icons.icon192}`, sizes: "192x192", type: "image/png", purpose: "any"},
+            {src: `./${icons.icon512}`, sizes: "512x512", type: "image/png", purpose: "any"},
+            {src: `./${icons.maskable}`, sizes: "512x512", type: "image/png", purpose: "maskable"},
+        ],
+    };
+    return {...icons, manifest: writeHashed(outdir, "manifest", "webmanifest", `${JSON.stringify(manifest, null, 2)}\n`)};
+}
+
 /** @param {string} value */
 const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (character) => `&#${character.charCodeAt(0)};`);
 
@@ -220,6 +267,7 @@ async function buildWeb({outdir = OUTDIR, manifestFile = manifestFileFor(outdir)
         })),
     };
     if (manifest.shell) {
+        Object.assign(manifest, await writeIcons(outdir));
         const names = {...manifest, version: build.version, commit: build.commit, csp: pagePolicy()};
         const page = fill(fs.readFileSync(path.join(APP_ROOT, "web", "index.html"), "utf8"), "web/index.html", names, escapeHtml);
         fs.writeFileSync(path.join(outdir, "index.html"), page);
@@ -231,7 +279,7 @@ async function buildWeb({outdir = OUTDIR, manifestFile = manifestFileFor(outdir)
 
 if (require.main === module) {
     buildWeb().then((manifest) => {
-        for (const [name, file] of Object.entries(manifest)) console.log(`${name.padEnd(7)}${path.relative(APP_ROOT, path.join(OUTDIR, file))}`);
+        for (const [name, file] of Object.entries(manifest)) console.log(`${name.padEnd(9)}${path.relative(APP_ROOT, path.join(OUTDIR, file))}`);
         console.log(`written ${path.relative(APP_ROOT, path.join(OUTDIR, "index.html"))}, _headers and ${path.relative(APP_ROOT, manifestFileFor(OUTDIR))}`);
     }).catch(/** @param {unknown} error */ (error) => {
         const details = error && typeof error === "object" ? error : {};

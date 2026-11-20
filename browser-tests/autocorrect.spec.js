@@ -91,6 +91,9 @@ test("the screen is a bank of replacements beside the editor of the one picked, 
     await expect(editor(page).locator('.name-titlebar [data-act="ac-delete"]')).toHaveText("Delete replacement");
     await expect(editor(page).locator('[data-act="place"]')).toHaveCount(0);
     await expect(editor(page).locator(".macro-sequence-heading h4, .editor-section .card-h h3")).toHaveText(["Replacement", "Fires", "Inputs", "Try it"]);
+    // Each section after the first opens with a rule, as the macro editor's do.
+    const rules = await editor(page).locator(".card-b > .macro-sequence-heading, .card-b > .editor-section").evaluateAll((parts) => parts.map((part) => getComputedStyle(part).borderTopStyle));
+    expect(rules).toEqual(["none", "solid", "solid", "solid"]);
     // No switch here, no menu of macros, and nothing says typo, correction, typed form or a match by name.
     await expect(page.locator('.pad.autocorrect [data-macro="autocorrect"]')).toHaveCount(0);
     await expect(page.locator(".pad.autocorrect select")).toHaveCount(0);
@@ -223,6 +226,33 @@ test("New replacement opens an editor with its text focused, and it joins the li
     await bank(page).locator('[data-act="ac-add"]').click();
     await item(page, "the").click();
     await expect(page.locator("[data-ac-new-item]")).toHaveCount(0);
+});
+
+test("a new replacement's first input is kept wherever its field is left for, but the replacement's own fields", async ({page}) => {
+    await openControls(page, "autocorrect");
+    await bank(page).locator('[data-act="ac-add"]').click();
+    const fresh = page.locator("[data-ac-new]"), first = fresh.locator("[data-ac-first]");
+    await fresh.locator("[data-ac-text]").fill("definitely");
+    await first.fill("definately");
+    // Back to what the replacement is, or how it fires, or an ⓘ: nothing is kept yet.
+    await clearPosts(page);
+    for (const control of [fresh.locator("[data-ac-text]"), fresh.locator('[name$=":fires"][value="leader"]'), fresh.locator("[data-info-mark] button").first()]) {
+        await first.focus();
+        await control.focus();
+    }
+    await page.waitForTimeout(100);
+    expect(await edits(page)).toEqual([]);
+    // Anywhere else in the editor, Try it's box among them, keeps it as Enter does.
+    await first.focus();
+    await fresh.locator("[data-f='autocorrect:try:text']").click();
+    await expectEdits(page, [expect.objectContaining({type: "addAutocorrectTypos", correction: "definitely", inputs: "definately"})]);
+    // Once the list takes it, the focus stays where it went: no field for a next input takes it back.
+    await page.keyboard.type("teh");
+    await accept(page, (model) => { model.autocorrect.entries.push(published("definitely", "definately")); });
+    await expect(editor(page)).toHaveAttribute("data-ac-editor", "definitely");
+    await expect(editor(page).locator("[data-ac-more]")).toHaveCount(0);
+    await expect(editor(page).locator("[data-f='autocorrect:try:text']")).toBeFocused();
+    await expect(editor(page).locator("[data-f='autocorrect:try:text']")).toHaveValue("teh");
 });
 
 test("a new replacement the list already has is offered to be opened, and makes no duplicate", async ({page}) => {
@@ -523,6 +553,38 @@ test("what the host layout cannot type is said once across the screen and on its
     await expect(editor(page).locator('[data-ac-warning="nu"]')).toContainText("is a short input with *");
 });
 
+test("a replacement's editor ends with the layout its text types through, as the macro editor does, and goes to where it changes", async ({page}) => {
+    await openControls(page, "autocorrect");
+    await publish(page, (model) => {
+        model.macroUnicode = {...model.macroUnicode, layoutName: "ABC", layoutFits: true};
+        model.macros[5] = {...model.macros[5], name: "Sign-off", empty: false};
+        model.autocorrect.entries.push({id: "\u0001macro:5", label: "Sign-off", correction: "", macro: 5, fires: "word", warnings: [], typos: [{typo: "sig", input: "sig", warnings: []}]});
+    });
+    await item(page, "the").click();
+    // Under Try it, the editor's last part, behind a rule as the macro editor's is.
+    await expect(editor(page).locator(":scope > .card-b > :last-child")).toHaveClass(/macro-footer/);
+    await expect(editor(page).locator(".card-b > .macro-footer")).toHaveCSS("border-top-style", "solid");
+    const typing = editor(page).locator(".macro-footer [data-host-typing]");
+    await expect(typing).toHaveText(/^Replacement text types through the ABC layout/);
+    // How it types, read once in its info mark: the layout, and no Unicode entry.
+    await typing.locator(".info-button").click();
+    await expect(typing.locator(".info-pop")).toContainText("Replacement text types through the ABC layout chosen in");
+    await expect(typing.locator(".info-pop")).toContainText("keep that layout active on the computer");
+    await expect(typing.locator(".info-pop")).toContainText("Unicode entry is for macros");
+    await page.keyboard.press("Escape");
+    await expect(editor(page).locator("[data-layout-warning]")).toHaveCount(0);
+    // A layout that is not the computer's is a warning under it.
+    await publish(page, (model) => { model.macroUnicode = {...model.macroUnicode, os: 1, layout: 9, layoutFits: false}; });
+    await expect(editor(page).locator("[data-layout-warning]")).toContainText(/^Replacement text types through .*replacements may type the wrong characters/);
+    // A macro's own editor says what its text types through.
+    await bank(page).locator('[data-ac-entry$="macro:5"]').click();
+    await expect(editor(page).locator("[data-host-typing]")).toHaveCount(0);
+    await item(page, "the").click();
+    await editor(page).locator("[data-host-settings]").click();
+    await expect(page.locator('[data-screen="host"]')).toHaveAttribute("aria-current", "true");
+    await expect(page.locator('[data-section="host"]')).toHaveClass(/revealed/);
+});
+
 test("no control that removes something is a bare ×: each is written out", async ({page}) => {
     await openControls(page, "autocorrect");
     // Every state the screen has a removing control in: an entry with a chip open, a new replacement, the import's summary.
@@ -558,17 +620,18 @@ test("every control of the screen has a name, and the keyboard reaches them in r
     await expect(bank(page).locator(".ac-bank")).toHaveAttribute("role", "group");
     await expect(editor(page).locator(".ac-inputs")).toHaveAttribute("role", "group");
     await expect(page.locator(".pad.autocorrect button[role]")).toHaveCount(0);
-    // Tab from the search walks the bank's items, New, the files, then the editor from its header down.
+    // Tab from the search walks the bank's items, New, the files, then the editor from its header down, the layout its text types through under its text.
     await page.locator('[data-f="autocorrect:search"]').focus();
     const order = [];
     for (let step = 0; step < 40; step++) {
         await page.keyboard.press("Tab");
-        const at = await page.evaluate(() => { const node = document.activeElement; return node?.closest(".pad.autocorrect") ? node.dataset.act || node.dataset.f || (node.classList.contains("info-button") ? `ⓘ ${node.getAttribute("aria-label")}` : node.dataset.acEntry !== undefined ? "item" : node.tagName) : null; });
+        const at = await page.evaluate(() => { const node = document.activeElement; return node?.closest(".pad.autocorrect") ? node.dataset.act || node.dataset.f || (node.classList.contains("info-button") ? `ⓘ ${node.getAttribute("aria-label")}` : node.dataset.acEntry !== undefined ? "item" : node.dataset.hostSettings !== undefined ? "host-settings" : node.tagName) : null; });
         if (!at) break;
         if (order.at(-1) !== at) order.push(at);
     }
     expect(order.map((name) => name.replace(/^autocorrect:entry:because:/, ""))).toEqual(["item", "ac-add", "ac-import", "ac-export-menu", "ac-delete", "ⓘ How a replacement works", "kind:text", "replacement",
-        "ⓘ How a replacement fires", "fires:word", "ⓘ How inputs are written, and the * wildcard", "ac-chip", "input:becasue", "ac-remove-input", "ac-chip", "ac-more", "ⓘ About the preview", "autocorrect:try:text"]);
+        "ⓘ How a replacement fires", "fires:word", "ⓘ How inputs are written, and the * wildcard", "ac-chip", "input:becasue", "ac-remove-input", "ac-chip", "ac-more", "ⓘ About the preview", "autocorrect:try:text",
+        "ⓘ How a replacement's text types", "host-settings"]);
     // Clear is off with nothing to clear, as Clear take is, and a replaced part of the preview is no tab stop.
     await expect(editor(page).locator('[data-act="ac-try-clear"]')).toBeDisabled();
 });
@@ -637,8 +700,8 @@ const answer = (page, result) => page.evaluate(async (result) => {
 test("Try it closes the editor: its box is never changed, and the preview under it shows what the core answers", async ({page}) => {
     await openControls(page, "autocorrect");
     const section = editor(page).locator("[data-ac-try]"), box = page.locator('[data-f="autocorrect:try:text"]'), preview = page.locator("[data-ac-try-preview]");
-    // The last section of the editor card, as Record is a macro's.
-    await expect(editor(page).locator("> .card-b > :last-child")).toHaveAttribute("data-ac-try", "");
+    // The last section of the editor card, as Record is a macro's: only the layout line ends it.
+    await expect(editor(page).locator("> .card-b > :nth-last-child(2)")).toHaveAttribute("data-ac-try", "");
     await expect(section.locator(".field > span")).toHaveText("Your keyboard would type");
     await expect(section.locator("#ac-info-try")).toContainText("What your keyboard would type with this draft's list, through US.");
     // Save is the word on screen; nothing here says Apply.

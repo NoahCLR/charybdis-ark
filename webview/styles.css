@@ -231,6 +231,17 @@ button.rail-keyboard:disabled .rail-keyboard-text { color: var(--text-2); }
 .rail-message.err { border-left-color: var(--danger); color: var(--text); }
 .rail-message span { flex: 1; min-width: 0; }
 .rail-message .btn { flex: none; margin-top: calc(-1 * var(--sp-0)); }
+/* A message that closes by itself drains a line along its foot over its
+   reading time (ui/rail-message.mjs sets --fade and how much of it has
+   passed), stopped while it is held. The line is a background, so it stays
+   at the foot while a long message scrolls. */
+.rail-message.fades {
+  background: linear-gradient(color-mix(in srgb, var(--text-2) 70%, transparent) 0 0) left bottom / 100% 2px no-repeat, var(--surface-2);
+  animation: rail-fade var(--fade) linear calc(-1 * var(--fade-passed, 0ms)) forwards;
+}
+.rail-message.fades.held { animation-play-state: paused; }
+@keyframes rail-fade { to { background-size: 0% 2px, auto; } }
+@media (prefers-reduced-motion: reduce) { .rail-message.fades { animation: none; background: var(--surface-2); } }
 .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--text-3); flex: none; }
 .dot.on { background: var(--text); }
 .dot.ok { background: var(--ok); }
@@ -984,18 +995,10 @@ button.tier:hover { background: var(--surface-3); }
 .bench-tabs .tab-sep { width: 1px; height: 18px; align-self: center; background: var(--line-2); margin: 0 var(--sp-2); }
 /* Each stage tab is as wide as its label in the picked weight, whatever font
    the system draws it in: the label's text is laid again, bold and unseen,
-   under itself, so picking a tab moves none. Lighting's tabs have less
-   padding than the Keymap's and no gap between a tab and the step beside it.
-   Where the names do not all fit, each tab reads by its short word (its stage
-   bar names it whole): fitStageWords, webview/ui/lighting.mjs, measures. */
-.bench-tabs button[data-ltab] { padding: 0 var(--sp-1); gap: var(--sp-1); }
-.lighting-bench .bench-tablist { gap: 0; }
-.lighting-bench .tab-sep { margin: 0 var(--sp-1); }
+   under itself, so picking a tab moves none. They keep the Keymap's padding
+   and gaps, as the layer tabs do, and read by their short words (D-L105). */
 .bench-tabs .tab-label [data-text] { display: inline-grid; }
 .bench-tabs .tab-label [data-text]::after { content: attr(data-text) / ""; font-weight: var(--fw-strong); height: 0; visibility: hidden; overflow: hidden; }
-.bench-tabs .tab-label .short { display: none; }
-.bench-tabs.short-words [data-ltab] .tab-label .long { display: none; }
-.bench-tabs.short-words [data-ltab] .tab-label .short { display: inline-grid; }
 @container content (max-width: 1153px) { /* window 1400 */
   /* A narrower list leaves where it paints room for its whole choice. */
   .workbench .stage .tab-split.reach-split { grid-template-columns: 280px minmax(0, 1fr); }
@@ -1260,9 +1263,12 @@ table.t .num { text-align: right; font-variant-numeric: tabular-nums; }
 .draft-dot.lead { margin: 0 var(--sp-1) 0 0; }
 .mslot { position: relative; }
 
-/* A place a jump landed on is marked for a moment, then fades. */
+/* A place a jump landed on is marked for a moment, then fades: tinted, and
+   ringed inside its own edge (a ring outside would be cut off by a card that
+   clips), so a whole card stands out among its neighbours as well as a row. */
 .revealed, tr.revealed > td { background: color-mix(in srgb, var(--draft) 16%, transparent) !important; }
-.settings-group, [data-reach] > td, [data-pick] > td, tr[data-row] > td { transition: background .6s ease; }
+.revealed:not(tr) { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--draft) 75%, transparent); }
+.settings-group, .setrow, [data-reach] > td, [data-pick] > td, tr[data-row] > td { transition: background .6s ease, box-shadow .6s ease; }
 
 /* The review: one item per thing that differs, with only the fields that do.
    Items made together share a block and one Discard. */
@@ -2061,16 +2067,17 @@ select.input.pd-add { height: var(--h-chip); width: 124px; min-width: 0; padding
 .macro-token-wrap:last-child.drop-after::after { right: -5px; }
 .macro-legend { display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-3); margin: var(--sp-3) 0; }
 .macro-legend span { font-size: var(--fs-xs); }
-.macro-utilities { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2) var(--sp-4); }
+/* What an editor's text types through (ui/host-typing.mjs), read as a
+   sentence on the left, as Uninterruptible playback is, and where to change
+   it on the right. The macro editor ends with it. */
+.host-typing { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: var(--sp-2) var(--sp-4); }
+.host-typing-says { display: inline-flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-sm); color: var(--text-2); }
+.host-typing-says strong { color: var(--text); font-weight: var(--fw-strong); }
 .macro-footer { border-top: 1px solid var(--line); padding-top: var(--sp-4); }
 .macro-editor-card [data-recorder], .card.editor-section { border: 0; border-top: 1px solid var(--line); border-radius: 0; background: transparent; padding-top: var(--sp-4); }
 .macro-editor-card [data-recorder] .card-h, .editor-section .card-h { border-bottom: 0; padding: 0; margin-bottom: var(--sp-3); }
 .macro-editor-card [data-recorder] .card-b, .editor-section .card-b { padding: 0; gap: var(--sp-3); }
-/* Record is the recorder's own control: a regular button, never one that outranks Save. */
-.macro-editor-card [data-recorder] [data-act="record"] { min-width: 88px; justify-content: center; }
-.macro-editor-card [data-recorder] .record-opts { gap: var(--sp-3) var(--sp-4); }
 .macro-editor-card [data-recorder] .note, .editor-section .note { font-size: var(--fs-xs); }
-.macro-editor-card [data-recorder] .row > .right { margin-left: auto; }
 [data-sequence-notice]:empty { display: none; }
 [data-step-inspectors] { margin-top: var(--sp-3); }
 .macro-step-head { flex-wrap: wrap; }
@@ -2080,11 +2087,43 @@ select.input.pd-add { height: var(--h-chip); width: 124px; min-width: 0; padding
 .macro-step .tok { display: block; flex: 1; min-width: 0; height: auto; min-height: var(--h-chip); padding: var(--sp-1) var(--sp-2); overflow-wrap: anywhere; }
 .macro-add { flex-wrap: wrap; }
 .macro-add select.input { width: auto; }
-/* The recorder's delays read as the sentence they set: Record delays, then
-   the time after each step, rounded to the second time. */
-.record-opts { gap: var(--sp-3); align-items: center; flex-wrap: wrap; }
+/* The recorder's options and actions share one strip: the options on the
+   left, a rule, Record over Clear take on the right. Every row is one control
+   high, so Record shares Record delays' line and Clear take the next. Record
+   delays reads as the sentence it sets. Record is a regular button, never one
+   that outranks Save; its mark is the record dot, a stop square while it
+   captures, so the button keeps its width from one to the other. Narrow, the
+   actions take a line of their own under the options. */
+[data-recorder] > .card-b { container: recorder / inline-size; }
+.record-opts { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: repeat(2, var(--h-control)); gap: var(--sp-3) var(--sp-5); align-items: center;
+  padding: var(--sp-4) var(--sp-4) var(--sp-4) var(--sp-5); background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-card); }
+.record-opt { grid-column: 1; display: flex; align-items: center; gap: var(--sp-3); min-width: 0; }
 .record-opts .ms-field { display: inline-flex; align-items: center; gap: var(--sp-2); white-space: nowrap; font-size: var(--fs-md); color: var(--text-2); }
+.record-opts .ms-field:has(input:disabled) { color: var(--text-disabled); }
 .record-opts .ms-field > .affix { width: auto; }
+.record-opts .ms-field .input { height: var(--h-control); }
+.record-actions { grid-column: 2; grid-row: 1 / span 2; align-self: stretch; display: grid; grid-template-rows: subgrid; align-items: center;
+  padding-left: var(--sp-5); border-left: 1px solid var(--line-2); }
+.record-actions [data-act="record"] { min-width: 104px; justify-content: center; gap: var(--sp-2); }
+.record-actions [data-act="clear-take"] { justify-self: center; }
+.record-mark { width: 8px; height: 8px; border-radius: 50%; background: var(--danger); flex: none; }
+[data-recorder] [data-act="record"]:disabled .record-mark { background: currentColor; }
+.is-recording .record-mark { border-radius: var(--r-mark); background: currentColor; }
+@container recorder (max-width: 540px) {
+  .record-opts { grid-template-columns: minmax(0, 1fr); grid-template-rows: repeat(2, var(--h-control)) auto; }
+  .record-actions { grid-column: 1; grid-row: 3; display: flex; gap: var(--sp-3); padding: var(--sp-3) 0 0; border-left: 0; border-top: 1px solid var(--line-2); }
+}
+/* A take in progress: the canvas ringed in red, Recording pulsing in its
+   bottom-right corner, how to finish beside it; the steps keep clear of both. */
+.macro-canvas { position: relative; }
+.macro-canvas.is-recording .macro-sequence { border-color: var(--danger); box-shadow: 0 0 0 1px var(--danger), 0 0 0 4px color-mix(in srgb, var(--danger) 18%, transparent); }
+.macro-canvas.is-recording .macro-sequence:not(.empty) { padding-bottom: calc(var(--sp-5) + var(--sp-6)); }
+.macro-canvas-recording { position: absolute; left: var(--sp-4); right: var(--sp-4); bottom: var(--sp-3); display: flex; align-items: center; justify-content: flex-end; gap: var(--sp-4); pointer-events: none; }
+.macro-canvas-recording .note { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-xs); margin-right: auto; }
+.recording-badge { display: inline-flex; align-items: center; gap: var(--sp-2); flex: none; font-family: var(--mono); font-size: var(--fs-xs); letter-spacing: .04em; text-transform: uppercase; color: var(--danger); }
+.recording-badge::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; animation: record-pulse 1.2s ease-in-out var(--pulse-phase, 0s) infinite; }
+@keyframes record-pulse { 50% { opacity: .25; } }
+@media (prefers-reduced-motion: reduce) { .recording-badge::before { animation: none; } }
 [data-raw] summary { cursor: pointer; color: var(--text-2); font-size: var(--fs-md); }
 [data-raw] > .field { margin-top: var(--sp-3); }
 [data-raw] > .note { margin-top: var(--sp-2); }
@@ -2476,6 +2515,8 @@ details > summary { list-style: none; }
 .ac-replacement > .ac-text, .ac-replacement > .ac-macro { flex: 1 1 280px; min-width: 0; }
 .ac-macro .input[readonly] { cursor: pointer; }
 .ac-macro-none { flex-basis: 100%; }
+/* Each section after the first opens with a rule, as the macro editor's do. */
+.ac-editor .card-b > .macro-sequence-heading ~ .macro-sequence-heading { border-top: 1px solid var(--line); padding-top: var(--sp-4); }
 .ac-editor .editor-section .card-h { gap: var(--sp-1); }
 .ac-bytes { font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
 .ac-inputs { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; min-height: var(--h-compact); }

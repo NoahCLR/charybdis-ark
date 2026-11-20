@@ -92,12 +92,19 @@ export function behaviourEditor(behaviour, {head = true} = {}) {
     // order marked, until a timing mends them (D-L82).
     const refused = state.timingRefusal?.keycode === behaviour.keycode ? state.timingRefusal : null;
     /** @param {import("../../../contracts/edits.js").TimingTerm} name */
-    const timingControl = (name) => {
+    const timingField = (name) => {
         const field = behaviourTimingField(refused ? {...behaviour, ...refused.terms} : behaviour, name);
-        const placeholder = field.fallback === "" ? "default unavailable" : field.placeholder;
+        return {field, placeholder: field.fallback === "" ? "default unavailable" : field.placeholder};
+    };
+    // The fields share one width, the widest placeholder's, so a dual-role
+    // key's longer "· dual-role" keeps the column even.
+    const timingWidth = Math.max(...TIMING_TERMS.map((name) => timingDigits(timingField(name).placeholder)));
+    /** @param {import("../../../contracts/edits.js").TimingTerm} name */
+    const timingControl = (name) => {
+        const {field, placeholder} = timingField(name);
         const invalid = refused?.term === name ? ' aria-invalid="true" aria-describedby="timing-problem"' : "";
         return `<label class="field inline bterm-field" data-term-field="${esc(name)}" data-tip="${esc(`${thresholdTips[name]} ${timingFallbackNote(model, behaviour, name)}`)}"><span>${marked(model, settingGoverns(model, name), sentence(thresholdNames[name]), {slot: true})}</span>
-            <span class="affix unit"><input class="input mono num" style="--digits: ${esc(timingDigits(placeholder))}" data-f="behaviour:${esc(behaviour.keycode)}:timing:${esc(name)}" data-term="${esc(name)}" data-stored="${esc(field.stored)}" inputmode="numeric" value="${esc(field.value)}"
+            <span class="affix unit"><input class="input mono num" style="--digits: ${esc(timingWidth)}" data-f="behaviour:${esc(behaviour.keycode)}:timing:${esc(name)}" data-term="${esc(name)}" data-stored="${esc(field.stored)}" inputmode="numeric" value="${esc(field.value)}"
                 placeholder="${esc(placeholder)}"${invalid} ${canEdit && !timingIdle ? "" : "disabled"}><i>ms</i></span></label>`;
     };
 

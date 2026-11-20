@@ -282,7 +282,7 @@ The same kind of control looks and sits the same on every screen.
   (`browser-tests/macro-ux.spec.js`,
   `browser-tests/custom-key-behaviour.spec.js`,
   `browser-tests/pointing-controls.spec.js`).
-- A Settings screen (Behaviours, Combos, Pointer, Typing) draws its
+- A Settings screen (Behaviours, Combos, Typing, Pointer) draws its
   sections as open cards, none folding, and offers no search
   (`tests/view/settings-layout.test.mjs`,
   `browser-tests/settings-screens.spec.js`).
@@ -385,12 +385,13 @@ The same kind of control looks and sits the same on every screen.
   without saying so: an end with more tabs past it fades, and while it does
   not fit an arrow at each end, outside what scrolls, moves it a page; Rename &
   reorder stays outside it (`keepInView`, `webview/ui/layerbar.mjs`).
-  Lighting's stage tabs and All accents read by their names where every name
-  fits the strip, in the font the system draws, and otherwise by their short
-  words (`stages[].short`), the stage bar naming the stage whole; with the
-  Mac's font that is a 1440px window by names and a 1280px one by short words.
-  Each tab is as wide as its label in bold, so picking a tab moves none
-  (`fitStageWords`, `webview/ui/lighting.mjs`; D-L103).
+  Lighting's stage tabs read by their short words (`stages[].short`) at any
+  width, the stage bar, the tab's tip and its accessible name naming the
+  stage whole (D-L105). They keep the layer tabs' padding and gaps, so with
+  the Mac's font the strip fits from about a 1370px window and scrolls below
+  it; a wider font, as Windows' and Linux's are, needs about 1500px. Each tab
+  is as wide as its label in bold, in whatever font the system draws, so
+  picking a tab moves none (D-L103).
 - A Keymap workbench tab's own actions sit in its body, by what they open:
   New combo heads the combo builder's column, centred on the table's first
   group band, and stays put when the builder opens under it. The tab bar carries only a tab's way to its screen, centred on the bar
@@ -438,6 +439,17 @@ The same kind of control looks and sits the same on every screen.
   its top-left corner, the trackball's in its middle, and moves or shrinks no
   legend: a key's legends are the same on Lighting as on the Keymap
   (`webview/ui/board.mjs`; `browser-tests/lighting-controls.spec.js`).
+- The rail's message is kept by what kind the core says it is (D-L106;
+  `railMessageView`, `readingTime`, `webview/view/rail-message.mjs`, tested in
+  `tests/view/rail-message.test.mjs`): a failure (`failed`) until ✕ or a
+  later message, a message held while its condition is (`lasting`) until the
+  core takes it back, the keyboard's own error while it is reported unless ✕
+  hid it, and any other message for its reading time, a line along its foot
+  draining over it, both stopped while the pointer is over it or focus inside
+  it and carried over a redraw (`webview/ui/rail-message.mjs`). Its words
+  never make it a failure. `railMessageView` alone decides which message is
+  shown: ✕ closes that one and `announcements` says that one. Closing or
+  dismissing it redraws it alone.
 - The rail's message never covers the screens' names: under them it shrinks
   first, scrolling in its own box, and a window under 860px tall leaves out
   the board drawn over Ark's name. In a window 1100px wide or less the rail
@@ -786,7 +798,7 @@ here: its home and tests are in
 | QMK key expressions: how a name, a call (LCTL(KC_A), MT(), LT(), MO(n)…) or a number reads as the keycode it stores, in one grammar with two dialects whose differences are one table (`DIALECTS`): QMK's own, which core's encoder reads, and the keyboard's, with its own names and whitespace anywhere, which the draft stores by and the picker checks by, so the two accept the same keys (D-L73) | `rules/keycode-expression.mjs`, read by `core/schema/keycodes.js` (`encode`), `core/schema/compiled-profile-v1.js` (`resolveNativeQmkExpression`) and `webview/view/keycode-expression.mjs` (`keycodeValue`) | `tests/rules/keycode-expression.test.mjs`, `tests/schema/keycodes.test.js`, `tests/schema/compiled-profile-v1.test.js`, `tests/view/keycode-expression.test.mjs` |
 | The text replacement list (D-L84, D-L91): how an input is written with `*` (`inputOf`, `inputForm`), and how a replacement fires (`setTrigger`, posted as `updateAutocorrectTrigger` and with an add's `trigger`, published as each entry's `fires`, `TRIGGER_NAMES`); what an edit to it is refused for, in words; what is only warned about (untypable on the host layout, a replacement changed again, a loop, a short input with `*`, one that matches inside a replacement, a macro with no steps), asking the matcher (D-L86) which input fires on a word; what a replacement is called wherever one is listed (`replacementCalled`, published as each entry's `label`) and inside a sentence (`replacementSaid`); how a field's text is read into its inputs (`splitInputs`); which entry an edit's replacement is and whether the list has it (`editNames`); the list's size against every ceiling (`autocorrectCounts`), how full its text is of the text the keyboard holds for it and what is free (`usage.share`, `usage.free`); and two lists' entries paired for Review. The interface holds none of it: it posts a field's text as it was typed, asks core to check it (`validateAutocorrect`), posts the edit only once that check has passed, opens and follows entries by the id the check answered with, and draws the labels, figures and warnings core publishes on each entry and input | `core/model/autocorrect-list.js`; the screen's view and its edits, `core/model/autocorrect-editor.js`; the list's counts, `core/schema/autocorrect-domain-v1.js`; what the screen draws of it (a plain search over what is published, order, counts in words), `webview/view/autocorrect.mjs` | `tests/model/autocorrect-list.test.js`, `tests/model/autocorrect-editor.test.js`, `tests/view/autocorrect.test.mjs`, `tests/session/panel-loop.test.js`, `browser-tests/autocorrect.spec.js` |
 | Try it (D-L86, D-L91): what the keyboard would leave on screen for text typed against the draft's list, by the firmware's own rules, under the computer's Caps Lock as each key typed reports it (`capsLock`). The interface runs none of them: it reads its box as typing (text added, a Backspace, or text that stands), asks core (`tryAutocorrect`) and shows the answer in the preview under its box, each standing replacement marked where the answer's `marks` say it is; it never writes to the box. Whether the connected keyboard is replacing now is core's to say (`autocorrectRunning`, from the keyboard's settings as read and its runtime page) | `core/model/autocorrect-matcher.js`, through `tryText` in `core/model/autocorrect-editor.js`; how the box is read, `triedAfter` in `webview/view/autocorrect.mjs` | `tests/model/autocorrect-matcher.test.js` (the firmware's fixture), `tests/model/autocorrect-editor.test.js`, `tests/session/panel-loop.test.js`, `tests/view/autocorrect.test.mjs`, `browser-tests/autocorrect.spec.js` |
-| The Text replacement screen (D-L88): a bank of replacements beside the editor of the one picked, as Macros is. The interface holds which entry is open, the replacement being made and the field open in the editor (`autocorrectEntry`, `autocorrectNew`, `autocorrectEdit`), a replacement whose last input was removed waiting as one being made (`autocorrectNew.emptied`) until an input puts it back or Undo brings it back; which entries a search shows and which is open are `autocorrectRows` and `openEntry` (one is always open while the list has any). A replacement's macro is picked in the keycode picker on the macros alone (`allowedKeys`). No control that removes is a bare ×. Where the Leader key is placed comes from `keycodePlacements` and `reachLine`, as Pointer's sniping keys do, and Place on a key → sets `placement` as a macro's does. How each section works is behind the info mark, the one component the board's shortcuts mark is too, which keeps its list inside the screen's area (`infoMark`, `attachInfoMarks`); the words for Text and Macro and for the file formats are the vocabulary's (`replacementKinds`, `listFileFormats`), and the Export menu's keys the rail menu's (`menuKey`) | `webview/ui/autocorrect.mjs`, `webview/view/autocorrect.mjs`, `webview/ui/info-mark.mjs`, `webview/lib/menu-keys.mjs` | `tests/view/autocorrect.test.mjs`, `browser-tests/autocorrect.spec.js` |
+| The Text replacement screen (D-L88): a bank of replacements beside the editor of the one picked, as Macros is. The interface holds which entry is open, the replacement being made and the field open in the editor (`autocorrectEntry`, `autocorrectNew`, `autocorrectEdit`), a replacement whose last input was removed waiting as one being made (`autocorrectNew.emptied`) until an input puts it back or Undo brings it back; which entries a search shows and which is open are `autocorrectRows` and `openEntry` (one is always open while the list has any). A replacement's macro is picked in the keycode picker on the macros alone (`allowedKeys`); its editor ends, under Try it, with the host layout its text types through, as the macro editor ends (`hostTyping`). No control that removes is a bare ×. Where the Leader key is placed comes from `keycodePlacements` and `reachLine`, as Pointer's sniping keys do, and Place on a key → sets `placement` as a macro's does. How each section works is behind the info mark, the one component the board's shortcuts mark is too, which keeps its list inside the screen's area (`infoMark`, `attachInfoMarks`); the words for Text and Macro and for the file formats are the vocabulary's (`replacementKinds`, `listFileFormats`), and the Export menu's keys the rail menu's (`menuKey`) | `webview/ui/autocorrect.mjs`, `webview/view/autocorrect.mjs`, `webview/ui/info-mark.mjs`, `webview/ui/host-typing.mjs`, `webview/lib/menu-keys.mjs` | `tests/view/autocorrect.test.mjs`, `browser-tests/autocorrect.spec.js` |
 | A text replacement list file (D-L85, D-L91): how QMK's text, a spreadsheet's CSV and Ark's JSON read and are written, how a replacement fires among them (`fires`), which lines a file is refused, and what a file would do to the list added to it or replacing it. The interface reads a dropped file's text and posts it; core reads it and answers with the preview (`previewAutocorrectImport`, `chooseAutocorrectFile`), and the import is one draft edit of the preview's entries | `core/model/autocorrect-import.js`; the preview's sentences, `importLines` in `webview/view/autocorrect.mjs` | `tests/model/autocorrect-import.test.js`, `tests/model/autocorrect-editor.test.js`, `tests/session/panel-loop.test.js`, `tests/view/autocorrect.test.mjs`, `browser-tests/autocorrect.spec.js` |
 | Macro text: how text, `{key}`, `{key,key}`, `{+key}`, `{-key}` and `{milliseconds}` read as steps, the limits on them, and why one does not read, as a reason code (D-L73). Core reads it by keycode, sending only the key names the step editor offers, and refuses a macro that leaves a key held, which the step editor names key by key; the step editor reads it by key name, as a person types. Both word each reason from `vocabulary.macroProblems` (core through `wordedMacroError`, wherever it reads a macro), and both skip an empty name between commas | `rules/macro-payload.mjs`, read by `core/schema/macro-payload.js` (`parsePayload`) and `webview/view/macro.mjs` (`parseMacro`); its `overfillsReport`, what fills the report's six key slots (firmware D-F65), also by `webview/view/macro-sequence.mjs` (`sequenceIssues`) and, as `chordOverfills`, `webview/view/picker.mjs` (`pickKey`) | `tests/rules/macro-payload.test.mjs`, `tests/schema/macro-payload.test.js`, `tests/view/macro.test.mjs`, `tests/view/macro-cache.test.mjs`, `tests/view/macro-sequence.test.mjs`, `tests/view/picker.test.mjs` |
 | The lighting colour compositor: the order the stages paint in and the two "no colour" rules, a firmware rule (D-L73) ([more](#lighting-preview)) | `rules/led-light.mjs`, read by `webview/view/lighting.mjs` | `tests/rules/led-light.test.mjs`, `tests/view/lighting.test.mjs`, `tests/view/drawing-cases.test.mjs` |
@@ -803,6 +815,7 @@ here: its home and tests are in
 | Pointing links (firmware D-F62): which layers may start a slot's mode or be turned on by its key ([more](#pointing-links)) | `core/model/pointing-links.js`, `core/model/layer-effects.js` (`keycodeLayersOn`), `rules/pointing-link-starts.mjs` (whether a published start holds under the layers on), `webview/view/pointing-link.mjs`, `webview/view/pointing-reach.mjs` | `tests/model/pointing-links.test.js`, `tests/rules/pointing-link-starts.test.mjs`, `tests/model/layer-reach.test.js`, `tests/model/layer-effects.test.js`, `tests/session/pd-mode-editing.test.js`, `tests/view/pointing-link.test.mjs`, `tests/view/pointing-reach.test.mjs`, `browser-tests/pointing-controls.spec.js`, `browser-tests/keys-workbench.spec.js` |
 | Shortcut layers (firmware D-F26): which layers a custom key's shortcut may turn on ([more](#shortcut-layers)) | `core/model/shortcut-layers.js`, `webview/view/custom-key.mjs` (`shortcutLayerRows`) | `tests/model/shortcut-layers.test.js`, `tests/model/custom-key-editor.test.js`, `browser-tests/custom-key-shortcut.spec.js` |
 | The rail's keyboard button and its menu ([more](#the-rails-keyboard-menu)) | `webview/view/keyboard-menu.mjs`, `webview/ui/keyboard-menu.mjs` | `tests/view/keyboard-menu.test.mjs`, `browser-tests/preview.spec.js`, `browser-tests/live-edits.spec.js` |
+| The rail's message: what it says, which kind it is and how long it stays (D-L106), drawn and closed by `webview/ui/rail-message.mjs` | `webview/view/rail-message.mjs` (`railMessageView`, `readingTime`) | `tests/view/rail-message.test.mjs`, `browser-tests/rail-message.spec.js` |
 | The commit bar: which bar the frame shows over the draft (an Apply running, its read back, a failed one until dismissed, a held live edit, other work, a draft from another keyboard, or waiting for its own with none connected, or one the keyboard changed under, a restart, the live modes', the review), drawn by `webview/ui/frame.mjs` | `webview/view/commit-bar.mjs` (`commitBarState`) | `tests/view/commit-bar.test.mjs`, `browser-tests/live-edits.spec.js`, `browser-tests/apply-progress.spec.js` |
 | Whether an area takes an edit now: the draft core binds (`draft.editable`) and the area's own capability, Export only the keyboard; and what a screen says when it does not, or nothing while the draft is busy, which the commit bar says | `webview/view/edit-gate.mjs` (`editGate`) | `tests/view/edit-gate.test.mjs`, `tests/scripts/conventions.test.js` |
 | Which key a spelling is, and whether two spellings are one key: the name the profile knows it by, one canonical spelling per key, what core publishes of it in a table keyed by keycode name (its label and short label, kind, layer, layer form, a layer-mod's modifiers, a layer-tap's tap, the layers it turns on, the host layout's legends), read under every name it goes by with each fact's own rule for an empty entry, the macro, custom key or pointing slot (held or locked) it is, and two ways of finding a behaviour row kept apart, the row keyed exactly by the spelling (what a key means, what a combo sends) and the row listening to the key however either is spelled (a picked or typed key); worked out once per model and spelling | `webview/view/key-identity.mjs` (`keyIdentity`, `sameKey`, `keycodeName`, `macroIndex`) | `tests/view/key-identity.test.mjs`, `tests/scripts/conventions.test.js` |
@@ -1736,6 +1749,27 @@ escaped payload (D-L26), in `webview/ui/macros/`.
   each key arrives (`capturedKey`): a Mac's releases under ⌘ and its Caps Lock
   reports, Windows's lone Print Screen release and the Left Ctrl it sends with
   AltGr.
+- The recorder is one strip: its options on the left, each one control high,
+  and Record over Clear take on the right, Record on Record delays' line;
+  narrow, the two actions take a line under the options. While a take
+  records, the sequence's canvas is ringed in the danger colour with
+  Recording and how to finish in its bottom-right corner, never in the
+  recorder's heading, its dot keeping one beat across the redraw of each
+  key; each key scrolls the content down just far enough, in the same frame,
+  to keep the recorder's actions in view (`keepInContentView`,
+  `webview/lib/scroll.mjs`). Nothing shows between the steps and the
+  recorder while it records: the take is checked once, when it finishes,
+  not key by key (`browser-tests/macro-recording-scope.spec.js`).
+- The macro editor ends as it opens: the layout its text types through, as a
+  sentence with its info mark, and **Change in Typing settings →**, which
+  lands on Your computer marked for a moment as every jump's place is (a tint
+  and a ring in the draft colour, `.revealed`;
+  `browser-tests/unicode-macros.spec.js`). A text replacement's editor ends
+  with the same line under Try it, saying "Replacement text" where a macro's
+  says "Text", its info mark saying the text has no Unicode entry; one that
+  plays a macro has none. Its sections after the first open with a rule, as
+  the macro editor's do (`hostTyping`, `attachHostTyping`,
+  `webview/ui/host-typing.mjs`; `browser-tests/autocorrect.spec.js`).
 
 ## Pointing mode editor
 

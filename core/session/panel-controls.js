@@ -33,7 +33,7 @@ const {exportedList} = require("../model/autocorrect-editor");
 const {DEMO_WORDS, panelCapabilities, panelState} = require("./demo-session");
 const {SHELL_WORDS, applyLayerEdit, discardDraftForDevice, layerEditDocument, startLayerEdit} = require("./panel-session");
 const {followRead, readFailed} = require("./draft-follow");
-const {closeEditors, whileApplying} = require("./panel-session-state");
+const {closeEditors, say, sayAfter, takeBack, whileApplying} = require("./panel-session-state");
 const {IDENTITY, compose} = require("../model/draft-order");
 const {RECONNECT_WORDS, expectReconnect, renamedTo} = require("./keyboard-reconnect");
 const {LIVE_ACTIONS, proposeLive, readNews, setEditMode} = require("./live-edits");
@@ -62,7 +62,8 @@ const rereadFailure = (error) => `Reading the keyboard again failed. ${failureSe
 // read after it that failed, then `copy`: what was kept before it, and where.
 // A save that renamed the keyboard is followed by the keyboard reconnecting
 // under its new name. Its readback may be cut short by that: the keyboard is
-// read again once it is back, so that is said instead of a failure.
+// read again once it is back, so that is said instead of a failure, and the
+// notice holds until the reconnect says how it went.
 /** @param {Session} session @param {{before: import("../model/types.js").ProfileSnapshot | null | undefined, result: import("../model/types.js").ProfileSnapshot & {slaveUnseen?: boolean}, copy: string, onStep?: (step: import("../../contracts/messages.js").ReadStep) => void}} stored */
 async function storedProfile(session, {before, result, copy, onStep}) {
     const service = session.service;
@@ -72,9 +73,11 @@ async function storedProfile(session, {before, result, copy, onStep}) {
         if (!(expected && session.reconnect === expected && !service.snapshot().connected)) reread = rereadFailure(error);
     });
     const notice = `${savedNotice(result)} ${reread}${copy}`;
-    if (!expected) return notice;
+    if (!expected) {say(session, notice, reread ? "failed" : undefined); return;}
     expected.saved = notice;
-    return `${notice} ${RECONNECT_WORDS.waiting}`;
+    expected.waiting = `${notice} ${RECONNECT_WORDS.waiting}`;
+    // A failed read after the save is said as the failure it is, and stays.
+    say(session, expected.waiting, reread ? "failed" : "lasting");
 }
 
 // The shell's progress words for the editor read's slow steps.
@@ -97,27 +100,28 @@ async function readKeyboard(session, selectedDeviceId, shell = {}) {
     // "No keyboard found" holds only while the page has none it may open: a
     // read of one it lists takes it back, as soon as the read publishes.
     const noneFound = shell.words?.noneFound || SHELL_WORDS.noneFound;
-    if (session.noticeSaid === noneFound && service.snapshot().devices?.length) session.notice = "";
+    if (service.snapshot().devices?.length) takeBack(session, noneFound);
     const read = await service.readForEditor(selectedDeviceId, {
         progress: (step, work) => run(shell, READ_TITLES[step], work),
         // A follow-back's read the keyboard moved under is the live watch's
         // to read again (live-watch.js), within its bound.
         failed: (error) => {if (session.reconnect && session.draft?.live) readFailed(session, error);},
     });
+    // It holds until a keyboard is listed (above).
     if (read.kind === "none") {
-        session.notice = noneFound;
+        say(session, noneFound, "lasting");
         return false;
     }
     if (read.kind === "firmware") {
         // Ark reads only current firmware; the compatibility diagnostics say what
         // this keyboard's firmware lacks.
-        session.notice = (read.failure || firmwareUpdateRequired()).message;
+        say(session, (read.failure || firmwareUpdateRequired()).message, "failed");
         return false;
     }
     // A keyboard that has just come back is read once it has finished
     // starting (keyboard-starting.js); one that never finishes says so.
     if (read.kind === "starting") {
-        session.notice = startingTimeout(session);
+        say(session, startingTimeout(session), "failed");
         return false;
     }
     const portable = read.portable;
@@ -127,20 +131,21 @@ async function readKeyboard(session, selectedDeviceId, shell = {}) {
         // Each failure says itself in words (model/vocabulary.js
         // failureSentence); the decoder's own text stays in the diagnostics,
         // where the device service put it.
-        session.notice = `The keyboard profile could not be read. ${state.error ? failureSentence(state.error) : "The keyboard returned no verified profile."}`;
+        say(session, `The keyboard profile could not be read. ${state.error ? failureSentence(state.error) : "The keyboard returned no verified profile."}`, "failed");
     } else {
         const description = state.committed.source === "compiled"
             ? "compiled defaults"
             : `saved profile, generation ${state.committed.generation}`;
         const failures = state.committed.failures?.length || 0;
-        session.notice = `Read the keyboard's ${description}.` + (failures ? ` ${failures} part${failures === 1 ? "" : "s"} of it could not be read.` : "");
+        say(session, `Read the keyboard's ${description}.` + (failures ? ` ${failures} part${failures === 1 ? "" : "s"} of it could not be read.` : ""), failures ? "failed" : undefined);
     }
-    if (macroFailure) session.notice += macroFailure;
+    // What could not be read stays said, as the failure it is.
+    if (macroFailure) sayAfter(session, macroFailure.trim(), "failed");
     // A live keyboard that restarted (a replug, a lost connection) since Ark
     // knew of unsaved edits: in Live edit it may have saved them first. Or
     // its working copy changed without Ark.
     const told = readNews(session, portable);
-    if (told.words) session.notice += ` ${told.words}`;
+    if (told.words) sayAfter(session, told.words);
     // A keyboard Ark followed back says so after this read: what became of a
     // Save cut short goes with what it says.
     if (told.cutShort && session.reconnect) session.reconnect.after = [session.reconnect.after, told.restart].filter(Boolean).join(" ");
@@ -188,7 +193,7 @@ const DRAFT_ACTIONS = Object.freeze({
     // Taken while the edit runs (registry phase `within`): the edit's own
     // path says how it ended (live-edits.js).
     abortLive: async ({session, service}) => {
-        if (!service.cancelLiveEdit?.()) session.notice = "Nothing to cancel: the keyboard is not holding an edit of Ark's.";
+        if (!service.cancelLiveEdit?.()) say(session, "Nothing to cancel: the keyboard is not holding an edit of Ark's.");
     },
     setMode: ({session, message, shell}) => setEditMode(session, /** @type {{mode: number, pending?: string, draftRevision: number}} */ (/** @type {unknown} */ (message)),
         (cause) => recoveryFor(shell, session, cause), shell),
@@ -201,7 +206,7 @@ const DRAFT_ACTIONS = Object.freeze({
         if (!draft.stale && !draft.base.incomplete && panelState(session).selectedDeviceId === draft.deviceId) {
             draft.discardAll(revision);
             session.resetDraftForms = true;
-            session.notice = "Draft discarded. Undo brings it back.";
+            say(session, "Draft discarded. Undo brings it back.");
             return;
         }
         draft.assertRevision(revision, {allowStale: true});
@@ -209,7 +214,7 @@ const DRAFT_ACTIONS = Object.freeze({
         if (!state.connected) throw new Error("Reconnect and read the keyboard before discarding its draft.");
         const complete = hasCurrentLayers(state.capabilities);
         discardDraftForDevice(session, state, complete ? await service.readPortableProfile() : undefined);
-        session.notice = complete ? "Draft discarded. Showing the keyboard's saved profile." : "Draft discarded. This keyboard remains read-only.";
+        say(session, complete ? "Draft discarded. Showing the keyboard's saved profile." : "Draft discarded. This keyboard remains read-only.");
         return;
     }),
     rebase: liveOr("rebase", async ({draft, revision, session, service}) => {
@@ -219,7 +224,7 @@ const DRAFT_ACTIONS = Object.freeze({
         followRead(session, snapshot, service.snapshot());
         draft.rebase(revision);
         session.resetDraftForms = true;
-        session.notice = "Review now compares your draft with the latest keyboard state. Save will replace the differences shown.";
+        say(session, "Review now compares your draft with the latest keyboard state. Save will replace the differences shown.");
         return;
     }),
     // The success state's way back: the copy saved before the last Apply
@@ -249,7 +254,7 @@ const DRAFT_ACTIONS = Object.freeze({
             // What the keyboard held before, for "Put back what it had".
             if (saved) remember(session, "beforeApply", {document: saved, savedAt: new Date().toISOString()}, service.snapshot(), draft.deviceId);
             else forget(session, "beforeApply");
-            session.notice = await storedProfile(session, {before, result, copy: `Recovery copy on Backups: ${recovery}`, onStep: (step) => {
+            await storedProfile(session, {before, result, copy: `Recovery copy on Backups: ${recovery}`, onStep: (step) => {
                 readStep(step);
                 service.emitChange?.();
             }});
@@ -323,7 +328,7 @@ const PORTABLE_ACTIONS = Object.freeze({
         if (!session.draft) throw new Error("Read the keyboard before exporting its text replacement list.");
         const {format} = /** @type {Extract<PortableMessage, {type: "exportAutocorrect"}>} */ (message);
         const where = await shell.saveExport?.(exportedList(session.draft.current, format));
-        if (where) session.notice = `Text replacement list exported to ${where}`;
+        if (where) say(session, `Text replacement list exported to ${where}`);
     },
     manageLayers: async ({session, service}) => {
         const before = session.draft?.current || await service.readPortableProfile();
@@ -376,7 +381,7 @@ const PORTABLE_ACTIONS = Object.freeze({
         const result = await service.restorePortableProfile(document, {expectedFingerprint: before.fingerprint,
             saveRecovery: async (copy) => (recovery = await recoveryFor(shell, session, "restore")(copy))});
         closeEditors(session);
-        session.notice = await storedProfile(session, {before, result, copy: (before.incomplete ? "Interrupted data retained for diagnosis on Backups: " : "Recovery copy on Backups: ") + recovery});
+        await storedProfile(session, {before, result, copy: (before.incomplete ? "Interrupted data retained for diagnosis on Backups: " : "Recovery copy on Backups: ") + recovery});
         return;
     },
 });

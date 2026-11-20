@@ -20,6 +20,8 @@ const TYPES = {
     ".css": "text/css; charset=utf-8",
     ".json": "application/json; charset=utf-8",
     ".svg": "image/svg+xml",
+    ".png": "image/png",
+    ".webmanifest": "application/manifest+json",
 };
 
 /** @param {string} root @param {number} port @returns {Promise<import("node:http").Server>} */

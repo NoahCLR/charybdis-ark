@@ -34,7 +34,7 @@ const {profileFindings} = require("../model/profile-checks");
 const {EDIT_MODE, isEditMode} = require("../protocol/profile-edit-v1");
 const {EDIT_MODE_WORDS, INTERRUPTION_REASONS, PHASE, SAVE_WORDS, arkCode, failureSentence, quietWords} = require("../model/vocabulary");
 const {IDENTITY} = require("../model/draft-order");
-const {replaceDraft} = require("./panel-session-state");
+const {replaceDraft, say} = require("./panel-session-state");
 const {keepStale, needRead, readAndFollow, replaceFromRead, takeNews, takeRead} = require("./draft-follow");
 const {expectReconnect, renamedTo} = require("./keyboard-reconnect");
 const {interruption, saveResult} = require("./interruption");
@@ -120,12 +120,12 @@ async function sendLive(session, draft, target, {accepted, replaceWhenLarge = fa
         if (result.cancelled) {
             draft.expectedLive = undefined;
             session.resetDraftForms = true;
-            session.notice = CANCELLED;
+            say(session, CANCELLED);
             return false;
         }
         draft.confirmLive(target, result);
         landed(session, before, target, result, accepted);
-        if (result.cancelTooLate) session.notice = "The keyboard took the edit just before Cancel edit reached it: it runs now. Undo sends it back.";
+        if (result.cancelTooLate) say(session, "The keyboard took the edit just before Cancel edit reached it: it runs now. Undo sends it back.");
         return true;
     } catch (error) {
         session.resetDraftForms = true;
@@ -141,7 +141,7 @@ async function sendLive(session, draft, target, {accepted, replaceWhenLarge = fa
         // app): nothing failed, the edit was simply made against an older
         // state. The draft now shows the keyboard's; the person makes it again.
         if (codeOf(error) === "LIVE_EDIT_STALE") {
-            session.notice = ["Not sent: the keyboard changed by itself just before (a DPI or lighting key, or another app). Ark read it again; make the edit again.", told?.restart].filter(Boolean).join(" ");
+            say(session, ["Not sent: the keyboard changed by itself just before (a DPI or lighting key, or another app). Ark read it again; make the edit again.", told?.restart].filter(Boolean).join(" "));
             return false;
         }
         throw withNews(error, told?.words || "");
@@ -156,8 +156,8 @@ function landed(session, before, target, result, accepted) {
     // A new keyboard name is taken by one USB restart once the keyboard
     // is quiet (firmware D-F25): that loss is expected, as after a save.
     if (!result.slaveRefused) expectReconnect(session, renamedTo(before, {...before, document: target.document, fingerprint: fingerprint(target.document)}));
-    if (result.slaveRefused) session.notice = "The slave half refused this edit, so the halves run different profiles. Revert puts both back on the saved profile.";
-    else if (!result.converged) session.notice = "The edit runs on the master half; the slave half is catching up. The next edit waits for it.";
+    if (result.slaveRefused) say(session, "The slave half refused this edit, so the halves run different profiles. Revert puts both back on the saved profile.", "failed");
+    else if (!result.converged) say(session, "The edit runs on the master half; the slave half is catching up. The next edit waits for it.");
 }
 
 // Revert on the keyboard, recorded as `target` (a Revert step, or the history
@@ -173,7 +173,7 @@ async function revertTo(session, draft, target) {
         const told = await reread(session);
         session.resetDraftForms = true;
         if (session.draft?.stale) throw withNews(refusal("Reverted on the keyboard, but its saved profile could not be read. Read the keyboard again."), told.words);
-        session.notice = ["Reverted: the keyboard runs its saved profile again. It was saved elsewhere; Ark read that profile again.", told.restart].filter(Boolean).join(" ");
+        say(session, ["Reverted: the keyboard runs its saved profile again. It was saved elsewhere; Ark read that profile again.", told.restart].filter(Boolean).join(" "));
         return false;
     }
     const before = draft.current;
@@ -263,7 +263,7 @@ async function reread(session) {
     needRead(session);
     if (!session.service.snapshot().connected) return readNews(session, undefined);
     const told = readNews(session, await readAndFollow(session));
-    if (told.words) session.notice = told.words;
+    if (told.words) say(session, told.words);
     return told;
 }
 
@@ -299,7 +299,7 @@ const LIVE_ACTIONS = Object.freeze({
     revert: async ({draft, revision, session}) => {
         draft.assertRevision(revision, {allowStale: false});
         if (await revertTo(session, draft, {document: draft.completeBase.document, label: "Reverted to the saved profile", origin: "revert", order: IDENTITY})) {
-            session.notice = "Reverted: the keyboard runs its saved profile again. Undo sends the edits back.";
+            say(session, "Reverted: the keyboard runs its saved profile again. Undo sends the edits back.");
         }
     },
     // Save: a recovery copy of what is saved, then the keyboard writes what it
@@ -314,14 +314,14 @@ const LIVE_ACTIONS = Object.freeze({
         if (keyboardSaves && !live.keyboard?.saveFailed && live.unsaved) throw new Error(`In Live edit the keyboard saves by itself after ${quietWords(live.keyboard?.quietMs)} with no edit and no key held.`);
         if (!keyboardSaves && draft.hasBlockers()) throw new Error("Resolve the blockers in Checks before saving.");
         if (!keyboardSaves && draft.reviewedRevision !== revision) throw new Error("Review the keyboard's unsaved edits before saving them.");
-        if (!live.unsaved) {session.notice = "Nothing to save: the keyboard runs its saved profile."; return;}
+        if (!live.unsaved) {say(session, "Nothing to save: the keyboard runs its saved profile."); return;}
         if (!keyboardSaves && draft.hasChecksToConfirm() && /** @type {{confirmChecks?: boolean}} */ (message).confirmChecks !== true) throw new Error("These edits have warnings or traps. Confirm them in the review before saving.");
         const recovery = await saveRecovery(draft.completeBase.document);
         if (!recovery) throw refusal("A recovery copy could not be saved. Nothing was saved on the keyboard.", "RECOVERY_REQUIRED");
         try {
             const status = await service.saveWorkingCopy({session: live.session, revision: live.revision});
             draft.confirmSaved(status);
-            session.notice = `Saved on both halves. Recovery copy of what was saved before, on Backups: ${recovery}`;
+            say(session, `Saved on both halves. Recovery copy of what was saved before, on Backups: ${recovery}`);
         } catch (error) {
             if (codeOf(error) === "LIVE_HALVES_APART") markApart(draft);
             else if (interruption(error)) throw await saveCutShort(session, draft, error, saveRecovery);
@@ -335,7 +335,7 @@ const LIVE_ACTIONS = Object.freeze({
         const told = await reread(session);
         session.resetDraftForms = true;
         if (session.draft?.stale) throw withNews(new Error("Read the keyboard again; it could not be read just now."), told.words);
-        session.notice = ["Read the keyboard again: the draft shows what it runs now.", told.restart].filter(Boolean).join(" ");
+        say(session, ["Read the keyboard again: the draft shows what it runs now.", told.restart].filter(Boolean).join(" "));
     },
     confirmLive: async ({session, draft, message}) => {
         const proposal = session.liveProposal;
@@ -404,7 +404,7 @@ async function setEditMode(session, message, recoveryFor, shell) {
     // Sending publishes the model on its way, which takes any notice set
     // before it: the draft's words are said with the mode's, once it is sent.
     if (send && session.draft) await sendApplyDraft(session, send, mode, notice);
-    else session.notice = notice;
+    else say(session, notice);
 }
 
 // The Review and save draft goes live as one edit, its checks confirmed by
@@ -416,7 +416,7 @@ async function sendApplyDraft(session, kept, mode, notice) {
     try {
         const published = await proposeLive(session, {document: kept.document, label: "Sent the draft live", origin: "edit", order: draft.order}, {confirmed: true, replaceWhenLarge: true});
         if (!published) throw refusal("The keyboard changed before it took the draft. Read it again before sending.", "LIVE_EDIT_STALE");
-        session.notice = `${notice} ${mode === EDIT_MODE.LIVE ? "Your draft is running on the keyboard, which saves it in a moment." : "Your draft is running on the keyboard, unsaved."}`;
+        say(session, `${notice} ${mode === EDIT_MODE.LIVE ? "Your draft is running on the keyboard, which saves it in a moment." : "Your draft is running on the keyboard, unsaved."}`);
     } catch (error) {
         // The Review and save draft belongs to the person until publication
         // succeeds, even if the keyboard refuses the return to Review and

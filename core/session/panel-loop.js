@@ -68,7 +68,7 @@ const {ProfileDeviceService} = require("./profile-device-service");
 const {buildPanelModel, panelRequest, routeMessage} = require("./panel-session");
 const {followService} = require("./draft-follow");
 const {panelCatalog} = require("../model/profile-model");
-const {beginRead, boundDraft, closeEditors, endRead, takeOutbox, whilePanelBusy} = require("./panel-session-state");
+const {beginRead, boundDraft, closeEditors, endRead, say, takeOutbox, whilePanelBusy} = require("./panel-session-state");
 const {awaitReconnect, endReconnect, expectLost} = require("./keyboard-reconnect");
 const {draftControl, portableControl, readKeyboard} = require("./panel-controls");
 const {closingLoses, liveEdit} = require("./live-edits");
@@ -122,7 +122,7 @@ function openPanelLoop(shell, options) {
             if (session.service.snapshot().busy) return fail(session, new Error("Wait for the keyboard to finish before disconnecting it."), shell);
             await session.service.disconnect();
             await letGo();
-            session.notice = "Disconnected. This page will not open that keyboard again until you choose it.";
+            say(session, "Disconnected. This page will not open that keyboard again until you choose it.");
             return loop.keyboardsChanged();
         },
         keyboardsChanged: () => followAllowed(session, shell, allowed, loop.handleMessage),
@@ -364,8 +364,7 @@ function fail(session, error, shell) {
     const held = /** @type {{code?: string}} */ (error)?.code === "LIVE_EDIT_HELD";
     const verdict = /** @type {{verdict?: unknown}} */ (error)?.verdict;
     const news = /** @type {{news?: unknown}} */ (error)?.news;
-    session.notice = [held || (typeof verdict === "string" && verdict && text.startsWith(verdict)) ? text : `Failed: ${text}`, typeof news === "string" ? news : ""].filter(Boolean).join(" ");
-    session.noticeFailed = !held;
+    say(session, [held || (typeof verdict === "string" && verdict && text.startsWith(verdict)) ? text : `Failed: ${text}`, typeof news === "string" ? news : ""].filter(Boolean).join(" "), held ? undefined : "failed");
     publish(session, shell);
 }
 
@@ -397,7 +396,7 @@ async function choseKeyboard(session, picked, leave, shell, handle) {
     try {await picked;}
     catch (error) {
         if (/** @type {{code?: unknown}} */ (error)?.code !== "CANCELLED") return fail(session, error, shell);
-        session.notice = "No keyboard was chosen.";
+        say(session, "No keyboard was chosen.");
         return publish(session, shell);
     }
     try {await session.service.enumerate();}
@@ -498,12 +497,12 @@ async function portableMessage(session, message, shell) {
                 const where = await shell.saveExport(exportedProfile(snapshot, new Date(), "charybdis-demo"));
                 if (where) {
                     saved();
-                    session.notice = `Demo profile exported to ${where}. Import it on your keyboard to review and save it.`;
+                    say(session, `Demo profile exported to ${where}. Import it on your keyboard to review and save it.`);
                 }
             } else if (panelControl(message.type)?.action === "export") {
                 const file = exportedProfile(await session.service.readPortableProfile());
                 const where = await shell.saveExport(file);
-                if (where) session.notice = "Complete keyboard profile exported to " + where;
+                if (where) say(session, "Complete keyboard profile exported to " + where);
             } else {
                 await portableControl(session, message, shell);
             }

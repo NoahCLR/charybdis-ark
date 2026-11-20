@@ -93,6 +93,7 @@ test("Restart keeps the unsaved edits, restarts both halves and puts them back u
     const said = notices(shell).at(-1);
     assert.ok(said.startsWith(RESTART_WORDS.back()), said);
     assert.match(said, /Your unsaved edits are back on the keyboard, not saved yet: review and save them\./);
+    assert.equal(shell.posted.filter((message) => message.notice).at(-1).failed, undefined, "edits back are no failure: it closes by itself");
     // And they save as any edit does.
     await send({type: "reviewProfileDraft"});
     await send({type: "saveProfileDraft", confirmChecks: true});
@@ -250,6 +251,8 @@ test("a keyboard that stops again at once is told apart: the edits stay in the r
     const said = notices(shell).at(-1);
     assert.match(said, /stopped saving again at once, so the fault is in its flash or its firmware/);
     assert.match(said, /not put back\. Your unsaved edits are in the recovery copy on Backups: \/recovery\/1\.json/);
+    // A failure, so it stays with where the copy is (D-L106).
+    assert.equal(shell.posted.filter((message) => message.notice).at(-1).failed, true);
 });
 
 // Under a Review and save draft the edits are Ark's own, not the keyboard's:

@@ -118,16 +118,17 @@ export function screenLighting() {
     // A tab's swatch is the colour the stage paints for what it has picked:
     // hollow while the stage paints nothing, hatched for a passthrough
     // colour, dark and struck through for one that is off. Its label is the
-    // stage's name, or its short word where the names do not all fit (its
-    // stage bar says the name whole); the numbers give the paint order.
-    /** @param {{id: string, label: string, short?: string}} stage @param {number} index */
+    // stage's short word, at any width (D-L105): its stage bar, its tip and
+    // its accessible name say the name whole; the numbers give the paint
+    // order.
+    /** @param {{id: string, label: string, short: string}} stage @param {number} index */
     const stageTab = (stage, index) => {
         const on = stageInEffect(model, stage.id), colour = stageColour(model, stage.id), mark = swatchOf(colour, {stageOn: on});
         const idle = stageIdle(model, stage.id);
         return `<button role="tab" id="stage-tab-${esc(stage.id)}" class="${on ? "" : "off"}" data-ltab="${esc(stage.id)}" aria-selected="${state.stage === stage.id}" aria-label="${esc(stage.label)}"
             data-tip="${esc(stage.label)} · painted ${esc(index + 1)} of ${stages.length}${on ? "" : ` · ${esc(lightingOff(model) ? "All lighting is off, so nothing paints" : idle || "this stage is off")}`}">
             <span class="n">${esc(index + 1)}</span><i class="swatch ${mark}" style="${colour && !mark ? `background:${css(colour)}` : ""}"></i>
-            <span class="tab-label"><span class="long" data-text="${esc(stage.label)}">${esc(stage.label)}</span><span class="short" aria-hidden="true" data-text="${esc(stage.short || stage.label)}">${esc(stage.short || stage.label)}</span></span>${marks.lighting.has(stage.id) ? draftDot(model?.draft) : ""}</button>`;
+            <span class="tab-label"><span data-text="${esc(stage.short)}">${esc(stage.short)}</span></span>${marks.lighting.has(stage.id) ? draftDot(model?.draft) : ""}</button>`;
     };
     const bench = el(`<div class="card bench workbench lighting-bench">
         <div class="bench-tabs"><div class="bench-tablist" role="tablist" aria-label="Lighting stages, in paint order">
@@ -143,30 +144,12 @@ export function screenLighting() {
         render();
     }));
     stageBody(/** @type {HTMLElement} */ (bench.querySelector("#benchBody")));
-    fitStageWords(/** @type {HTMLElement} */ (bench.querySelector(".bench-tablist")));
     keepInView(/** @type {HTMLElement} */ (bench.querySelector(".bench-tablist")));
     rovingTabs(/** @type {HTMLElement} */ (bench.querySelector(".bench-tablist")), /** @type {HTMLElement} */ (bench.querySelector("#benchBody")));
     pad.appendChild(bench);
 
     main.appendChild(content);
     return main;
-}
-
-/** The stage tabs read by their names where every name fits the strip, and
- * by their short words where one would not, in whatever font the system
- * draws them. The strip is measured with the names, so a wider window brings
- * them back. It is measured first in the frame keepInView then measures in,
- * so the strip's arrows see the words that are shown, and again on a resize.
- * @param {HTMLElement} strip */
-function fitStageWords(strip) {
-    const bar = /** @type {HTMLElement} */ (strip.closest(".bench-tabs"));
-    const fit = () => {
-        if (!strip.isConnected) return;
-        bar.classList.remove("short-words");
-        bar.classList.toggle("short-words", strip.scrollWidth > strip.clientWidth);
-    };
-    requestAnimationFrame(fit);
-    new ResizeObserver(fit).observe(strip);
 }
 
 // All lighting and its idle timeout darken every LED, every stage with them,

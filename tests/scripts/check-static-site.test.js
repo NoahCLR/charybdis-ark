@@ -67,6 +67,7 @@ test("anything the build does not write fails the check", async () => {
         const cases = [
             ["manifest.json", ({site}) => fs.writeFileSync(path.join(site, "manifest.json"), "{}"), /manifest\.json is not a file the web build writes/],
             ["an unhashed script", ({site}) => fs.writeFileSync(path.join(site, "app.js"), ""), /app\.js is not a file the web build writes/],
+            ["an unhashed icon", ({site}) => fs.writeFileSync(path.join(site, "favicon.png"), ""), /favicon\.png is not a file the web build writes/],
             ["a folder", ({site}) => fs.mkdirSync(path.join(site, "assets")), /assets is not a plain file/],
             ["a link", ({site}) => fs.symlinkSync(path.join(site, "index.html"), path.join(site, "page.html")), /page\.html is not a plain file/],
             ["no index.html", ({site}) => fs.rmSync(path.join(site, "index.html")), /index\.html is missing/],
