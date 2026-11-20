@@ -2515,8 +2515,8 @@ details > summary { list-style: none; }
 .ac-replacement > .ac-text, .ac-replacement > .ac-macro { flex: 1 1 280px; min-width: 0; }
 .ac-macro .input[readonly] { cursor: pointer; }
 .ac-macro-none { flex-basis: 100%; }
-/* A replacement's text says under its own field what it types through. */
-.ac-typing { flex-basis: 100%; display: grid; gap: var(--sp-2); }
+/* Each section after the first opens with a rule, as the macro editor's do. */
+.ac-editor .card-b > .macro-sequence-heading ~ .macro-sequence-heading { border-top: 1px solid var(--line); padding-top: var(--sp-4); }
 .ac-editor .editor-section .card-h { gap: var(--sp-1); }
 .ac-bytes { font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
 .ac-inputs { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; min-height: var(--h-compact); }
