@@ -49,8 +49,9 @@ VIA, save your layout there before you flash, and once Ark has read the
 keyboard [import it in Backups](backups.md#import-a-via-layout) to carry over
 your keys and macros.
 
-If something goes wrong, the message beside the rail starts with **Failed:**
-and says what happened and what to do. A problem in Ark itself says only
+If something goes wrong, the message beside the rail turns red, says what
+happened and what to do, and stays until you dismiss it or do something else.
+Most failures start with **Failed:**. A problem in Ark itself says only
 that, and to reload the page if it keeps happening. If the page shows **Ark
 did not finish loading**, reload it. If Ark itself fails to start, which
 happens with JavaScript off, a file that didn't load, or a browser too old for
@@ -118,8 +119,13 @@ The column on the left is the rail. From the top:
   and **Pointer** under Settings, each showing all its settings at once;
   **Backups** and **Keyboard** under Keyboard. Elsewhere Ark calls those four
   Behaviour settings, Combo settings, Typing settings and Pointer settings.
-- Messages from Ark, each with ✕ to dismiss it. A long one scrolls in its own
-  box rather than hiding the screens above it.
+- Messages from Ark. One that only says what happened, such as a read or an
+  export, closes by itself after a few seconds, or longer for a long one: the
+  line along its foot drains until it does, and stops while the pointer is on
+  it. A failure stays until you dismiss it with
+  ✕ or do something else; one that says what Ark is waiting for, such as a
+  restart, stays until the wait ends. A long one scrolls in its own box rather
+  than hiding the screens above it.
 - **Draft history**, with undo and redo arrows and a count of the steps so far.
 
 Rest the pointer on a button, a setting or a figure and a tip opens beside

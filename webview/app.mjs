@@ -46,6 +46,7 @@ import {reviewOverlay} from "./ui/review-overlay.mjs";
 import {leaveDemoOverlay} from "./ui/leave-demo.mjs";
 import {editModeOverlay, liveProposalOverlay} from "./ui/edit-mode.mjs";
 import {commitBar, rail, reserveCommitRoom, topbar} from "./ui/frame.mjs";
+import {fadeWhenRead} from "./ui/rail-message.mjs";
 
 const root = /** @type {HTMLElement} */ (document.getElementById("root"));
 /** @type {import("./view/screens.mjs").ScreenId | null} */
@@ -230,7 +231,7 @@ function refreshCommitBar() {
     announce(announcements(getModel(), state));
 }
 
-const receivePanelMessage = createPanelMessages({root, refreshCommitBar, render, receiveMacroValidation, receiveAutocorrectValidation, receiveAutocorrectImport, receiveAutocorrectTry});
+const receivePanelMessage = createPanelMessages({root, refreshCommitBar, render, receiveMacroValidation, receiveAutocorrectValidation, receiveAutocorrectImport, receiveAutocorrectTry, onNotice: fadeWhenRead});
 // Replies from the core cross the message boundary as copies, in the shapes
 // contracts/ declares. Device values have already passed core's validators.
 addEventListener("message", (event) => receivePanelMessage(/** @type {import("../contracts/messages.js").PanelResponse} */ (event.data)));

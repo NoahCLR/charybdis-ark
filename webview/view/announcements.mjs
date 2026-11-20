@@ -10,11 +10,14 @@
 // backup being read or written, the commit bar's save, read back, held key or
 // other work, a keyboard asking for a restart), a slot tile held for a
 // keyboard swap (D-L81) and the rail's notice; the assertive ones a save cut
-// short, the keyboard's own save failing and the rail's error. A bar that says the rail's notice says it alone, as on screen.
+// short, the keyboard's own save failing and the rail's error. The rail's
+// message is what it shows (view/rail-message.mjs): a bar that says it says
+// it alone, and the keyboard's error dismissed gives way to what is under it.
 // A save's step is said by its label, not by its bytes, so the region is not
 // rewritten for every page sent.
 
-import {barSaysNotice, commitBarState} from "./commit-bar.mjs";
+import {commitBarState} from "./commit-bar.mjs";
+import {railMessageView} from "./rail-message.mjs";
 
 /** @typedef {{polite: string[], assertive: string[]}} Announcements */
 
@@ -23,10 +26,10 @@ export const HELD_SLOT_WORDS = "A slot is held for a swap. Press Shift+Space on 
 
 /**
  * @param {import("../../contracts/panel.js").PublishedModel | null | undefined} model
- * @param {{notice?: string, error?: string, applyDismissed?: number | null, heldSlot?: {bank: string, key: string} | null}} panel the panel's notice, error, dismissed Apply and held slot tile
+ * @param {{notice?: string, error?: string, healthDismissed?: string, applyDismissed?: number | null, heldSlot?: {bank: string, key: string} | null}} panel the panel's notice, error, dismissed keyboard error, dismissed Apply and held slot tile
  * @returns {Announcements}
  */
-export function announcements(model, {notice = "", error = "", applyDismissed = null, heldSlot = null} = {}) {
+export function announcements(model, {notice = "", error = "", healthDismissed = "", applyDismissed = null, heldSlot = null} = {}) {
     /** @type {string[]} */
     const polite = [];
     /** @type {string[]} */
@@ -48,8 +51,7 @@ export function announcements(model, {notice = "", error = "", applyDismissed = 
     }
     if (bar?.kind === "saveFailed") assertive.push(bar.saving.title);
     if (heldSlot) polite.push(HELD_SLOT_WORDS);
-    const failed = error || model?.device?.health?.error || "";
-    const said = failed || notice;
-    if (said && !barSaysNotice(bar, said)) (failed ? assertive : polite).push(said);
+    const rail = railMessageView(model, {notice, error, healthDismissed}, bar);
+    if (rail) (rail.failed ? assertive : polite).push(rail.text);
     return {polite, assertive};
 }

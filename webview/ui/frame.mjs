@@ -17,6 +17,7 @@ import {bindKeyboardMenu, keyboardMenu} from "./keyboard-menu.mjs";
 import {restartOffer} from "../view/edit-mode.mjs";
 import {barSaysNotice, commitBarState, restartOffReason} from "../view/commit-bar.mjs";
 import {ariaShortcut, shortcut} from "../view/shortcuts.mjs";
+import {bindRailMessage, railMessage} from "./rail-message.mjs";
 
 // The review opens at once; the core marks it reviewed when it answers.
 function openReview() {
@@ -70,7 +71,7 @@ export function rail() {
         state.screen = id;
         render();
     }));
-    /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="dismiss"]'))?.addEventListener("click", () => { state.notice = ""; state.error = ""; render(); });
+    bindRailMessage(node);
     bindKeyboardMenu(node);
     // Draft history, undo and redo show once there is a draft to step through.
     /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="history"]'))?.addEventListener("click", openHistory);
@@ -109,20 +110,6 @@ function railBuild(build) {
     return url
         ? `<a class="rail-build" href="${esc(url)}" target="_blank" rel="noopener" data-tip="This build's commit on GitHub">${githubMark("rail-build-mark")}<span>${esc(buildLine(build))}</span></a>`
         : `<div class="rail-build"><span>${esc(buildLine(build))}</span></div>`;
-}
-
-// What the rail and the bars say as it happens is heard through the page's
-// own live regions (view/announcements.mjs), not through these, which every
-// render draws anew.
-function railMessage() {
-    const model = getModel();
-    const error = state.error || model?.device?.health?.error;
-    const message = error || state.notice;
-    // A failed Apply is said once, by its bar, which stays until dismissed.
-    if (!message || barSaysNotice(commitBarState(model, state), message)) return "";
-    return `<div class="rail-message ${error ? "err" : ""}">
-        <span>${esc(message)}</span>
-        <button class="btn tiny ghost icon" data-act="dismiss" aria-label="Dismiss">✕</button></div>`;
 }
 
 // One Apply's steps, as the keyboard reports them. The running step carries

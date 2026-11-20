@@ -231,6 +231,17 @@ button.rail-keyboard:disabled .rail-keyboard-text { color: var(--text-2); }
 .rail-message.err { border-left-color: var(--danger); color: var(--text); }
 .rail-message span { flex: 1; min-width: 0; }
 .rail-message .btn { flex: none; margin-top: calc(-1 * var(--sp-0)); }
+/* A message that closes by itself drains a line along its foot over its
+   reading time (ui/rail-message.mjs sets --fade and how much of it has
+   passed), stopped while it is held. The line is a background, so it stays
+   at the foot while a long message scrolls. */
+.rail-message.fades {
+  background: linear-gradient(color-mix(in srgb, var(--text-2) 70%, transparent) 0 0) left bottom / 100% 2px no-repeat, var(--surface-2);
+  animation: rail-fade var(--fade) linear calc(-1 * var(--fade-passed, 0ms)) forwards;
+}
+.rail-message.fades.held { animation-play-state: paused; }
+@keyframes rail-fade { to { background-size: 0% 2px, auto; } }
+@media (prefers-reduced-motion: reduce) { .rail-message.fades { animation: none; background: var(--surface-2); } }
 .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--text-3); flex: none; }
 .dot.on { background: var(--text); }
 .dot.ok { background: var(--ok); }

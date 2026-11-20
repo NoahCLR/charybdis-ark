@@ -201,11 +201,13 @@ test("an Apply that renames the keyboard expects it to reconnect, and a readback
         stage(session, {type: "renameKeyboard", name});
         session.draft.review(session.draft.revision);
         await draftControl(session, {type: "applyProfileDraft", draftRevision: session.draft.revision}, shell());
+        const waiting = `Complete profile saved to both halves and verified. Recovery copy on Backups: /recovery/1.json ${RECONNECT_WORDS.waiting}`;
         assert.deepEqual(session.reconnect, {deviceId: "kb", serialNumber: "", name, otherDevices: [], startedAt: session.reconnect.startedAt, dropped: false,
-            saved: "Complete profile saved to both halves and verified. Recovery copy on Backups: /recovery/1.json"});
+            saved: "Complete profile saved to both halves and verified. Recovery copy on Backups: /recovery/1.json", waiting});
         assert.deepEqual(expecting, [true]);
-        assert.equal(session.notice, `Complete profile saved to both halves and verified. Recovery copy on Backups: /recovery/1.json ${RECONNECT_WORDS.waiting}`,
-            interrupted ? "the keyboard is read again once it is back, so the cut-short read is not reported" : "");
+        assert.equal(session.notice, waiting, interrupted ? "the keyboard is read again once it is back, so the cut-short read is not reported" : "");
+        // It holds until the keyboard is back, and is no failure (D-L106).
+        assert.equal(session.noticeKind, "lasting");
     }
     // A save that leaves the name alone expects nothing.
     const session = sessionWithDraft();

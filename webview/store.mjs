@@ -148,6 +148,8 @@ export const STATE_FIELDS = {
     confirmChecks: kept(null), // the draft revision whose checks Apply is asking about
     picker: kept(null),
     notice: kept(""),
+    noticeLasting: kept(false), // the notice holds while its condition does, so it does not close by itself
+    healthDismissed: kept(""),  // the keyboard's own error, dismissed until it says something else
     error: kept(""),
 };
 

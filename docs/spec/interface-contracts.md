@@ -439,6 +439,17 @@ The same kind of control looks and sits the same on every screen.
   its top-left corner, the trackball's in its middle, and moves or shrinks no
   legend: a key's legends are the same on Lighting as on the Keymap
   (`webview/ui/board.mjs`; `browser-tests/lighting-controls.spec.js`).
+- The rail's message is kept by what kind the core says it is (D-L106;
+  `railMessageView`, `readingTime`, `webview/view/rail-message.mjs`, tested in
+  `tests/view/rail-message.test.mjs`): a failure (`failed`) until ✕ or a
+  later message, a message held while its condition is (`lasting`) until the
+  core takes it back, the keyboard's own error while it is reported unless ✕
+  hid it, and any other message for its reading time, a line along its foot
+  draining over it, both stopped while the pointer is over it or focus inside
+  it and carried over a redraw (`webview/ui/rail-message.mjs`). Its words
+  never make it a failure. `railMessageView` alone decides which message is
+  shown: ✕ closes that one and `announcements` says that one. Closing or
+  dismissing it redraws it alone.
 - The rail's message never covers the screens' names: under them it shrinks
   first, scrolling in its own box, and a window under 860px tall leaves out
   the board drawn over Ark's name. In a window 1100px wide or less the rail
@@ -804,6 +815,7 @@ here: its home and tests are in
 | Pointing links (firmware D-F62): which layers may start a slot's mode or be turned on by its key ([more](#pointing-links)) | `core/model/pointing-links.js`, `core/model/layer-effects.js` (`keycodeLayersOn`), `rules/pointing-link-starts.mjs` (whether a published start holds under the layers on), `webview/view/pointing-link.mjs`, `webview/view/pointing-reach.mjs` | `tests/model/pointing-links.test.js`, `tests/rules/pointing-link-starts.test.mjs`, `tests/model/layer-reach.test.js`, `tests/model/layer-effects.test.js`, `tests/session/pd-mode-editing.test.js`, `tests/view/pointing-link.test.mjs`, `tests/view/pointing-reach.test.mjs`, `browser-tests/pointing-controls.spec.js`, `browser-tests/keys-workbench.spec.js` |
 | Shortcut layers (firmware D-F26): which layers a custom key's shortcut may turn on ([more](#shortcut-layers)) | `core/model/shortcut-layers.js`, `webview/view/custom-key.mjs` (`shortcutLayerRows`) | `tests/model/shortcut-layers.test.js`, `tests/model/custom-key-editor.test.js`, `browser-tests/custom-key-shortcut.spec.js` |
 | The rail's keyboard button and its menu ([more](#the-rails-keyboard-menu)) | `webview/view/keyboard-menu.mjs`, `webview/ui/keyboard-menu.mjs` | `tests/view/keyboard-menu.test.mjs`, `browser-tests/preview.spec.js`, `browser-tests/live-edits.spec.js` |
+| The rail's message: what it says, which kind it is and how long it stays (D-L106), drawn and closed by `webview/ui/rail-message.mjs` | `webview/view/rail-message.mjs` (`railMessageView`, `readingTime`) | `tests/view/rail-message.test.mjs`, `browser-tests/rail-message.spec.js` |
 | The commit bar: which bar the frame shows over the draft (an Apply running, its read back, a failed one until dismissed, a held live edit, other work, a draft from another keyboard, or waiting for its own with none connected, or one the keyboard changed under, a restart, the live modes', the review), drawn by `webview/ui/frame.mjs` | `webview/view/commit-bar.mjs` (`commitBarState`) | `tests/view/commit-bar.test.mjs`, `browser-tests/live-edits.spec.js`, `browser-tests/apply-progress.spec.js` |
 | Whether an area takes an edit now: the draft core binds (`draft.editable`) and the area's own capability, Export only the keyboard; and what a screen says when it does not, or nothing while the draft is busy, which the commit bar says | `webview/view/edit-gate.mjs` (`editGate`) | `tests/view/edit-gate.test.mjs`, `tests/scripts/conventions.test.js` |
 | Which key a spelling is, and whether two spellings are one key: the name the profile knows it by, one canonical spelling per key, what core publishes of it in a table keyed by keycode name (its label and short label, kind, layer, layer form, a layer-mod's modifiers, a layer-tap's tap, the layers it turns on, the host layout's legends), read under every name it goes by with each fact's own rule for an empty entry, the macro, custom key or pointing slot (held or locked) it is, and two ways of finding a behaviour row kept apart, the row keyed exactly by the spelling (what a key means, what a combo sends) and the row listening to the key however either is spelled (a picked or typed key); worked out once per model and spelling | `webview/view/key-identity.mjs` (`keyIdentity`, `sameKey`, `keycodeName`, `macroIndex`) | `tests/view/key-identity.test.mjs`, `tests/scripts/conventions.test.js` |

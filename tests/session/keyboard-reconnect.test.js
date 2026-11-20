@@ -65,6 +65,19 @@ test("a stored rename expects a reconnect even when the USB product already has 
     assert.equal(session.reconnect, undefined);
     assert.equal(session.notice, "said");
     assert.deepEqual(session.service.calls, ["expect:true", "expect:false"]);
+    // A wait that ends saying nothing takes back what the rail said while it
+    // lasted, and nothing said since.
+    const waited = expectReconnect(session, "Desk", now);
+    waited.waiting = "Saved. Waiting for the keyboard…";
+    Object.assign(session, {notice: undefined, noticeSaid: waited.waiting});
+    endReconnect(session, waited);
+    assert.equal(session.notice, "");
+    const later = expectReconnect(session, "Desk", now);
+    later.waiting = "Saved. Waiting for the keyboard…";
+    session.noticeSaid = "Read the keyboard's saved profile, generation 3.";
+    session.notice = undefined;
+    endReconnect(session, later);
+    assert.equal(session.notice, undefined);
     assert.equal(expectReconnect(stubSession({connected: false}), "Desk", now), undefined);
     assert.equal(expectReconnect(stubSession({selectedDeviceId: "gone"}), "Desk", now), undefined);
 });
@@ -107,6 +120,7 @@ test("a safe restart may be delayed beyond ten seconds; only the return wait is 
         }});
         assert.equal(session.reconnect, undefined);
         assert.equal(session.notice, RECONNECT_WORDS.back("Desk"));
+        assert.equal(session.noticeKind, undefined, "a keyboard back and read is no failure: its notice closes by itself");
         assert.equal(timing.now(), 15500);
         assert.deepEqual(reads, ["back"]);
     }
@@ -147,6 +161,7 @@ test("the return wait ignores the other keyboard left connected until the rename
         assert.ok(ticks >= 3, "the other keyboard alone must not finish the wait");
         assert.deepEqual(reads, product === "Travel" ? ["back"] : []);
         assert.equal(session.notice, product === "Travel" ? RECONNECT_WORDS.back("Desk") : RECONNECT_WORDS.ambiguous);
+        assert.equal(session.noticeKind, product === "Travel" ? undefined : "failed", "a keyboard Ark cannot tell is a failure");
     }
 });
 
@@ -181,6 +196,7 @@ test("the wait gives way to the person, waits out a running operation, and says 
             read: async (id) => {reads.push(id); session.service.state.error = {message: "no answer"};}});
         assert.deepEqual(reads, ["a"], "read once the running operation ended");
         assert.equal(session.notice, RECONNECT_WORDS.failed);
+        assert.equal(session.noticeKind, "failed", "a keyboard back but unread is a failure, kept until dismissed");
     }
     {
         // A read that connected but did not come back ready (its complete

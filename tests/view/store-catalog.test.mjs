@@ -21,7 +21,7 @@ const copy = (message) => structuredClone(message);
 
 function surface() {
     const renders = [];
-    const receive = createPanelMessages({root: {querySelector: () => null}, refreshCommitBar() {}, render: (options) => renders.push(options), receiveMacroValidation() {}});
+    const receive = createPanelMessages({root: {querySelector: () => null}, refreshCommitBar() {}, render: (options) => renders.push(options), receiveMacroValidation() {}, onNotice() {}});
     return {receive, renders};
 }
 

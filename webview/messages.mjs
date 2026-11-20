@@ -13,9 +13,10 @@ import {sameEditorContent} from "./view/render-content.mjs";
  * @param {{root: HTMLElement, refreshCommitBar: () => void, render: (options: {keepScreen: boolean}) => void, receiveMacroValidation: (message: Extract<import("../contracts/messages.js").PanelResponse, {type: 'macroValidation'}>) => void,
  *   receiveAutocorrectValidation: (message: Extract<import("../contracts/messages.js").PanelResponse, {type: 'autocorrectValidation'}>) => void,
  *   receiveAutocorrectImport: (message: Extract<import("../contracts/messages.js").PanelResponse, {type: 'autocorrectImportPreview'}>) => void,
- *   receiveAutocorrectTry: (message: Extract<import("../contracts/messages.js").PanelResponse, {type: 'autocorrectTry'}>) => void}} surface
+ *   receiveAutocorrectTry: (message: Extract<import("../contracts/messages.js").PanelResponse, {type: 'autocorrectTry'}>) => void,
+ *   onNotice: () => void}} surface `onNotice` hears each notice the core says, or takes back, once the state holds it
  */
-export function createPanelMessages({root, refreshCommitBar, render, receiveMacroValidation, receiveAutocorrectValidation, receiveAutocorrectImport, receiveAutocorrectTry}) {
+export function createPanelMessages({root, refreshCommitBar, render, receiveMacroValidation, receiveAutocorrectValidation, receiveAutocorrectImport, receiveAutocorrectTry, onNotice}) {
     let inDemo = false;
     /** @type {string | null} */
     let lastStackKey = null;
@@ -83,23 +84,28 @@ export function createPanelMessages({root, refreshCommitBar, render, receiveMacr
         inDemo = demoNow;
         // The page's theme, as its toggle last set it.
         document.documentElement.dataset.theme = shellOf(model).theme;
-        // The core marks a failure's notice (most say "Failed: …"; an Apply or
-        // Save cut short starts with its verdict instead), so it is shown as
-        // one rather than as a neutral message.
+        // The core says what kind of notice it is (D-L106): a failure, shown
+        // as one and kept until dismissed or replaced; one held while its
+        // condition is; or one that closes by itself once read.
         if (message.notice) {
-            const failed = Boolean(message.failed) || /^Failed/.test(message.notice);
+            const failed = Boolean(message.failed);
             state.error = failed ? message.notice : "";
             state.notice = failed ? "" : message.notice;
+            state.noticeLasting = !failed && Boolean(message.lasting);
         }
         // An empty notice takes back what the rail says: core's "no keyboard
         // found", once a keyboard is being read (panel-controls.js).
-        else if (message.notice === "") state.notice = "";
+        else if (message.notice === "") {state.notice = ""; state.noticeLasting = false;}
+        if (message.notice !== undefined) onNotice();
+        // The keyboard's own error, dismissed, comes back once it has cleared
+        // and is reported again.
+        if (!model?.device?.health?.error) state.healthDismissed = "";
         if (message.resetDraftForms) resetDraftForms();
         // A combo builder waiting on Keep or Delete closes when the core accepts
         // the edit, and stays open with its fields when the core refuses it. A
         // builder for a combo that no longer exists closes too.
         if (state.combo.awaiting) {
-            if (message.failed || /^Failed/.test(message.notice || "")) state.combo.awaiting = false;
+            if (message.failed) state.combo.awaiting = false;
             else closeComboBuilder();
         }
         if (state.combo.editId !== null && !(model?.combos || []).some((combo) => combo.id === state.combo.editId)) closeComboBuilder();

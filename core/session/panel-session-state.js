@@ -18,9 +18,13 @@
 //   endRead          …and ends, ready to edit or not
 //   whilePanelBusy   a draft, backup or demo control runs; the panel takes nothing else
 //   whileApplying    an Apply and its readback run, step by step
+//   say              the notice the next model carries, and what kind it is
+//   sayAfter         …said after what this step has said already
+//   takeBack         a notice the rail still shows, taken back
 //   takeOutbox       what the next model carries once: a notice (and whether
-//                    it is a failure), the accepted edit, and whether the
-//                    forms start again from the model
+//                    it is a failure, or holds while its condition does), the
+//                    accepted edit, and whether the forms start again from
+//                    the model
 
 /**
  * @typedef {import("./types.js").PanelSession} Session
@@ -159,19 +163,45 @@ async function whileApplying(session, work) {
     }
 }
 
+// What the rail says next, and what kind of notice it is (D-L106): a
+// "failed" one stays until it is dismissed or a later notice replaces it; a
+// "lasting" one holds while its condition does, until the core takes it back
+// or replaces it; one with no kind closes by itself once read. Every notice
+// is said through these, so none takes the kind of the one before it.
+/** @typedef {NonNullable<Session["noticeKind"]>} NoticeKind */
+/** @param {Pick<Session, "notice" | "noticeKind">} session @param {string} text @param {NoticeKind} [kind] */
+function say(session, text, kind) {
+    session.notice = text;
+    session.noticeKind = kind;
+}
+
+// Said after what this step has said already, if anything, as one notice:
+// of `kind`, or of the kind already said.
+/** @param {Pick<Session, "notice" | "noticeKind">} session @param {string} text @param {NoticeKind} [kind] */
+function sayAfter(session, text, kind = session.noticeKind) {
+    say(session, [session.notice, text].filter(Boolean).join(" "), kind);
+}
+
+// Takes back `text` while it is what the rail says and nothing newer is on
+// its way to it.
+/** @param {Pick<Session, "notice" | "noticeKind" | "noticeSaid">} session @param {string} text */
+function takeBack(session, text) {
+    if (session.notice === undefined && session.noticeSaid === text) say(session, "");
+}
+
 // What the next model carries once, then forgets; the notice it carries is
 // what the rail says from then on (`noticeSaid`). An empty notice takes back
 // what the rail said.
-/** @param {Pick<Session, "notice" | "noticeFailed" | "noticeSaid" | "acceptedEdit" | "resetDraftForms">} session */
+/** @param {Pick<Session, "notice" | "noticeKind" | "noticeSaid" | "acceptedEdit" | "resetDraftForms">} session */
 function takeOutbox(session) {
     const outbox = {notice: session.notice, acceptedEdit: session.acceptedEdit, resetDraftForms: session.resetDraftForms,
-        ...(session.noticeFailed && session.notice ? {failed: true} : {})};
+        ...(session.notice && session.noticeKind ? {[session.noticeKind]: true} : {})};
     if (session.notice !== undefined) session.noticeSaid = session.notice;
     session.notice = undefined;
-    session.noticeFailed = undefined;
+    session.noticeKind = undefined;
     session.acceptedEdit = undefined;
     session.resetDraftForms = undefined;
     return outbox;
 }
 
-module.exports = {assertBound, beginRead, boundDraft, closeEditors, draftBinding, endRead, replaceDraft, setDraft, takeOutbox, whileApplying, whilePanelBusy};
+module.exports = {assertBound, beginRead, boundDraft, closeEditors, draftBinding, endRead, replaceDraft, say, sayAfter, setDraft, takeBack, takeOutbox, whileApplying, whilePanelBusy};

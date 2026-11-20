@@ -43,6 +43,7 @@ const {storedKeyboardName} = require("../model/keyboard-name");
 const {isStartingTimeout, startingTimeout} = require("./keyboard-starting");
 const {selectedDevice} = require("./device-model");
 const {followKeyboard} = require("./kept");
+const {say, takeBack} = require("./panel-session-state");
 
 const RECONNECT = Object.freeze({WAIT_MS: 10000, POLL_MS: 500});
 const RECONNECT_WORDS = Object.freeze({
@@ -116,7 +117,7 @@ function expectRestart(session, now = Date.now) {
 function expectLost(session, lost, now = Date.now) {
     if (!lost || session.reconnect || session.demo || (!lost.unanswered && !lost.serialNumber)) return undefined;
     if (session.lostAt !== undefined && now() - session.lostAt < LOST_GUARD_MS) {
-        session.notice = LOST_WORDS.again;
+        say(session, LOST_WORDS.again, "failed");
         return undefined;
     }
     session.lostAt = now();
@@ -126,13 +127,17 @@ function expectLost(session, lost, now = Date.now) {
     return expected;
 }
 
-// Stops expecting it, with what the panel should say about it, if anything.
-/** @param {Session} session @param {Expected} expected @param {string} [notice] */
-function endReconnect(session, expected, notice) {
+// Stops expecting it, with what the panel should say about it, if anything,
+// and whether that is a failure.
+/** @param {Session} session @param {Expected} expected @param {string} [notice] @param {"failed"} [kind] */
+function endReconnect(session, expected, notice, kind) {
     if (session.reconnect !== expected) return;
     session.reconnect = undefined;
     session.service.expectReconnect?.(false);
-    if (notice) session.notice = notice;
+    if (notice) say(session, notice, kind);
+    // A wait that ends saying nothing takes back what the rail said while it
+    // lasted, unless something has been said since.
+    else if (expected.waiting) takeBack(session, expected.waiting);
 }
 
 // Which listed keyboard is the renamed one: found, ambiguous, or not back yet.
@@ -171,9 +176,11 @@ function reconnectTarget(expected, devices) {
 async function awaitReconnect(session, expected, {read, publish, sleep = defaultSleep, now = Date.now, waitMs = RECONNECT.WAIT_MS, pollMs = RECONNECT.POLL_MS}) {
     const service = session.service;
     const words = expected.restart ? RESTART_WORDS : expected.lost === undefined ? RECONNECT_WORDS : {...LOST_WORDS, back: () => LOST_WORDS.back(/** @type {string} */ (expected.lost))};
-    const finish = /** @param {string} notice */ (notice) => {
+    // Only a keyboard back and read is not a failure, and only when what
+    // followed the read did not fail either.
+    const finish = /** @param {string} notice @param {boolean} [failed] */ (notice, failed = true) => {
         const said = expected.saved ? `${expected.saved} ${notice}` : notice;
-        endReconnect(session, expected, expected.after ? `${said} ${expected.after}` : said);
+        endReconnect(session, expected, expected.after ? `${said} ${expected.after}` : said, failed || expected.afterFailed ? "failed" : undefined);
         publish();
     };
     while (session.reconnect === expected) {
@@ -212,9 +219,8 @@ async function awaitReconnect(session, expected, {read, publish, sleep = default
             try {failed = await read(target.device.id) === false;} catch {failed = true;}
             const back = service.snapshot();
             // What the save said comes first, so its recovery copy is not lost.
-            const outcome = isStartingTimeout(back.error) ? startingTimeout(session)
-                : failed || !back.connected || back.error ? words.failed : words.back(expected.name);
-            finish(outcome);
+            const unread = failed || !back.connected || Boolean(back.error);
+            finish(isStartingTimeout(back.error) ? startingTimeout(session) : unread ? words.failed : words.back(expected.name), unread);
             return;
         }
         if (target) {finish(words.ambiguous); return;}
