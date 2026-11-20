@@ -523,6 +523,34 @@ test("what the host layout cannot type is said once across the screen and on its
     await expect(editor(page).locator('[data-ac-warning="nu"]')).toContainText("is a short input with *");
 });
 
+test("a replacement's text says under it the layout it types through, as the macro editor ends, and goes to where it changes", async ({page}) => {
+    await openControls(page, "autocorrect");
+    await publish(page, (model) => {
+        model.macroUnicode = {...model.macroUnicode, layoutName: "ABC", layoutFits: true};
+        model.macros[5] = {...model.macros[5], name: "Sign-off", empty: false};
+        model.autocorrect.entries.push({id: "\u0001macro:5", label: "Sign-off", correction: "", macro: 5, fires: "word", warnings: [], typos: [{typo: "sig", input: "sig", warnings: []}]});
+    });
+    await item(page, "the").click();
+    const typing = editor(page).locator(".ac-replacement [data-host-typing]");
+    await expect(typing).toHaveText(/^Text types through the ABC layout/);
+    // How it types, read once in its info mark: the layout, and no Unicode entry.
+    await typing.locator(".info-button").click();
+    await expect(typing.locator(".info-pop")).toContainText("keep that layout active on the computer");
+    await expect(typing.locator(".info-pop")).toContainText("Unicode entry is for macros");
+    await page.keyboard.press("Escape");
+    await expect(editor(page).locator("[data-layout-warning]")).toHaveCount(0);
+    // A layout that is not the computer's is a warning under it.
+    await publish(page, (model) => { model.macroUnicode = {...model.macroUnicode, os: 1, layout: 9, layoutFits: false}; });
+    await expect(editor(page).locator("[data-layout-warning]")).toContainText("replacements may type the wrong characters");
+    // A macro's own editor says what its text types through.
+    await bank(page).locator('[data-ac-entry$="macro:5"]').click();
+    await expect(editor(page).locator("[data-host-typing]")).toHaveCount(0);
+    await item(page, "the").click();
+    await editor(page).locator("[data-host-settings]").click();
+    await expect(page.locator('[data-screen="host"]')).toHaveAttribute("aria-current", "true");
+    await expect(page.locator('[data-section="host"]')).toHaveClass(/revealed/);
+});
+
 test("no control that removes something is a bare ×: each is written out", async ({page}) => {
     await openControls(page, "autocorrect");
     // Every state the screen has a removing control in: an entry with a chip open, a new replacement, the import's summary.
@@ -558,17 +586,17 @@ test("every control of the screen has a name, and the keyboard reaches them in r
     await expect(bank(page).locator(".ac-bank")).toHaveAttribute("role", "group");
     await expect(editor(page).locator(".ac-inputs")).toHaveAttribute("role", "group");
     await expect(page.locator(".pad.autocorrect button[role]")).toHaveCount(0);
-    // Tab from the search walks the bank's items, New, the files, then the editor from its header down.
+    // Tab from the search walks the bank's items, New, the files, then the editor from its header down, the layout its text types through under its text.
     await page.locator('[data-f="autocorrect:search"]').focus();
     const order = [];
     for (let step = 0; step < 40; step++) {
         await page.keyboard.press("Tab");
-        const at = await page.evaluate(() => { const node = document.activeElement; return node?.closest(".pad.autocorrect") ? node.dataset.act || node.dataset.f || (node.classList.contains("info-button") ? `ⓘ ${node.getAttribute("aria-label")}` : node.dataset.acEntry !== undefined ? "item" : node.tagName) : null; });
+        const at = await page.evaluate(() => { const node = document.activeElement; return node?.closest(".pad.autocorrect") ? node.dataset.act || node.dataset.f || (node.classList.contains("info-button") ? `ⓘ ${node.getAttribute("aria-label")}` : node.dataset.acEntry !== undefined ? "item" : node.dataset.hostSettings !== undefined ? "host-settings" : node.tagName) : null; });
         if (!at) break;
         if (order.at(-1) !== at) order.push(at);
     }
     expect(order.map((name) => name.replace(/^autocorrect:entry:because:/, ""))).toEqual(["item", "ac-add", "ac-import", "ac-export-menu", "ac-delete", "ⓘ How a replacement works", "kind:text", "replacement",
-        "ⓘ How a replacement fires", "fires:word", "ⓘ How inputs are written, and the * wildcard", "ac-chip", "input:becasue", "ac-remove-input", "ac-chip", "ac-more", "ⓘ About the preview", "autocorrect:try:text"]);
+        "ⓘ How a replacement's text types", "host-settings", "ⓘ How a replacement fires", "fires:word", "ⓘ How inputs are written, and the * wildcard", "ac-chip", "input:becasue", "ac-remove-input", "ac-chip", "ac-more", "ⓘ About the preview", "autocorrect:try:text"]);
     // Clear is off with nothing to clear, as Clear take is, and a replaced part of the preview is no tab stop.
     await expect(editor(page).locator('[data-act="ac-try-clear"]')).toBeDisabled();
 });

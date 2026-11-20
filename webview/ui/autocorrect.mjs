@@ -58,6 +58,7 @@ import {topbar} from "./frame.mjs";
 import {dialogFoot} from "./dialog-foot.mjs";
 import {openPicker} from "./picker.mjs";
 import {attachInfoMarks, infoMark} from "./info-mark.mjs";
+import {attachHostTyping, hostTyping} from "./host-typing.mjs";
 import {sectionPath, settingLabel} from "../view/settings-layout.mjs";
 import {marked, phraseMarked, replacementMark} from "./marks.mjs";
 import {titleText} from "./title-name.mjs";
@@ -510,7 +511,8 @@ const ICON = `<span class="mark-lg">${replacementMark()}</span>`;
 // What a replacement is: Text or Macro, in the vocabulary's words, then its
 // text with the bytes it may hold, or its macro named in a read-only field
 // with Pick… beside it, as a custom key's shortcut is: the keycode picker on
-// the macros alone. Opening the macro in Macros is the header's link. `f`
+// the macros alone. Text says under it the layout it types through, as the
+// macro editor ends; a macro's own editor says that of a macro. Opening the macro in Macros is the header's link. `f`
 // names the fields' form identities; `pending` says a choice of Text or Macro
 // made and not kept yet.
 /** @param {Model} model @param {string} f @param {Named} value @param {boolean} canEdit @param {number} most @param {string} [pending] */
@@ -526,7 +528,9 @@ function replacementControls(model, f, value, canEdit, most, pending = "") {
             ${value.macro === null && !macros.some((macro) => !macro.empty) ? `<p class="note ac-macro-none">No macro has steps yet. <button type="button" class="btn tiny link" data-act="ac-macros">Make one in Macros →</button></p>` : ""}`
         : `<label class="field ac-text"><span class="sr">Replacement text</span>
             <input class="input" data-f="${esc(f)}:replacement" data-ac-text autocomplete="off" spellcheck="false" placeholder="because, or +31 6 1234 5678" value="${esc(value.text)}" ${off}>
-            <span class="note ac-bytes${count.over ? " warn" : ""}" data-ac-bytes>${esc(count.label)}</span></label>`}
+            <span class="note ac-bytes${count.over ? " warn" : ""}" data-ac-bytes>${esc(count.label)}</span></label>
+        <div class="ac-typing">${hostTyping(model, {id: "ac-info-typing", label: "How a replacement's text types", what: "replacements",
+            more: "A character the layout can't type can't be a replacement's text: Unicode entry is for macros."})}</div>`}
         ${pending ? `<p class="note ac-macro-none" data-ac-pending>${esc(pending)}</p>` : ""}</div>`;
 }
 
@@ -642,6 +646,7 @@ function entryEditor(model, list, entry, canEdit) {
         </div></div>`);
     /** @type {HTMLElement} */ (card.querySelector(".card-b")).appendChild(trySection(model, list));
     attachInfoMarks(card);
+    attachHostTyping(card);
     countsBytes(card, list.usage.correctionMax);
     const identity = () => identityOf(getModel());
     const target = replacementOf(entry);
@@ -815,6 +820,7 @@ function newEditor(model, list, fresh, canEdit) {
         </div></div>`);
     /** @type {HTMLElement} */ (card.querySelector(".card-b")).appendChild(trySection(model, list));
     attachInfoMarks(card);
+    attachHostTyping(card);
     countsBytes(card, list.usage.correctionMax);
     const first = /** @type {HTMLInputElement | null} */ (card.querySelector("[data-ac-first]"));
     // The add the editor names as it stands, with the first input typed so

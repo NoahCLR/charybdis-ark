@@ -13,7 +13,7 @@ for (const theme of ["dark", "light"]) {
             window.__posted.length = 0;
         });
         // The editor's last line says what text types through and where it changes.
-        await expect(page.locator('[data-macro-typing]')).toContainText("Text types through");
+        await expect(page.locator('[data-host-typing]')).toContainText("Text types through");
         await expect(page.locator('[data-host-settings]')).toHaveText("Change in Typing settings →");
         await page.locator('[data-host-settings]').click();
         await expect(page.locator('[data-screen="host"]')).toHaveAttribute("aria-current", "true");
