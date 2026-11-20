@@ -281,10 +281,12 @@ To give an input to another replacement, remove it here and add it there.
 3. Press Enter, type its first input, and press Enter again. Several inputs
    with spaces between them are all added.
 
-It joins your list with that first input, and stays open for more. Leaving
-the editor from that field, for another replacement or another screen, keeps
-the input as Enter does. Until then it waits at the top of the list as **not
-on your list yet**, with what you typed for it, and **Discard** lets it go.
+It joins your list with that first input, and stays open with a field for
+the next one. Leaving that field keeps the input too: for **Try it**, another
+replacement, another screen, or a click anywhere else, and the cursor stays
+where you went. Going back to the replacement itself, how it fires, or an ⓘ
+keeps nothing yet. Until then it waits at the top of the list as **not on
+your list yet**, with what you typed for it, and **Discard** lets it go.
 
 If the list already has that replacement, Ark says so and offers **Open it**
 instead: the list never holds the same replacement twice.
