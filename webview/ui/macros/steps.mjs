@@ -84,6 +84,11 @@ export function insertStep(model, slot, steps, kind) {
     });
 }
 
+// Each key a take records redraws the canvas, so its Recording dot is drawn
+// at the point in its pulse the clock has reached: it keeps one steady beat
+// instead of starting over, and flashing, with every key.
+const RECORDING_PULSE_MS = 1200;
+
 /** @param {import('../../../contracts/panel.js').PublishedModel} model @param {MacroSlot} slot @param {MacroStep[]} steps @param {boolean} canEdit */
 export function sequenceEditor(model, slot, steps, canEdit) {
     const form = macroForm(slot.keycode);
@@ -91,9 +96,14 @@ export function sequenceEditor(model, slot, steps, canEdit) {
         const selected = steps[0]?.kind === "text" ? steps[0].focusId : null;
         setMacroForm(slot.keycode, {selectedStep: selected, selectionAnchor: selected, selectedSteps: selected ? [selected] : []});
     }
-    const tiles = vocabulary(model).macroStepTiles;
+    const tiles = vocabulary(model).macroStepTiles, recording = state.recording?.slot === slot.keycode;
+    // While a take runs the canvas is ringed in red and says so in its own
+    // corner, how to finish beside it, where the recorded steps appear.
     const node = el(`<div class="macro-sequence-editor" data-macro-sequence>
-        <div class="macro-sequence ${steps.length ? "" : "empty"}" data-sequence-tiles tabindex="0" data-act="macro-sequence:${esc(slot.keycode)}" aria-label="Macro step sequence"></div>
+        <div class="macro-canvas${recording ? " is-recording" : ""}">
+            <div class="macro-sequence ${steps.length ? "" : "empty"}" data-sequence-tiles tabindex="0" data-act="macro-sequence:${esc(slot.keycode)}" aria-label="Macro step sequence"></div>
+            ${recording ? `<div class="macro-canvas-recording" data-recording-status role="status"><span class="note">Hold Escape, press Stop or click elsewhere to finish.</span><span class="recording-badge" style="--pulse-phase: -${Date.now() % RECORDING_PULSE_MS}ms">Recording</span></div>` : ""}
+        </div>
         ${steps.length ? `<div class="macro-legend note"><span>↓ ${esc(tiles.press)}</span><span>↑ ${esc(tiles.release)}</span><span>• ${esc(tiles.key)}</span><span>+ ${esc(tiles.chord)}</span><span>ms ${esc(tiles.delay)}</span><span class="right">${canEdit ? "Click to edit · drag to reorder · Delete to remove" : "Click a step to inspect"}</span></div>` : ""}
         <p class="note" data-sequence-notice role="status" aria-live="polite">${esc(form.moveNotice || "")}</p>
         <div data-step-inspectors></div>
@@ -140,7 +150,7 @@ function paintTiles(node, model, slot, steps) {
     };
     if (!steps.length) {
         node.replaceChildren(el(`<div class="macro-empty"><span class="macro-empty-mark" aria-hidden="true">+</span>
-            <strong>Your macro starts here</strong><p class="note">${editable ? "Add text, a shortcut or a delay above, or record your keys below." : "This macro has no steps."}</p></div>`));
+            <strong>Your macro starts here</strong><p class="note">${state.recording?.slot === slot.keycode ? "Type, and your keys appear here." : editable ? "Add text, a shortcut or a delay above, or record your keys below." : "This macro has no steps."}</p></div>`));
         return;
     }
     node.replaceChildren(...steps.map((step, index) => {

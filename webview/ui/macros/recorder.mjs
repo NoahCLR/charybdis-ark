@@ -10,6 +10,7 @@ import {onMac} from "../../view/shortcuts.mjs";
 import {rememberMacroEdit} from "./history.mjs";
 import {stageMacro} from "./validation.mjs";
 import {attachInfoMarks, infoMark} from "../info-mark.mjs";
+import {keepInContentView} from "../../lib/scroll.mjs";
 /* ── the recorder ──────────────────────────────────────────────────────── */
 // Keys pressed during a take that a macro cannot send: named in the recorder,
 // never silently turned into a pause.
@@ -41,21 +42,28 @@ const recordInfo = (slot) => infoMark({id: `macro-info-record-${slot.keycode}`, 
 export function recorder(model, slot, canEdit) {
     const recording = state.recording?.slot === slot.keycode;
     const delays = state.recordPreserveHoldTiming || state.recordDelays !== false;
-    const node = el(`<div class="card" data-recorder="${esc(slot.keycode)}">
-        <div class="card-h"><h3>Record</h3>${recordInfo(slot)}${recording ? `<span class="tag">recording</span>` : state.lastTake?.slot === slot.keycode ? `<span class="tag">recorded</span>` : ""}
-            <button class="btn right" data-act="record" ${canEdit ? "" : "disabled"}>${recording ? "Stop" : "● Record"}</button></div>
+    // The options on the left, one control high each; the recorder's actions
+    // on the right, each on an option's line. While it records, the canvas
+    // itself says so (sequenceEditor), so the heading only names a take
+    // Clear take can still undo.
+    const node = el(`<div class="card${recording ? " is-recording" : ""}" data-recorder="${esc(slot.keycode)}">
+        <div class="card-h"><h3>Record</h3>${recordInfo(slot)}${!recording && state.lastTake?.slot === slot.keycode ? `<span class="tag">recorded</span>` : ""}</div>
         <div class="card-b stack">
             ${skippedKeys.length && (recording || state.lastTake?.slot === slot.keycode) ? `<p class="note warn" data-skipped-keys>Not recorded: ${esc(skippedKeys.join(", "))}. A macro cannot send ${skippedKeys.length === 1 ? "this key" : "these keys"}.</p>` : ""}
-            <div class="row record-opts">
-                <label class="sw"><input type="checkbox" data-f="macro:${esc(slot.keycode)}:record-delays" data-delays ${delays ? "checked" : ""} ${state.recordPreserveHoldTiming ? "disabled" : ""}>
-                    <span class="track"></span><span class="txt">${esc(RECORD_DELAYS)}</span></label>
-                <label class="ms-field"><span class="affix unit"><input class="input mono num" aria-label="Delay after each step" data-f="macro:${esc(slot.keycode)}:record-threshold" data-threshold inputmode="numeric" value="${esc(state.recordDelayThreshold)}" ${delays ? "" : "disabled"}><i>ms</i></span><span>after each step</span></label>
-                <label class="sw"><input type="checkbox" data-f="macro:${esc(slot.keycode)}:record-preserve-hold-timing" data-preserve-hold-timing ${state.recordPreserveHoldTiming ? "checked" : ""} ${recording ? "disabled" : ""}>
-                    <span class="track"></span><span class="txt">${esc(PRESERVE_HOLD_TIMING)}</span></label>
-            </div>
-            <div class="row gap-8">
-                ${recording ? `<span class="note">Typing is captured for this slot, Escape included. Holding Escape, Stop or clicking outside this recorder finishes the take.</span>` : ""}
-                <button class="btn tiny ghost destructive right" data-act="clear-take" ${recording || state.lastTake?.slot === slot.keycode ? "" : "disabled"}>Clear take</button>
+            <div class="record-opts">
+                <div class="record-opt">
+                    <label class="sw"><input type="checkbox" data-f="macro:${esc(slot.keycode)}:record-delays" data-delays ${delays ? "checked" : ""} ${state.recordPreserveHoldTiming ? "disabled" : ""}>
+                        <span class="track"></span><span class="txt">${esc(RECORD_DELAYS)}</span></label>
+                    <label class="ms-field"><span class="affix unit"><input class="input mono num" aria-label="Delay after each step" data-f="macro:${esc(slot.keycode)}:record-threshold" data-threshold inputmode="numeric" value="${esc(state.recordDelayThreshold)}" ${delays ? "" : "disabled"}><i>ms</i></span><span>after each step</span></label>
+                </div>
+                <div class="record-opt">
+                    <label class="sw"><input type="checkbox" data-f="macro:${esc(slot.keycode)}:record-preserve-hold-timing" data-preserve-hold-timing ${state.recordPreserveHoldTiming ? "checked" : ""} ${recording ? "disabled" : ""}>
+                        <span class="track"></span><span class="txt">${esc(PRESERVE_HOLD_TIMING)}</span></label>
+                </div>
+                <div class="record-actions">
+                    <button class="btn" data-act="record" ${canEdit ? "" : "disabled"}><span class="record-mark" aria-hidden="true"></span>${recording ? "Stop" : "Record"}</button>
+                    <button class="btn tiny ghost destructive" data-act="clear-take" ${recording || state.lastTake?.slot === slot.keycode ? "" : "disabled"}>Clear take</button>
+                </div>
             </div>
         </div></div>`);
 
@@ -194,7 +202,7 @@ function onRecordKey(event) {
         // Named in the recorder rather than passing as a pause.
         if (event.type !== "keydown" || !event.code) return;
         const name = event.key && event.key !== "Unidentified" && event.key.length > 1 ? event.key : event.code;
-        if (!skippedKeys.includes(name)) { skippedKeys = [...skippedKeys, name]; render(); }
+        if (!skippedKeys.includes(name)) { skippedKeys = [...skippedKeys, name]; render(); keepStopInView(); }
         return;
     }
     if (event.repeat) return;
@@ -204,7 +212,12 @@ function onRecordKey(event) {
     setMacroForm(recording.slot, {steps: undefined, stepError: "",
         draft: recordedTakePayload(recording.before, recordedEvents, {...recordingOptions(), finished: false})});
     render();
+    keepStopInView();
 }
+
+// The take's steps grow above the recorder, so each key keeps Stop and
+// Clear take on screen rather than leaving them below the window's edge.
+const keepStopInView = () => keepInContentView(document, "[data-recorder] .record-opts");
 
 // An Escape press held to the end finishes the take and is not part of it.
 /** @param {import('../../view/macro-recording.mjs').RecordedKey | undefined} press */
