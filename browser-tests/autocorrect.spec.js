@@ -225,6 +225,33 @@ test("New replacement opens an editor with its text focused, and it joins the li
     await expect(page.locator("[data-ac-new-item]")).toHaveCount(0);
 });
 
+test("a new replacement's first input is kept wherever its field is left for, but the replacement's own fields", async ({page}) => {
+    await openControls(page, "autocorrect");
+    await bank(page).locator('[data-act="ac-add"]').click();
+    const fresh = page.locator("[data-ac-new]"), first = fresh.locator("[data-ac-first]");
+    await fresh.locator("[data-ac-text]").fill("definitely");
+    await first.fill("definately");
+    // Back to what the replacement is, or how it fires, or an ⓘ: nothing is kept yet.
+    await clearPosts(page);
+    for (const control of [fresh.locator("[data-ac-text]"), fresh.locator('[name$=":fires"][value="leader"]'), fresh.locator("[data-info-mark] button").first()]) {
+        await first.focus();
+        await control.focus();
+    }
+    await page.waitForTimeout(100);
+    expect(await edits(page)).toEqual([]);
+    // Anywhere else in the editor, Try it's box among them, keeps it as Enter does.
+    await first.focus();
+    await fresh.locator("[data-f='autocorrect:try:text']").click();
+    await expectEdits(page, [expect.objectContaining({type: "addAutocorrectTypos", correction: "definitely", inputs: "definately"})]);
+    // Once the list takes it, the focus stays where it went: no field for a next input takes it back.
+    await page.keyboard.type("teh");
+    await accept(page, (model) => { model.autocorrect.entries.push(published("definitely", "definately")); });
+    await expect(editor(page)).toHaveAttribute("data-ac-editor", "definitely");
+    await expect(editor(page).locator("[data-ac-more]")).toHaveCount(0);
+    await expect(editor(page).locator("[data-f='autocorrect:try:text']")).toBeFocused();
+    await expect(editor(page).locator("[data-f='autocorrect:try:text']")).toHaveValue("teh");
+});
+
 test("a new replacement the list already has is offered to be opened, and makes no duplicate", async ({page}) => {
     await openControls(page, "autocorrect");
     await bank(page).locator('[data-act="ac-add"]').click();
