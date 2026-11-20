@@ -49,7 +49,7 @@ const KEPT = [
     "macroClipboard", "keyClipboard", "stage", "railMenu", "layersOpen", "layersAsked", "pointingSlot", "pointingSearch", "pdAdvanced", "applyDismissed", "recoveryAsk", "feedbackRow", "replacementRow", "comboPreview", "lightingGroupsShut",
     "macroSlot", "macroSearch", "autocorrectSearch", "autocorrectEntry", "autocorrectTry", "autocorrectExport", "customKey", "customKeySearch", "recording", "recordDelays", "recordPreserveHoldTiming", "recordDelayThreshold",
     "overlay", "leaveDemo", "modeAsk", "confirmChecks",
-    "picker", "notice", "error", "settingsDurationUnits",
+    "picker", "notice", "noticeLasting", "healthDismissed", "error", "settingsDurationUnits",
 ];
 
 test("every panel state field declares what a draft change does to it", () => {

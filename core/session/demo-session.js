@@ -28,7 +28,7 @@ const {LAYERS, MATRIX_KEYS} = require("../data/charybdis-layout");
  */
 const {panelControl} = require("./panel-control-registry");
 const {ProfileDraftSession} = require("./profile-draft-session");
-const {replaceDraft} = require("./panel-session-state");
+const {replaceDraft, say} = require("./panel-session-state");
 const {forgetRead} = require("./draft-follow");
 const {validateSnapshot, fingerprint, summary} = require("../model/portable-profile");
 const {ACTION_ABI} = require("../schema/actions");
@@ -209,7 +209,7 @@ const DEMO_ACTIONS = Object.freeze({
     },
     leave: ({session, message}) => {
         leaveDemo(session, message);
-        session.notice = "Left the demo.";
+        say(session, "Left the demo.");
     },
     openProfile: async ({session, message, shell, state}) => {
         if (session.demo) assertDemoMayClose(session, message);
@@ -221,7 +221,7 @@ const DEMO_ACTIONS = Object.freeze({
         if (chosen === undefined) return;
         const name = typeof chosen === "string" ? null : chosen.name || null;
         openDemo(session, state, {value: typeof chosen === "string" ? chosen : chosen.text, fileName: name});
-        session.notice = `Opened ${name || "the backup"} in the demo.`;
+        say(session, `Opened ${name || "the backup"} in the demo.`);
         return;
     },
 });

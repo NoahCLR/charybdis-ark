@@ -16,6 +16,7 @@ function surface() {
         refreshCommitBar: () => { calls.refresh++; },
         render: (options) => { calls.render++; calls.renders.push(options); },
         receiveMacroValidation: (message) => { calls.validations.push(message); },
+        onNotice: () => {},
     });
     return {receive, calls};
 }
@@ -102,11 +103,12 @@ test("a macro inspection goes to its editor, and an unknown reply changes nothin
 });
 
 // An Apply or Save cut short starts with its verdict, not "Failed:"; the
-// reply marks it a failure, so the rail shows it as one.
-test("a notice the core marks as a failure is shown as one, whatever its first word", (t) => {
+// reply marks it a failure, so the rail shows it as one. Its words never
+// decide it (D-L106).
+test("a notice is a failure when the core marks it one, whatever its first word", (t) => {
     const previousDocument = globalThis.document;
     globalThis.document = {documentElement: {dataset: {}}};
-    t.after(() => { globalThis.document = previousDocument; state.error = ""; state.notice = ""; });
+    t.after(() => { globalThis.document = previousDocument; state.error = ""; state.notice = ""; state.noticeLasting = false; });
     const {receive} = surface();
     const model = {...reading(), load: {state: "ready"}, draft: {id: "d1", revision: 2}};
     const said = "Nothing was saved: the keyboard kept the profile it had. The keyboard was disconnected or restarted.";
@@ -116,8 +118,31 @@ test("a notice the core marks as a failure is shown as one, whatever its first w
     receive({type: "model", model, notice: "Read the keyboard's saved profile, generation 7."});
     assert.equal(state.error, "");
     assert.equal(state.notice, "Read the keyboard's saved profile, generation 7.");
-    receive({type: "model", model, notice: "Failed: The keyboard did not answer."});
+    receive({type: "model", model, notice: "Failed: The keyboard did not answer.", failed: true});
     assert.equal(state.error, "Failed: The keyboard did not answer.");
+    receive({type: "model", model, notice: "Failed is only a word here."});
+    assert.equal(state.error, "");
+    assert.equal(state.notice, "Failed is only a word here.");
+});
+
+// A notice held while its condition is does not close by itself; the next
+// notice says again whether it does, and the rail hears each one said.
+test("a lasting notice is kept as one until the next notice", (t) => {
+    const previousDocument = globalThis.document;
+    globalThis.document = {documentElement: {dataset: {}}};
+    t.after(() => { globalThis.document = previousDocument; state.error = ""; state.notice = ""; state.noticeLasting = false; });
+    let said = 0;
+    const receive = createPanelMessages({root: {querySelector: () => null}, refreshCommitBar: () => {}, render: () => {}, receiveMacroValidation: () => {}, onNotice: () => { said++; }});
+    const model = {...reading(), load: {state: "loading"}};
+    receive({type: "model", model, notice: "Restarting the keyboard…", lasting: true});
+    assert.deepEqual([state.notice, state.noticeLasting, said], ["Restarting the keyboard…", true, 1]);
+    receive({type: "model", model});
+    assert.equal(said, 1, "a model with no notice says nothing new");
+    receive({type: "model", model, notice: "The keyboard restarted; Ark connected it again and read it."});
+    assert.deepEqual([state.noticeLasting, said], [false, 2]);
+    receive({type: "model", model, notice: "Restarting the keyboard…", lasting: true});
+    receive({type: "model", model, notice: ""});
+    assert.deepEqual([state.notice, state.noticeLasting, said], ["", false, 4]);
 });
 
 // Core takes a notice back with an empty one (its "no keyboard found", once

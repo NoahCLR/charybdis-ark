@@ -2,7 +2,7 @@
 const {CURRENT_CAPABILITIES} = require("../fixtures/portable-profile");
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const {assertBound, beginRead, boundDraft, closeEditors, draftBinding, endRead, replaceDraft, setDraft, takeOutbox, whileApplying, whilePanelBusy} = require("../../core/session/panel-session-state");
+const {assertBound, beginRead, boundDraft, closeEditors, draftBinding, endRead, replaceDraft, say, sayAfter, setDraft, takeBack, takeOutbox, whileApplying, whilePanelBusy} = require("../../core/session/panel-session-state");
 const {ProfileDraftSession} = require("../../core/session/profile-draft-session");
 const {DEMO_CAPABILITIES, DEMO_DEVICE_ID, demoProfile, demoSnapshot, demoState} = require("../../core/session/demo-session");
 const {fingerprint, summary} = require("../../core/model/portable-profile");
@@ -157,4 +157,51 @@ test("the outbox is carried by one model, then forgotten", () => {
     const session = {notice: "Saved.", acceptedEdit: {revision: 2}, resetDraftForms: true};
     assert.deepEqual(takeOutbox(session), {notice: "Saved.", acceptedEdit: {revision: 2}, resetDraftForms: true});
     assert.deepEqual(takeOutbox(session), {notice: undefined, acceptedEdit: undefined, resetDraftForms: undefined});
+});
+
+// What kind of notice it is goes with it once, and a notice set directly
+// after is one that closes by itself (D-L106).
+test("a notice said with its kind carries it once, and never takes the kind of the one before", () => {
+    const session = {};
+    say(session, "Failed: no answer.", "failed");
+    assert.deepEqual(takeOutbox(session), {notice: "Failed: no answer.", failed: true, acceptedEdit: undefined, resetDraftForms: undefined});
+    say(session, "Restarting the keyboard…", "lasting");
+    assert.equal(takeOutbox(session).lasting, true);
+    assert.equal(session.noticeSaid, "Restarting the keyboard…");
+    say(session, "Failed: no answer.", "failed");
+    say(session, "Left the demo.");
+    const outbox = takeOutbox(session);
+    assert.deepEqual([outbox.failed, outbox.lasting], [undefined, undefined]);
+});
+
+test("a notice said after another this step is one notice, of the kind asked or already said", () => {
+    const session = {};
+    sayAfter(session, "Read the keyboard.");
+    assert.deepEqual([session.notice, session.noticeKind], ["Read the keyboard.", undefined]);
+    sayAfter(session, "Macros could not be read.", "failed");
+    assert.deepEqual([session.notice, session.noticeKind], ["Read the keyboard. Macros could not be read.", "failed"]);
+    sayAfter(session, "It restarted.");
+    assert.equal(session.noticeKind, "failed", "what follows keeps the kind already said");
+});
+
+test("a notice is taken back only while the rail still shows it", () => {
+    const session = {noticeSaid: "No keyboard found."};
+    takeBack(session, "Restarting the keyboard…");
+    assert.equal(session.notice, undefined);
+    takeBack(session, "No keyboard found.");
+    assert.equal(session.notice, "");
+    const newer = {noticeSaid: "No keyboard found.", notice: "Read the keyboard."};
+    takeBack(newer, "No keyboard found.");
+    assert.equal(newer.notice, "Read the keyboard.", "something newer on its way stays");
+});
+
+// Every notice goes through say, sayAfter or takeBack, so none is set without
+// its kind (D-L106).
+test("no session module sets the rail's notice but these", () => {
+    const fs = require("node:fs"), path = require("node:path");
+    const dir = path.join(__dirname, "../../core/session");
+    const writes = fs.readdirSync(dir).filter((file) => file.endsWith(".js") && file !== "panel-session-state.js")
+        .flatMap((file) => fs.readFileSync(path.join(dir, file), "utf8").split("\n").map((line, at) => [file, at + 1, line]))
+        .filter(([, , line]) => /\bsession\.notice\s*(\+=|=(?!=))/.test(line)).map(([file, at]) => `${file}:${at}`);
+    assert.deepEqual(writes, []);
 });

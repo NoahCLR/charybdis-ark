@@ -27,6 +27,7 @@
 const {endRetries, lastFollowed, readAndFollow, retryPending} = require("./draft-follow");
 const {EDIT_MODE} = require("../protocol/profile-edit-v1");
 const {readNews} = require("./live-edits");
+const {say} = require("./panel-session-state");
 
 const LIVE_WATCH_MS = 1000;
 const MOVED = "The keyboard changed by itself (a DPI or lighting key, or another app); Ark read it again.";
@@ -48,7 +49,7 @@ async function checkLive(session) {
         // What the read told is said with it (readNews), as Read keyboard says it.
         const told = readNews(session, await readAndFollow(session)).words;
         const notice = [elsewhere && session.draft === draft && !draft.stale ? FOLLOWED : "", told].filter(Boolean).join(" ");
-        if (notice) session.notice = notice;
+        if (notice) say(session, notice);
         return true;
     }
     const before = {revision: draft.revision, live: draft.live};
@@ -66,8 +67,8 @@ async function checkLive(session) {
         // without Ark is what this look's own words say.
         const told = readNews(session, await readAndFollow(session)).restart;
         session.resetDraftForms = true;
-        if (told) session.notice = told;
-        else if (!restarted && session.draft && !session.draft.stale) session.notice = status.mode !== before.live?.mode ? "The keyboard's edit mode was changed elsewhere; Ark read it again." : MOVED;
+        if (told) say(session, told);
+        else if (!restarted && session.draft && !session.draft.stale) say(session, status.mode !== before.live?.mode ? "The keyboard's edit mode was changed elsewhere; Ark read it again." : MOVED);
         return true;
     }
     return draft.observeLiveStatus(status) !== "same";
@@ -110,7 +111,7 @@ async function checkApply(session, draft, status) {
         : base && base.committedGeneration === status.savedGeneration && base.committedOriginHalf === status.savedOrigin;
     if (status.unsaved || same) return told;
     await readAndFollow(session);
-    if (session.draft && !session.draft.stale) session.notice = MOVED;
+    if (session.draft && !session.draft.stale) say(session, MOVED);
     return true;
 }
 

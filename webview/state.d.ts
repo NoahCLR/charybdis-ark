@@ -63,4 +63,8 @@ export interface PanelState {
     leaveDemo: {ask: {title: string; detail: string; confirm: string}; message: PanelCommand} | null;
     modeAsk: {mode: number; question: 'saveOrRevert' | 'sendOrDiscard'} | null;
     confirmChecks: number | null; picker: PickerState | null; notice: string; error: string;
+    /** The notice holds while its condition does, until the core takes it back (D-L106). */
+    noticeLasting: boolean;
+    /** The keyboard's own error as dismissed: hidden until it says something else. */
+    healthDismissed: string;
 }

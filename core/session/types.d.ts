@@ -151,8 +151,8 @@ export interface DemoSession {
     resetDraftForms?: boolean;
     historyOpen?: boolean;
     notice?: string;
-    /** The notice is a failure's, said with or without "Failed:" (panel-loop.js). */
-    noticeFailed?: boolean;
+    /** What kind of notice it is (panel-session-state.js say): a failure, said with or without "Failed:", or one held while its condition is; none closes by itself. */
+    noticeKind?: 'failed' | 'lasting';
     /** The notice the rail was last told, '' once taken back (panel-session-state.js takeOutbox). */
     noticeSaid?: string;
     portableReview?: unknown;
@@ -349,7 +349,7 @@ export type KeptKind = keyof KeptValues;
 /** Each record with the keyboard it is for: its device id, and its serial number where that names it (kept.js). */
 export type KeptRecords = {[K in KeptKind]?: KeptValues[K] & {deviceId: string | null | undefined; serialNumber: string}};
 /** A renamed keyboard the panel waits to see again (keyboard-reconnect.js). */
-export interface ExpectedReconnect {deviceId: string; serialNumber: string; name: string; otherDevices: readonly {id: string; product?: string}[]; startedAt: number; dropped: boolean; saved?: string; /** Lost unexpectedly rather than renamed: what happened. */ lost?: string; /** Restarted because Ark asked, rather than renamed. */ restart?: boolean; /** Said after how the wait ended: what followed the read. */ after?: string}
+export interface ExpectedReconnect {deviceId: string; serialNumber: string; name: string; otherDevices: readonly {id: string; product?: string}[]; startedAt: number; dropped: boolean; saved?: string; /** Lost unexpectedly rather than renamed: what happened. */ lost?: string; /** Restarted because Ark asked, rather than renamed. */ restart?: boolean; /** Said after how the wait ended: what followed the read. */ after?: string; /** What followed the read failed, so the wait's ending is said as a failure. */ afterFailed?: boolean; /** What the rail says while the wait lasts, taken back if it ends saying nothing (keyboard-reconnect.js endReconnect). */ waiting?: string}
 export interface ControlShell extends PanelShell {
     progress?: <T>(title: string, work: () => Promise<T>) => Promise<T>;
     saveRecovery?: ShellSaveRecovery;

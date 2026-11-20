@@ -36,6 +36,9 @@ test("a notice is polite, an error assertive, and a save cut short is said once,
     assert.deepEqual(announcements(published, {notice: "Saved.", error: "The keyboard stopped answering."}),
         {polite: [], assertive: ["The keyboard stopped answering."]});
     assert.deepEqual(announcements(model({health: {error: "Halves apart."}})).assertive, ["Halves apart."]);
+    // The keyboard's error dismissed, the notice under it is said, as shown.
+    assert.deepEqual(announcements(model({health: {error: "Halves apart."}}), {notice: "Left the demo.", healthDismissed: "Halves apart."}),
+        {polite: ["Left the demo."], assertive: []});
 
     const failure = {label: "Send the profile", reason: "It stopped.", verdict: "Nothing was saved: the keyboard kept the profile it had."};
     const apply = {id: 4, state: "failed", steps, failure};
