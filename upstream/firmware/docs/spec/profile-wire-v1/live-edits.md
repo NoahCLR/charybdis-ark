@@ -4,8 +4,8 @@ How a client changes the working copy over Profile Wire so an edit runs on
 both halves at once without a save, then saves it, reverts it, or has the
 keyboard save it in Live edit; the edit mode stored beside the profile; keyboard
 adjustments; and how a stopped keyboard says so and is restarted
-([D-F32](https://github.com/NoahCLR/charybdis-4x6/blob/ac42a7231376ac108149a378cb6feae98e3708a2/docs/adr/0032-live-edits-working-copy-and-save.md),
-[D-F34](https://github.com/NoahCLR/charybdis-4x6/blob/ac42a7231376ac108149a378cb6feae98e3708a2/docs/adr/0034-stopped-keyboard-says-so-and-restarts.md)). The
+([D-F32](https://github.com/NoahCLR/charybdis-4x6/blob/e8b9ccdf94ae657c6c9933594f080bdf2f954629/docs/adr/0032-live-edits-working-copy-and-save.md),
+[D-F34](https://github.com/NoahCLR/charybdis-4x6/blob/e8b9ccdf94ae657c6c9933594f080bdf2f954629/docs/adr/0034-stopped-keyboard-says-so-and-restarts.md)). The
 Raw HID framing and read envelope are in [the HID channel](hid-channel.md);
 every result code is in [errors](errors.md); Save writes through
 [candidate transfer](candidate-transfer.md). How the slave half follows the
@@ -244,7 +244,7 @@ was; its result (`VALIDATION_REJECTED`, or `PUBLICATION_FAILED` with the
 candidate's error id) and transaction are on page 1, and a working copy
 replaced before the save began writing ends it `ABORTED`. A save waits for
 a quiet keyboard before each flash erase
-([D-F29](https://github.com/NoahCLR/charybdis-4x6/blob/ac42a7231376ac108149a378cb6feae98e3708a2/docs/adr/0029-profile-slots-in-their-own-flash-region.md)); that
+([D-F29](https://github.com/NoahCLR/charybdis-4x6/blob/e8b9ccdf94ae657c6c9933594f080bdf2f954629/docs/adr/0029-profile-slots-in-their-own-flash-region.md)); that
 wait counts toward no timeout on either half.
 
 An Apply still works and replaces the working copy: unsaved edits are gone
@@ -556,9 +556,11 @@ push of the settings never undoes the override. Switching auto-mouse off, by
 key or by an edit, turns the pointer layer off unless a key's hold, a lock, a
 one-shot or a pointing mode's layers keep it: QMK leaves the layer on and,
 with auto-mouse off, never times it out. While it is off no anchor forces the
-pointer layer on.
+pointer layer on. Moving the pointer layer (a new settings scalar 5, as a
+change of layer priority sends) turns the old one off under the same rule:
+QMK leaves it on and times out only the new one.
 
-Held by: `tests/host/run_qmk_portable_profile_tests.sh` (`qmk_portable_profile_test.c`), `tests/host/run_participation_tests.sh` (`participation_test.c`, `test_overrides_beside_the_masters`), `tests/host/run_auto_mouse_switch_tests.sh` (`auto_mouse_switch_test.c`).
+Held by: `tests/host/run_qmk_portable_profile_tests.sh` (`qmk_portable_profile_test.c`), `tests/host/run_participation_tests.sh` (`participation_test.c`, `test_overrides_beside_the_masters`), `tests/host/run_auto_mouse_switch_tests.sh` (`auto_mouse_switch_test.c`), `tests/host/run_qmk_contract_checks.sh` (`qmk_auto_mouse_layer_move_contract_test.c`).
 
 ## A stopped keyboard
 

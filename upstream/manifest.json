@@ -3,7 +3,7 @@
   "sources": {
     "firmware": {
       "repository": "https://github.com/NoahCLR/charybdis-4x6",
-      "commit": "ac42a7231376ac108149a378cb6feae98e3708a2"
+      "commit": "e8b9ccdf94ae657c6c9933594f080bdf2f954629"
     },
     "qmk": {
       "repository": "https://github.com/NoahCLR/bastardkb-qmk",
@@ -24,7 +24,7 @@
       "source": "firmware",
       "sourcePath": "docs/spec/README.md",
       "sourceSha256": "ec3a26c53e488ac59afb45184f723058df6eb66f87d481d6f82126eaac5effd3",
-      "sha256": "649668e84d7e575e2c07f4bfa77f1a2bff56c8a2677cd9b50eb88afb6c747fb6",
+      "sha256": "32b9413d92a2b2dcdc02ec6f560e798eb764e1e74ae6bc568adb490d4086ce04",
       "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
     },
     {
@@ -32,7 +32,7 @@
       "source": "firmware",
       "sourcePath": "docs/spec/authority-state-table.md",
       "sourceSha256": "db5e65a1004926d66c8383af011f94f49ed8fb22cb9ce1213170686ecf344182",
-      "sha256": "206c2f9699476e8c31b4113295674fef06d969071264e29b12df8567d22bb948",
+      "sha256": "deb0db11edb837112261d23c6dce2e4be1ec1e38ec39a19da63e9dc789688bb1",
       "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
     },
     {
@@ -40,7 +40,7 @@
       "source": "firmware",
       "sourcePath": "docs/spec/autocorrect-v1.md",
       "sourceSha256": "4c33328ef2b8f8157bc152d50bc3f1099aa10184651a85b73cc845f7e0f2f120",
-      "sha256": "9b3d4db489897a479fedc39a6603eb12b47ef24bd68e202d69fc8b0499efe7ce",
+      "sha256": "1284c3c7021a173fb312594e340e0cac86475af91374b92cbbdc89d7c03a9485",
       "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
     },
     {
@@ -48,7 +48,7 @@
       "source": "firmware",
       "sourcePath": "docs/spec/device-resident-profile.md",
       "sourceSha256": "58c81ceb0a014a7aaa7c74f9007b980e596232d4cd8468978dc62f4d23c4f532",
-      "sha256": "f0013d72d638a0bcedf8c7cad684100a97a842ccae3eacffbebb1a3ca0ef690e",
+      "sha256": "136170d6692107228971c8c6f3a0a97d7d68f1afb760f5d46c42779d87d9bd88",
       "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
     },
     {
@@ -56,7 +56,7 @@
       "source": "firmware",
       "sourcePath": "docs/spec/field-classification.md",
       "sourceSha256": "3aa70eab76ba74761d7eeedaa3f4a11c27daef9498cd55506503b43f54664d69",
-      "sha256": "a9954b9872ba885649ac1bc063d9fca9142fe7bf6a976a2a547614da948b4bcb",
+      "sha256": "1a957e8eb451bcda659171af45c07983ea74dda0d4937f64911613ce923d6bf8",
       "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
     },
     {
@@ -64,7 +64,7 @@
       "source": "firmware",
       "sourcePath": "docs/spec/host-layouts-v1.md",
       "sourceSha256": "782c79ccf2971eb655ee3d4d7158ed449a072b6e4a549f312ab04bd3e631e9ee",
-      "sha256": "dac1e82d1fda7ec2a3a2fcc711bfaa46261a7deec40405d2b81c2ce32e9b5d1e",
+      "sha256": "e14e119841cbcdde6c73f087e56c535c15349044487735a7bdf0d2432008be69",
       "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
     },
     {
@@ -72,7 +72,7 @@
       "source": "firmware",
       "sourcePath": "docs/spec/logical-profile-transaction-v1.md",
       "sourceSha256": "97e1b7f9200e13986fbe28f6136c1accdb13eb00be0c162249a1755738375c4a",
-      "sha256": "de35b5535729060c515114c7faa68b82ba64bf71a6ab2dfd7079cb5dd007698e",
+      "sha256": "1d93981fb40075d05dfcc6e32a5d913e8da2b084c7f74b1c681f78de7ce8d7b3",
       "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
     },
     {
@@ -80,7 +80,7 @@
       "source": "firmware",
       "sourcePath": "docs/spec/participation-policy.md",
       "sourceSha256": "1e0ba7a2efe20056d3f7383ffa2b150971aa728c4e2713d41f3717a701eba220",
-      "sha256": "ab051d07055c2646497d79908050e1acd8083b4fa0f6f7f1edaabebf8d2d888d",
+      "sha256": "4da65871118136318d5bc8135230f6e3ac093343571ae407b275295fc40361f5",
       "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
     },
     {
@@ -88,7 +88,7 @@
       "source": "firmware",
       "sourcePath": "docs/spec/pd-mode-domain-v1.md",
       "sourceSha256": "df0dcdbb86697a72d7956ae64b18e8266554fdf189c415fa71f5878ef51030eb",
-      "sha256": "3f54054682b222f89c3b89e0c1a1d7bb3e96d4fc316213a938988925fa9d4698",
+      "sha256": "a44ee61e65a6645ab0c515c3050a637dda088f6936c25a8966326025d9fdd01d",
       "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
     },
     {
@@ -96,7 +96,7 @@
       "source": "firmware",
       "sourcePath": "docs/spec/portable-profile-v1.md",
       "sourceSha256": "ae5746d0d3362ac3023e08bea73e9f2f544e499dd593519d62529a00f1daab8d",
-      "sha256": "d7f93d80ddfd85d7b0f97a68fce7bb52ba0267689fded1640420d92b7968b70f",
+      "sha256": "1657f748fb66c0eb677f87d95a9ad5d05077c82c59d1c97aca7eea3f3df4fdd8",
       "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
     },
     {
@@ -104,7 +104,7 @@
       "source": "firmware",
       "sourcePath": "docs/spec/profile-split-v1.md",
       "sourceSha256": "02d4479d24f2c6195dd5ee49a26321b79d536e448bda656d0fc200c0bcdd5104",
-      "sha256": "2b677e1221ad78cf6be827ca7654cda45a9b47aff608f201309b147b2a726f56",
+      "sha256": "bf87de12a3f077660d57642a7969338a94c47fba2fac5893b58531e873db5ff4",
       "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
     },
     {
@@ -112,7 +112,7 @@
       "source": "firmware",
       "sourcePath": "docs/spec/profile-wire-v1/README.md",
       "sourceSha256": "24bb49b6aad63758750c6fe8de1a62e2b5ffa74d51e229874bd4ccc13cfe385c",
-      "sha256": "edf92270323b269ef752ff3fe4cd2e3bdaf9793ba55ba21f4f4b2e888803d4a2",
+      "sha256": "aa06af04329636b88d8f88c1343c8d5e10bbeccf1dc9cf2701dd8e3017d33b33",
       "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
     },
     {
@@ -120,7 +120,7 @@
       "source": "firmware",
       "sourcePath": "docs/spec/profile-wire-v1/autocorrect-domain.md",
       "sourceSha256": "a0b6e4e54ab2654a09ec9c2b4d6003c2d669893e208de1eea4e9b7200f198d37",
-      "sha256": "f1e9824ca69a13eedffab17a88c9c35f8bf94bdf05b24b76516ede0b0ca3fc8f",
+      "sha256": "63d671e80889a30614842ed943f7700c57a719306beb92430277e3171845450b",
       "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
     },
     {
@@ -128,7 +128,7 @@
       "source": "firmware",
       "sourcePath": "docs/spec/profile-wire-v1/blob-and-digests.md",
       "sourceSha256": "70aed86d715443f99f9b3cf8fc5983313bd8800a2ba73cd517490c65a337b640",
-      "sha256": "ff48610240f8c6612bdbfe8a4810643d7751670fd1c58acd7d9a3ed0830e6101",
+      "sha256": "8df348531a5157ca22c520bab8fbc6f7093f48fd6df4d5f8c401f7187c1d11fe",
       "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
     },
     {
@@ -136,7 +136,7 @@
       "source": "firmware",
       "sourcePath": "docs/spec/profile-wire-v1/candidate-transfer.md",
       "sourceSha256": "e6632a381a664bc38a5ce6be3e4cdfe40f5f35f608a5a663b7fb14969e8da46e",
-      "sha256": "7052dbb96b44c5bdbf021182607771ade34322ae9f6c189bfa3de5b5df055ada",
+      "sha256": "98d1d4030abbf39be85f4a10a0ce3969e58e31ec21c12af081edf8989ee83e06",
       "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
     },
     {
@@ -144,7 +144,7 @@
       "source": "firmware",
       "sourcePath": "docs/spec/profile-wire-v1/combo-domain.md",
       "sourceSha256": "f718319a044be8f075964cc67c4b11c5c1fc62a4278098edc49fd10bc53cddc1",
-      "sha256": "55f471f9eb9271c255a02040b8df7277527d62d0743cc2b14f61fb8262aabe30",
+      "sha256": "262b821d7d6f849fec53090770baf8b385ce360daf43bfa17c8273a66bcbcb3c",
       "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
     },
     {
@@ -160,7 +160,7 @@
       "source": "firmware",
       "sourcePath": "docs/spec/profile-wire-v1/hid-channel.md",
       "sourceSha256": "bf03bc5534d4113538d1345250308562e8267d3024eefb145046b0814f43d310",
-      "sha256": "c11cb886a2b9b13d996b42896a0ca2f6cd017fad42a27cdfd5fb0501a17b1ba7",
+      "sha256": "37d52bcf6c66e3d07f5d23a3de0f649a4f5a8c4e58842205aaa86dcc3a41b940",
       "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
     },
     {
@@ -168,7 +168,7 @@
       "source": "firmware",
       "sourcePath": "docs/spec/profile-wire-v1/key-behavior-domain.md",
       "sourceSha256": "8758c0d26e9af129b9059331c02c63a9600ca08bb6fafc207026a676fcbfb6ab",
-      "sha256": "6e6b93b2e52c8f0123201107936cdba0d9f13cd142dc3c541caf92be532230b0",
+      "sha256": "b8038b72226937875a515667b4534ebd2b12087445a131a7c0eaa09dfc9f45f0",
       "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
     },
     {
@@ -176,15 +176,15 @@
       "source": "firmware",
       "sourcePath": "docs/spec/profile-wire-v1/keymap-domain.md",
       "sourceSha256": "7f0b819f270f6bd43fffee9d56472e4ef8ed3dd2229ca2115aa8c0ef4c9ddf82",
-      "sha256": "7e49700c2e26784de25bc6e1fcd683ec6da2349f2ac16f14c942cc66641c6bdf",
+      "sha256": "58eb150a3aad00751865e358bb3a15c6a69e3effe20ecc65e09f550be11359cf",
       "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
     },
     {
       "path": "upstream/firmware/docs/spec/profile-wire-v1/live-edits.md",
       "source": "firmware",
       "sourcePath": "docs/spec/profile-wire-v1/live-edits.md",
-      "sourceSha256": "adf39b6a4553e510d883e576de97a3717dfe7290a3dd448d22bb73b57d26cf24",
-      "sha256": "d86ee54007bd7dd87d8f98ad645eaf37b4c45220eb3243afbadb19da5aef4a61",
+      "sourceSha256": "6e591355b7ec0cfde4db981fed1edbffc4aaed5e61605b1c3a9b04cdef28b600",
+      "sha256": "0dbe996e58a3d6535e97708d9ac5b76ef8d999ec67fd31f63b6e211ea7f5a724",
       "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
     },
     {
@@ -192,7 +192,7 @@
       "source": "firmware",
       "sourcePath": "docs/spec/profile-wire-v1/macro-domain.md",
       "sourceSha256": "6a5633c9f868e98df90f3880540b420f50467a4d0b1b4648cc1395de4ce024ea",
-      "sha256": "964d3ce4429676eebf2c9491b15f66d5f4acc252c13a10ee754ec80a5da9ef80",
+      "sha256": "a3c025997fa101844e3bf3ecbdfd036863c6f0adf33c556e26bd8e9b60a69942",
       "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
     },
     {
@@ -200,7 +200,7 @@
       "source": "firmware",
       "sourcePath": "docs/spec/profile-wire-v1/settings-domain.md",
       "sourceSha256": "71f2505a393da7d1ffd71dcb17c6707c1b679a259c7d851640c67ac2fd9c6370",
-      "sha256": "d3158f69c4f6341e9506705126c42cef6a1e350a73b1fce8624382ad51828f09",
+      "sha256": "02ecea5f4efb836b9a87df7d061f68e5ba17fa6f53de3e4c7130fc7c8cf1da3e",
       "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
     },
     {
@@ -208,7 +208,7 @@
       "source": "firmware",
       "sourcePath": "docs/spec/resource-policy.md",
       "sourceSha256": "c95485acf49e919b396904c785f0daf91da0f7877287f0de13cb2ce33fa96306",
-      "sha256": "475faa0ef2cd6ca48cd20ea5a3f0722781d191898e63ed41fd33e1514fcd2b73",
+      "sha256": "82dc177aaa73305609e284ab271889fab86d51c52fa8eac5eb4f42351a22a750",
       "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
     },
     {
@@ -216,7 +216,7 @@
       "source": "firmware",
       "sourcePath": "docs/spec/rgb-domain-v1.md",
       "sourceSha256": "d32fd32325bd88d0844af1cbbf914011d166671566a4813f1147d7ea20762aa3",
-      "sha256": "135aa159f9c4f085ae4d02402568e5fe4dea9c7da903c8fd96cc2a2174928f34",
+      "sha256": "6acb200f655837fefff56f0d86262db2129046851e5eab0acfe33664d5aaf36b",
       "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
     },
     {
@@ -224,7 +224,7 @@
       "source": "firmware",
       "sourcePath": "docs/spec/split-activity-sync.md",
       "sourceSha256": "bc40b398bb20088702bfc09fc24ab5c7ede66a5d6a4d028d4a4f82e6e43c4a92",
-      "sha256": "e0078e0223054ed2762f43da718133e62391075c974660fc9d895634557d3746",
+      "sha256": "f4a49dbea3e1349f676a599c18be627845b1f169203fe62d587f0a2d6fca374c",
       "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
     },
     {

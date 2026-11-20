@@ -1,14 +1,14 @@
 # Macro domain `0x70`
 
 Domain `0x70`, version 1, holds the 128 macros' steps in one bank (D-F30,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/ac42a7231376ac108149a378cb6feae98e3708a2/docs/adr/0030-keymap-and-macros-belong-to-the-profile.md)). It is the
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/e8b9ccdf94ae657c6c9933594f080bdf2f954629/docs/adr/0030-keymap-and-macros-belong-to-the-profile.md)). It is the
 only copy of the macros the firmware keeps; VIA is not supported (D-F31,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/ac42a7231376ac108149a378cb6feae98e3708a2/docs/adr/0031-via-is-not-supported.md)). Macro names live in the
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/e8b9ccdf94ae657c6c9933594f080bdf2f954629/docs/adr/0031-via-is-not-supported.md)). Macro names live in the
 [settings domain](settings-domain.md#names) (D-F43,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/ac42a7231376ac108149a378cb6feae98e3708a2/docs/adr/0043-macros-have-names-user-macros-retired.md)). The domain
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/e8b9ccdf94ae657c6c9933594f080bdf2f954629/docs/adr/0043-macros-have-names-user-macros-retired.md)). The domain
 id, envelope and byte order are [blob and digests](blob-and-digests.md)'s; how
 domains make a profile is [the device-resident profile](../device-resident-profile.md)'s;
-how a macro plays is [macro playback](https://github.com/NoahCLR/charybdis-4x6/blob/ac42a7231376ac108149a378cb6feae98e3708a2/docs/architecture/macro-playback.md)'s.
+how a macro plays is [macro playback](https://github.com/NoahCLR/charybdis-4x6/blob/e8b9ccdf94ae657c6c9933594f080bdf2f954629/docs/architecture/macro-playback.md)'s.
 Refusal codes are named in [errors](errors.md).
 
 ## Bank layout
@@ -47,10 +47,10 @@ control (U+0080–U+009F), and not cut off by the terminator. Playback
 saturates a delay at 65,535 ms.
 
 The protection step (D-F17,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/ac42a7231376ac108149a378cb6feae98e3708a2/docs/adr/0017-per-macro-protection-isolates-keyboard-output.md)) sets
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/e8b9ccdf94ae657c6c9933594f080bdf2f954629/docs/adr/0017-per-macro-protection-isolates-keyboard-output.md)) sets
 the macro's uninterruptible playback: no prefix is automatic, `p = 1` on and
 `p = 2` off; any other `p` is refused. What each policy does is
-[macro playback](https://github.com/NoahCLR/charybdis-4x6/blob/ac42a7231376ac108149a378cb6feae98e3708a2/docs/architecture/macro-playback.md#uninterruptible-playback)'s.
+[macro playback](https://github.com/NoahCLR/charybdis-4x6/blob/e8b9ccdf94ae657c6c9933594f080bdf2f954629/docs/architecture/macro-playback.md#uninterruptible-playback)'s.
 
 Held by: `tests/host/run_profile_validator_v1_tests.sh` (`profile_validator_v1_test.c`), `tests/host/run_macro_payload_tests.sh` (`macro_payload_test.c`).
 
@@ -69,7 +69,7 @@ its text typeable through the host layout in
 ([host layouts](../host-layouts-v1.md)). A macro that fails plays nothing.
 
 The six are the keyboard report's key slots, whatever the build: no NKRO
-(D-F65, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/ac42a7231376ac108149a378cb6feae98e3708a2/docs/adr/0065-a-macro-holds-at-most-six-keys-besides-modifiers.md)).
+(D-F65, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/e8b9ccdf94ae657c6c9933594f080bdf2f954629/docs/adr/0065-a-macro-holds-at-most-six-keys-besides-modifiers.md)).
 They count the presses still held, a chord's keys and the key that types a
 character, together; a key a chord names that is already held, or names
 twice, counts once. Modifiers (`0xe0`–`0xe7`) and system, consumer and mouse
