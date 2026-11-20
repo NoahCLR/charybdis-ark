@@ -53,8 +53,9 @@ export function editor(model, slot, canEdit) {
             <div data-macro-steps class="stack"></div>
             <div data-macro-feedback role="status" aria-live="polite"></div>
             <div class="stack macro-footer">
-            <div class="macro-utilities"><button class="btn tiny link" data-host-settings>${model.macroUnicode?.layoutName ? `${esc(model.macroUnicode.layoutName)} · ` : ""}${esc(vocabulary(model).settingsSections.host)} →</button>
-                ${infoMark({id: `macro-info-typing-${slot.keycode}`, label: "How a macro's text types", heading: "How text types", lead: typing.about})}
+            <div class="macro-utilities"><span class="macro-typing" data-macro-typing><span>${model.macroUnicode?.layoutName ? `Text types through the <strong>${esc(model.macroUnicode.layoutName)}</strong> layout` : "Text types through your computer's layout"}</span>
+                ${infoMark({id: `macro-info-typing-${slot.keycode}`, label: "How a macro's text types", heading: "How text types", lead: typing.about})}</span>
+                <button class="btn tiny link" data-host-settings>Change in ${esc(vocabulary(model).settingsScreens.host)} →</button>
             </div>
             ${typing.warning ? `<p class="note warn" data-layout-warning>${esc(typing.warning)}</p>` : ""}
             </div>
@@ -63,7 +64,7 @@ export function editor(model, slot, canEdit) {
     card.addEventListener("pointerdown", event => {
         if (/** @type {HTMLElement | null} */ (/** @type {Element} */ (event.target).closest('[data-act="clear"]'))) setMacroForm(slot.keycode, {cancelBlur: true});
     });
-    // The host section, on Typing settings.
+    // The host section, on Typing settings, marked for a moment as it lands.
     /** @type {HTMLElement | null} */ (card.querySelector("[data-host-settings]"))?.addEventListener("click", () => {
         Object.assign(state, {screen: "host", reveal: '.settings-group[data-section="host"]'});
         render();
@@ -153,7 +154,7 @@ function nameField(model, slot, canEdit) {
 // this macro picked in its Macros tab, on the row for the first of those
 // routes, so the board rings its keys and the table marks the row.
 
-// How a macro's text types, read once in the info mark by the Your computer button
+// How a macro's text types, read once in the info mark beside the layout it names
 // (D-L96); a layout that is not the computer's is a warning on show.
 /** @param {Model} model */
 function typingWords(model) {

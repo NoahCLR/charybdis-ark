@@ -30,7 +30,8 @@ function currentSlot(keycode) { return getModel()?.macros?.find(slot => slot.key
 /** @param {MacroSlot} slot */
 export function requestInspection(slot) {
     const form = macroForm(slot.keycode), model = getModel();
-    if (form.draft === undefined || form.stepError || !editGate(getModel(), "macros").editable) return;
+    // A take in progress is not staged; it is checked once, when it finishes.
+    if (form.draft === undefined || form.stepError || !editGate(getModel(), "macros").editable || state.recording?.slot === slot.keycode) return;
     const context = inspectionContext(model, slot);
     const pending = pendingInspections.get(slot.keycode);
     if (pending?.context === context && pending.payload === form.draft && pending.requestId === form.requestId) return;
@@ -96,6 +97,10 @@ export function paintFeedback(card, model, slot) {
     const error = form.stepError || parsed.error || (held.length ? `Release ${listed(held.map(key => keyIdentity(model, key).label))} before the macro ends.` : "") || inspection?.error || (!local && slot.playbackError);
     const note = error ? (local ? editWords(model?.draft).macroFixFirst : `Change ${sectionPath(model, "host")} or fix the macro before playing it.`) : local && !inspection ? "Checking this edit…" : "";
     const feedback = /** @type {HTMLElement} */ (card.querySelector("[data-macro-feedback]"));
+    // While a take records, nothing comes and goes between the steps and the
+    // recorder: a key still held and the check of each key wait for Stop,
+    // so the recorder holds still under the growing steps.
+    if (state.recording?.slot === slot.keycode) { feedback.hidden = true; feedback.replaceChildren(); return; }
     feedback.hidden = !error && !note;
     feedback.replaceChildren(el(`<div class="stack">
         ${error ? `<div class="unavailable">${esc(error)} ${local ? esc(editWords(model?.draft).macroNotIn) : `This stored macro cannot play with the current settings in ${esc(vocabulary(model).settingsSections.host)}.`}</div>` : ""}

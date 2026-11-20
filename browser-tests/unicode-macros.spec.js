@@ -12,9 +12,16 @@ for (const theme of ["dark", "light"]) {
             store.setModel(model); store.state.screen = "macros"; store.render();
             window.__posted.length = 0;
         });
+        // The editor's last line says what text types through and where it changes.
+        await expect(page.locator('[data-macro-typing]')).toContainText("Text types through");
+        await expect(page.locator('[data-host-settings]')).toHaveText("Change in Typing settings →");
         await page.locator('[data-host-settings]').click();
         await expect(page.locator('[data-screen="host"]')).toHaveAttribute("aria-current", "true");
         await expect(page.locator('[data-section="host"]')).toBeVisible();
+        // It lands marked, ringed in the draft colour, for a moment.
+        await expect(page.locator('[data-section="host"]')).toHaveClass(/revealed/);
+        expect(await page.locator('[data-section="host"]').evaluate(node => getComputedStyle(node).boxShadow)).toContain("inset");
+        await expect(page.locator('[data-section="host"]')).not.toHaveClass(/revealed/, {timeout: 3000});
         // The preview detects macOS: a keyboard layout and the ISO option, and
         // Unicode entry is the Unicode Hex Input layout rather than a switch.
         await expect(page.locator('[data-macro="unicodeEnabled"]')).toHaveCount(0);

@@ -1,7 +1,7 @@
 // @ts-check
 "use strict";
 const {test, expect} = require("@playwright/test");
-const {openControls} = require("./control-preview");
+const {openControls, wideFont} = require("./control-preview");
 
 const take = page => page.evaluate(async () => {
     const {state, macroForm} = await import("/webview/store.mjs");
@@ -233,4 +233,103 @@ test('Clear take during a take restores the macro as it was before Record and pr
     await expect.poll(() => take(page).then(value => value.recording)).toBeNull();
     await page.locator('[data-sequence-tiles]').focus(); await page.keyboard.press('Control+z');
     await expect(page.locator('[data-step-text]')).toHaveValue('original');
+});
+
+// Record sits on Record delays' line and Clear take on the next, right of the
+// options; narrow, or in a wider font, they take a line under the options and
+// nothing in the strip overflows it.
+for (const [width, wide] of [[1400, false], [1000, true], [860, true]]) {
+    test(`the recorder's actions share the options' lines at ${width}px${wide ? " in a wide font" : ""}`, async ({page}, testInfo) => {
+        await page.setViewportSize({width, height: 1000});
+        await openControls(page, "macros", {macroSlot: "MACRO_17"});
+        if (wide) await wideFont(page);
+        const box = async selector => /** @type {{x: number, y: number, width: number, height: number}} */ (await page.locator(`[data-recorder] ${selector}`).boundingBox());
+        const strip = await box(".record-opts"), delays = await box(".record-opt:has([data-delays])"), hold = await box(".record-opt:has([data-preserve-hold-timing])");
+        const record = await box('[data-act="record"]'), clear = await box('[data-act="clear-take"]');
+        const middle = (/** @type {{y: number, height: number}} */ b) => b.y + b.height / 2;
+        await page.locator("[data-recorder]").screenshot({path: testInfo.outputPath("recorder.png")});
+        expect(await page.locator("[data-recorder] .record-opts").evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
+        for (const part of [delays, hold, record, clear]) expect(part.x + part.width).toBeLessThanOrEqual(strip.x + strip.width + 0.5);
+        if (record.x > delays.x + delays.width) {
+            expect(Math.abs(middle(record) - middle(delays))).toBeLessThan(1);
+            expect(Math.abs(middle(clear) - middle(hold))).toBeLessThan(1);
+        } else {
+            expect(record.y).toBeGreaterThan(hold.y + hold.height);
+            expect(Math.abs(middle(record) - middle(clear))).toBeLessThan(1);
+        }
+    });
+}
+
+test("a take rings the canvas in red and says Recording in its corner, and stopping clears both", async ({page}) => {
+    await openControls(page, "macros", {macroSlot: "MACRO_17", recordDelays: false});
+    const canvas = page.locator(".macro-canvas"), status = page.locator("[data-recording-status]");
+    await expect(status).toHaveCount(0);
+    await page.locator('[data-act="record"]').click();
+    await expect(canvas).toHaveClass(/is-recording/);
+    await expect(status.locator(".recording-badge")).toHaveText("Recording");
+    await expect(status).toContainText("Hold Escape, press Stop or click elsewhere to finish.");
+    await expect(page.locator(".macro-empty")).toContainText("Type, and your keys appear here.");
+    const color = await page.locator(".macro-canvas .macro-sequence").evaluate(node => getComputedStyle(node).borderTopColor);
+    const danger = await page.evaluate(() => { const probe = Object.assign(document.createElement("i"), {style: "color: var(--danger)"}); document.body.append(probe); const value = getComputedStyle(probe).color; probe.remove(); return value; });
+    expect(color).toBe(danger);
+    // The badge is the canvas's bottom-right corner, inside it.
+    const outer = /** @type {{x: number, y: number, width: number, height: number}} */ (await page.locator(".macro-canvas .macro-sequence").boundingBox());
+    const badge = /** @type {{x: number, y: number, width: number, height: number}} */ (await status.locator(".recording-badge").boundingBox());
+    expect(outer.x + outer.width - (badge.x + badge.width)).toBeLessThan(40);
+    expect(outer.y + outer.height - (badge.y + badge.height)).toBeLessThan(30);
+    await expect(page.locator('[data-recorder] [data-act="record"]')).toHaveText("Stop");
+    await page.keyboard.press("a");
+    await page.locator('[data-act="record"]').click();
+    await expect(canvas).not.toHaveClass(/is-recording/);
+    await expect(status).toHaveCount(0);
+    await expect(page.locator("[data-recorder] .card-h .tag")).toHaveText("recorded");
+});
+
+test("a take that grows the steps keeps Stop in view, scrolling the page down with it", async ({page}) => {
+    await page.setViewportSize({width: 1400, height: 760});
+    await openControls(page, "macros", {macroSlot: "MACRO_17", recordDelays: false});
+    const stop = page.locator('[data-recorder] [data-act="record"]');
+    await stop.scrollIntoViewIfNeeded();
+    await stop.click();
+    const contentBottom = () => page.locator(".content").evaluate(node => node.getBoundingClientRect().bottom);
+    const startTop = await page.locator(".content").evaluate(node => node.scrollTop);
+    for (const key of "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz") await page.keyboard.press(key);
+    await expect.poll(async () => (/** @type {{y: number, height: number}} */ (await stop.boundingBox())).y + 32 <= await contentBottom()).toBe(true);
+    expect(await page.locator(".content").evaluate(node => node.scrollTop)).toBeGreaterThan(startTop);
+    // Pinned there, Stop holds still from key to key: the scroll lands in the
+    // same frame as the redraw, never a glide the next key cuts short.
+    const stopTop = () => page.locator('[data-recorder] [data-act="record"]').evaluate(node => Math.round(node.getBoundingClientRect().top));
+    const pinned = await stopTop(), tops = [];
+    for (const key of "abcdefghijklmnopqrstuvwxyz") { await page.keyboard.press(key); tops.push(await stopTop()); }
+    expect(tops.every(top => Math.abs(top - pinned) <= 1)).toBe(true);
+    // The Recording dot is drawn at its pulse's place on the clock, so a
+    // redraw continues its beat rather than restarting it.
+    expect(await page.locator(".recording-badge").evaluate(node => getComputedStyle(node, "::before").animationDelay)).toMatch(/^-\d/);
+    await expect(stop).toHaveText("Stop");
+    await stop.click();
+    await expect.poll(() => updates(page).then(rows => rows.at(-1)?.payload.length)).toBeGreaterThan(0);
+});
+
+test("while a take records, nothing comes and goes between the steps and the recorder; the take is checked once it finishes", async ({page}) => {
+    await openControls(page, "macros", {macroSlot: "MACRO_17", recordDelays: false});
+    const feedback = page.locator("[data-macro-feedback]");
+    const checks = () => page.evaluate(() => window.__posted.filter(message => message.type === "validateMacro").length);
+    await page.locator('[data-act="record"]').click();
+    const recorderTop = () => page.locator("[data-recorder]").evaluate(node => Math.round(node.getBoundingClientRect().top));
+    // The first step turns the empty canvas into a row of steps; the next keys
+    // fit that row, so the recorder has no reason to move.
+    await page.keyboard.press("x");
+    const top = await recorderTop();
+    // A held key and each key's check would each show a line here.
+    await page.keyboard.down("Shift");
+    await expect(feedback).toBeHidden();
+    await page.keyboard.press("a");
+    await expect(feedback).toBeHidden();
+    await page.keyboard.up("Shift");
+    await page.keyboard.press("b");
+    await expect(feedback).toBeHidden();
+    expect(await recorderTop()).toBe(top);
+    expect(await checks()).toBe(0);
+    await page.locator('[data-act="record"]').click();
+    await expect.poll(checks).toBeGreaterThan(0);
 });

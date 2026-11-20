@@ -140,3 +140,18 @@ export function scrollContentTo(root, selector, margin = 20) {
     const top = content.scrollTop + target.getBoundingClientRect().top - content.getBoundingClientRect().top - margin;
     content.scrollTo({top, left: content.scrollLeft, behavior: scrollMotion()});
 }
+
+// Something that grows above a control the person still needs (a take's
+// steps above Stop) pushes it below the content scroller's bottom edge.
+// Scroll down just far enough to show it again, in the same frame as the
+// redraw that grew it, so the control holds still and what grew moves up; a
+// glide would be cut short by the next redraw and judder. One already in
+// view, or above it, stays where it is.
+/** @param {ParentNode} root @param {string} selector @param {number} [margin] */
+export function keepInContentView(root, selector, margin = 20) {
+    const content = root.querySelector(".content");
+    const target = content?.querySelector(selector);
+    if (!content || !target) return;
+    const below = target.getBoundingClientRect().bottom - (content.getBoundingClientRect().bottom - margin);
+    if (below > 0) content.scrollTop += below;
+}

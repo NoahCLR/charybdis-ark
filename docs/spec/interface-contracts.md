@@ -1749,6 +1749,22 @@ escaped payload (D-L26), in `webview/ui/macros/`.
   each key arrives (`capturedKey`): a Mac's releases under ⌘ and its Caps Lock
   reports, Windows's lone Print Screen release and the Left Ctrl it sends with
   AltGr.
+- The recorder is one strip: its options on the left, each one control high,
+  and Record over Clear take on the right, Record on Record delays' line;
+  narrow, the two actions take a line under the options. While a take
+  records, the sequence's canvas is ringed in the danger colour with
+  Recording and how to finish in its bottom-right corner, never in the
+  recorder's heading, its dot keeping one beat across the redraw of each
+  key; each key scrolls the content down just far enough, in the same frame,
+  to keep the recorder's actions in view (`keepInContentView`,
+  `webview/lib/scroll.mjs`). Nothing shows between the steps and the
+  recorder while it records: the take is checked once, when it finishes,
+  not key by key (`browser-tests/macro-recording-scope.spec.js`).
+- The macro editor ends as it opens: the layout its text types through, as a
+  sentence with its info mark, and **Change in Typing settings →**, which
+  lands on Your computer marked for a moment as every jump's place is (a tint
+  and a ring in the draft colour, `.revealed`;
+  `browser-tests/unicode-macros.spec.js`).
 
 ## Pointing mode editor
 
