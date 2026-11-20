@@ -216,6 +216,14 @@ what it was. Changing it to a replacement the list already has joins the
 two, and Ark says so under the field before you keep it: "“the” is already
 on your list: this one's inputs will join it."
 
+Under the counter, a line names the [host layout](macros.md#your-computer)
+the text types through ("Text types through the US layout"), as the macro
+editor's last line does: its ⓘ says how text types, and **Change in Typing
+settings** takes you to **Your computer** and marks it for a moment. Text
+types through that layout alone; a character it can't type, such as an emoji,
+can't be a replacement's text, since Unicode entry is for macros. A layout
+that isn't one for your computer's system is a warning under it.
+
 Or choose **Macro**. The macro's name shows in the field beside it;
 **Pick…**, or the field itself, opens the same picker a key's keycode is
 picked in, here with only your macros that have steps (an empty macro would

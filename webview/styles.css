@@ -2067,12 +2067,12 @@ select.input.pd-add { height: var(--h-chip); width: 124px; min-width: 0; padding
 .macro-token-wrap:last-child.drop-after::after { right: -5px; }
 .macro-legend { display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-3); margin: var(--sp-3) 0; }
 .macro-legend span { font-size: var(--fs-xs); }
-/* The editor ends as it opens: what the macro's text types through, read
-   as a sentence on the left, as Uninterruptible playback is, and where to
-   change it on the right. */
-.macro-utilities { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: var(--sp-2) var(--sp-4); }
-.macro-typing { display: inline-flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-sm); color: var(--text-2); }
-.macro-typing strong { color: var(--text); font-weight: var(--fw-strong); }
+/* What an editor's text types through (ui/host-typing.mjs), read as a
+   sentence on the left, as Uninterruptible playback is, and where to change
+   it on the right. The macro editor ends with it. */
+.host-typing { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: var(--sp-2) var(--sp-4); }
+.host-typing-says { display: inline-flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-sm); color: var(--text-2); }
+.host-typing-says strong { color: var(--text); font-weight: var(--fw-strong); }
 .macro-footer { border-top: 1px solid var(--line); padding-top: var(--sp-4); }
 .macro-editor-card [data-recorder], .card.editor-section { border: 0; border-top: 1px solid var(--line); border-radius: 0; background: transparent; padding-top: var(--sp-4); }
 .macro-editor-card [data-recorder] .card-h, .editor-section .card-h { border-bottom: 0; padding: 0; margin-bottom: var(--sp-3); }
@@ -2515,6 +2515,8 @@ details > summary { list-style: none; }
 .ac-replacement > .ac-text, .ac-replacement > .ac-macro { flex: 1 1 280px; min-width: 0; }
 .ac-macro .input[readonly] { cursor: pointer; }
 .ac-macro-none { flex-basis: 100%; }
+/* A replacement's text says under its own field what it types through. */
+.ac-typing { flex-basis: 100%; display: grid; gap: var(--sp-2); }
 .ac-editor .editor-section .card-h { gap: var(--sp-1); }
 .ac-bytes { font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
 .ac-inputs { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; min-height: var(--h-compact); }
