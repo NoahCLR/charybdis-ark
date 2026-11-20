@@ -145,7 +145,7 @@ A replacement that plays a macro can fire after Leader too. What the leader
 sends flashes as any replacement does (above), and one that sends nothing
 does not flash. While the leader
 waits, the keyboard can hold a colour of its own, **Leader waiting**, which
-you set on [Lighting's Replacement feedback tab](lighting.md#replacement-feedback).
+you set on [Lighting's **Text replacements** tab](lighting.md#replacement-feedback).
 
 The leader works with text replacement switched off, on Typing or by key. Ark
 warns before you apply a list with replacements that fire after Leader and no
