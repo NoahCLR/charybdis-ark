@@ -91,6 +91,9 @@ test("the screen is a bank of replacements beside the editor of the one picked, 
     await expect(editor(page).locator('.name-titlebar [data-act="ac-delete"]')).toHaveText("Delete replacement");
     await expect(editor(page).locator('[data-act="place"]')).toHaveCount(0);
     await expect(editor(page).locator(".macro-sequence-heading h4, .editor-section .card-h h3")).toHaveText(["Replacement", "Fires", "Inputs", "Try it"]);
+    // Each section after the first opens with a rule, as the macro editor's do.
+    const rules = await editor(page).locator(".card-b > .macro-sequence-heading, .card-b > .editor-section").evaluateAll((parts) => parts.map((part) => getComputedStyle(part).borderTopStyle));
+    expect(rules).toEqual(["none", "solid", "solid", "solid"]);
     // No switch here, no menu of macros, and nothing says typo, correction, typed form or a match by name.
     await expect(page.locator('.pad.autocorrect [data-macro="autocorrect"]')).toHaveCount(0);
     await expect(page.locator(".pad.autocorrect select")).toHaveCount(0);
@@ -550,7 +553,7 @@ test("what the host layout cannot type is said once across the screen and on its
     await expect(editor(page).locator('[data-ac-warning="nu"]')).toContainText("is a short input with *");
 });
 
-test("a replacement's text says under it the layout it types through, as the macro editor ends, and goes to where it changes", async ({page}) => {
+test("a replacement's editor ends with the layout its text types through, as the macro editor does, and goes to where it changes", async ({page}) => {
     await openControls(page, "autocorrect");
     await publish(page, (model) => {
         model.macroUnicode = {...model.macroUnicode, layoutName: "ABC", layoutFits: true};
@@ -558,17 +561,21 @@ test("a replacement's text says under it the layout it types through, as the mac
         model.autocorrect.entries.push({id: "\u0001macro:5", label: "Sign-off", correction: "", macro: 5, fires: "word", warnings: [], typos: [{typo: "sig", input: "sig", warnings: []}]});
     });
     await item(page, "the").click();
-    const typing = editor(page).locator(".ac-replacement [data-host-typing]");
-    await expect(typing).toHaveText(/^Text types through the ABC layout/);
+    // Under Try it, the editor's last part, behind a rule as the macro editor's is.
+    await expect(editor(page).locator(":scope > .card-b > :last-child")).toHaveClass(/macro-footer/);
+    await expect(editor(page).locator(".card-b > .macro-footer")).toHaveCSS("border-top-style", "solid");
+    const typing = editor(page).locator(".macro-footer [data-host-typing]");
+    await expect(typing).toHaveText(/^Replacement text types through the ABC layout/);
     // How it types, read once in its info mark: the layout, and no Unicode entry.
     await typing.locator(".info-button").click();
+    await expect(typing.locator(".info-pop")).toContainText("Replacement text types through the ABC layout chosen in");
     await expect(typing.locator(".info-pop")).toContainText("keep that layout active on the computer");
     await expect(typing.locator(".info-pop")).toContainText("Unicode entry is for macros");
     await page.keyboard.press("Escape");
     await expect(editor(page).locator("[data-layout-warning]")).toHaveCount(0);
     // A layout that is not the computer's is a warning under it.
     await publish(page, (model) => { model.macroUnicode = {...model.macroUnicode, os: 1, layout: 9, layoutFits: false}; });
-    await expect(editor(page).locator("[data-layout-warning]")).toContainText("replacements may type the wrong characters");
+    await expect(editor(page).locator("[data-layout-warning]")).toContainText(/^Replacement text types through .*replacements may type the wrong characters/);
     // A macro's own editor says what its text types through.
     await bank(page).locator('[data-ac-entry$="macro:5"]').click();
     await expect(editor(page).locator("[data-host-typing]")).toHaveCount(0);
@@ -623,7 +630,8 @@ test("every control of the screen has a name, and the keyboard reaches them in r
         if (order.at(-1) !== at) order.push(at);
     }
     expect(order.map((name) => name.replace(/^autocorrect:entry:because:/, ""))).toEqual(["item", "ac-add", "ac-import", "ac-export-menu", "ac-delete", "ⓘ How a replacement works", "kind:text", "replacement",
-        "ⓘ How a replacement's text types", "host-settings", "ⓘ How a replacement fires", "fires:word", "ⓘ How inputs are written, and the * wildcard", "ac-chip", "input:becasue", "ac-remove-input", "ac-chip", "ac-more", "ⓘ About the preview", "autocorrect:try:text"]);
+        "ⓘ How a replacement fires", "fires:word", "ⓘ How inputs are written, and the * wildcard", "ac-chip", "input:becasue", "ac-remove-input", "ac-chip", "ac-more", "ⓘ About the preview", "autocorrect:try:text",
+        "ⓘ How a replacement's text types", "host-settings"]);
     // Clear is off with nothing to clear, as Clear take is, and a replaced part of the preview is no tab stop.
     await expect(editor(page).locator('[data-act="ac-try-clear"]')).toBeDisabled();
 });
@@ -692,8 +700,8 @@ const answer = (page, result) => page.evaluate(async (result) => {
 test("Try it closes the editor: its box is never changed, and the preview under it shows what the core answers", async ({page}) => {
     await openControls(page, "autocorrect");
     const section = editor(page).locator("[data-ac-try]"), box = page.locator('[data-f="autocorrect:try:text"]'), preview = page.locator("[data-ac-try-preview]");
-    // The last section of the editor card, as Record is a macro's.
-    await expect(editor(page).locator("> .card-b > :last-child")).toHaveAttribute("data-ac-try", "");
+    // The last section of the editor card, as Record is a macro's: only the layout line ends it.
+    await expect(editor(page).locator("> .card-b > :nth-last-child(2)")).toHaveAttribute("data-ac-try", "");
     await expect(section.locator(".field > span")).toHaveText("Your keyboard would type");
     await expect(section.locator("#ac-info-try")).toContainText("What your keyboard would type with this draft's list, through US.");
     // Save is the word on screen; nothing here says Apply.
