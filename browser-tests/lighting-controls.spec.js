@@ -773,7 +773,11 @@ test("the stage tabs read by their short words in a wide window, each named whol
     await expect(page.locator('[data-ltab="key"]')).toHaveAttribute("data-tip", /^Behaviour feedback · painted 6 of 7/);
 });
 
-test("every stage tab and All accents fit a 1440px window, whichever stage is selected", async ({page}) => {
+// With the Mac's font the strip fits from about a 1370px window; Windows' and
+// Linux's wider fonts need about 1500px (D-L105), which the wide-font test
+// below holds at 1536px. So this one measures the Mac's font only.
+test("with the Mac's font, every stage tab and All accents fit a 1440px window, whichever stage is selected", async ({page}) => {
+    test.skip(process.platform !== "darwin", "the Mac's font only; wider fonts are held at 1536px below (D-L105)");
     await page.setViewportSize({width: 1440, height: 900});
     for (const stage of ["autocorrect", "layers"]) {
         await openControls(page, "lighting", {stage, layer: 0}, "dark", "shell=demo");
