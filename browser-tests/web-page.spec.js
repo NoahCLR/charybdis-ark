@@ -406,6 +406,8 @@ test("explore the demo: edit on several screens, review with no Apply, export, o
     const banner = page.locator(".demo-banner");
     await expect(banner).toContainText("Demo · no keyboard");
     await expect(banner).toContainText("Edits stay in this tab");
+    await expect(banner.locator('a[data-act="firmware-releases"]')).toHaveAttribute("href", "https://github.com/NoahCLR/charybdis-4x6/releases");
+    await expect(banner.locator('a[data-act="firmware-releases"]')).toHaveAttribute("target", "_blank");
     await expect(page.locator(".rail-product")).toHaveText("Demo");
     await expect(page.locator(".rail-keyboard .dot.demo")).toHaveCount(1);
     await expect(page.locator(".rail-keyboard")).not.toContainText(/Connected|halves|Recovery/);

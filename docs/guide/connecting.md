@@ -164,7 +164,9 @@ profile with nothing connected: 16 layers, 32 pointing modes, 128 macros and
 128 custom keys. Every screen works, and every edit shows up in Review. Only
 saving needs a keyboard.
 
-A strip across the top says **Demo · no keyboard**. It has two buttons:
+A strip across the top says **Demo · no keyboard**. It links to the
+**Firmware releases**, where a keyboard gets the firmware Ark edits, and has
+two buttons:
 
 - **Open a backup…** puts one of your backups in place of the demo
   profile.

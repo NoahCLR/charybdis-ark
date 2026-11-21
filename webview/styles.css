@@ -2444,6 +2444,7 @@ details > summary { list-style: none; }
 .demo-banner strong { color: var(--text); font-weight: var(--fw-label); white-space: nowrap; }
 .demo-banner .copy { flex: 1; min-width: 0; }
 .demo-banner .acts { display: flex; gap: var(--sp-2); flex: none; }
+.demo-banner .acts a.btn { text-decoration: none; }
 .dot.demo { background: none; box-shadow: inset 0 0 0 1.2px var(--text-2); width: 7px; height: 7px; }
 .sheet.leave-demo { width: min(560px, 100%); }
 .sheet.edit-mode-ask, .sheet.live-ask { width: min(560px, 100%); }
