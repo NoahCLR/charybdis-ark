@@ -496,7 +496,7 @@ function profileReview(before, after, capabilities) {
                 entry.macro === undefined ? replacement(entry, mine) : {text: replacement(entry, mine), key: `macro:${entry.macro}`, mark: {kind: "macro"}}],
             // How it fires (D-L91), in the words of its switch: said where
             // either side fires after the Leader key.
-            ...(triggerOf(entry) || (twin && triggerOf(twin)) ? [/** @type {[string, Field]} */ (["Fires", word(V.inputModes, TRIGGER_NAMES[triggerOf(entry)])])] : []),
+            ...(triggerOf(entry) || (twin && triggerOf(twin)) ? [/** @type {[string, Field]} */ (["Trigger", word(V.inputModes, TRIGGER_NAMES[triggerOf(entry)])])] : []),
             ...entry.typos.map(typo => {
                 const elsewhere = twin?.typos.some(row => row.typo === typo.typo) ? undefined : heldTypo(theirs.autocorrect, typo.typo)?.entry;
                 return [`typo:${typo.typo}`, {label: "Input", key: typo.match,

@@ -90,7 +90,7 @@ test("the screen is a bank of replacements beside the editor of the one picked, 
     await expect(editor(page).locator(".name-titlebar .tag")).toHaveCount(0);
     await expect(editor(page).locator('.name-titlebar [data-act="ac-delete"]')).toHaveText("Delete replacement");
     await expect(editor(page).locator('[data-act="place"]')).toHaveCount(0);
-    await expect(editor(page).locator(".macro-sequence-heading h4, .editor-section .card-h h3")).toHaveText(["Replacement", "Fires", "Inputs", "Try it"]);
+    await expect(editor(page).locator(".macro-sequence-heading h4, .editor-section .card-h h3")).toHaveText(["Replacement", "Trigger", "Inputs", "Try it"]);
     // Each section after the first opens with a rule, as the macro editor's do.
     const rules = await editor(page).locator(".card-b > .macro-sequence-heading, .card-b > .editor-section").evaluateAll((parts) => parts.map((part) => getComputedStyle(part).borderTopStyle));
     expect(rules).toEqual(["none", "solid", "solid", "solid"]);
@@ -1365,12 +1365,14 @@ test("in the demo a list is imported in each format by picker and by drop, summe
 test("a replacement fires as you type, after Leader or both, its inputs one list whichever, and the Leader key is said", async ({page}) => {
     await openControls(page, "autocorrect");
     await item(page, "because").click();
-    const fires = editor(page).locator('.seg[aria-label="How it fires"]');
+    const fires = editor(page).locator('.seg[aria-label="Trigger"]');
     await expect(fires.locator("label")).toHaveText(["As you type", "After Leader", "Both"]);
     await expect(fires.locator('input[value="word"]')).toBeChecked();
-    // What each choice means is the Fires heading's info mark, in the
+    // What each choice means is the Trigger heading's info mark, in the
     // choices' own words, and no tip on the choice says it again (D-L96).
     await expect(editor(page).locator("#ac-info-fires dt")).toHaveText(["As you type", "After Leader", "Both"]);
+    // As you type says what finishing a word is, as Replacement's info mark does.
+    await expect(editor(page).locator("#ac-info-fires dd").first()).toHaveText("Replaced as you finish the word with a space, punctuation, Enter or Tab.");
     await expect(editor(page).locator("#ac-info-fires")).toContainText("the computer never sees what you typed");
     await expect(fires).not.toHaveAttribute("data-tip", /./);
     await expect(editor(page).locator('.seg[aria-label="Replacement is"]')).not.toHaveAttribute("data-tip", /./);
@@ -1389,7 +1391,7 @@ test("a replacement fires as you type, after Leader or both, its inputs one list
         await accept(page, (model) => { model.autocorrect.entries.find((entry) => entry.id === "because").fires = kind; model.autocorrect.usage.leaders = 3; });
         await expect(fires.locator(`input[value="${kind}"]`)).toBeChecked();
         await expect(inputs()).toHaveText(["beacuse", "becasue", "becuase"]);
-        // What the Leader key does is the Fires info mark; under the switch, only where it is.
+        // What the Leader key does is the Trigger info mark; under the switch, only where it is.
         await expect(editor(page).locator("#ac-info-fires")).toContainText("Press the Leader key, then type one of its inputs");
         await expect(editor(page).locator("[data-ac-leader-note]")).not.toContainText("the computer never sees");
         await expect(editor(page).locator('[data-ac-leader-note] [data-act="ac-place-leader"]')).toHaveText("Place on a key →");
@@ -1407,7 +1409,7 @@ test("a replacement fires as you type, after Leader or both, its inputs one list
     await expect(editor(page).locator("[data-ac-more]")).toBeFocused();
 });
 
-// Where the Leader key is placed is said under Fires, as Pointer says where
+// Where the Leader key is placed is said under Trigger, as Pointer says where
 // its sniping keys are, and Place on a key → puts it on one, as a macro's and
 // a pointing mode's editors do.
 test("while a replacement fires after Leader its editor says where the Leader key is, and places it on a key", async ({page}) => {
@@ -1433,7 +1435,7 @@ test("in the demo a replacement made to fire after Leader is marked in the bank 
     await bank(page).locator('[data-act="ac-add"]').click();
     await editor(page).locator("[data-ac-text]").fill("Kind regards, Sam");
     await editor(page).locator("[data-ac-text]").press("Enter");
-    await page.locator('[data-ac-new] .seg[aria-label="How it fires"] label:has-text("After Leader")').click();
+    await page.locator('[data-ac-new] .seg[aria-label="Trigger"] label:has-text("After Leader")').click();
     await expect(page.locator("[data-ac-new] [data-ac-leader-note]")).toBeVisible();
     const first = editor(page).locator("[data-ac-first]");
     await first.fill("kr");
@@ -1457,7 +1459,7 @@ test("in the demo a replacement whose only input is removed stays open off the l
     await bank(page).locator('[data-act="ac-add"]').click();
     await editor(page).locator("[data-ac-text]").fill("Kind regards, Sam");
     await editor(page).locator("[data-ac-text]").press("Enter");
-    await page.locator('[data-ac-new] .seg[aria-label="How it fires"] label:has-text("Both")').click();
+    await page.locator('[data-ac-new] .seg[aria-label="Trigger"] label:has-text("Both")').click();
     const first = editor(page).locator("[data-ac-first]");
     await first.fill("kr");
     await first.press("Enter");
@@ -1469,9 +1471,9 @@ test("in the demo a replacement whose only input is removed stays open off the l
     await remove.click();
     const made = page.locator("[data-ac-new]");
     await expect(made.locator("[data-ac-text]")).toHaveValue("Kind regards, Sam");
-    // Its sections in a listed replacement's order: Fires, then Inputs.
-    expect((await made.locator(".macro-sequence-heading h4").allTextContents()).slice(0, 3)).toEqual(["Replacement", "Fires", "Inputs"]);
-    await expect(made.locator('.seg[aria-label="How it fires"] input[value="both"]')).toBeChecked();
+    // Its sections in a listed replacement's order: Trigger, then Inputs.
+    expect((await made.locator(".macro-sequence-heading h4").allTextContents()).slice(0, 3)).toEqual(["Replacement", "Trigger", "Inputs"]);
+    await expect(made.locator('.seg[aria-label="Trigger"] input[value="both"]')).toBeChecked();
     await expect(made.locator("[data-ac-joins-with]")).toHaveText("Its last input was removed, so it is off your list: give it an input to put it back.");
     await expect(first).toBeFocused();
     await expect(item(page, "Kind regards, Sam")).toHaveCount(0);

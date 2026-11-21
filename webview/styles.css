@@ -2554,10 +2554,10 @@ details > summary { list-style: none; }
 .ac-more { border-style: dashed; background: none; color: var(--text-2); }
 .ac-more-field { display: inline-flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
 .ac-more-field > .field.segmented, .ac-inputs > .field.segmented { flex: none; }
-/* The Leader key's cap, under Fires (D-L91). */
+/* The Leader key's cap, under Trigger (D-L91). */
 .ac-leader-key { display: inline-block; margin-right: var(--sp-1); padding: 0 var(--sp-1); border: 1px solid var(--line-2); border-bottom-width: 2px; border-radius: var(--r-chip);
   font-family: var(--sans); font-size: var(--fs-xs); line-height: 1.35; color: var(--text-2); background: var(--surface-2); vertical-align: 1px; }
-/* Under Fires: the Leader key's cap, where it is placed, and Place on a key →. */
+/* Under Trigger: the Leader key's cap, where it is placed, and Place on a key →. */
 .ac-leader { gap: var(--sp-2); }
 .ac-leader-place { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; min-height: var(--h-control); }
 .ac-leader-place .ac-leader-key { margin-right: 0; }

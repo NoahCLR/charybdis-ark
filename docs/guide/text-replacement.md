@@ -233,7 +233,7 @@ steps yet, Pick… is off and **Make one in Macros →** goes there.
 or change its steps. Choosing Text or Macro changes nothing until you type
 the text or pick the macro, and a line under the choice says so until then.
 
-The ⓘ beside **Replacement**, **Fires**, **Inputs** and **Try it** sums up how each
+The ⓘ beside **Replacement**, **Trigger**, **Inputs** and **Try it** sums up how each
 works: when the keyboard replaces, capitals, Backspace and macros; what each
 way of firing means; how an
 input is written with `*`, the wildcard, with examples and where it may go;
@@ -243,7 +243,7 @@ or tab elsewhere or press Escape; resting the pointer on it shows it while it
 stays. In a small window the list opens
 where there is room, and scrolls when it is taller than that.
 
-### Fires
+### Trigger
 
 **As you type**, **After Leader** or **Both** says how this replacement
 fires: as you finish a word, after the [Leader key](#after-the-leader-key),
