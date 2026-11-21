@@ -413,9 +413,9 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     // How a replacement fires (D-L91): as you type, after the Leader key, or
     // both; its inputs are one list whichever. The switch on its editor.
     inputModes: [["word", "As you type"], ["leader", "After Leader"], ["both", "Both"]],
-    // What each means, by the same value, read once in the Fires info mark
+    // What each means, by the same value, read once in the Trigger info mark
     // (D-L96); how long the Leader key waits is said after it, by its setting.
-    inputModesMean: [["word", "Replaced as you finish the word."],
+    inputModesMean: [["word", "Replaced as you finish the word with a space, punctuation, Enter or Tab."],
         ["leader", "Press the Leader key, then type one of its inputs: the keyboard sends the replacement the moment it is typed, and the computer never sees what you typed."],
         ["both", "Either way."]],
     // The Leader key as its cap names it, where a replacement's editor says
