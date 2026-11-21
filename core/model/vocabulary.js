@@ -434,7 +434,7 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     // plays with (the host OS it types for), as the macro editor says it.
     unicodeEntry: [
         [1, "Other characters use Unicode entry: keep Unicode Hex Input active in macOS input sources while macros play. Option shortcuts can behave differently in this input source."],
-        [2, "Other characters use Unicode entry: install and run WinCompose on Windows with Right Alt as its Compose key."],
+        [2, "Other characters use Unicode entry: run a compose program on Windows that types a character from Right Alt, U, its hexadecimal code and Enter, such as WinCompose."],
         [3, "Other characters use Unicode entry: use an input method or application that accepts Ctrl+Shift+U, hexadecimal digits and Space, such as IBus. This sequence does not work in every Linux application."],
     ],
     // What Unicode entry needs while it is off, by host OS; any other host
