@@ -81,8 +81,10 @@ behaviour, a combo, or the layer itself when the mode is linked to it
 tab. An empty slot shows the keys still bound to it, which do nothing until it
 holds a mode.
 
-The editor runs in four steps, top to bottom. The ⓘ beside a step's title
-says what each of its choices does; a click keeps it open.
+The editor runs in numbered steps, top to bottom: four for a mode that sends
+keys, five for one that scrolls, whose held modifiers have a step of their
+own. The ⓘ beside a step's title says what each of its choices does; a click
+keeps it open.
 
 ### Starting a mode
 
@@ -96,12 +98,12 @@ mode, and its key on the board reads by the slot's number, such as **Pointing mo
 hold (empty)**. So you can lay out the keys first and fill in the modes later,
 and clearing a slot doesn't break the keys that use it.
 
-### 1. What the ball does
+### What the ball does
 
 **Scroll** or **Send keys**. Switching redraws the steps below for the other
 movement; nothing is saved to your draft until you change one of its settings.
 
-### 2. What each direction sends
+### What each direction sends
 
 For a mode that sends keys, each direction it reads is a key drawn where the
 ball sends it, around the ball. Click a key to pick another; hover it and
@@ -136,7 +138,7 @@ The keyboard plays one macro at a time, and a trigger while one is playing is
 dropped. For a longer macro, turning on **Send only once per movement** is
 usually the better fit.
 
-### 2. How it scrolls
+### How it scrolls
 
 For a scrolling mode:
 
@@ -149,10 +151,15 @@ For a scrolling mode:
 - **Feel**: **Fastest repeat** is the shortest time between two scroll steps,
   and **Axis kept after the ball stops** is how long a scroll keeps its axis
   once the ball stops: move again within it and it carries on the same way.
-- **Hold modifiers while scrolling**, for example Shift to scroll sideways in
-  some apps.
 
-### 3. What starts it
+### Modifiers it holds down during scrolling
+
+For a scrolling mode, the step after **How it scrolls**: the modifiers held
+down while it scrolls, a switch for each, left and right. Some apps scroll
+differently with one held: Shift to scroll sideways in some, Command or Ctrl
+to zoom in others.
+
+### What starts it
 
 **Its keys** shows the mode's hold and lock keys, by the mode's name. Where
 they sit is in the chips under the title.
@@ -227,7 +234,7 @@ A copy (**Or copy a mode**) takes the layers a mode's key turns on, but not
 the layers that start it, since a layer starts only one mode; set those on
 the copy.
 
-### 4. While it runs
+### While it runs
 
 - **Pointer speed**: the mode's own DPI, or **Normal pointer speed** to keep
   the one set on Pointer settings.
@@ -272,6 +279,6 @@ Your computer decides what each button number does.
 
 Modes once had mouse button overrides, which made buttons 1–3 do something
 else while the mode ran. The keyboard no longer has them; a linked layer does
-that job (see [What starts it](#3-what-starts-it)). A backup made on firmware that
+that job (see [What starts it](#what-starts-it)). A backup made on firmware that
 had them is from older firmware, and Ark refuses it (see
 [Backups](backups.md)).

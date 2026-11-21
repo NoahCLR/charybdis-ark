@@ -40,9 +40,9 @@ export function formControls(model, slot, canEdit) {
         return node;
     };
     // The shared Left / Right by Ctrl / Shift / Alt / GUI grid.
-    /** @param {string} label @param {number} mask @param {string} key */
-    const modifiers = (label, mask, key) => {
-        const grid = modifierGrid(model, {label, mask, id: `pointing:${slot.id}:${key}`, disabled: !canEdit});
+    /** @param {string} label @param {number} mask @param {string} key @param {{hideLabel?: boolean}} [options] */
+    const modifiers = (label, mask, key, options = {}) => {
+        const grid = modifierGrid(model, {label, mask, id: `pointing:${slot.id}:${key}`, disabled: !canEdit, ...options});
         form[key] = grid.read;
         return grid.node;
     };
