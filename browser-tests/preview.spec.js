@@ -168,7 +168,7 @@ for (const theme of ["dark", "light"]) {
 for (const theme of ["dark", "light"]) {
     test(`the keyboard's name is posted on change, with its byte count kept live (${theme})`, async ({page}) => {
         await openPreview(page, theme);
-        // The name is the Keyboard screen's title (it was a Settings card).
+        // The name is the About screen's title (it was a Settings card).
         await page.locator('[data-screen="device"]').click();
         const field = page.getByRole("textbox", {name: "Keyboard name", exact: true});
         await expect(field).toHaveAttribute("placeholder", "Charybdis 4x6");
@@ -305,7 +305,7 @@ test("the web shell's controls post their messages", async ({page}) => {
     await expect.poll(() => page.evaluate(() => document.documentElement.dataset.theme)).toBe("light");
     await expect(page.locator('.topbar [data-act="theme"]')).toHaveCount(1);
 
-    // The Keyboard screen builds its own header, with the toggle too.
+    // The About screen builds its own header, with the toggle too.
     await page.locator('[data-screen="device"]').click();
     await expect(page.locator('.keyboard-topbar [data-act="theme"]')).toHaveCount(1);
     await page.evaluate(() => {window.__posted.length = 0;});

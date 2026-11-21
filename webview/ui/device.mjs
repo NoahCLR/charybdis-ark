@@ -1,5 +1,5 @@
 // @ts-check
-// The Keyboard screen: who the keyboard is. Its name is the title (click to
+// The About screen: who the keyboard is. Its name is the title (click to
 // rename), then what it is and runs (product, firmware against this Ark,
 // Ark's own version, the two halves, a restart when one is needed), with Read
 // keyboard in its heading, then how full its memory is. On a page opened with

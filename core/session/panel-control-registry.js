@@ -68,7 +68,7 @@ const CONTROLS = Object.freeze({
     previewAutocorrectImport: Object.freeze({route: "inspect", action: "previewAutocorrectImport", binding: "inspect", demo: "allow", phase: "inspect", identity: false}),
     chooseAutocorrectFile: Object.freeze({route: "inspect", action: "chooseAutocorrectFile", binding: "inspect", demo: "allow", phase: "inspect", identity: false}),
     exportAutocorrect: Object.freeze({route: "portable", action: "exportAutocorrect", binding: "none", demo: "allow", phase: "panel", identity: false}),
-    // The Keyboard screen's Diagnostics opened: each half's flash pauses, a
+    // The About screen's Diagnostics opened: each half's flash pauses, a
     // background read (flash-pauses.js) skipped while anything runs.
     readFlashPauses: Object.freeze({route: "diagnose", action: "readFlashPauses", binding: "none", demo: "ignore", phase: "diagnose", identity: false}),
 });

@@ -70,7 +70,7 @@ async function readLiveStatus(op, {timeoutMs, label}) {
     }
 }
 
-// Each half's flash pauses (GET 0x0D) for the Keyboard screen's
+// Each half's flash pauses (GET 0x0D) for the About screen's
 // Diagnostics, into `flashPauses`: a background read like the watch's
 // look, each request waiting `timeoutMs`. Resolves true once read; a
 // failure is the read's own `{state: "unavailable", error}`, never the

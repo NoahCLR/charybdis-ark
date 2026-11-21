@@ -49,7 +49,7 @@ export const STATE_FIELDS = {
     pickCombo: kept(null),     // a combo id to pick in the Combos tab, wherever this layer lists it
     comboPreview: kept(null),  // {id, keys}: the combo Combo feedback holds on the board and the keys picked to hold it from (view/combo-held.mjs)
     lightingGroupsShut: kept([]), // the groups of Lighting's lists folded shut, as "stage:group" ("layers:inUse", "key:tiers", "combo:layer")
-    settingsOpen: kept([]),    // the Keyboard screen's folds opened by hand, so a render keeps them open
+    settingsOpen: kept([]),    // the About screen's folds opened by hand, so a render keeps them open
     flashPausesAsked: kept(null), // the connection whose flash pauses an open Diagnostics last asked for
     // The folds opened by hand and kept open across renders, wherever they
     // appear next, by fold id (ui/disclosure.mjs keepFold): the Key tab's

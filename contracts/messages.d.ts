@@ -61,7 +61,7 @@ export interface ControlPayloads {
     };
     read: {
         ready: {discardDemo?: boolean};
-        /** `flashPauses`: the Keyboard screen's Diagnostics is open, so each half's flash pauses are read after the keyboard. */
+        /** `flashPauses`: the About screen's Diagnostics is open, so each half's flash pauses are read after the keyboard. */
         refresh: {discardDemo?: boolean; flashPauses?: boolean};
         selectDevice: {deviceId: string; discardDemo?: boolean};
     };
@@ -88,7 +88,7 @@ export interface ControlPayloads {
         chooseAutocorrectFile: {requestId: number};
     };
     diagnose: {
-        /** Read each half's flash pauses (GET 0x0D) for the Keyboard screen's Diagnostics. */
+        /** Read each half's flash pauses (GET 0x0D) for the About screen's Diagnostics. */
         readFlashPauses: Record<never, never>;
     };
 }

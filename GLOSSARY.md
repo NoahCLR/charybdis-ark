@@ -33,7 +33,7 @@ _Avoid_: locked, view-only, disabled
 
 **Flash pauses**:
 How long each half stopped to work on its flash since it started, as it
-measures them, shown under Diagnostics on the Keyboard screen (with
+measures them, shown under Diagnostics on the About screen (with
 `?diagnostics` in the address).
 _Avoid_: stalls, latency, flash timing
 
@@ -182,7 +182,7 @@ _Avoid_: reset, wipe, factory reset (for this)
 One of Ark's top-level views chosen from the rail, in three groups: Keymap,
 Lighting, Macros, Text replacement, Custom keys and Pointing modes under
 Configure; Behaviours, Combos, Typing and Pointer under Settings; Backups and
-Keyboard under Keyboard. Outside the rail, a Settings screen is named with "settings" after
+About under Keyboard (D-L108). Outside the rail, a Settings screen is named with "settings" after
 it (Behaviour settings, Combo settings, Typing settings, Pointer settings),
 since nothing around a link or a tip says it is one.
 _Avoid_: page, tab, area (for this), surface, panel

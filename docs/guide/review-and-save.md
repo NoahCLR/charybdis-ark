@@ -285,8 +285,8 @@ while the keyboard is still connected.
 Either way the recovery copy is on the [Backups](backups.md) screen, named
 as that screen lists it: what made it, the keyboard and when. The keyboard's
 own error, for whoever looks into it, is under **Diagnostics** on the
-Keyboard screen, shown when Ark is opened with `?diagnostics` in its address
-([Connecting](connecting.md#the-keyboard-screen)).
+About screen, shown when Ark is opened with `?diagnostics` in its address
+([Connecting](connecting.md#the-about-screen)).
 
 ## When the keyboard stops saving
 

@@ -135,7 +135,7 @@ layers in view reach:
 
 The same kind of control looks and sits the same on every screen.
 
-- Every screen's header is as tall as every other's, the Keyboard screen's,
+- Every screen's header is as tall as every other's, the About screen's,
   whose title is the keyboard's renamable name, included, while it is
   renamed too; a screen waiting for a keyboard is titled by its rail label,
   the rail item it highlights (`browser-tests/screens-registry.spec.js`).
@@ -604,7 +604,7 @@ hold what they name.
   tab's keycode, no test; a behaviour's timings,
   `browser-tests/behaviour-timings.spec.js`). Review's group Discard lights what it takes back on
   focus as on hover (no test). No button sits inside a `<summary>`:
-  the Keyboard screen's Read keyboard is in This keyboard's heading, outside
+  the About screen's Read keyboard is in This keyboard's heading, outside
   Diagnostics' fold (tested).
 - Every control shows the one focus ring (2px of `--focus`) when the
   keyboard reaches it, in either theme; a strip that scrolls sideways draws
@@ -1282,7 +1282,7 @@ only an operation stands in the way. The demo's draft is bound to the demo
   detail as `liveDetail`), which `draftBlockWords`
   (`webview/view/vocabulary.mjs`) reads (`tests/model/vocabulary.test.js`,
   `tests/view/readiness.test.mjs`). The
-  Keyboard screen says firmware this Ark does not work with in
+  About screen says firmware this Ark does not work with in
   `vocabulary.firmwareUpdate` too.
 - An edit names the draft it was built from (`expectedBase`, or a domain's
   `expectedFingerprint`), and core refuses it once the draft is another. A
@@ -1347,14 +1347,14 @@ standalone export reads its own snapshot and leaves the editor's alone
   for it, and a whole model, as the preview posts it, is taken as it is
   (`tests/session/panel-loop.test.js`, `tests/view/store-catalog.test.mjs`,
   `tests/web-shell.test.mjs`).
-- The Keyboard screen shows its Diagnostics only on a page whose address
+- The About screen shows its Diagnostics only on a page whose address
   has `?diagnostics` (`diagnosticsShown`, D-L100); without it the fold is
   not drawn and the flash pauses are never read. Read keyboard is in This
   keyboard's heading either way
   (`tests/view/keyboard-view.test.mjs`,
   `browser-tests/settings-screens.spec.js`). No user-facing sentence sends a
   person to them.
-- The Keyboard screen's Diagnostics list, `model.diagnostics`, is what was
+- The About screen's Diagnostics list, `model.diagnostics`, is what was
   read, then the device service's log, newest last and bounded by the service
   (`addDiagnostic`): the code and own text of a failure no notice says, with
   what lay under it (`causeText`), connections and the keyboard's odd answers.
@@ -1956,7 +1956,7 @@ input's key under the layers in view (`tests/model/participation.test.js`,
 
 ## Flash pauses
 
-The Keyboard screen's Diagnostics (shown with `?diagnostics`, D-L100) shows
+The About screen's Diagnostics (shown with `?diagnostics`, D-L100) shows
 each half's flash pauses, GET `0x0D`
 (firmware D-F29; `upstream/firmware/docs/spec/profile-wire-v1/hid-channel.md`,
 "Flash pauses"), decoded by `core/protocol/flash-pauses-v1.js`
@@ -1971,7 +1971,7 @@ each half's flash pauses, GET `0x0D`
 - They are read only when the fold opens (`readFlashPauses`), once for each
   connection while it stays open and nothing holds the keyboard
   (`state.flashPausesAsked` against `load.connectionToken`), and by the
-  Keyboard screen's Read keyboard while it is open (`refresh` with
+  About screen's Read keyboard while it is open (`refresh` with
   `flashPauses`, after the keyboard is read). Each
   reads both pages, waits longer than the master half's one-second pull
   interval and reads both again, as the firmware's spec says to get fresh
@@ -1996,7 +1996,7 @@ and the firmware serves the effective name as its USB product string
 - `deviceLabels` names a listed keyboard by its product name and the connected
   one by its stored name, adding a serial or number only where two labels
   match (`tests/session/device-model.test.js`).
-- The Keyboard screen's title is the name (`titleName`), following
+- The About screen's title is the name (`titleName`), following
   `editGate(model, "settings")`, with the built-in name as placeholder
   (`browser-tests/settings-screens.spec.js`). It posts trimmed; core refuses
   more than 32 bytes or control characters (`tests/view/edits.test.mjs`,

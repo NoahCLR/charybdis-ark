@@ -149,7 +149,7 @@ test("the demo shows its name and dot, no edit modes, and only Choose keyboard",
 
 // What the rail's status lines used to say about the keyboard itself, and
 // nothing else on screen says, is in the dot's hover words.
-test("a restart the keyboard needs turns the dot red and says how, in the Keyboard screen's words", () => {
+test("a restart the keyboard needs turns the dot red and says how, in the About screen's words", () => {
     const dot = keyboardControl(connected({status: {slaveCleanupPending: true}})).dot;
     assert.equal(dot.tone, "err");
     assert.ok(dot.tip.startsWith(`${RESTART_NEEDED.label}. ${[RESTART_NEEDED.detail, ...RESTART_NEEDED.steps].join(" ")}`), dot.tip);

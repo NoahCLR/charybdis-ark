@@ -382,7 +382,7 @@ edit was checked before it was sent.
 `core/session/live-watch.js`, run by `panel-loop.js`, looks at
 the edit status about once a second. It skips while an operation, an Apply or
 a proposal holds the keyboard, and drops a look that raced one. A look is a
-background read (`softTimeout`): one at a time with the Keyboard screen's
+background read (`softTimeout`): one at a time with the About screen's
 flash pauses (`readFlashPauses`, the other background read), skipped while
 either is out, and an operation that starts meanwhile waits for it to end. A
 missed answer skips the look and keeps the

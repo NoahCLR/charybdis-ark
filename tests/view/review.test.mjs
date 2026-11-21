@@ -106,7 +106,7 @@ test("Show goes to where each kind of item is edited", () => {
     for (const section of ["normalPointerSpeed", "sniping", "autoMouse"]) {
         assert.deepEqual(lands(section, "Pointer"), {screen: "pointer", reveal: `.settings-group[data-section="${section}"]`}, `${section} is a pointer setting`);
     }
-    assert.deepEqual(lands("keyboard"), {screen: "device"}, "the keyboard's name is the Keyboard screen's title");
+    assert.deepEqual(lands("keyboard"), {screen: "device"}, "the keyboard's name is the About screen's title");
     assert.equal(lands("startupLayers"), null, "Default layers has no editor, so its row has no Show");
     assert.equal(placeState({kind: "settings"}), null, "stored key options Ark has no switch for have nowhere to go");
     assert.deepEqual(placeState({kind: "settings", section: "automouseFade", area: "Lighting", stage: "auto"}), {screen: "lighting", stage: "auto"},

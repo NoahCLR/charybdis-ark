@@ -23,7 +23,7 @@ test("every registered screen opens from the rail with its own title and keeps t
         else await expect(page.locator(".main > .topbar h1")).toHaveText(label);
         await expect(page.locator(".read-placeholder")).toHaveCount(0);
         // Every header is as tall as every other, so nothing below it jumps
-        // between screens; the Keyboard screen's renamable title included.
+        // between screens; the About screen's renamable title included.
         heights.add(await page.locator(".main > .topbar").evaluate((node) => node.getBoundingClientRect().height));
         // Nor does the theme toggle, beside Lighting's taller power controls.
         themes.add(await page.locator('.main > .topbar [data-act="theme"]').evaluate((node) => node.getBoundingClientRect().top));

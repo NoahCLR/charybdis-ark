@@ -50,7 +50,7 @@ test("an answer from the keyboard that did not read is said in words, its decode
     assert.equal(recorded.message, malformed.message, "the record keeps the decoder's text for the diagnostics");
     assert.equal(failureSentence(recorded), FAILURE_WORDS.unreadable);
     assert.equal(failureSentence(rejection(recorded)), FAILURE_WORDS.unreadable);
-    // And the Keyboard screen says it the same way.
+    // And the About screen says it the same way.
     assert.equal(buildDeviceModel({connected: false, error: recorded}).device.health.error, FAILURE_WORDS.unreadable);
 });
 
@@ -141,7 +141,7 @@ test("a fault in Ark reaches the panel as a plain sentence, its own text in the 
         assert.deepEqual(shell.errors, [FAILURE_WORDS.unexpected], "the shell hears what the panel says");
         assert.equal(loop.session.service.snapshot().diagnostics.at(-1), "TypeError: Cannot read properties of undefined (reading 'document')");
         assert.equal(reply.model.diagnostics.at(-1), "TypeError: Cannot read properties of undefined (reading 'document')",
-            "and the Keyboard screen's Diagnostics list it, where the guide says it is");
+            "and the About screen's Diagnostics list it, where the guide says it is");
         // A shell's own failure is said the same way.
         loop.fail(new Error("That recovery copy is no longer in this browser."));
         assert.equal(shell.posted.at(-1).notice, "Failed: That recovery copy is no longer in this browser.");

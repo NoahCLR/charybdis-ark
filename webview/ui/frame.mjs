@@ -80,7 +80,7 @@ export function rail() {
     return node;
 }
 
-// The theme toggle sits at the top right of every screen, the Keyboard
+// The theme toggle sits at the top right of every screen, the About
 // screen's own header included.
 /** @param {string} title @param {string} subtitle @param {string} [actions] */
 export const topbar = (title, subtitle, actions = "") => `<header class="topbar">

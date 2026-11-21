@@ -157,7 +157,7 @@ test("a keyboard that needs a restart is offered Restart in every edit mode, onc
         const stopped = draft.live ? {...draft, live: {...draft.live, keyboard: {...keyboard, stopped: true}}} : {...draft, keyboard: {...keyboard, slaveStopped: true}};
         assert.deepEqual(restartOffer(needs(stopped)), {kind: "stopped", title: STOPPED_WORDS.title, detail: STOPPED_WORDS.detail}, `${name}: stopped says it, one bar`);
     }
-    assert.equal(restartOffer(needs(null)), null, "no draft: Restart is a draft control, so the Keyboard screen's steps say it");
+    assert.equal(restartOffer(needs(null)), null, "no draft: Restart is a draft control, so the About screen's steps say it");
     assert.equal(restartOffer({...needs(drafts["Live edit"]), demo: {active: true}}), null, "never in the demo");
 });
 

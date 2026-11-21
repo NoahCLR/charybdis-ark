@@ -9,7 +9,7 @@ test("the registry owns every rail screen and renderer in the existing order", (
         ["Keyboard", ["profile", "device"]],
     ]);
     assert.deepEqual(Object.values(SCREENS).map((definition) => definition.label), ["Keymap", "Lighting", "Macros", "Text replacement", "Custom keys", "Pointing modes",
-        "Behaviours", "Combos", "Typing", "Pointer", "Backups", "Keyboard"]);
+        "Behaviours", "Combos", "Typing", "Pointer", "Backups", "About"]);
     const renderers = Object.fromEntries(["Keys", "Lighting", "Macros", "Autocorrect", "CustomKeys", "Pointing", "Behaviours", "Combos", "Host", "Pointer", "Profile", "Device"]
         .map(name => [`screen${name}`, () => name[0].toLowerCase() + name.slice(1)]));
     for (const [id, definition] of Object.entries(SCREENS)) {
@@ -49,11 +49,11 @@ test("an unknown screen cannot silently render Keys or pass readiness", () => {
     }
 });
 
-test("unavailable screens offer Backups before the Keyboard screen and never link to themselves", () => {
+test("unavailable screens offer Backups before the About screen and never link to themselves", () => {
     const connected = {load: {state: "unavailable"}, device: {connected: true}, portable: {available: true}};
     assert.deepEqual(secondaryScreen(connected, "keys"), {screen: "profile", label: "Backups"});
-    assert.deepEqual(secondaryScreen(connected, "profile"), {screen: "device", label: "Keyboard"});
-    assert.deepEqual(secondaryScreen({...connected, portable: {available: false}}, "keys"), {screen: "device", label: "Keyboard"});
+    assert.deepEqual(secondaryScreen(connected, "profile"), {screen: "device", label: "About"});
+    assert.deepEqual(secondaryScreen({...connected, portable: {available: false}}, "keys"), {screen: "device", label: "About"});
     assert.equal(secondaryScreen({...connected, portable: {available: false}}, "device"), null);
     assert.equal(secondaryScreen({...connected, load: {state: "loading"}}, "keys"), null);
     assert.equal(secondaryScreen(null, "keys"), null);

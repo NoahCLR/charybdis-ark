@@ -1,5 +1,5 @@
 // @ts-check
-// What the Keyboard screen says about the connected keyboard: its product,
+// What the About screen says about the connected keyboard: its product,
 // its two halves and its firmware against this Ark. Pure: it reads the
 // published model.
 
@@ -26,7 +26,7 @@ export const FIRMWARE_NEEDED = Object.freeze({
 });
 
 // Diagnostics are for whoever looks into a fault, not for using the
-// keyboard, so the Keyboard screen shows them only on a page opened with
+// keyboard, so the About screen shows them only on a page opened with
 // `?diagnostics` in its address (D-L100).
 /** @param {string} [search] the page address's query, `location.search` */
 export const diagnosticsShown = (search = globalThis.location?.search || "") => new URLSearchParams(search).has("diagnostics");
@@ -50,7 +50,7 @@ export function halvesRows(model) {
 
 // A save the keyboard is in the middle of and will finish
 // (`health.recoveryPending`), in the words the rail's keyboard dot and the
-// Keyboard screen both use.
+// About screen both use.
 export const SAVE_IN_PROGRESS = Object.freeze({
     label: "Save in progress",
     detail: "A save is in progress on the keyboard: it keeps its previous profile until both halves confirm the new one.",
@@ -58,7 +58,7 @@ export const SAVE_IN_PROGRESS = Object.freeze({
 
 // A keyboard whose slave half never confirmed a cancelled save
 // (`health.restartNeeded`), in the words the rail's keyboard dot, the
-// Keyboard screen and the bar use. The bar offers Ark's Restart for it
+// About screen and the bar use. The bar offers Ark's Restart for it
 // (D-L67); the steps say the other way out, unplugging the master half's USB
 // cable, for where there is no bar.
 export const RESTART_NEEDED = Object.freeze({
@@ -71,7 +71,7 @@ export const RESTART_NEEDED = Object.freeze({
     ]),
 });
 
-// The Keyboard screen's Product row: the firmware's built-in name, which Ark
+// The About screen's Product row: the firmware's built-in name, which Ark
 // knows while the keyboard carries no stored name (it is then the keyboard's
 // USB product). A renamed keyboard reports its given name over USB instead
 // (firmware D-F25), and the title already shows that, so the row is left out
@@ -82,7 +82,7 @@ export function productName(model) {
     return model?.keyboardName?.builtIn || null;
 }
 
-// The firmware's line on the Keyboard screen: its version, and whether this
+// The firmware's line on the About screen: its version, and whether this
 // Ark works with it or what to do.
 /** @param {Model | null | undefined} model */
 export function firmwareLine(model) {

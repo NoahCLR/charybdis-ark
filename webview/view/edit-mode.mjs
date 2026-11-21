@@ -131,7 +131,7 @@ export function liveSaveState(draft, {adjustment = true} = {}) {
  * never confirmed a cancelled save (`health.restartNeeded`), which refuses
  * new saves until it restarts (D-L67). Stopped outranks it, so a keyboard
  * that says both gets one bar. Restart is a draft control, so with no draft
- * nothing is offered here and the Keyboard screen's steps say it; nor in the
+ * nothing is offered here and the About screen's steps say it; nor in the
  * demo, which has no keyboard.
  * @param {Partial<Model> | null | undefined} model
  * @returns {null | {kind: 'stopped' | 'restartNeeded', title: string, detail: string}}

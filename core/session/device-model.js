@@ -101,7 +101,7 @@ function deviceHeader(state) {
     // generation and it is not one.
     // `savedProfile` says it in words a person reads, for the review's footer:
     // whether a profile is saved and how the halves stand. Its generation and
-    // digest are for the Keyboard screen's Diagnostics.
+    // digest are for the About screen's Diagnostics.
     const unsaved = status && (state.committed?.source === "compiled" || status.committedGeneration === 0);
     const summary = !status ? ""
         : unsaved ? `no committed profile · running compiled defaults · ${convergence(status)}`

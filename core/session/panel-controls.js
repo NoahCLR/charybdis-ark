@@ -419,7 +419,7 @@ function requireReview(value) {
 }
 
 // The shell's recovery copy, saying what made it and the keyboard it comes
-// from, named as the Keyboard screen's title names it at that moment. Storage
+// from, named as the About screen's title names it at that moment. Storage
 // that would not keep it is said as its cause (recovery-copy.js).
 /** @param {Shell} shell @param {Session} session @param {import("../../contracts/model.js").RecoveryCause} cause @returns {import("./types.js").SaveRecovery} */
 const recoveryFor = (shell, session, cause) => async (document) => {

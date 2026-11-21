@@ -189,7 +189,7 @@ export function placeState(place, layers = []) {
         case "settings": {
             if (place.stage) return {screen: "lighting", stage: place.stage};
             if (place.area === "Lighting") return {screen: "lighting", reveal: place.section ? `.settings-group[data-section="${place.section}"]` : null};
-            // The keyboard's name is the Keyboard screen's title.
+            // The keyboard's name is the About screen's title.
             if (place.section === "keyboard") return {screen: "device"};
             const screen = screenOfSection(place.section);
             return screen ? {screen, reveal: `.settings-group[data-section="${place.section}"]`} : null;
