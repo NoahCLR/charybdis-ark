@@ -109,6 +109,22 @@ test("reverse scrolling is a switch per axis, posted as the record's two bits", 
     await configPost(page, 0, {scroll: expect.objectContaining({invert: 1})});
 });
 
+// A scrolling mode's held modifiers are a step of their own, after How it
+// scrolls: the grid alone under the step's title, its info mark saying what
+// it does. A mode that sends keys has no such step.
+test("a scrolling mode holds its modifiers in a step of their own, after How it scrolls", async ({page}) => {
+    await openControls(page, "pointing", {pointingSlot: 0});
+    await expect(editor(page).locator(".pd-step h4")).toHaveText(["What the ball does", "How it scrolls", "Modifiers it holds down during scrolling", "What starts it", "While it runs"]);
+    await expect(editor(page).locator(".pd-step-h .pd-n")).toHaveText(["1", "2", "3", "4", "5"]);
+    const held = editor(page).locator(".pd-step").nth(2);
+    await expect(held.getByRole("group", {name: "Hold modifiers while scrolling"}).locator("[data-bit]")).toHaveCount(8);
+    await expect(held.locator(".pd-step-h .info-lead")).toHaveText(/Shift to scroll sideways/);
+    await expect(held.locator(".pd-step-b")).not.toContainText("Hold modifiers while scrolling");
+    await expect(editor(page).locator(".pd-step").nth(1).locator(".pd-mods")).toHaveCount(0);
+    await openControls(page, "pointing", {pointingSlot: 4});
+    await expect(editor(page).locator(".pd-step h4")).toHaveText(["What the ball does", "What each direction sends", "What starts it", "While it runs"]);
+});
+
 test("each modifier checkbox in scrolling contributes its own bit", async ({page}) => {
     await openControls(page, "pointing", {pointingSlot: 0});
     const modifiers = editor(page).locator('.pd-mods [data-bit]');
@@ -424,8 +440,8 @@ async function publishSlot(page, id, link) {
 test("What starts it posts the layers that start the mode, the layers its key turns on and what ends it", async ({page}) => {
     await openControls(page, "pointing", {pointingSlot: 1});
     const card = editor(page).locator(".pd-starts");
-    // Step 3: its keys, then the layers that start it, then the layers its key turns on.
-    await expect(editor(page).locator(".pd-step h4").nth(2)).toHaveText("What starts it");
+    // Its keys, then the layers that start it, then the layers its key turns on.
+    await expect(editor(page).locator(".pd-step").filter({has: page.locator(".pd-starts")}).locator("h4")).toHaveText("What starts it");
     await expect(card.locator(".pd-row-l")).toHaveText(["Its keys", "Layers", "Its key turns on"]);
     await expect(card.locator(".pd-cap")).toHaveText(["Volume hold", "Volume lock"]);
     await expect(card).not.toContainText("PD_MODE_1");
@@ -513,9 +529,16 @@ test("every setting in a mode says what it does once, under Advanced too", async
         const said = await editor(page).locator(".field").evaluateAll(fields => fields
             .filter(field => field.querySelector("input.input, .seg, .pd-switches, .pd-radios, .pd-mods") && !field.closest(".pd-taps"))
             .map(field => {
-                // A field's label heads it; a switch alone is named by its words.
-                const name = (field.querySelector(":scope > span") || field.querySelector(".sw .txt"))?.textContent?.trim() || "";
+                // A field's label heads it; a switch alone is named by its
+                // words; a field with no label of its own (the held
+                // modifiers' grid) is the one field its step's title names,
+                // said in the step's lead.
+                const unlabelled = field.getAttribute("role") === "group";
+                const name = unlabelled ? field.getAttribute("aria-label") || ""
+                    : (field.querySelector(":scope > span") || field.querySelector(".sw .txt"))?.textContent?.trim() || "";
                 const info = field.closest(".pd-step, .pd-sect")?.querySelector(".info-pop");
+                if (unlabelled) return {name, tip: Boolean(field.getAttribute("data-tip")), help: false,
+                    info: Boolean(info?.querySelector(":scope > .info-body > .info-lead")?.textContent?.trim())};
                 const terms = [...(info?.querySelectorAll("dt, .info-part") || [])].map(term => term.textContent?.trim());
                 const choices = [...field.querySelectorAll(".seg label > span")].map(choice => choice.textContent?.trim());
                 return {name,
@@ -548,7 +571,7 @@ test("a step's info mark says what each of its choices does, and a press keeps i
     await expect(mark.locator(".info-pop")).toBeVisible();
     await page.mouse.move(0, 0);
     await expect(mark.locator(".info-pop")).toBeVisible();
-    const running = editor(page).locator(".pd-step").nth(3).locator(".pd-step-h .info-mark");
+    const running = editor(page).locator(".pd-step").filter({has: page.locator("h4", {hasText: "While it runs"})}).locator(".pd-step-h .info-mark");
     await expect(running.locator(".info-part")).toHaveText(["Pointer layer"]);
     await expect(running.locator(".info-lead")).toHaveText("A mode its layers started never keeps the pointer layer on.");
 });
@@ -556,7 +579,7 @@ test("a step's info mark says what each of its choices does, and a press keeps i
 test("the pointer layer is set where the mode's running is, and no Advanced section is called Behaviour", async ({page}) => {
     for (const slot of [0, 4]) {
         await openControls(page, "pointing", {pointingSlot: slot, pdAdvanced: true});
-        await expect(editor(page).locator(".pd-step").nth(3).locator('.seg[aria-label="Pointer layer"]')).toHaveCount(1);
+        await expect(editor(page).locator(".pd-step").filter({has: page.locator("h4", {hasText: "While it runs"})}).locator('.seg[aria-label="Pointer layer"]')).toHaveCount(1);
         await expect(editor(page).locator(".pd-advanced .seg[aria-label=\"Pointer layer\"]")).toHaveCount(0);
         await expect(editor(page).locator(".pd-advanced h4")).not.toContainText(["Behaviour"]);
     }

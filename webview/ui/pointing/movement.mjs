@@ -5,7 +5,8 @@
 // column beside the compass: which directions it reads, a row of shapes;
 // what a direction with no key does, radio buttons; and whether it sends
 // once per movement, a switch.
-// A scrolling mode groups its fields as which way, speed and feel.
+// A scrolling mode groups its fields as which way, speed and feel; the
+// modifiers it holds are a step of their own (heldModifiers).
 import {el, esc} from "../../lib/dom.mjs";
 import {AXIS, DIAGONALS, DIRECTIONS, axisReads, scrollAxesOf, tapPlaceWord} from "../../view/pointing-config.mjs";
 import {keyDisplayName} from "../../view/keyvalues.mjs";
@@ -177,7 +178,7 @@ function arm(model, slot, group, name, disabled) {
 // record. A field drawn twice registers its reader twice, and the second
 // input silently wins, so the two never overlap (common.mjs SCROLL_LEAD).
 /** @param {Model} model @param {PresentedSlot} slot @param {FormControls} controls */
-function scrollingFields(model, slot, {field, choice, form, disabled, modifiers}) {
+function scrollingFields(model, slot, {field, choice, form, disabled}) {
     // Four columns, so every field heads a column: which way and reverse
     // over two each, then Speed's two fields and Feel's two under their
     // names.
@@ -197,10 +198,14 @@ function scrollingFields(model, slot, {field, choice, form, disabled, modifiers}
     for (const [key, unit] of SCROLL_LEAD) {
         group("fields").append(field(scrollLabel(model, key, unit), slot.scroll?.[key], `scroll:${key}`, {unit, tip: tipFor(model, key)}));
     }
-    const held = modifiers(words(model).heldModifiers, slot.heldModifiers, "heldModifiers");
-    held.setAttribute("data-tip", tipFor(model, "heldModifiers"));
-    node.append(held);
     return node;
+}
+
+// A scrolling mode's held modifiers, the step after How it scrolls: the grid
+// alone, the step's title naming it and its info mark saying what it does.
+/** @param {Model} model @param {PresentedSlot} slot @param {FormControls} controls */
+export function heldModifiers(model, slot, {modifiers}) {
+    return modifiers(words(model).heldModifiers, slot.heldModifiers, "heldModifiers", {hideLabel: true});
 }
 
 // Reverse scrolling is one switch per axis, named as the vocabulary names

@@ -1780,7 +1780,9 @@ escaped payload (D-L26), in `webview/ui/macros/`.
 
 A configured mode's editor (`webview/ui/pointing/editor.mjs`) is one card
 titled by the mode's name, with Place on a key → and Clear pointing mode
-beside it (a copy is made from an empty slot, Or copy a mode), and four numbered steps read top to bottom; Advanced follows as its
+beside it (a copy is made from an empty slot, Or copy a mode), and numbered
+steps read top to bottom, four for a mode that sends keys and five for one
+that scrolls, each numbered in the order it is drawn; Advanced follows as its
 own folded card (`browser-tests/pointing-controls.spec.js`).
 
 1. **What the ball does**: Scroll or Send keys, a radio group of two large
@@ -1816,8 +1818,7 @@ own folded card (`browser-tests/pointing-controls.spec.js`).
    card): which way (Scrolls, a segmented choice; Reverse scrolling, a
    switch per axis named as the vocabulary names each bit, the record's two
    bits) over two columns each, then Speed's two fields and Feel's two under
-   the vocabulary's names, and the held modifiers
-   (`webview/ui/pointing/movement.mjs`). Each direction's held-modifier handling,
+   the vocabulary's names (`webview/ui/pointing/movement.mjs`). Each direction's held-modifier handling,
    under Advanced, is a segmented choice too.
    Every setting, Reverse scrolling and the held modifiers included, says what it does once (D-L96): as its field's tip,
    or in the info mark beside its step's title or its Advanced section's (Distance, Scroll tuning), by its name or by
@@ -1827,10 +1828,15 @@ own folded card (`browser-tests/pointing-controls.spec.js`).
    the firmware runs it), and `vocabulary.pointing.choicesMean`, keyed by the value a choice stores, every choice and
    only those (`tests/model/vocabulary.test.js`)
    (`browser-tests/pointing-controls.spec.js`).
-3. **What starts it**: the mode's hold and lock keys named by the mode, never
+3. **Modifiers it holds down during scrolling**, a scrolling mode's alone,
+   so a mode that sends keys numbers the steps after it one lower: the held
+   modifiers, the shared Left / Right grid (`webview/ui/modifier-grid.mjs`)
+   with no label of its own, the step's title naming it and its info mark's
+   lead saying what it does (`vocabulary.pointing.tips.heldModifiers`).
+4. **What starts it**: the mode's hold and lock keys named by the mode, never
    by `PD_MODE_n`, and where they sit; then its link as layer chips
    ([Pointing links](#pointing-links)).
-4. **While it runs**: its pointer speed, its light with Edit in Lighting,
+5. **While it runs**: its pointer speed, its light with Edit in Lighting,
    and its pointer layer, a segmented choice, in step 2's four columns. Advanced's sections are named
    for what they set (Distance, Held modifiers, Scroll tuning), never
    Behaviour, which is a key's in Ark.

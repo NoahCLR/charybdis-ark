@@ -2,9 +2,9 @@
 // A configured pointing mode's editor: one card titled by the mode's name,
 // clicked to rename as Macros and Custom keys are, its actions beside it (Place
 // on a key → and Clear pointing mode; a copy is made from an empty slot), and
-// four numbered steps read top to bottom — what the ball does, what it sends
-// or how it scrolls, what starts it, and what holds while it runs. Advanced
-// follows as its own card, folded.
+// numbered steps read top to bottom — what the ball does, what it sends or
+// how it scrolls, the modifiers a scrolling mode holds, what starts it, and
+// what holds while it runs. Advanced follows as its own card, folded.
 import {el, esc} from "../../lib/dom.mjs";
 import {NAME_MAX_BYTES} from "../../view/names.mjs";
 import {KIND, dpiOptions, readConfig, scrollStarter, settleTaps, startingRecord} from "../../view/pointing-config.mjs";
@@ -16,7 +16,7 @@ import {mark} from "../marks.mjs";
 import {attachTitleName, titleName} from "../title-name.mjs";
 import {formControls} from "./form-controls.mjs";
 import {movementChoice} from "./movement-choice.mjs";
-import {movement} from "./movement.mjs";
+import {heldModifiers, movement} from "./movement.mjs";
 import {lightRow, placeButton} from "./keys-and-light.mjs";
 import {placedOnMarkup, showPlacements} from "../keys/reach.mjs";
 import {startInfo, startStep} from "./link.mjs";
@@ -67,20 +67,24 @@ export function editor(model, slot, canEdit, slots) {
     attachTitleName(card, {stored: slot.name || "", perName: NAME_MAX_BYTES, rename: () => stage()});
 
     const steps = /** @type {HTMLElement} */ (card.querySelector(".pd-steps"));
-    /** @param {number} n @param {string} title @param {import("../info-mark.mjs").InfoContent} [info] */
-    const step = (n, title, info) => pdStep(steps, slot.id, n, title, {info});
+    // Steps number themselves in the order they are drawn: a scrolling
+    // mode's held modifiers add one, after How it scrolls.
+    let count = 0;
+    /** @param {string} title @param {import("../info-mark.mjs").InfoContent} [info] */
+    const step = (title, info) => pdStep(steps, slot.id, ++count, title, {info});
     const P = words(model);
-    step(1, "What the ball does").append(movementChoice(model, slot.id, kind, {disabled: !canEdit,
+    step("What the ball does").append(movementChoice(model, slot.id, kind, {disabled: !canEdit,
         // Switching movement only redraws the form for the other kind: its
         // fields start empty, so staging now would post an invalid record.
         // The slot is staged once a field of the new form is changed.
         pick: (picked) => { state.pdKind = {slot: slot.id, kind: picked}; render(); }}));
     // What a step's choices mean is its info mark, read once, not each
     // field's tip (D-L96).
-    step(2, scrolling ? "How it scrolls" : "What each direction sends", scrolling ? {rows: [{term: P.fieldLabels.scrollAxes, says: tipFor(model, "scrollAxes")}]} : {
+    step(scrolling ? "How it scrolls" : "What each direction sends", scrolling ? {rows: [{term: P.fieldLabels.scrollAxes, says: tipFor(model, "scrollAxes")}]} : {
         rows: [{term: P.fieldLabels.axis, says: tipFor(model, "axis")}], parts: [choicesPart(model, "emptyDirection", P.fieldLabels.emptyDirection), sendsPart(model)]})
         .append(movement(model, slot, scrolling, controls, stage));
-    step(3, "What starts it", startInfo(model, slot)).append(startStep(model, slot, controls, stage));
+    if (scrolling) step("Modifiers it holds down during scrolling", {lead: tipFor(model, "heldModifiers")}).append(heldModifiers(model, slot, controls));
+    step("What starts it", startInfo(model, slot)).append(startStep(model, slot, controls, stage));
     // The same four columns step 2 lays its fields in.
     const runs = el(`<div class="pd-cols"></div>`);
     const pointerLayer = controls.choice(P.pointerLayerLabel, P.pointerLayer, slot.pointerLayer, "pointerLayer");
@@ -88,7 +92,7 @@ export function editor(model, slot, canEdit, slots) {
     runs.append(controls.choice(P.fieldLabels.dpi, dpiOptions(model.pdModeEditing?.dpiChoices, slot.dpi), slot.dpi ?? 0, "dpi",
         {tip: `${tipFor(model, "dpi")} Normal pointer speed keeps the DPI set in ${sectionPath(model, "normalPointerSpeed")}.`}),
     lightRow(model, slot), pointerLayer);
-    step(4, "While it runs", {parts: [choicesPart(model, "pointerLayer", P.pointerLayerLabel)]}).append(runs);
+    step("While it runs", {parts: [choicesPart(model, "pointerLayer", P.pointerLayerLabel)]}).append(runs);
     wrap.append(card, advancedControls(model, slot, scrolling, controls));
 
     wrap.addEventListener("change", (event) => {
