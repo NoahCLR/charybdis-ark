@@ -1,6 +1,6 @@
 // @ts-check
 // Each half's flash pauses (GET 0x0D, `model.device.flashPauses`) as the
-// Keyboard screen's Diagnostics shows them: a column per half, the master
+// About screen's Diagnostics shows them: a column per half, the master
 // half then the slave half with the side each reports, every pause in the
 // unit that suits it and its exact microseconds in its tip. A half that
 // reports no figures yet is "not measured yet", never zeros.

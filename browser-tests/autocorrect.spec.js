@@ -971,9 +971,9 @@ test("with no replacements the editor's place says where they start, and offers 
     await expect(page.locator("[data-ac-empty]")).toHaveCount(0);
 });
 
-// ── memory, on the Keyboard screen ──────────────────────────────────────
+// ── memory, on the About screen ──────────────────────────────────────
 
-test("the Keyboard screen's Memory panel counts the inputs of text replacements and shows their memory", async ({page}) => {
+test("the About screen's Memory panel counts the inputs of text replacements and shows their memory", async ({page}) => {
     await openControls(page, "device");
     const usage = page.locator(".card.usage");
     const counted = usage.locator(".usage-counts tbody tr").filter({hasText: "Text replacement inputs"});

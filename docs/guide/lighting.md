@@ -402,6 +402,6 @@ different LED sets across every stage (Ark uses whatever the connected
 keyboard reports): accents that light the same LEDs share one set, and a set no accent
 lights any more is freed. Each list shows how many the keyboard uses, **On
 the keyboard** (also **Accents** and **LED sets** under **Memory** on the
-Keyboard screen). Adding one more is
+About screen). Adding one more is
 refused in the draft, saying which is full, before the keyboard sees it;
 remove one first.

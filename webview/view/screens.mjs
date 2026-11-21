@@ -91,8 +91,8 @@ export const SCREENS = Object.freeze({
         unavailable: {title: "Backups unavailable", detail: "Connect a keyboard with complete-profile firmware, then read it to manage backups."},
     }),
     device: screen({
-        label: "Keyboard", group: "Keyboard", keepOnPublish: false,
-        secondaryLabel: "Keyboard",
+        label: "About", group: "Keyboard", keepOnPublish: false,
+        secondaryLabel: "About",
         icon: '<svg viewBox="0 0 16 16"><rect x="2.5" y="2.5" width="11" height="11" rx="2.5"/><path d="M6 6.5h4v3H6z"/></svg>',
         available: model => Boolean(model.device?.connected || model.demo?.active), render: renderers => renderers.screenDevice(),
         unavailable: {title: "Keyboard status unavailable", detail: "Read the keyboard to see its firmware, its halves and how full it is."},
@@ -131,7 +131,7 @@ export function screenGroups() {
 }
 
 // Unavailable Configure and Settings screens offer the first available
-// keyboard surface; Backups precedes the Keyboard screen, in the same order as
+// keyboard surface; Backups precedes the About screen, in the same order as
 // the rail.
 /** @param {StatusModel | null | undefined} model @param {unknown} current */
 export function secondaryScreen(model, current) {

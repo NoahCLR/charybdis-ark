@@ -71,7 +71,7 @@ export const usageWords = (usage) => `${n(usage.typos)} of ${n(usage.maxTypos)} 
 
 // The list's text of the text the keyboard holds for it, and what it can
 // still grow by, as Macro memory says its own. How full its meter is drawn is
-// core's too (`usage.share`), the same figure the Keyboard screen's Memory
+// core's too (`usage.share`), the same figure the About screen's Memory
 // panel draws.
 /** @param {View["usage"]} usage */
 export const bytesWords = (usage) => `${n(usage.textBytes)} of ${n(usage.maxTextBytes)} bytes of text used`;

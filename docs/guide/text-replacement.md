@@ -475,7 +475,7 @@ used of the 20,480, with a bar, how many are free, and your replacements and
 inputs. Whichever limit is met first refuses the next edit.
 
 The list is stored with the rest of the profile; the
-[Keyboard screen](connecting.md#the-keyboard-screen)'s **Memory** panel
+[About screen](connecting.md#the-about-screen)'s **Memory** panel
 shows **Text replacement inputs** among the counts and **Text replacement
 memory** after Macro memory, its bar as full as the one here.
 
