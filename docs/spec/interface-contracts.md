@@ -250,10 +250,15 @@ The same kind of control looks and sits the same on every screen.
   (`ON_SCREEN_MAX_OPTIONS`, `ON_SCREEN_MAX_CHARACTERS`: 60 characters) shows them on screen, as one segmented radio group
   (`webview/ui/segmented.mjs`), so each is read without opening anything and
   picked in one click; more options, or longer ones, stay a menu
-  (`onScreenChoice`, `webview/view/choices.mjs`). Every such choice is drawn
-  by `choiceField`, which applies the rule, and read by `choiceValue`,
-  whichever it became (`tests/view/choices.test.mjs`,
-  `browser-tests/consistency.spec.js`). A stored value that is none of a
+  (`onScreenChoice`, `webview/view/choices.mjs`). Every such choice in words
+  is drawn by `choiceField`, which applies the rule, and read by
+  `choiceValue`, whichever it became (`tests/view/choices.test.mjs`,
+  `browser-tests/consistency.spec.js`). A screen may draw one by hand where it
+  needs another look, as shapes or as radio buttons one under another, and
+  keeps the rule's promises: every option on show in a radio group named by
+  its label, each option's form identity its field's then its value, and a
+  stored value shown "as stored" (D-L107; a pointing mode's Reads and When a
+  direction has no key, [Pointing mode editor](#pointing-mode-editor)). A stored value that is none of a
   choice's options, a setting's or a pointing mode's, shows as one more option,
   "as stored", so a form read back whole sends it unchanged
   (`storedChoices`, `webview/view/choices.mjs`). A choice on show is never
@@ -1774,8 +1779,8 @@ escaped payload (D-L26), in `webview/ui/macros/`.
 ## Pointing mode editor
 
 A configured mode's editor (`webview/ui/pointing/editor.mjs`) is one card
-titled by the mode's name, with Place on a key →, Duplicate and Clear mode
-beside it, and four numbered steps read top to bottom; Advanced follows as its
+titled by the mode's name, with Place on a key → and Clear pointing mode
+beside it (a copy is made from an empty slot, Or copy a mode), and four numbered steps read top to bottom; Advanced follows as its
 own folded card (`browser-tests/pointing-controls.spec.js`).
 
 1. **What the ball does**: Scroll or Send keys, a radio group of two large
@@ -1789,10 +1794,24 @@ own folded card (`browser-tests/pointing-controls.spec.js`).
 2. **What each direction sends** draws each direction the mode reads as a key
    placed where the ball sends it, around the ball (four, or eight with the
    diagonals); a click opens the picker on the keys a pointing mode sends, ×
-   clears it, and a macro's notes sit under its key. Reads sits above them,
-   When a direction has no key and How often it sends below, each a
-   segmented choice (`webview/ui/segmented.mjs`); that a direction can also
-   click a mouse button or play a macro is an empty key's tip. **How it
+   clears it; a macro's key carries no notes under it. Its options stand in
+   a column beside the compass (above it on a card under 720px,
+   `.pd-direction-options`), and the ball's centre stays put whichever
+   directions the mode reads: a straight direction one axis leaves out
+   keeps its place as an unseen, inert arm drawn as its key would be, the
+   rows above and below the ball share one height, every shape has the same columns, both columns start at the top,
+   and the options column keeps the widest shape name's width. Drawn by
+   hand as D-L107 allows, Reads a radio group of shapes, each drawing
+   the directions it reads, in the vocabulary's order (all eight, the four
+   straight ones, then one axis), each named by its radio's label, the
+   picked one's name beside them and the others named by their tips, a
+   stored axis none of them "as stored" in words; When a direction has no
+   key, radio buttons each named in full (`.pd-radios`); and how often it
+   sends, a switch, Send only once per movement: on stores once per
+   movement, off every step, and the step's info mark says each as On or
+   Off (`switchState`) with the words Review names it by (`sendsPart`,
+   `webview/ui/pointing/common.mjs`). That a direction can also click a
+   mouse button or play a macro is an empty key's tip. **How it
    scrolls** lays its fields in four columns (`.pd-cols`, two on a narrow
    card): which way (Scrolls, a segmented choice; Reverse scrolling, a
    switch per axis named as the vocabulary names each bit, the record's two
@@ -1803,7 +1822,7 @@ own folded card (`browser-tests/pointing-controls.spec.js`).
    Every setting, Reverse scrolling and the held modifiers included, says what it does once (D-L96): as its field's tip,
    or in the info mark beside its step's title or its Advanced section's (Distance, Scroll tuning), by its name or by
    each of its choices' words, with no tip saying it again. A step's choices (When a direction has no key, How often it
-   sends, Scrolls, Ends when, Pointer layer) are explained there, each in a part headed by the field's label, or a row; the line under a
+   sends, Reads, Scrolls, Ends when, Pointer layer) are explained there, each in a part headed by the field's label, or a row; the line under a
    Distance field is its value alone. The words come from `vocabulary.pointing.tips`, keyed by the field it sets (as
    the firmware runs it), and `vocabulary.pointing.choicesMean`, keyed by the value a choice stores, every choice and
    only those (`tests/model/vocabulary.test.js`)

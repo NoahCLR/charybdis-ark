@@ -132,14 +132,17 @@ test("directional shortcuts, axes, empty directions, output and thresholds all p
         await pickDirection(page, direction, "KC_A");
         await configPost(page, 4, {directions: expect.objectContaining({[direction]: expect.objectContaining({keycode: "KC_A"})})});
     }
-    for (const [label, value, expected] of [
-        ["When a direction has no key", "2", {emptyDirection: 2}],
-        ["How often it sends", "1", {directionOutput: 1}],
-    ]) {
-        await clearPosts(page);
-        await choose(page, label, value);
-        await configPost(page, 4, expected);
-    }
+    // What a direction with no key does is radio buttons, each named in full.
+    await clearPosts(page);
+    const empty = editor(page).getByRole("radiogroup", {name: "When a direction has no key"});
+    await expect(empty.getByRole("radio")).toHaveCount(3);
+    await expect(empty.getByRole("radio", {name: "The nearest direction takes over"})).toBeChecked();
+    await empty.getByText("Nothing", {exact: true}).click();
+    await configPost(page, 4, {emptyDirection: 2});
+    // How often it sends is a switch: on sends once per movement.
+    await clearPosts(page);
+    await editor(page).locator('label.sw:has([data-f="pointing:4:directionOutput"])').click();
+    await configPost(page, 4, {directionOutput: 1});
     await advanced(page);
     for (const [axis, key] of [["Horizontal", "thresholdX"], ["Vertical", "thresholdY"]]) {
         await clearPosts(page);
@@ -153,6 +156,74 @@ test("directional shortcuts, axes, empty directions, output and thresholds all p
     await choose(page, "Reads", "0");
     await configPost(page, 4, {axis: 0, thresholdX: 0,
         directions: expect.objectContaining({left: {keycode: "0", modifierPolicy: 0, mask: 0}, right: {keycode: "0", modifierPolicy: 0, mask: 0}})});
+});
+
+// A directional mode's options stand in a column beside the compass: which
+// directions it reads, a row of shapes, all eight first, the picked one
+// named beside them and the others by their tips; what a direction with no
+// key does; and how often it sends, a switch, on for once per movement.
+test("a directional mode's options stand beside the compass: shapes, empty direction, then a switch", async ({page}) => {
+    // Wide enough for the column beside the compass; a narrower card stacks them.
+    await page.setViewportSize({width: 1440, height: 1000});
+    await openControls(page, "pointing", {pointingSlot: 4});
+    const reads = editor(page).getByRole("radiogroup", {name: "Reads"});
+    await expect(reads.getByRole("radio")).toHaveCount(4);
+    const tips = () => reads.locator("label").evaluateAll(labels => labels.map(label => label.getAttribute("data-tip")));
+    expect(await reads.getByRole("radio").evaluateAll(radios => radios.map(radio => radio.getAttribute("aria-label"))))
+        .toEqual(["Eight directions", "Dominant axis", "Vertical only", "Horizontal only"]);
+    expect(await tips()).toEqual(["Eight directions", null, "Vertical only", "Horizontal only"]);
+    await expect(reads.getByRole("radio", {name: "Dominant axis"})).toBeChecked();
+    await expect(editor(page).locator(".pd-shape-name > :not([data-off])")).toHaveText("Dominant axis");
+    const box = async (locator) => (await locator.boundingBox()) || {x: 0, y: 0, width: 0, height: 0};
+    const options = editor(page).locator(".pd-direction-options");
+    const column = await box(options), compass = await box(editor(page).locator(".pd-compass"));
+    expect(column.x + column.width).toBeLessThan(compass.x);
+    expect(await options.locator(":scope > .field").evaluateAll(fields => fields.map(field => field.querySelector(":scope > span, .sw .txt")?.textContent?.trim())))
+        .toEqual(["Reads", "When a direction has no key", "Send only once per movement"]);
+    await reads.locator("label").filter({has: page.locator('input[value="0"]')}).click();
+    await expect(editor(page).locator(".pd-shape-name > :not([data-off])")).toHaveText("Vertical only");
+    expect(await tips()).toEqual(["Eight directions", "Dominant axis", null, "Horizontal only"]);
+    const sends = editor(page).getByRole("checkbox", {name: "Send only once per movement"});
+    await expect(sends).not.toBeChecked();
+});
+
+// The ball's centre stays put whichever directions the mode reads, with or
+// without macros on its keys, beside the options or under them.
+test("the ball stays put whichever directions a mode reads", async ({page}) => {
+    const box = async (locator) => (await locator.boundingBox()) || {x: 0, y: 0, width: 0, height: 0};
+    for (const [width, macros] of [[1440, false], [1440, true], [1920, true], [950, true]]) {
+        await page.setViewportSize({width, height: 1200});
+        await openControls(page, "pointing", {pointingSlot: 4});
+        const centres = [];
+        for (const axis of [3, 2, 0, 1]) {
+            await page.evaluate(async ({axis, macros}) => {
+                const store = await import("/webview/store.mjs");
+                const model = structuredClone(store.getModel());
+                model.pdModes[4].axis = axis;
+                if (macros) for (const direction of ["left", "down"]) model.pdModes[4].directions[direction].keycode = 0x7700;
+                store.setModel(model); store.render();
+            }, {axis, macros});
+            const ball = await box(editor(page).locator(".pd-ball"));
+            centres.push([Math.round(ball.x + ball.width / 2), Math.round(ball.y + ball.height / 2)]);
+        }
+        expect(new Set(centres.map(String)).size, `${width}px${macros ? " with macros" : ""}: ${JSON.stringify(centres)}`).toBe(1);
+    }
+});
+
+// A stored axis that is none of the shapes shows as one more option, in
+// words, so the form read back whole sends it unchanged.
+test("a stored axis that is none of the shapes shows as stored", async ({page}) => {
+    await openControls(page, "pointing", {pointingSlot: 4});
+    await page.evaluate(async () => {
+        const store = await import("/webview/store.mjs");
+        const model = structuredClone(store.getModel());
+        model.pdModes[4].axis = 7;
+        store.setModel(model); store.render();
+    });
+    const reads = editor(page).getByRole("radiogroup", {name: "Reads"});
+    await expect(reads.getByRole("radio")).toHaveCount(5);
+    await expect(reads.getByRole("radio", {name: "7 · as stored"})).toBeChecked();
+    await expect(reads.locator("label").first()).toHaveText("7 · as stored");
 });
 
 test("eight directions draw and post every diagonal shortcut and modifier policy", async ({page}) => {
@@ -231,7 +302,7 @@ test("movement changes its form locally, and the first edit posts the new kind",
     await configPost(page, 0, {kind: 1, name: "Directional sentinel", thresholdY: 60});
 });
 
-test("shortcut picker, duplicate, clear and empty-slot creation post their commands", async ({page}) => {
+test("shortcut picker, clear and empty-slot creation post their commands", async ({page}) => {
     await openControls(page, "pointing", {pointingSlot: 4});
     await pickDirection(page, "up", "KC_A");
     await configPost(page, 4, {directions: expect.objectContaining({up: expect.objectContaining({keycode: expect.stringContaining("KC_A")})})});
@@ -239,10 +310,10 @@ test("shortcut picker, duplicate, clear and empty-slot creation post their comma
     await clearPosts(page);
     await editor(page).locator(".pd-arm.down .pd-key-clear").click();
     await configPost(page, 4, {directions: expect.objectContaining({down: {keycode: "0", modifierPolicy: 0, mask: 0}})});
-    await clearPosts(page);
-    await editor(page).locator('[data-act="duplicate"]').click();
-    await expectPost(page, {type: "duplicatePdMode", slot: 6, source: 4});
-    await page.locator('[data-slot="4"]').click();
+    // A mode's title bar offers no Duplicate (a copy is made from an empty
+    // slot), and Clear pointing mode empties the slot.
+    await expect(editor(page).locator('[data-act="duplicate"]')).toHaveCount(0);
+    await expect(editor(page).locator('[data-act="clear"]')).toHaveText("Clear pointing mode");
     await clearPosts(page);
     await editor(page).locator('[data-act="clear"]').click();
     await expectPost(page, {type: "clearPdMode", slot: 4});
@@ -440,9 +511,10 @@ test("every setting in a mode says what it does once, under Advanced too", async
         // field, in the line under it, or in the info mark of its step or
         // Advanced section, by its name or each of its choices' words.
         const said = await editor(page).locator(".field").evaluateAll(fields => fields
-            .filter(field => field.querySelector("input.input, .seg, .pd-switches, .pd-mods") && !field.closest(".pd-taps"))
+            .filter(field => field.querySelector("input.input, .seg, .pd-switches, .pd-radios, .pd-mods") && !field.closest(".pd-taps"))
             .map(field => {
-                const name = field.querySelector("span")?.textContent?.trim() || "";
+                // A field's label heads it; a switch alone is named by its words.
+                const name = (field.querySelector(":scope > span") || field.querySelector(".sw .txt"))?.textContent?.trim() || "";
                 const info = field.closest(".pd-step, .pd-sect")?.querySelector(".info-pop");
                 const terms = [...(info?.querySelectorAll("dt, .info-part") || [])].map(term => term.textContent?.trim());
                 const choices = [...field.querySelectorAll(".seg label > span")].map(choice => choice.textContent?.trim());
@@ -468,9 +540,10 @@ test("a step's info mark says what each of its choices does, and a press keeps i
     await openControls(page, "pointing", {pointingSlot: 4});
     const step = editor(page).locator(".pd-step").nth(1);
     const mark = step.locator(".pd-step-h .info-mark");
-    await expect(mark.locator(".info-part")).toHaveText(["When a direction has no key", "How often it sends"]);
-    await expect(mark.locator("dt")).toHaveText(["Its neighbours take over", "Send both neighbours", "Nothing", "Every step", "Once per movement"]);
-    await expect(step.locator('.seg[aria-label="How often it sends"]')).not.toHaveAttribute("data-tip", /./);
+    await expect(mark.locator(".info-part")).toHaveText(["When a direction has no key", "Send only once per movement"]);
+    await expect(mark.locator("dt")).toHaveText(["Reads", "The nearest direction takes over", "Send both neighbours", "Nothing", "On · Once per movement", "Off · Every step"]);
+    await expect(step.locator('.pd-radios[aria-label="When a direction has no key"]')).not.toHaveAttribute("data-tip", /./);
+    await expect(step.locator('.seg[aria-label="Reads"]')).not.toHaveAttribute("data-tip", /./);
     await mark.locator(".info-button").click();
     await expect(mark.locator(".info-pop")).toBeVisible();
     await page.mouse.move(0, 0);

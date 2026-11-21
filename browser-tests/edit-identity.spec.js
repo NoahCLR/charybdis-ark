@@ -156,8 +156,6 @@ const forms = [
         commit: page => change(page.locator('[data-f="pointing:0:name"]'), "Trackball"), type: "savePdMode", names: "base"},
     {name: "pointing mode cleared", screen: "pointing", state: {pointingSlot: 0}, shown: '[data-f="pointing:0:name"]',
         commit: page => page.locator('[data-act="clear"]').click(), type: "clearPdMode", names: "base"},
-    {name: "pointing mode duplicated", screen: "pointing", state: {pointingSlot: 0}, shown: '[data-f="pointing:0:name"]',
-        commit: page => page.locator('[data-act="duplicate"]').click(), type: "duplicatePdMode", names: "base"},
     {name: "new pointing mode", screen: "pointing", state: {pointingSlot: 20}, shown: '[data-f="pointing:20:copy"]',
         commit: page => page.locator(".pd-kind").first().click(), type: "savePdMode", names: "base"},
     {name: "pointing mode copied into an empty slot", screen: "pointing", state: {pointingSlot: 20}, shown: '[data-f="pointing:20:copy"]',

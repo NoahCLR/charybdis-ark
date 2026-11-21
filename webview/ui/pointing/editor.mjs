@@ -1,6 +1,7 @@
 // @ts-check
 // A configured pointing mode's editor: one card titled by the mode's name,
-// clicked to rename as Macros and Custom keys are, its actions beside it, and
+// clicked to rename as Macros and Custom keys are, its actions beside it (Place
+// on a key → and Clear pointing mode; a copy is made from an empty slot), and
 // four numbered steps read top to bottom — what the ball does, what it sends
 // or how it scrolls, what starts it, and what holds while it runs. Advanced
 // follows as its own card, folded.
@@ -21,7 +22,7 @@ import {placedOnMarkup, showPlacements} from "../keys/reach.mjs";
 import {startInfo, startStep} from "./link.mjs";
 import {advancedControls} from "./advanced.mjs";
 import {step as pdStep} from "./step.mjs";
-import {choicesPart, tipFor, words} from "./common.mjs";
+import {choicesPart, sendsPart, tipFor, words} from "./common.mjs";
 
 /** @param {import("../../../contracts/panel.js").PublishedModel} model @param {import("../surface-types.js").PresentedSlot} slot @param {boolean} canEdit @param {import("../surface-types.js").PresentedSlot[]} slots */
 export function editor(model, slot, canEdit, slots) {
@@ -47,17 +48,14 @@ export function editor(model, slot, canEdit, slots) {
     };
 
     const wrap = el(`<div class="pd-editor stack" data-pd-editor="${esc(slot.id)}"></div>`);
-    const empties = slots.some((candidate) => !candidate.kind);
     const card = el(`<div class="card">
         <div class="card-h name-titlebar"><span class="mark-lg">${mark(model, {kind: "pointing", slot: slot.id})}</span>
             ${titleName({f: `pointing:${slot.id}:name`, value: slot.name || "", placeholder: slot.defaultName,
                 label: words(model).fieldLabels.name, perName: NAME_MAX_BYTES, canEdit})}
             <span class="tag">${esc(slot.defaultName)}</span>
             <span class="right row actions">
-                ${empties ? `<button class="btn tiny ghost" data-act="duplicate" ${canEdit ? "" : "disabled"}
-                    data-tip="Copy this mode into the first empty slot.">Duplicate</button>` : ""}
                 <button class="btn tiny ghost destructive" data-act="clear" ${canEdit ? "" : "disabled"}
-                    data-tip="Empty this slot. Keys bound to it stay on the board and do nothing until it holds a mode again.">Clear mode</button>
+                    data-tip="Empty this slot. Keys bound to it stay on the board and do nothing until it holds a mode again.">Clear pointing mode</button>
             </span></div>
         <div class="card-b pd-steps"><div class="slot-context">${placedOnMarkup(model, "pointing", String(slot.id),
             "No key, behaviour, combo or layer starts this mode. Place it on a key to use it.")}</div></div></div>`);
@@ -79,8 +77,8 @@ export function editor(model, slot, canEdit, slots) {
         pick: (picked) => { state.pdKind = {slot: slot.id, kind: picked}; render(); }}));
     // What a step's choices mean is its info mark, read once, not each
     // field's tip (D-L96).
-    step(2, scrolling ? "How it scrolls" : "What each direction sends", scrolling ? {rows: [{term: P.fieldLabels.scrollAxes, says: tipFor(model, "scrollAxes")}]} : {parts: [
-        choicesPart(model, "emptyDirection", P.fieldLabels.emptyDirection), choicesPart(model, "directionOutput", P.fieldLabels.directionOutput)]})
+    step(2, scrolling ? "How it scrolls" : "What each direction sends", scrolling ? {rows: [{term: P.fieldLabels.scrollAxes, says: tipFor(model, "scrollAxes")}]} : {
+        rows: [{term: P.fieldLabels.axis, says: tipFor(model, "axis")}], parts: [choicesPart(model, "emptyDirection", P.fieldLabels.emptyDirection), sendsPart(model)]})
         .append(movement(model, slot, scrolling, controls, stage));
     step(3, "What starts it", startInfo(model, slot)).append(startStep(model, slot, controls, stage));
     // The same four columns step 2 lays its fields in.
@@ -102,12 +100,6 @@ export function editor(model, slot, canEdit, slots) {
         state.pdKind = null;
         state.pdTaps = null;
         post(edits.clearPdMode(slot.id, model.profileIdentity));
-    });
-    /** @type {HTMLButtonElement | null} */ (card.querySelector('[data-act="duplicate"]'))?.addEventListener("click", () => {
-        const target = slots.find((candidate) => !candidate.kind);
-        if (!target) return;
-        state.pointingSlot = target.id;
-        post(edits.duplicatePdMode(target.id, slot.id, model.profileIdentity));
     });
     return wrap;
 }
