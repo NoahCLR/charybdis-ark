@@ -3,8 +3,10 @@
 // on show, as a radio group of segmented buttons, so each is read without
 // opening anything and picked in one click (the arrow keys move between
 // them, as in any radio group); a longer list as a select menu. Every choice
-// that might be either is drawn by choiceField, so none can skip the rule,
-// and read by choiceValue, whichever it became. A segmented option carries
+// in words that might be either is drawn by choiceField, so none can skip
+// the rule, and read by choiceValue, whichever it became. A screen that
+// draws one by hand, as shapes or radio buttons, keeps every option on show
+// (D-L107). A segmented option carries
 // its own form identity, `f` then its value; a menu carries `f`.
 import {esc} from "../lib/dom.mjs";
 import {onScreenChoice} from "../view/choices.mjs";

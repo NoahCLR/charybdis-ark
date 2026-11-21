@@ -246,6 +246,10 @@ export interface Vocabulary {
         movementLabel: string;
         scrollFields: WordList<string>;
         heldModifiers: string;
+        /** The directional editor's switch for how often it sends: on is once per movement, off every step. */
+        sendsOnce: string;
+        /** A switch's two states, as an info mark names them. */
+        switchState: Readonly<Record<'on' | 'off', string>>;
         tips: Readonly<Record<string, string>>;
         /** What each choice of a step does, by the value it stores, read once in its step's info mark; `lead` holds whichever is chosen. */
         choicesMean: Readonly<Record<PointingChoice, {lead?: string; rows: WordList<number>}>>;

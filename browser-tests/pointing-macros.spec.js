@@ -46,16 +46,15 @@ for (const theme of ["dark", "light"]) {
                 .toEqual({keycode: `MACRO_${macro}`, modifierPolicy: 0, mask: 0});
             await expect(page.locator(`.pd-arm.${name} .pd-key`)).toHaveText(macro === 0 ? "Greeting <&>" : "Macro 127");
         }
-        await expect(page.locator(".pd-compass")).toContainText("Empty macro: does nothing yet");
-        await expect(page.locator(".pd-compass")).toContainText("Busy triggers are dropped");
+        // A macro's key carries no notes under it.
+        await expect(page.locator(".pd-compass .note")).toHaveCount(0);
         await expect(page.locator('[data-f="pointing:4:dirPolicy:left"]')).toHaveCount(0);
         await expect(page.locator('[data-f="pointing:4:diagPolicy:upLeft"]')).toHaveCount(0);
         await expect(page.locator(".pd-taps")).toContainText("The macro continues after its trigger");
 
         await clearPosts(page);
-        await page.locator('label:has([data-f="pointing:4:directionOutput:1"])').click();
+        await page.locator('label:has([data-f="pointing:4:directionOutput"])').click();
         await stagePosts();
-        await expect(page.locator(".pd-compass")).not.toContainText("Busy triggers are dropped");
         expect(validateSnapshot(draft.document).pdModes[4].directions.left.keycode).toBe(0x7700);
     });
 }

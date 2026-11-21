@@ -71,8 +71,9 @@ locks from an empty Tap.
 The mode's name is the editor's title: click it to rename, up to 32 bytes
 (an accented letter takes two). The tag beside it names the slot, such as
 **Pointing mode 0**, which is also what the mode is called until you name it. **Place on a key →** beside it puts the
-mode's hold key on a key you pick on the board. **Duplicate** copies the mode
-into the first empty slot, and **Clear mode** empties the slot.
+mode's hold key on a key you pick on the board, and **Clear pointing mode**
+empties the slot. To copy a mode, open an empty slot and pick it under **Or
+copy a mode**.
 
 Under the title, chips name the layers that start the mode and how: a key, a
 behaviour, a combo, or the layer itself when the mode is linked to it
@@ -104,27 +105,36 @@ movement; nothing is saved to your draft until you change one of its settings.
 
 For a mode that sends keys, each direction it reads is a key drawn where the
 ball sends it, around the ball. Click a key to pick another; hover it and
-click **×** to clear it. A direction with no key shows **+ Key**.
+click **×** to clear it. A direction with no key shows **+ Key**. Its options
+stand in a column beside the ball (above it in a narrow window):
 
-- **Reads**: **Dominant axis**, **Eight directions** (adds the diagonals),
-  **Vertical only** or **Horizontal only**.
+- **Reads**: a row of shapes, each a drawing of the directions it
+  reads: **Eight directions** (adds the diagonals), **Dominant axis** (the
+  four straight ones), **Vertical only** and **Horizontal only**. Hover one
+  for its name; the one picked is named beside them.
 - The picker offers only what a pointing mode can send, and its search finds
   a key by its QMK name or alias too. A key shows as the picker names it:
   "Mouse Button 3", a macro by its name. A stored keycode QMK has no name for
   shows as its hex value, such as `0x1004`, and saves back unchanged.
-- **When a direction has no key**: its neighbours take over, send both
-  neighbours (eight directions only), or nothing.
-- **How often it sends**: **Every step** sends again each time the ball moves
-  a threshold further. **Once per movement** sends once, however far the ball
-  goes, and again when it moves back the other way or after a short pause.
+- **When a direction has no key**: **The nearest direction takes over**
+  sends the one direction with a key nearest the way the ball leans, never
+  two, so moving straight at the empty direction sends little or nothing.
+  **Send both neighbours** sends the two directions either side of it (eight
+  directions only; elsewhere the nearest direction takes over). **Nothing**
+  sends nothing.
+- **Send only once per movement**: on, a direction sends once, however far the
+  ball goes, and again when it moves back the other way or after a short
+  pause (**Once per movement**). Off, it sends again each time the ball moves
+  a threshold further (**Every step**). Review names it by those words,
+  under **How often it sends**.
 
 A direction can also click a mouse button, **Mouse Button 1** to **8**, or play
 a macro. Both are in the picker. It can't move the pointer, scroll, or change
 layers or modes.
 
 The keyboard plays one macro at a time, and a trigger while one is playing is
-dropped; the key says so under it. For a longer macro, **Once per movement**
-is usually the better fit.
+dropped. For a longer macro, turning on **Send only once per movement** is
+usually the better fit.
 
 ### 2. How it scrolls
 
@@ -213,8 +223,9 @@ asks before sending the edit that makes it. Leave the lock key showing
 through (transparent) on those layers, or put the mode's lock or hold key on
 them.
 
-**Duplicate** copies the layers a mode's key turns on, but not the layers
-that start it, since a layer starts only one mode; set those on the copy.
+A copy (**Or copy a mode**) takes the layers a mode's key turns on, but not
+the layers that start it, since a layer starts only one mode; set those on
+the copy.
 
 ### 4. While it runs
 

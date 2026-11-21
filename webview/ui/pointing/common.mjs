@@ -16,6 +16,15 @@ export const choicesPart = (model, key, heading) => {
     const means = words(model).choicesMean[key];
     return {heading, lead: means.lead, rows: means.rows.map(([value, says]) => ({term: word(words(model)[key], value), says}))};
 };
+// How often a directional mode sends, as its switch says it: on and off,
+// each with the words Review names it by (directionOutput) and what it does.
+/** @param {import("../../../contracts/panel.js").PublishedModel | null} model */
+export const sendsPart = (model) => {
+    const P = words(model), means = P.choicesMean.directionOutput;
+    /** @param {string} state @param {number} value */
+    const row = (state, value) => ({term: `${state} · ${word(P.directionOutput, value)}`, says: word(means.rows, value)});
+    return {heading: P.sendsOnce, rows: [row(P.switchState.on, 1), row(P.switchState.off, 0)]};
+};
 // A scroll field's label; a field that shows its unit beside it drops the
 // "(ms)" its label carries elsewhere.
 /** @param {import("../../../contracts/panel.js").PublishedModel | null} model @param {string} key @param {string} [unit] */
