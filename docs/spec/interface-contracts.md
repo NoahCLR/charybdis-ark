@@ -1541,8 +1541,8 @@ Import checks one, under the capabilities current firmware reports
 `tests/data/demo-profile.test.js`).
 
 - The editing gates hold unchanged; `model.device` says Demo with no
-  connection and a strip says the demo is open
-  (`tests/view/demo-view.test.mjs`).
+  connection and a strip says the demo is open and links the firmware
+  releases (`tests/view/demo-view.test.mjs`).
 - Core refuses Apply and reviewing against a keyboard; Export saves the draft.
   Leaving the demo with unexported edits needs `discardDemo`. The demo is
   offered only with no keyboard connected and no unsaved keyboard draft
