@@ -2,9 +2,9 @@
 
 Domain `0x80`, version 2, holds the profile's autocorrect list: what the
 keyboard replaces as it is typed, and with what (D-F68,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/e8b9ccdf94ae657c6c9933594f080bdf2f954629/docs/adr/0068-the-autocorrect-list-is-a-readable-profile-domain.md)),
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/746f8b4ca0a5d8d5fa53c3c1db0bca523755e767/docs/adr/0068-the-autocorrect-list-is-a-readable-profile-domain.md)),
 and what the leader sends (D-F71,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/e8b9ccdf94ae657c6c9933594f080bdf2f954629/docs/adr/0071-the-leader-is-part-of-the-typing-stage.md)). It holds the
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/746f8b4ca0a5d8d5fa53c3c1db0bca523755e767/docs/adr/0071-the-leader-is-part-of-the-typing-stage.md)). It holds the
 entries as they are written, not a compiled tree. An **entry** is one
 **replacement**, stored once, with how it **fires**, as a word ends, after
 the leader or both, and every **typed form** that produces it; each typed
@@ -140,7 +140,7 @@ Held by: `tests/host/run_profile_autocorrect_v1_tests.sh` (`build.py --check`; `
 ## Ceilings
 
 Counted, and all held at once (D-F14,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/e8b9ccdf94ae657c6c9933594f080bdf2f954629/docs/adr/0014-bigger-profiles.md)):
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/746f8b4ca0a5d8d5fa53c3c1db0bca523755e767/docs/adr/0014-bigger-profiles.md)):
 
 | Ceiling | Value |
 | --- | ---: |
@@ -218,7 +218,7 @@ Held by: `tests/host/run_profile_autocorrect_v1_tests.sh` (`profile_autocorrect_
 
 The keyboard reads the list where it lies, in the active profile: a saved
 slot in flash or the working copy in RAM (D-F54,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/e8b9ccdf94ae657c6c9933594f080bdf2f954629/docs/adr/0054-callbacks-never-write-flash.md)).
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/746f8b4ca0a5d8d5fa53c3c1db0bca523755e767/docs/adr/0054-callbacks-never-write-flash.md)).
 It keeps the list's range and its five counts, and no index or copy of the
 list in RAM. A newly active profile, a live edit included, replaces the range.
 
@@ -253,7 +253,7 @@ the whole word, neither for anywhere; `:typo: => N` plays macro slot `N`;
 a line that begins `leader ` fires only after the Leader key, its typo typed
 whole and so without colons, and one that begins `both ` fires both ways; the
 lines naming one replacement fire one way;
-[authoring](https://github.com/NoahCLR/charybdis-4x6/blob/e8b9ccdf94ae657c6c9933594f080bdf2f954629/docs/guide/authoring.md#the-autocorrect-list)).
+[authoring](https://github.com/NoahCLR/charybdis-4x6/blob/746f8b4ca0a5d8d5fa53c3c1db0bca523755e767/docs/guide/authoring.md#the-autocorrect-list)).
 `tools/autocorrect/build.py --write-authored` encodes it into
 `authored_autocorrect_list.h`, which the compiled defaults copy;
 real-profile validation refuses a header the list no longer encodes to. An
