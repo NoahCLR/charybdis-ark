@@ -272,7 +272,8 @@ function settingsSections(snapshot, settings) {
     const macos = host.effective === MACOS;
     // How Unicode playback types on each system, said on its switch; macOS
     // has none, since there Unicode entry is the Unicode Hex Input layout.
-    const setup = ["", "", "Needs WinCompose running, with Right Alt as Compose.", "Types Ctrl+Shift+U and hex digits, which not every app accepts."][host.effective];
+    // Windows needs a compose program; WinCompose is one example (GLOSSARY).
+    const setup = ["", "", "Needs a compose program running that types a character from Right Alt, U, its hexadecimal code and Enter, such as WinCompose.", "Types Ctrl+Shift+U and hex digits, which not every app accepts."][host.effective];
     // The effective OS's layouts first, then US; with no known OS, all of them.
     const osName = OS_OF[host.effective];
     const offered = hostLayouts().filter(layout => !osName || layout.os === "any" || layout.os === osName || layout.id === host.layout);
