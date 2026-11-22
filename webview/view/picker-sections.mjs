@@ -32,7 +32,7 @@ const isCustom = inGroups("Custom keys");
 // The switch keys, in core's group for them: QMK's for combos and
 // autocorrect, and the keyboard's for behaviours and auto-mouse.
 const isSwitchKey = inGroups("Switch keys");
-// The Leader key (D-L91): text replacement's, offered beside the switch keys
+// The Leader key (D-L91): text replacement's, offered after its switch keys
 // though it is none.
 const isTextReplacementKey = inGroups("Text replacement");
 /** @param {Entry} entry */
@@ -51,8 +51,10 @@ const TYPING = /^KC_(?:ENTER|ESCAPE|BACKSPACE|TAB|SPACE|CAPS_LOCK)$/;
 /** @param {Entry} entry */
 const isCommonKey = (entry) => entry.group === "modifiers" || entry.group === "internal" || isNavigation(entry) || isFunction(entry)
     || (entry.group === "basic" && TYPING.test(valueOf(entry)));
+// The keyboard keys no section above takes: editing, international, language,
+// the rarer system keys and the rarely used ones, at the head of Other QMK.
 /** @param {Entry} entry */
-const isMoreKey = (entry) => entry.group === "basic" && !isSymbol(entry) && !isCommonKey(entry) && !isNumpad(entry) && !isLetterOrDigit(entry);
+const isOtherKeyboardKey = (entry) => entry.group === "basic" && !isSymbol(entry) && !isCommonKey(entry) && !isNumpad(entry) && !isLetterOrDigit(entry);
 
 // A section's groups, in order, are the picker's own way of telling its keys
 // apart; no keyboard stores them. A key is in the first group that takes it,
@@ -98,28 +100,32 @@ export function pickerSections() {
         {id: "media", label: "Media", kind: "catalogue", filter: inGroups("media", "audio"), groups: [
             group("Playback", named(/MEDIA_/)), group("Volume", named(/AUDIO/)), group("Screen", named(/BRIGHTNESS/)), group("Browser", named(/WWW/)), group("Apps", rest),
         ]},
-        {id: "more", label: "More keys", kind: "catalogue", filter: isMoreKey, groups: [
-            group("Editing", named(/^KC_(?:UNDO|CUT|COPY|PASTE|FIND|AGAIN)$/)),
-            group("International", named(/INTERNATIONAL/)),
-            group("Language", named(/LANGUAGE/)),
-            group("System", named(/^KC_(?:APPLICATION|KB_POWER|EXECUTE|HELP|MENU|STOP|KB_MUTE|KB_VOLUME_)/)),
-            group("Rarely used", rest),
+        // The keys that turn a feature on and off (D-L109), a group for each:
+        // QMK's for combos and for autocorrect, then the keyboard's for
+        // behaviours and for auto-mouse. Text replacement's Leader key
+        // follows its switch keys.
+        {id: "switches", label: "Switch keys", kind: "catalogue", filter: (entry) => isSwitchKey(entry) || isTextReplacementKey(entry), groups: [
+            group("Combos", named(/^QK_COMBO_/)),
+            listed("Text replacement", "QK_AUTOCORRECT_ON", "QK_AUTOCORRECT_OFF", "QK_AUTOCORRECT_TOGGLE", "QK_LEADER"),
+            group("Behaviours", named(/^BH_/)),
+            group("Auto-mouse", rest),
         ]},
         {id: "lighting", label: "Lighting", kind: "catalogue", filter: inGroups("backlight", "led_matrix", "underglow", "rgb", "rgb_matrix"), groups: [
             group("Switch", named(/_(?:ON|OFF|TOGGLE)$/)), group("Effect", named(/MODE|FLAG/)), group("Colour", rest),
         ]},
-        {id: "other", label: "Other QMK", kind: "catalogue", filter: (entry) => isSwitchKey(entry) || isTextReplacementKey(entry) || inGroups(
+        // The rest: the keyboard keys no section above takes, then QMK's own.
+        {id: "other", label: "Other QMK", kind: "catalogue", filter: (entry) => isOtherKeyboardKey(entry) || inGroups(
             "connection", "joystick", "magic", "midi", "programmable_button", "quantum", "sequencer", "steno", "swap_hands", "system",
         )(entry), groups: [
+            group("Editing", named(/^KC_(?:UNDO|CUT|COPY|PASTE|FIND|AGAIN)$/)),
+            group("International", named(/INTERNATIONAL/)),
+            group("Language", named(/LANGUAGE/)),
+            group("System", (entry) => entry.group === "system" || /^KC_(?:APPLICATION|KB_POWER|EXECUTE|HELP|MENU|STOP|KB_MUTE|KB_VOLUME_)/.test(valueOf(entry))),
             group("Magic swaps", (entry) => entry.group === "magic" && /SWAP|TOGGLE_(?:CONTROL|BACKSLASH|ALT_GUI|CTL_GUI|ESCAPE)/.test(valueOf(entry))),
             group("Magic switches", from("magic")),
-            group("System", from("system")), group("Firmware", named(/BOOTLOADER|REBOOT|DEBUG|EEPROM|MAKE/)), group("Space Cadet", named(/SPACE_CADET/)),
-            // The switch keys: QMK's for combos and for autocorrect, then the
-            // keyboard's for behaviours and for auto-mouse, each in the order
-            // its catalogue gives them.
-            group("Switch keys", isSwitchKey),
-            group("Text replacement", isTextReplacementKey),
-            group("Features", rest),
+            group("Firmware", named(/BOOTLOADER|REBOOT|DEBUG|EEPROM|MAKE/)), group("Space Cadet", named(/SPACE_CADET/)),
+            group("Features", (entry) => entry.group !== "basic"),
+            group("Rarely used", rest),
         ]},
         {id: "all", label: "All keycodes", kind: "all"},
     ];

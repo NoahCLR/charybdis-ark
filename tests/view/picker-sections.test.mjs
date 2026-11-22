@@ -20,7 +20,7 @@ const catalogue = ["KC_A", "KC_SLASH", "KC_EXLM", "KC_HOME", "KC_KP_1", "KC_F12"
 test("the picker uses task-shaped sections instead of raw QMK group names", () => {
     assert.deepEqual(pickerSections().map(({label}) => label), [
         "Keyboard", "Letters and digits", "Symbols", "Numpad", "Common keys", "Layers", "Macros", "Custom keys", "Pointing modes",
-        "Mouse", "Media", "More keys", "Lighting", "Other QMK", "All keycodes",
+        "Mouse", "Media", "Switch keys", "Lighting", "Other QMK", "All keycodes",
     ]);
 });
 
@@ -90,27 +90,31 @@ test("arrows and navigation keys read in the order a person says them, not the c
     assert.deepEqual(keysOf("Navigation"), ["KC_HOME", "KC_END", "KC_PAGE_UP", "KC_PAGE_DOWN", "KC_INSERT", "KC_DELETE"]);
 });
 
-// The keyboard's switch keys for behaviours and then for auto-mouse (firmware
-// D-F66) sit right after QMK's for combos and autocorrect, in Other QMK's
-// Switch keys, by their words.
-test("the switch keys for behaviours and auto-mouse are offered beside those for combos", () => {
+// The switch keys have a section of their own (D-L109), a group for each
+// feature they turn on and off: QMK's for combos and autocorrect, then the
+// keyboard's for behaviours and auto-mouse (firmware D-F66), by their words.
+test("the switch keys have a section of their own, a group for each feature", () => {
     const published = publishedModel(profileDocument());
-    const other = pickerSections().find((section) => section.id === "other");
-    const groups = groupedEntries(other, entriesForPickerSection(published.qmkKeycodes, other), published);
-    const switches = groups.find((group) => group.name === "Switch keys");
-    assert.deepEqual(switches?.entries.map((entry) => [entry.value, entry.label]), [
-        ["QK_COMBO_ON", "Combo On"], ["QK_COMBO_OFF", "Combo Off"], ["QK_COMBO_TOGGLE", "Toggle Combo"],
-        ["QK_AUTOCORRECT_ON", "Text replacement On"], ["QK_AUTOCORRECT_OFF", "Text replacement Off"], ["QK_AUTOCORRECT_TOGGLE", "Toggle Text replacement"],
-        ["BH_ON", "Behaviours On"], ["BH_OFF", "Behaviours Off"], ["BH_TOGG", "Toggle Behaviours"],
-        ["AM_ON", "Auto-mouse On"], ["AM_OFF", "Auto-mouse Off"], ["AM_TOGG", "Toggle Auto-mouse"],
+    const switches = pickerSections().find((section) => section.id === "switches");
+    const groups = groupedEntries(switches, entriesForPickerSection(published.qmkKeycodes, switches), published);
+    assert.deepEqual(groups.map((group) => [group.name, group.entries.map((entry) => [entry.value, entry.label])]), [
+        ["Combos", [["QK_COMBO_ON", "Combo On"], ["QK_COMBO_OFF", "Combo Off"], ["QK_COMBO_TOGGLE", "Toggle Combo"]]],
+        ["Text replacement", [["QK_AUTOCORRECT_ON", "Text replacement On"], ["QK_AUTOCORRECT_OFF", "Text replacement Off"], ["QK_AUTOCORRECT_TOGGLE", "Toggle Text replacement"], ["QK_LEADER", "Leader"]]],
+        ["Behaviours", [["BH_ON", "Behaviours On"], ["BH_OFF", "Behaviours Off"], ["BH_TOGG", "Toggle Behaviours"]]],
+        ["Auto-mouse", [["AM_ON", "Auto-mouse On"], ["AM_OFF", "Auto-mouse Off"], ["AM_TOGG", "Toggle Auto-mouse"]]],
     ]);
-    assert.deepEqual(switches.entries.slice(6).map((entry) => entry.keycode), [0x7ee0, 0x7ee1, 0x7ee2, 0x7ef0, 0x7ef1, 0x7ef2]);
-    assert.ok(switches.entries.every(pickable));
+    const entries = groups.flatMap((group) => group.entries);
+    assert.deepEqual(entries.filter((entry) => /^(?:BH|AM)_/.test(entry.value)).map((entry) => entry.keycode), [0x7ee0, 0x7ee1, 0x7ee2, 0x7ef0, 0x7ef1, 0x7ef2]);
+    assert.ok(entries.every(pickable));
+    assert.equal(entries.find((entry) => entry.value === "QK_LEADER").keycode, 0x7c58);
+    assert.ok(entries.find((entry) => entry.value === "QK_LEADER").search.includes("leader"));
     // QMK's keys for autocorrect are worded as the feature is here, and a
     // search for either name finds them: QMK's own words stay search terms.
-    const replacement = switches.entries.slice(3, 6);
+    const replacement = entries.filter((entry) => entry.value.startsWith("QK_AUTOCORRECT_"));
     assert.ok(replacement.every((entry) => entry.search.includes("autocorrect") && entry.search.includes("text replacement") && entry.aliases.some((alias) => alias.startsWith("AC_"))));
-    assert.deepEqual(switches.entries.map((entry) => entry.tip), Array(12).fill(undefined), "no switch key has help of its own: each tile says its keycode, as every catalogue key's does");
+    assert.deepEqual(entries.map((entry) => entry.tip), Array(13).fill(undefined), "no key here has help of its own: each tile says its keycode, as every catalogue key's does");
+    const other = pickerSections().find((section) => section.id === "other");
+    assert.deepEqual(entriesForPickerSection(published.qmkKeycodes, other).filter((entry) => entries.includes(entry)), [], "Other QMK holds none of them");
 });
 
 test("a section's groups tell its keys apart by keycode, and a custom key by whether it has a name", () => {
@@ -124,7 +128,10 @@ test("a section's groups tell its keys apart by keycode, and a custom key by whe
     };
     assert.deepEqual(["KC_ENTER", "KC_LEFT_CTRL", "KC_LEFT", "KC_HOME", "KC_PRINT_SCREEN", "KC_F12", "KC_NO", "KC_TRANSPARENT"].map((value) => groupOf("common", value)),
         ["Typing", "Modifiers", "Arrows", "Navigation", "System", "Function", "No key", "No key"]);
-    assert.deepEqual(["KC_UNDO", "KC_INTERNATIONAL_1", "KC_LANGUAGE_1", "KC_KB_MUTE"].map((value) => groupOf("more", value)), ["Editing", "International", "Language", "System"]);
+    // Other QMK starts with the keyboard keys no section above takes (D-L109),
+    // their system keys with QMK's.
+    assert.deepEqual(["KC_UNDO", "KC_INTERNATIONAL_1", "KC_LANGUAGE_1", "KC_KB_MUTE", "KC_SYSTEM_SLEEP", "KC_EXSEL"].map((value) => groupOf("other", value)),
+        ["Editing", "International", "Language", "System", "System", "Rarely used"]);
     assert.deepEqual(["KC_NUM_LOCK", "KC_KP_SLASH", "KC_KP_1"].map((value) => groupOf("numpad", value)), ["Signs and lock", "Signs and lock", "Digits"]);
     assert.equal(groupOf("other", "QK_GRAVE_ESCAPE"), "Features");
     assert.deepEqual(["QK_MAGIC_SWAP_CONTROL_CAPS_LOCK", "QK_MAGIC_TOGGLE_GUI", "QK_BOOTLOADER"].map((value) => groupOf("other", value)), ["Magic swaps", "Magic switches", "Firmware"]);
@@ -132,20 +139,4 @@ test("a section's groups tell its keys apart by keycode, and a custom key by whe
     assert.equal(groupOf("custom", unnamed.keycode), "Unnamed");
     const renamed = {...published, customKeys: published.customKeys.map((key) => key.keycode === unnamed.keycode ? {...key, name: "Thumb"} : key)};
     assert.equal(groupOf("custom", unnamed.keycode, renamed), "Named");
-});
-
-// The Leader key (firmware D-F71, D-L91) is text replacement's: offered right
-// after the switch keys in a group of its own, since it switches nothing,
-// worded as the catalogue words it and found by "leader".
-test("the Leader key is offered in Other QMK's Text replacement group, right after the switch keys", () => {
-    const published = publishedModel(profileDocument());
-    const other = pickerSections().find((section) => section.id === "other");
-    const groups = groupedEntries(other, entriesForPickerSection(published.qmkKeycodes, other), published);
-    const names = groups.map((group) => group.name);
-    assert.equal(names.indexOf("Text replacement"), names.indexOf("Switch keys") + 1);
-    const leader = groups.find((group) => group.name === "Text replacement").entries;
-    assert.deepEqual(leader.map((entry) => [entry.value, entry.label, entry.keycode, entry.tip]), [["QK_LEADER", "Leader", 0x7c58, undefined]]);
-    assert.ok(leader.every(pickable));
-    assert.ok(leader[0].search.includes("leader"));
-    assert.ok(!groups.find((group) => group.name === "Switch keys").entries.some((entry) => entry.value === "QK_LEADER"), "it is no switch key");
 });

@@ -50,16 +50,16 @@ for (const theme of ["dark", "light"]) {
 }
 
 // The keyboard's switch keys for behaviours (firmware D-F66) are picked beside
-// QMK's for combos, in Other QMK, and post by the keyboard's name.
+// QMK's for combos, in Switch keys (D-L109), and post by the keyboard's name.
 test("a switch key for behaviours is picked beside those for combos and posts by name", async ({page}) => {
     await openControls(page, "keys", {tab: "key", selected: 0});
     await page.locator('[data-act="pick"]').click();
     const picker = page.getByRole("dialog", {name: "Pick a keycode"});
-    await picker.locator('[data-sec="other"]').click();
-    const switches = ["QK_COMBO_ON", "QK_COMBO_OFF", "QK_COMBO_TOGGLE", "QK_AUTOCORRECT_ON", "QK_AUTOCORRECT_OFF", "QK_AUTOCORRECT_TOGGLE", "BH_ON", "BH_OFF", "BH_TOGG"];
+    await picker.locator('[data-sec="switches"]').click();
+    const order = ["QK_COMBO_ON", "QK_COMBO_OFF", "QK_COMBO_TOGGLE", "QK_AUTOCORRECT_ON", "QK_AUTOCORRECT_OFF", "QK_AUTOCORRECT_TOGGLE", "QK_LEADER", "BH_ON", "BH_OFF", "BH_TOGG"];
     const shown = await picker.locator("[data-pick]").evaluateAll(tiles => tiles.map(tile => tile.getAttribute("data-pick")));
     const at = shown.indexOf("QK_COMBO_ON");
-    expect(shown.slice(at, at + switches.length)).toEqual(switches);
+    expect(shown.slice(at, at + order.length)).toEqual(order);
     await expect(picker.locator('[data-pick="BH_TOGG"]')).toContainText("Toggle Behaviours");
     await clearPosts(page);
     await picker.locator('[data-pick="BH_TOGG"]').click();
@@ -69,16 +69,16 @@ test("a switch key for behaviours is picked beside those for combos and posts by
 });
 
 // And its switch keys for auto-mouse (firmware D-F66), right after them in the
-// same group.
+// same section.
 test("a switch key for auto-mouse is picked after those for behaviours and posts by name", async ({page}) => {
     await openControls(page, "keys", {tab: "key", selected: 0});
     await page.locator('[data-act="pick"]').click();
     const picker = page.getByRole("dialog", {name: "Pick a keycode"});
-    await picker.locator('[data-sec="other"]').click();
-    const switches = ["QK_COMBO_ON", "QK_COMBO_OFF", "QK_COMBO_TOGGLE", "QK_AUTOCORRECT_ON", "QK_AUTOCORRECT_OFF", "QK_AUTOCORRECT_TOGGLE", "BH_ON", "BH_OFF", "BH_TOGG", "AM_ON", "AM_OFF", "AM_TOGG"];
+    await picker.locator('[data-sec="switches"]').click();
+    const order = ["QK_COMBO_ON", "QK_COMBO_OFF", "QK_COMBO_TOGGLE", "QK_AUTOCORRECT_ON", "QK_AUTOCORRECT_OFF", "QK_AUTOCORRECT_TOGGLE", "QK_LEADER", "BH_ON", "BH_OFF", "BH_TOGG", "AM_ON", "AM_OFF", "AM_TOGG"];
     const shown = await picker.locator("[data-pick]").evaluateAll(tiles => tiles.map(tile => tile.getAttribute("data-pick")));
     const at = shown.indexOf("QK_COMBO_ON");
-    expect(shown.slice(at, at + switches.length)).toEqual(switches);
+    expect(shown.slice(at, at + order.length)).toEqual(order);
     await expect(picker.locator('[data-pick="AM_TOGG"]')).toContainText("Toggle Auto-mouse");
     await clearPosts(page);
     await picker.locator('[data-pick="AM_TOGG"]').click();
@@ -94,7 +94,7 @@ test("a switch key for text replacement is picked beside those for combos, found
     await openControls(page, "keys", {tab: "key", selected: 0});
     await page.locator('[data-act="pick"]').click();
     const picker = page.getByRole("dialog", {name: "Pick a keycode"});
-    await picker.locator('[data-sec="other"]').click();
+    await picker.locator('[data-sec="switches"]').click();
     await expect(picker.locator('[data-pick="QK_AUTOCORRECT_ON"]')).toContainText("Text replacement On");
     await expect(picker.locator('[data-pick="QK_AUTOCORRECT_OFF"]')).toContainText("Text replacement Off");
     await expect(picker.locator('[data-pick="QK_AUTOCORRECT_TOGGLE"]')).toContainText("Toggle Text replacement");
@@ -104,7 +104,7 @@ test("a switch key for text replacement is picked beside those for combos, found
         await expect(picker.locator('[data-pick="QK_AUTOCORRECT_TOGGLE"]')).toBeVisible();
     }
     await picker.locator("#pickerSearch").fill("");
-    await picker.locator('[data-sec="other"]').click();
+    await picker.locator('[data-sec="switches"]').click();
     await clearPosts(page);
     await picker.locator('[data-pick="QK_AUTOCORRECT_TOGGLE"]').click();
     await picker.locator('[data-act="use"]').click();
@@ -113,19 +113,18 @@ test("a switch key for text replacement is picked beside those for combos, found
 });
 
 // The Leader key (D-L91) is text replacement's key but switches nothing: it
-// sits in Other QMK in a group of its own, right after Switch keys, is found
-// by its name and QMK's, and posts by QMK's name.
-test("the Leader key is picked from Text replacement, after Switch keys, found by its name, and posts by name", async ({page}) => {
+// sits in Switch keys' Text replacement group after that feature's switch
+// keys (D-L109), is found by its name and QMK's, and posts by QMK's name.
+test("the Leader key is picked from Text replacement, after its switch keys, found by its name, and posts by name", async ({page}) => {
     await openControls(page, "keys", {tab: "key", selected: 0});
     await page.locator('[data-act="pick"]').click();
     const picker = page.getByRole("dialog", {name: "Pick a keycode"});
-    await picker.locator('[data-sec="other"]').click();
-    const labels = await picker.locator(".pk-label").allTextContents();
-    expect(labels.slice(labels.indexOf("Switch keys"), labels.indexOf("Switch keys") + 2)).toEqual(["Switch keys", "Text replacement"]);
+    await picker.locator('[data-sec="switches"]').click();
+    expect(await picker.locator(".pk-label").allTextContents()).toEqual(["Combos", "Text replacement", "Behaviours", "Auto-mouse"]);
     const group = picker.locator(".pk-group", {has: page.locator('.pk-label:text-is("Text replacement")')});
-    await expect(group.locator("[data-pick]")).toHaveCount(1);
+    expect(await group.locator("[data-pick]").evaluateAll((tiles) => tiles.map((tile) => tile.getAttribute("data-pick"))))
+        .toEqual(["QK_AUTOCORRECT_ON", "QK_AUTOCORRECT_OFF", "QK_AUTOCORRECT_TOGGLE", "QK_LEADER"]);
     await expect(group.locator('[data-pick="QK_LEADER"]')).toContainText("Leader");
-    await expect(picker.locator('.pk-group:has(.pk-label:text-is("Switch keys")) [data-pick="QK_LEADER"]')).toHaveCount(0);
     for (const query of ["leader", "QK_LEADER"]) {
         await picker.locator("#pickerSearch").fill(query);
         await expect(picker.locator('[data-pick="QK_LEADER"]')).toBeVisible();
