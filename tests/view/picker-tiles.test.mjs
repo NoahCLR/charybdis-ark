@@ -98,7 +98,7 @@ test("a search beginning a group's or a section's name lists it", () => {
     const fns = values(found("function"));
     assert.equal(fns.filter((value) => /^KC_F\d+$/.test(value)).length, 24);
     assert.ok(values(found("pointing")).includes("PD_MODE_0"));
-    assert.ok(values(found("magic")).includes("QK_MAGIC_TOGGLE_NKRO"), "Magic's groups, now in Other QMK");
+    assert.ok(values(found("magic")).includes("QK_MAGIC_TOGGLE_GUI"), "Magic's groups, now in Other QMK");
     assert.equal(values(found("layers")).length, model.layers.length * 6);
     assert.equal(values(found("e")).includes("KC_NO"), false, "not on one letter, which begins too much");
 });

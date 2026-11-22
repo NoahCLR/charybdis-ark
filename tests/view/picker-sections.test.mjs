@@ -127,7 +127,7 @@ test("a section's groups tell its keys apart by keycode, and a custom key by whe
     assert.deepEqual(["KC_UNDO", "KC_INTERNATIONAL_1", "KC_LANGUAGE_1", "KC_KB_MUTE"].map((value) => groupOf("more", value)), ["Editing", "International", "Language", "System"]);
     assert.deepEqual(["KC_NUM_LOCK", "KC_KP_SLASH", "KC_KP_1"].map((value) => groupOf("numpad", value)), ["Signs and lock", "Signs and lock", "Digits"]);
     assert.equal(groupOf("other", "QK_GRAVE_ESCAPE"), "Features");
-    assert.deepEqual(["QK_MAGIC_SWAP_CONTROL_CAPS_LOCK", "QK_MAGIC_TOGGLE_NKRO", "QK_BOOTLOADER"].map((value) => groupOf("other", value)), ["Magic swaps", "Magic switches", "Firmware"]);
+    assert.deepEqual(["QK_MAGIC_SWAP_CONTROL_CAPS_LOCK", "QK_MAGIC_TOGGLE_GUI", "QK_BOOTLOADER"].map((value) => groupOf("other", value)), ["Magic swaps", "Magic switches", "Firmware"]);
     if (named) assert.equal(groupOf("custom", named.keycode), "Named");
     assert.equal(groupOf("custom", unnamed.keycode), "Unnamed");
     const renamed = {...published, customKeys: published.customKeys.map((key) => key.keycode === unnamed.keycode ? {...key, name: "Thumb"} : key)};

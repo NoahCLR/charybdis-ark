@@ -55,7 +55,8 @@ Option or AltGr on the right. Below it are sections by task: **Letters and
 digits**, **Symbols**, **Numpad**, **Common keys**, then the things you own,
 **Layers**, **Macros**, **Custom keys** and **Pointing modes**, then **Mouse**,
 **Media**, **More keys**, **Lighting** and **Other QMK**, which holds Magic
-and the [switch keys](behaviours.md#switch-keys) for combos, text replacement,
+(but not its N-key rollover keys, which the keyboard doesn't build) and the
+[switch keys](behaviours.md#switch-keys) for combos, text replacement,
 behaviours and auto-mouse, in **Switch keys**.
 Keys sit in named groups, such as Arrows, Function and Modifiers, and **No key**
 in Common keys holds N/A and Transparent. **All keycodes** lists every key the
