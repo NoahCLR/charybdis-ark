@@ -107,8 +107,11 @@ async function checkApply(session, draft, status) {
     const base = observed && "status" in observed ? /** @type {import("./types.js").CompleteReadSnapshot} */ (observed).status : undefined;
     // The first poll must compare with the successful profile snapshot, since
     // an adjustment may already have been saved before this poll exists.
+    // A keyboard that never saved names generation 0 in both, and no half:
+    // the edit status says its saved base is the compiled defaults, whose
+    // origin is no half's, and the snapshot's status has no saved origin.
     const same = seen ? (seen.session === status.session && seen.revision === status.revision && seen.savedGeneration === status.savedGeneration)
-        : base && base.committedGeneration === status.savedGeneration && base.committedOriginHalf === status.savedOrigin;
+        : base && base.committedGeneration === status.savedGeneration && (status.savedGeneration === 0 || base.committedOriginHalf === status.savedOrigin);
     if (status.unsaved || same) return told;
     await readAndFollow(session);
     if (session.draft && !session.draft.stale) say(session, MOVED);

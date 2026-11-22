@@ -7,6 +7,7 @@ const {requestHandled} = require("./raw-hid-unhandled");
 const {RAW_HID_REPORT_SIZE, normalizeRawHidReport} = require("../transport/device-adapter");
 const {PROFILE_BLOB_V1, crc32, decodeProfileBlob, fnv1a32} = require("../schema/profile-blob-v1");
 const {
+    PROFILE_ORIGIN_COMPILED,
     PROFILE_WIRE_V1,
     buildProfileGetRequest,
     decodeProfileResponse,
@@ -197,7 +198,7 @@ function buildCandidateReuseRequest(transactionId, {offset, sourceOffset, length
     if (length > PROFILE_CANDIDATE_V1.REUSE_MAX || offset + length > PROFILE_CANDIDATE_V1.MAX_BLOB_SIZE || sourceOffset + length > PROFILE_CANDIDATE_V1.MAX_BLOB_SIZE) throw new RangeError("Reuse range exceeds the candidate bounds.");
     const kind = assertU8(source.kind, "Reuse source kind"), origin = assertU8(source.origin, "Reuse source origin");
     const generation = assertU32(source.generation, "Reuse source generation");
-    if ((kind === 0 && (origin !== 255 || generation !== 0)) || (kind === 1 && (origin > 1 || generation === 0)) || kind > 1) throw new RangeError("Reuse source must identify compiled defaults or a committed generation.");
+    if ((kind === 0 && (origin !== PROFILE_ORIGIN_COMPILED || generation !== 0)) || (kind === 1 && (origin > 1 || generation === 0)) || kind > 1) throw new RangeError("Reuse source must identify compiled defaults or a committed generation.");
     report.writeUInt32LE(offset, 5); report.writeUInt32LE(sourceOffset, 9); report.writeUInt32LE(length, 13);
     report.writeUInt32LE(generation, 17); report.writeUInt32LE(assertU32(source.digest, "Reuse source digest"), 21);
     report.writeUInt32LE(assertU32(source.crc32, "Reuse source CRC32"), 25); report[29] = kind; report[30] = origin;

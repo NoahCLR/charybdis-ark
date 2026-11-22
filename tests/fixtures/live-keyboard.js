@@ -38,7 +38,7 @@ const {crc32} = require("../../core/schema/profile-blob-v1");
 const {applySplices} = require("../../core/schema/profile-splices");
 const {PROFILE_DOMAIN_VERSIONS} = require("../../core/schema/profile-domains");
 const {SETTING} = require("../../core/schema/settings-domain-v1");
-const {PROFILE_WIRE_V1, PROFILE_ACTIVE_KIND, PROFILE_STATE_FLAGS} = require("../../core/protocol/profile-wire-v1");
+const {PROFILE_WIRE_V1, PROFILE_ACTIVE_KIND, PROFILE_ORIGIN_COMPILED, PROFILE_STATE_FLAGS} = require("../../core/protocol/profile-wire-v1");
 const {PROFILE_CANDIDATE_V1: C, CANDIDATE_ADMISSION: A, CANDIDATE_ERROR: CE} = require("../../core/protocol/profile-candidate-v1");
 const {PROFILE_EDIT_V1: E, EDIT_RESULT: R, EDIT_FLAGS: F, EDIT_PHASE} = require("../../core/protocol/profile-edit-v1");
 
@@ -152,17 +152,18 @@ function liveKeyboard(options) {
         p[17] = lastResult; p.writeUInt16LE(lastTransaction, 18); p.writeUInt16LE(pending?.transaction ?? waiting?.transaction ?? 0, 20); p[22] = mode; return p;
     }
     function statusPage1() {
-        const p = Buffer.alloc(25); p.writeUInt32LE(session, 4); p.writeUInt32LE(slaveBehind || slaveRefused ? revision - 1 : revision, 8); p[12] = working ? 1 : 0;
+        const p = Buffer.alloc(25); p.writeUInt32LE(session, 4); p.writeUInt32LE(slaveBehind || slaveRefused ? revision - 1 : revision, 8); p[12] = (working ? 1 : 0) | (generation === 0 ? 2 : 0);
         // A save waiting for a quiet keyboard on the slave half stays in
         // progress for a few reads.
         if (save.pauses) save.pauses--;
         p[13] = save.pauses ? 1 : 0; p[14] = save.lastResult; p[15] = save.lastError; p.writeUInt16LE(save.pauses ? save.lastTransactionId : 0, 16);
         p.writeUInt16LE(save.pauses ? 0 : save.lastTransactionId, 18); p[24] = mode; return p;
     }
-    // Page 2: where the last refusal failed (nothing here), what keeps the
-    // keyboard from a safe boundary, and how long the profile it runs is.
+    // Page 2: where the last refusal failed (nothing here: no domain, table,
+    // row, step or field, each all ones), what keeps the keyboard from a safe
+    // boundary, and how long the profile it runs is.
     function statusPage2() {
-        const p = Buffer.alloc(25); p.writeUInt32LE(held, 14); p.writeUInt32LE(active().length + (faults.lengthSkew ?? 0), 18); delete faults.lengthSkew; return p;
+        const p = Buffer.alloc(25); p.fill(0xff, 1, 7); p.writeUInt32LE(held, 14); p.writeUInt32LE(active().length + (faults.lengthSkew ?? 0), 18); delete faults.lengthSkew; return p;
     }
     function statusPage3() {
         const p = Buffer.alloc(25); p[0] = E.AUTO_SAVE_LAYOUT; p[1] = (auto.inProgress ? 1 : 0) | (auto.lastWasAutomatic ? 2 : 0);
@@ -243,13 +244,17 @@ function liveKeyboard(options) {
             }
             // Status and the saved and compiled payloads are the saved
             // profile's; a working copy shows as active kind 4, its revision
-            // in the digest. Combos, settings and the rest are what it runs.
+            // in the digest, its generation and origin half its saved base's:
+            // 0 and 255 over the compiled defaults, which no half saved
+            // (Profile Wire, "Profile status"). Combos, settings and the rest
+            // are what it runs.
             const source = r[2] === 2 || r[2] === 4 || r[2] === 5 ? savedReader() : cached;
             const response = source.answer(r)[0];
             if (r[2] === 2 && at === 0 && working) {
                 response.writeUInt16LE(response.readUInt16LE(9) & ~PROFILE_STATE_FLAGS.ACTIVE_IS_COMPILED_DEFAULT, 9);
                 response.writeUInt32LE(revision, 7 + 12); response[7 + 24] = PROFILE_ACTIVE_KIND.WORKING;
             }
+            if (r[2] === 2 && at === 1 && working && generation === 0) response[7 + 4] = PROFILE_ORIGIN_COMPILED;
             if (response[0] === 0xff) unhandled.push(r);
             return response;
         }

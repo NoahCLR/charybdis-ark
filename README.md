@@ -18,9 +18,9 @@ next keypress and can be tried in real typing before it is saved.
 </p>
 
 **Try the demo:** open <https://ark.ncleroy.dev> and choose
-**Explore a demo**. It opens on an example profile close to the firmware's
-defaults. Every screen and edit works and Review runs its checks; saving and
-the live edit modes need a keyboard. The demo runs in any browser on a
+**Explore a demo**. It opens on a complete example profile. Every screen and
+edit works and Review runs its checks; saving and the live edit modes need a
+keyboard. The demo runs in any browser on a
 computer, and **Open a backup…** loads your own profile into it.
 Connecting a keyboard needs Chrome or Edge. There is no account, and once
 the page has loaded it sends nothing to any server. To set up a keyboard,

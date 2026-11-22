@@ -1,7 +1,7 @@
 // @ts-check
 "use strict";
 const {readSettings} = require("../protocol/portable-profile-v1");
-const {readProfileStatus, PROFILE_ACTIVE_KIND, PROFILE_STATE_FLAGS} = require("../protocol/profile-wire-v1");
+const {readProfileStatus, PROFILE_ACTIVE_KIND, PROFILE_ORIGIN_COMPILED, PROFILE_STATE_FLAGS} = require("../protocol/profile-wire-v1");
 const {ProfilePayloadReader, payloadMatchesActive} = require("./profile-payload-reader");
 const {readDeviceCombos} = require("../protocol/combo-readback-v1");
 const {candidateMetadataForBlob, readCandidateSlaveStatus, readCandidateStatus, CANDIDATE_STATE} = require("../protocol/profile-candidate-v1");
@@ -44,9 +44,9 @@ function candidateBaseSource(before) {
         || !(/** @type {number[]} */ ([PROFILE_ACTIVE_KIND.COMPILED_ONLY, PROFILE_ACTIVE_KIND.COMMITTED])).includes(status.activeKind)
         || fnv1a32(bytes) !== status.activeDigest) return undefined;
     // Compiled GET status has no committed half and leaves origin zero; REUSE
-    // explicitly names that origin-independent source with the sentinel 255.
+    // explicitly names that origin-independent source: no half saved it.
     return {bytes, kind: status.activeKind, generation: status.activeGeneration, digest: status.activeDigest,
-        crc32: crc32(bytes), origin: status.activeKind === PROFILE_ACTIVE_KIND.COMPILED_ONLY ? 255 : status.activeOriginHalf};
+        crc32: crc32(bytes), origin: status.activeKind === PROFILE_ACTIVE_KIND.COMPILED_ONLY ? PROFILE_ORIGIN_COMPILED : status.activeOriginHalf};
 }
 // Waiting for the halves to agree is pointless while the slave half is not
 // there at all: it would only time out, and hold the keyboard until it did.
