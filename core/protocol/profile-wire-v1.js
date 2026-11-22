@@ -72,6 +72,11 @@ const PROFILE_ACTIVE_KIND = Object.freeze({
     WORKING: 4,
 });
 
+// The origin half of what no half saved: the compiled defaults. Status names
+// it for a working copy over them (below), and a candidate's reuse source for
+// the defaults themselves (profile-candidate-v1.js).
+const PROFILE_ORIGIN_COMPILED = 255;
+
 const PROFILE_STATE_FLAGS = Object.freeze({
     ACTIVE_IS_COMPILED_DEFAULT: 1 << 0,
     COMMITTED_VALID: 1 << 1,
@@ -313,8 +318,16 @@ function decodeStatusPages(pages) {
     if (!/** @type {number[]} */ (Object.values(PROFILE_ACTIVE_KIND)).includes(decoded.activeKind)) {
         throw new ProfileWireProtocolError("INCOMPATIBLE_RESPONSE", `Unknown active profile kind ${decoded.activeKind}.`);
     }
+    // A working copy's generation and origin are its saved base's, and no
+    // half saved the compiled defaults: over them it reports generation 0 and
+    // origin 255. A keyboard that reports pending while it runs one (its
+    // activation failed) zeroes the digest and generation and says nothing of
+    // the origin, which stays; its status must still be read, since it says
+    // what failed. Every other origin names a half.
+    const overCompiled = (decoded.activeKind === PROFILE_ACTIVE_KIND.WORKING || decoded.activeKind === PROFILE_ACTIVE_KIND.PENDING)
+        && decoded.activeGeneration === 0 && decoded.activeOriginHalf === PROFILE_ORIGIN_COMPILED;
     for (const [label, value] of /** @type {[string, number][]} */ ([
-        ["active origin half", decoded.activeOriginHalf],
+        ...(overCompiled ? [] : [["active origin half", decoded.activeOriginHalf]]),
         ["committed origin half", decoded.committedOriginHalf],
         ["slave half's generation origin", decoded.slaveOriginHalf],
     ])) {
@@ -406,6 +419,7 @@ function assertKnownMask(value, knownMask, label) {
 module.exports = {
     PROFILE_WIRE_STATUS,
     PROFILE_ACTIVE_KIND,
+    PROFILE_ORIGIN_COMPILED,
     PROFILE_STATE_FLAGS,
     PROFILE_WIRE_KNOWN_MASKS,
     PROFILE_WIRE_FEATURES,

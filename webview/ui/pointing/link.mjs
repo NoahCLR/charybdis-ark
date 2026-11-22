@@ -1,5 +1,5 @@
 // @ts-check
-// Step 3 of a mode, What starts it: its keys, then its link (firmware D-F62)
+// A mode's What starts it step: its keys, then its link (firmware D-F62)
 // as two lists of layer chips, the layers that start it and the layers its
 // key turns on, each with an Add menu. A layer that cannot go in a list is in
 // the menu, disabled, saying why; the empty layers sit in the menu's own

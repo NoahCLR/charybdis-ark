@@ -413,9 +413,9 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     // How a replacement fires (D-L91): as you type, after the Leader key, or
     // both; its inputs are one list whichever. The switch on its editor.
     inputModes: [["word", "As you type"], ["leader", "After Leader"], ["both", "Both"]],
-    // What each means, by the same value, read once in the Fires info mark
+    // What each means, by the same value, read once in the Trigger info mark
     // (D-L96); how long the Leader key waits is said after it, by its setting.
-    inputModesMean: [["word", "Replaced as you finish the word."],
+    inputModesMean: [["word", "Replaced as you finish the word with a space, punctuation, Enter or Tab."],
         ["leader", "Press the Leader key, then type one of its inputs: the keyboard sends the replacement the moment it is typed, and the computer never sees what you typed."],
         ["both", "Either way."]],
     // The Leader key as its cap names it, where a replacement's editor says
@@ -772,7 +772,9 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
         // straight directions, and the diagonals eight directions add.
         directions: [["left", "Left"], ["right", "Right"], ["up", "Up"], ["down", "Down"]],
         diagonals: [["upLeft", "Up-left"], ["upRight", "Up-right"], ["downLeft", "Down-left"], ["downRight", "Down-right"]],
-        axes: [[2, "Dominant axis"], [3, "Eight directions"], [0, "Vertical only"], [1, "Horizontal only"]],
+        // In the order the editor offers them as shapes: all eight, the four
+        // straight ones, then one axis.
+        axes: [[3, "Eight directions"], [2, "Dominant axis"], [0, "Vertical only"], [1, "Horizontal only"]],
         invert: [[0, "Neither axis"], [1, "Horizontal"], [2, "Vertical"], [3, "Both axes"]],
         // Which axes a scrolling mode scrolls.
         scrollAxes: [[0, "Both axes"], [1, "Horizontal only"], [2, "Vertical only"]],
@@ -797,8 +799,10 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
         // the two compass neighbours, 45 degrees either side, the one the
         // movement leans toward first: a diagonal's straight directions, a
         // straight direction's diagonals. Only eight directions has those, so
-        // elsewhere it acts as "its neighbours take over".
-        emptyDirection: [[0, "Its neighbours take over"], [1, "Send both neighbours"], [2, "Nothing"]],
+        // elsewhere it acts as "the nearest direction takes over": the empty
+        // direction is left out, and a movement toward it goes to the one
+        // direction with a key nearest the way it leans.
+        emptyDirection: [[0, "The nearest direction takes over"], [1, "Send both neighbours"], [2, "Nothing"]],
         // How often a directional mode sends: once for each threshold step,
         // or once per movement: again only after a pause or moving back.
         directionOutput: [[0, "Every step"], [1, "Once per movement"]],
@@ -815,6 +819,12 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
             ["decayDivisor", "Cross-axis decay divisor"],
         ],
         heldModifiers: "Hold modifiers while scrolling",
+        // How often a directional mode sends, as the editor's switch says it:
+        // on sends once per movement, off every step (directionOutput).
+        sendsOnce: "Send only once per movement",
+        // A switch's two states, as the step's info mark names each before
+        // what it does ("On · Once per movement").
+        switchState: {on: "On", off: "Off"},
         // What each setting of a mode does, by the field it sets, as the
         // firmware runs it (its pointing spec; pointing_mode_dragscroll.c for
         // the scroll fields): said once, as the field's tip in a step, or in
@@ -846,8 +856,8 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
         // in its step's info mark (D-L96); each choice's own words are its
         // table's above, and `lead` is what holds whichever is chosen.
         choicesMean: {
-            emptyDirection: {rows: [[0, "Moving toward it, the directions either side take over its share."],
-                [1, "Moving toward it sends both directions either side: a diagonal's two straight directions, a straight direction's two diagonals. In eight directions only; elsewhere its neighbours take over."],
+            emptyDirection: {rows: [[0, "Moving toward it sends the nearest direction that has a key, the one the movement leans toward. Moving straight at it sends little or nothing."],
+                [1, "Moving toward it sends both directions either side: a diagonal's two straight directions, a straight direction's two diagonals. In eight directions only; elsewhere the nearest direction takes over."],
                 [2, "Moving toward it does nothing."]]},
             directionOutput: {rows: [[0, "Sends the key again each time the ball moves a threshold further."],
                 [1, "Sends it once, however far the ball goes. A movement starts again after a 150 ms pause; before then, only turning more than 90 degrees from the direction that sent sends again."]]},

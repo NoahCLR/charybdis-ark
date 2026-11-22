@@ -22,6 +22,8 @@ export const leaveDemo = () => ({type: "leaveDemo"});
 export const DEMO_WORDS = Object.freeze({
     status: "Demo · no keyboard",
     banner: "Edits stay in this tab. Export profile keeps them as a backup for your keyboard.",
+    // The strip's link to the firmware releases: what a keyboard needs first.
+    firmwareTip: "Ark edits a Charybdis running the charybdis-4x6 firmware. Its releases are on GitHub, flashed to both halves from the same one.",
     explore: "Explore a demo",
     exploreTip: "Open Ark on a demo profile, with no keyboard. Every screen works and every edit shows in the review; only saving needs a keyboard.",
     exportNote: "Export the demo profile, with your edits, as a complete backup. On your keyboard, import it to review and save it.",

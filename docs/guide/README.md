@@ -4,7 +4,7 @@ How to use Ark, screen by screen. Start with connecting; after that, read the
 page for whatever you want to change.
 
 1. [Connecting](connecting.md): installing Ark, reading the keyboard, the
-   demo and the Keyboard screen.
+   demo and the About screen.
 2. [The board and layers](board-and-layers.md): the board, the hover card,
    layer tabs, previewing layers together, renaming and reordering layers.
 3. [Keys](keys.md): what a key sends, the keycode picker, custom keys (and

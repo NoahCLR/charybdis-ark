@@ -577,13 +577,13 @@ function showMacro(model, slot) {
     render();
 }
 
-// The Leader key's cap, drawn before where the key is placed under Fires.
+// The Leader key's cap, drawn before where the key is placed under Trigger.
 /** @param {Model} model */
 const leaderCap = (model) => `<span class="kbd ac-leader-key" aria-hidden="true">${esc(vocabulary(model).leaderKey)}</span>`;
 // How a replacement fires (D-L91): as you type, after the Leader key, or
 // both. Its inputs are one list whichever.
 /** @param {Model} model @param {string} f @param {boolean} canEdit @param {"word" | "leader" | "both"} current */
-const firesField = (model, f, canEdit, current) => choiceField({label: "How it fires", f: `${f}:fires`, hideLabel: true, disabled: !canEdit, choices: vocabulary(model).inputModes, current});
+const firesField = (model, f, canEdit, current) => choiceField({label: "Trigger", f: `${f}:fires`, hideLabel: true, disabled: !canEdit, choices: vocabulary(model).inputModes, current});
 // What a field for an input shows before it is typed in: an example, a
 // word's as the field gives it (`words`).
 /** @param {"word" | "leader" | "both"} fires @param {boolean} macro @param {string} [words] */
@@ -595,7 +595,7 @@ const LEADER_KEY = "QK_LEADER";
 // Under the switch while a replacement fires after Leader: where the Leader
 // key is placed (keys by layer, behaviours, combos), and Place on a key →, as
 // a macro's and a pointing mode's editors have it. What the Leader key does
-// is the Fires info mark (firesInfo).
+// is the Trigger info mark (firesInfo).
 /** @param {Model} model */
 function leaderRow(model) {
     return `<div class="stack ac-leader" data-ac-leader-note>
@@ -632,7 +632,7 @@ function entryEditor(model, list, entry, canEdit) {
             ${replacementControls(model, `autocorrect:entry:${entry.id}`, value, canEdit, list.usage.correctionMax, pending)}
             ${entry.warnings.map((warning) => `<p class="note warn" data-ac-warning>${esc(warning)}</p>`).join("")}
             <div data-ac-feedback="replacement" hidden></div>
-            <div class="macro-sequence-heading"><h4>Fires</h4>${firesInfo(model)}</div>
+            <div class="macro-sequence-heading"><h4>Trigger</h4>${firesInfo(model)}</div>
             ${firesField(model, `autocorrect:entry:${entry.id}`, canEdit, entry.fires)}
             ${entry.fires === "word" ? "" : leaderRow(model)}
             <div class="macro-sequence-heading"><h4>Inputs</h4>${inputsInfo(list)}</div>
@@ -819,7 +819,7 @@ function newEditor(model, list, fresh, canEdit) {
             <div data-ac-feedback="replacement" hidden></div>
             ${joins ? `<div class="callout ac-joins" data-ac-joins><span>${esc(fresh.joins?.said)}</span>
                     <button type="button" class="btn tiny" data-act="ac-open-joined">Open it</button></div>` : `
-            <div class="macro-sequence-heading"><h4>Fires</h4>${firesInfo(model)}</div>
+            <div class="macro-sequence-heading"><h4>Trigger</h4>${firesInfo(model)}</div>
             ${firesField(model, "autocorrect:new", canEdit && Boolean(named), fresh.fires ?? "word")}
             ${(fresh.fires ?? "word") === "word" ? "" : leaderRow(model)}
             <div class="macro-sequence-heading"><h4>Inputs</h4>${inputsInfo(list)}</div>

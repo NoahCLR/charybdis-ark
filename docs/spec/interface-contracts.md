@@ -135,7 +135,7 @@ layers in view reach:
 
 The same kind of control looks and sits the same on every screen.
 
-- Every screen's header is as tall as every other's, the Keyboard screen's,
+- Every screen's header is as tall as every other's, the About screen's,
   whose title is the keyboard's renamable name, included, while it is
   renamed too; a screen waiting for a keyboard is titled by its rail label,
   the rail item it highlights (`browser-tests/screens-registry.spec.js`).
@@ -250,10 +250,15 @@ The same kind of control looks and sits the same on every screen.
   (`ON_SCREEN_MAX_OPTIONS`, `ON_SCREEN_MAX_CHARACTERS`: 60 characters) shows them on screen, as one segmented radio group
   (`webview/ui/segmented.mjs`), so each is read without opening anything and
   picked in one click; more options, or longer ones, stay a menu
-  (`onScreenChoice`, `webview/view/choices.mjs`). Every such choice is drawn
-  by `choiceField`, which applies the rule, and read by `choiceValue`,
-  whichever it became (`tests/view/choices.test.mjs`,
-  `browser-tests/consistency.spec.js`). A stored value that is none of a
+  (`onScreenChoice`, `webview/view/choices.mjs`). Every such choice in words
+  is drawn by `choiceField`, which applies the rule, and read by
+  `choiceValue`, whichever it became (`tests/view/choices.test.mjs`,
+  `browser-tests/consistency.spec.js`). A screen may draw one by hand where it
+  needs another look, as shapes or as radio buttons one under another, and
+  keeps the rule's promises: every option on show in a radio group named by
+  its label, each option's form identity its field's then its value, and a
+  stored value shown "as stored" (D-L107; a pointing mode's Reads and When a
+  direction has no key, [Pointing mode editor](#pointing-mode-editor)). A stored value that is none of a
   choice's options, a setting's or a pointing mode's, shows as one more option,
   "as stored", so a form read back whole sends it unchanged
   (`storedChoices`, `webview/view/choices.mjs`). A choice on show is never
@@ -599,7 +604,7 @@ hold what they name.
   tab's keycode, no test; a behaviour's timings,
   `browser-tests/behaviour-timings.spec.js`). Review's group Discard lights what it takes back on
   focus as on hover (no test). No button sits inside a `<summary>`:
-  the Keyboard screen's Read keyboard is in This keyboard's heading, outside
+  the About screen's Read keyboard is in This keyboard's heading, outside
   Diagnostics' fold (tested).
 - Every control shows the one focus ring (2px of `--focus`) when the
   keyboard reaches it, in either theme; a strip that scrolls sideways draws
@@ -1277,7 +1282,7 @@ only an operation stands in the way. The demo's draft is bound to the demo
   detail as `liveDetail`), which `draftBlockWords`
   (`webview/view/vocabulary.mjs`) reads (`tests/model/vocabulary.test.js`,
   `tests/view/readiness.test.mjs`). The
-  Keyboard screen says firmware this Ark does not work with in
+  About screen says firmware this Ark does not work with in
   `vocabulary.firmwareUpdate` too.
 - An edit names the draft it was built from (`expectedBase`, or a domain's
   `expectedFingerprint`), and core refuses it once the draft is another. A
@@ -1342,14 +1347,14 @@ standalone export reads its own snapshot and leaves the editor's alone
   for it, and a whole model, as the preview posts it, is taken as it is
   (`tests/session/panel-loop.test.js`, `tests/view/store-catalog.test.mjs`,
   `tests/web-shell.test.mjs`).
-- The Keyboard screen shows its Diagnostics only on a page whose address
+- The About screen shows its Diagnostics only on a page whose address
   has `?diagnostics` (`diagnosticsShown`, D-L100); without it the fold is
   not drawn and the flash pauses are never read. Read keyboard is in This
   keyboard's heading either way
   (`tests/view/keyboard-view.test.mjs`,
   `browser-tests/settings-screens.spec.js`). No user-facing sentence sends a
   person to them.
-- The Keyboard screen's Diagnostics list, `model.diagnostics`, is what was
+- The About screen's Diagnostics list, `model.diagnostics`, is what was
   read, then the device service's log, newest last and bounded by the service
   (`addDiagnostic`): the code and own text of a failure no notice says, with
   what lay under it (`causeText`), connections and the keyboard's odd answers.
@@ -1541,8 +1546,8 @@ Import checks one, under the capabilities current firmware reports
 `tests/data/demo-profile.test.js`).
 
 - The editing gates hold unchanged; `model.device` says Demo with no
-  connection and a strip says the demo is open
-  (`tests/view/demo-view.test.mjs`).
+  connection and a strip says the demo is open and links the firmware
+  releases (`tests/view/demo-view.test.mjs`).
 - Core refuses Apply and reviewing against a keyboard; Export saves the draft.
   Leaving the demo with unexported edits needs `discardDemo`. The demo is
   offered only with no keyboard connected and no unsaved keyboard draft
@@ -1774,8 +1779,10 @@ escaped payload (D-L26), in `webview/ui/macros/`.
 ## Pointing mode editor
 
 A configured mode's editor (`webview/ui/pointing/editor.mjs`) is one card
-titled by the mode's name, with Place on a key →, Duplicate and Clear mode
-beside it, and four numbered steps read top to bottom; Advanced follows as its
+titled by the mode's name, with Place on a key → and Clear pointing mode
+beside it (a copy is made from an empty slot, Or copy a mode), and numbered
+steps read top to bottom, four for a mode that sends keys and five for one
+that scrolls, each numbered in the order it is drawn; Advanced follows as its
 own folded card (`browser-tests/pointing-controls.spec.js`).
 
 1. **What the ball does**: Scroll or Send keys, a radio group of two large
@@ -1789,29 +1796,47 @@ own folded card (`browser-tests/pointing-controls.spec.js`).
 2. **What each direction sends** draws each direction the mode reads as a key
    placed where the ball sends it, around the ball (four, or eight with the
    diagonals); a click opens the picker on the keys a pointing mode sends, ×
-   clears it, and a macro's notes sit under its key. Reads sits above them,
-   When a direction has no key and How often it sends below, each a
-   segmented choice (`webview/ui/segmented.mjs`); that a direction can also
-   click a mouse button or play a macro is an empty key's tip. **How it
+   clears it; a macro's key carries no notes under it. Its options stand in
+   a column beside the compass (above it on a card under 720px,
+   `.pd-direction-options`), and the ball's centre stays put whichever
+   directions the mode reads: a straight direction one axis leaves out
+   keeps its place as an unseen, inert arm drawn as its key would be, the
+   rows above and below the ball share one height, every shape has the same columns, both columns start at the top,
+   and the options column keeps the widest shape name's width. Drawn by
+   hand as D-L107 allows, Reads a radio group of shapes, each drawing
+   the directions it reads, in the vocabulary's order (all eight, the four
+   straight ones, then one axis), each named by its radio's label, the
+   picked one's name beside them and the others named by their tips, a
+   stored axis none of them "as stored" in words; When a direction has no
+   key, radio buttons each named in full (`.pd-radios`); and how often it
+   sends, a switch, Send only once per movement: on stores once per
+   movement, off every step, and the step's info mark says each as On or
+   Off (`switchState`) with the words Review names it by (`sendsPart`,
+   `webview/ui/pointing/common.mjs`). That a direction can also click a
+   mouse button or play a macro is an empty key's tip. **How it
    scrolls** lays its fields in four columns (`.pd-cols`, two on a narrow
    card): which way (Scrolls, a segmented choice; Reverse scrolling, a
    switch per axis named as the vocabulary names each bit, the record's two
    bits) over two columns each, then Speed's two fields and Feel's two under
-   the vocabulary's names, and the held modifiers
-   (`webview/ui/pointing/movement.mjs`). Each direction's held-modifier handling,
+   the vocabulary's names (`webview/ui/pointing/movement.mjs`). Each direction's held-modifier handling,
    under Advanced, is a segmented choice too.
    Every setting, Reverse scrolling and the held modifiers included, says what it does once (D-L96): as its field's tip,
    or in the info mark beside its step's title or its Advanced section's (Distance, Scroll tuning), by its name or by
    each of its choices' words, with no tip saying it again. A step's choices (When a direction has no key, How often it
-   sends, Scrolls, Ends when, Pointer layer) are explained there, each in a part headed by the field's label, or a row; the line under a
+   sends, Reads, Scrolls, Ends when, Pointer layer) are explained there, each in a part headed by the field's label, or a row; the line under a
    Distance field is its value alone. The words come from `vocabulary.pointing.tips`, keyed by the field it sets (as
    the firmware runs it), and `vocabulary.pointing.choicesMean`, keyed by the value a choice stores, every choice and
    only those (`tests/model/vocabulary.test.js`)
    (`browser-tests/pointing-controls.spec.js`).
-3. **What starts it**: the mode's hold and lock keys named by the mode, never
+3. **Modifiers it holds down during scrolling**, a scrolling mode's alone,
+   so a mode that sends keys numbers the steps after it one lower: the held
+   modifiers, the shared Left / Right grid (`webview/ui/modifier-grid.mjs`)
+   with no label of its own, the step's title naming it and its info mark's
+   lead saying what it does (`vocabulary.pointing.tips.heldModifiers`).
+4. **What starts it**: the mode's hold and lock keys named by the mode, never
    by `PD_MODE_n`, and where they sit; then its link as layer chips
    ([Pointing links](#pointing-links)).
-4. **While it runs**: its pointer speed, its light with Edit in Lighting,
+5. **While it runs**: its pointer speed, its light with Edit in Lighting,
    and its pointer layer, a segmented choice, in step 2's four columns. Advanced's sections are named
    for what they set (Distance, Held modifiers, Scroll tuning), never
    Behaviour, which is a key's in Ark.
@@ -1931,7 +1956,7 @@ input's key under the layers in view (`tests/model/participation.test.js`,
 
 ## Flash pauses
 
-The Keyboard screen's Diagnostics (shown with `?diagnostics`, D-L100) shows
+The About screen's Diagnostics (shown with `?diagnostics`, D-L100) shows
 each half's flash pauses, GET `0x0D`
 (firmware D-F29; `upstream/firmware/docs/spec/profile-wire-v1/hid-channel.md`,
 "Flash pauses"), decoded by `core/protocol/flash-pauses-v1.js`
@@ -1946,7 +1971,7 @@ each half's flash pauses, GET `0x0D`
 - They are read only when the fold opens (`readFlashPauses`), once for each
   connection while it stays open and nothing holds the keyboard
   (`state.flashPausesAsked` against `load.connectionToken`), and by the
-  Keyboard screen's Read keyboard while it is open (`refresh` with
+  About screen's Read keyboard while it is open (`refresh` with
   `flashPauses`, after the keyboard is read). Each
   reads both pages, waits longer than the master half's one-second pull
   interval and reads both again, as the firmware's spec says to get fresh
@@ -1971,7 +1996,7 @@ and the firmware serves the effective name as its USB product string
 - `deviceLabels` names a listed keyboard by its product name and the connected
   one by its stored name, adding a serial or number only where two labels
   match (`tests/session/device-model.test.js`).
-- The Keyboard screen's title is the name (`titleName`), following
+- The About screen's title is the name (`titleName`), following
   `editGate(model, "settings")`, with the built-in name as placeholder
   (`browser-tests/settings-screens.spec.js`). It posts trimmed; core refuses
   more than 32 bytes or control characters (`tests/view/edits.test.mjs`,

@@ -481,7 +481,7 @@ class ProfileDeviceService {
     }
 
     // The background reads (background-reads.js): the live watch's look, and
-    // each half's flash pauses for the Keyboard screen's Diagnostics. Neither
+    // each half's flash pauses for the About screen's Diagnostics. Neither
     // starts while an operation or another background read holds the
     // keyboard, and neither rejects.
     readLiveStatus() {

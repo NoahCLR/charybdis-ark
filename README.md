@@ -18,9 +18,9 @@ next keypress and can be tried in real typing before it is saved.
 </p>
 
 **Try the demo:** open <https://ark.ncleroy.dev> and choose
-**Explore a demo**. It opens on an example profile close to the firmware's
-defaults. Every screen and edit works and Review runs its checks; saving and
-the live edit modes need a keyboard. The demo runs in any browser on a
+**Explore a demo**. It opens on a complete example profile. Every screen and
+edit works and Review runs its checks; saving and the live edit modes need a
+keyboard. The demo runs in any browser on a
 computer, and **Open a backup…** loads your own profile into it.
 Connecting a keyboard needs Chrome or Edge. There is no account, and once
 the page has loaded it sends nothing to any server. To set up a keyboard,
@@ -173,7 +173,7 @@ empty mode can be placed on a key and set up later.
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/pointing-mode-dark.gif">
     <img src="docs/images/readme/pointing-mode-light.gif" width="880"
-         alt="Making a pointing mode in Ark: an empty slot, Send keys, Horizontal only, Ctrl+Left and Ctrl+Right picked for the two directions, Once per movement, the mode named Desktops, then placed on a key of the Pointing layer, whose hover card shows it">
+         alt="Making a pointing mode in Ark: an empty slot, Send keys, the horizontal shape, Ctrl+Left and Ctrl+Right picked for the two directions, the Send only once per movement switch turned on, the mode named Desktops, then placed on a key of the Pointing layer, whose hover card shows it">
   </picture>
   <br>
   <sub>A mode that switches desktops on a Mac, once per movement, placed on the Pointing layer.</sub>
@@ -207,14 +207,14 @@ combo, behaviour feedback case or replacement case shows.
   <sub>Navigation previewed, with the stages and the behaviour feedback colours.</sub>
 </p>
 
-### Typing and Keyboard screens
+### Typing and About screens
 
 The **Typing** screen tells Ark and the keyboard which system the computer runs
 (Auto, macOS, Windows or Linux) and which keyboard layout it uses. Keys are
 then labelled as the computer types them, and macros type the right
 characters. It also has the switch for text replacement.
 
-The **Keyboard** screen sets the name the computer shows for the keyboard,
+The **About** screen sets the name the computer shows for the keyboard,
 and shows how full the profile is. An edit that wouldn't fit is refused
 before it reaches the keyboard.
 

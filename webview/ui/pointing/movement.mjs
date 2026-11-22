@@ -1,16 +1,21 @@
 // @ts-check
 // Step 2 of a mode: what the ball does as it moves. A directional mode draws
 // each direction it reads as a key placed where the ball sends it, around the
-// ball; a click opens the picker and × clears it. A scrolling mode groups its
-// fields as which way, speed and feel.
+// ball; a click opens the picker and × clears it. Its options stand in a
+// column beside the compass: which directions it reads, a row of shapes;
+// what a direction with no key does, radio buttons; and whether it sends
+// once per movement, a switch.
+// A scrolling mode groups its fields as which way, speed and feel; the
+// modifiers it holds are a step of their own (heldModifiers).
 import {el, esc} from "../../lib/dom.mjs";
 import {AXIS, DIAGONALS, DIRECTIONS, axisReads, scrollAxesOf, tapPlaceWord} from "../../view/pointing-config.mjs";
-import {keyDisplayName, pointingMacro} from "../../view/keyvalues.mjs";
+import {keyDisplayName} from "../../view/keyvalues.mjs";
 import {keycodeName} from "../../view/key-identity.mjs";
 import {render} from "../../store.mjs";
 import {openPicker} from "../picker.mjs";
 import {ARROWS, SCROLL_LEAD, scrollLabel, tipFor, words} from "./common.mjs";
 import {word} from "../../view/vocabulary.mjs";
+import {storedChoices} from "../../view/choices.mjs";
 
 /** @typedef {ReturnType<typeof import("./form-controls.mjs").formControls>} FormControls */
 /** @typedef {import("../../../contracts/panel.js").PublishedModel} Model */
@@ -22,15 +27,14 @@ export function movement(model, slot, scrolling, controls, stage) {
 }
 
 /** @param {Model} model @param {PresentedSlot} slot @param {FormControls} controls @param {() => void} stage */
-function directions(model, slot, {choice, form, disabled}, stage) {
+function directions(model, slot, {form, disabled}, stage) {
     const reads = axisReads(slot.axis);
     const eight = slot.axis === AXIS.EIGHT;
     const shape = eight ? "eight" : reads.length === 4 ? "four" : reads.includes("up") ? "vertical" : "horizontal";
     const node = el(`<div class="pd-directions">
-        <div class="pd-direction-reads"></div>
+        <div class="pd-direction-options"></div>
         <div class="pd-compass ${shape}" role="group" aria-label="What each direction sends">
-            <div class="pd-ball" aria-hidden="true"><svg viewBox="0 0 80 80"><circle cx="40" cy="40" r="30"/><circle cx="40" cy="40" r="4"/></svg></div></div>
-        <div class="pd-direction-fields"></div></div>`);
+            <div class="pd-ball" aria-hidden="true"><svg viewBox="0 0 80 80"><circle cx="40" cy="40" r="30"/><circle cx="40" cy="40" r="4"/></svg></div></div></div>`);
     const compass = /** @type {HTMLElement} */ (node.querySelector(".pd-compass"));
     /** @type {[("directions" | "diagonals"), string][]} */
     const places = [...DIRECTIONS.filter((name) => reads.includes(name)).map((name) => /** @type {["directions", string]} */ (["directions", name])),
@@ -38,12 +42,91 @@ function directions(model, slot, {choice, form, disabled}, stage) {
     for (const [group, name] of places) {
         compass.append(directionKey(model, slot, group, name, {form, disabled, stage}));
     }
-    /** @type {HTMLElement} */ (node.querySelector(".pd-direction-reads")).append(choice(words(model).fieldLabels.axis, words(model).axes, slot.axis, "axis",
-        {tip: tipFor(model, "axis")}));
-    const fields = /** @type {HTMLElement} */ (node.querySelector(".pd-direction-fields"));
+    // The ball stays where it is whichever directions are read: a straight
+    // direction one axis leaves out keeps its place as an unseen, inert arm
+    // drawn as its key would be, so every row keeps its height.
+    for (const name of DIRECTIONS.filter((direction) => !reads.includes(direction))) {
+        const ghost = arm(model, slot, "directions", name, disabled);
+        ghost.classList.add("pd-arm-ghost");
+        ghost.setAttribute("aria-hidden", "true");
+        ghost.inert = true;
+        compass.append(ghost);
+    }
     // What each choice does is the step's info mark (editor.mjs).
-    fields.append(choice(words(model).fieldLabels.emptyDirection, words(model).emptyDirection, slot.emptyDirection ?? 0, "emptyDirection"));
-    fields.append(choice(words(model).fieldLabels.directionOutput, words(model).directionOutput, slot.directionOutput ?? 0, "directionOutput"));
+    /** @type {HTMLElement} */ (node.querySelector(".pd-direction-options")).append(shapes(model, slot, form, disabled),
+        emptyDirection(model, slot, form, disabled),
+        sendsOnce(model, slot, form, disabled));
+    return node;
+}
+
+// Each axis policy drawn as the directions it reads, on a 24-unit square:
+// all eight (a star, which arrowheads would blur at this size), the four
+// straight ones, up and down, left and right.
+/** @type {Readonly<Record<number, string>>} */
+const SHAPES = {
+    [AXIS.EIGHT]: `<path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6L5.6 18.4"/>`,
+    [AXIS.DOMINANT]: `<path d="M12 3v18M3 12h18"/><path d="M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/>`,
+    [AXIS.VERTICAL]: `<path d="M12 3v18"/><path d="M9 6l3-3 3 3M9 18l3 3 3-3"/>`,
+    [AXIS.HORIZONTAL]: `<path d="M3 12h18"/><path d="M6 9l-3 3 3 3M18 9l3 3-3 3"/>`,
+};
+
+// Which directions the mode reads, as a radio group of shapes in the
+// vocabulary's order, named to a screen reader, with the picked one's name
+// beside them; the others are named by their tips, the picked one needing
+// none (D-L96). A stored value that is none of them shows as one more
+// option in words, "as stored" (storedChoices). What reading means is the
+// step's info mark (editor.mjs).
+/** @param {Model} model @param {PresentedSlot} slot @param {FormControls["form"]} form @param {string} disabled */
+function shapes(model, slot, form, disabled) {
+    const P = words(model);
+    const f = `pointing:${slot.id}:axis`;
+    const current = slot.axis ?? AXIS.DOMINANT, choices = storedChoices(P.axes, current);
+    const node = el(`<div class="field pd-shapes"><span>${esc(P.fieldLabels.axis)}</span><div class="pd-shape-row">
+        <div class="seg pd-shape-seg" role="radiogroup" aria-label="${esc(P.fieldLabels.axis)}">${choices.map(([value, name]) => `<label data-axis="${esc(value)}">
+            <input type="radio" name="${esc(f)}" value="${esc(value)}" data-f="${esc(f)}:${esc(value)}" aria-label="${esc(name)}" ${value === current ? "checked" : ""} ${esc(disabled)}>
+            <span>${SHAPES[value] ? `<svg viewBox="0 0 24 24" aria-hidden="true">${SHAPES[value]}</svg>` : esc(name)}</span></label>`).join("")}</div>
+        <span class="pd-shape-name" aria-hidden="true">${choices.map(([value, name]) => `<span data-axis="${esc(value)}">${esc(name)}</span>`).join("")}</span></div></div>`);
+    const picked = () => /** @type {HTMLInputElement | null} */ (node.querySelector("input:checked"));
+    form.axis = () => Number(picked()?.value ?? current);
+    // Every name is drawn, the picked one shown, so the column keeps the
+    // widest one's width and the compass beside it never moves. The name
+    // and the tips follow a pick at once; the compass redraws once it is
+    // staged.
+    const show = () => {
+        const value = picked()?.value;
+        for (const name of /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll(".pd-shape-name > span"))) name.toggleAttribute("data-off", name.dataset.axis !== value);
+        for (const label of /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll(".pd-shape-seg > label"))) {
+            if (label.dataset.axis === value) label.removeAttribute("data-tip");
+            else label.dataset.tip = word(choices, Number(label.dataset.axis));
+        }
+    };
+    show();
+    node.addEventListener("change", show);
+    return node;
+}
+
+// What a direction with no key does, as radio buttons, each named in full,
+// holding the stored value even when it is none of them (storedChoices).
+// What each does is the step's info mark (editor.mjs).
+/** @param {Model} model @param {PresentedSlot} slot @param {FormControls["form"]} form @param {string} disabled */
+function emptyDirection(model, slot, form, disabled) {
+    const P = words(model), label = P.fieldLabels.emptyDirection, f = `pointing:${slot.id}:emptyDirection`;
+    const current = slot.emptyDirection ?? 0, choices = storedChoices(P.emptyDirection, current);
+    const node = el(`<div class="field"><span>${esc(label)}</span><div class="pd-radios" role="radiogroup" aria-label="${esc(label)}">
+        ${choices.map(([value, name]) => `<label><input type="radio" name="${esc(f)}" value="${esc(value)}" data-f="${esc(f)}:${esc(value)}" ${value === current ? "checked" : ""} ${esc(disabled)}><span>${esc(name)}</span></label>`).join("")}</div></div>`);
+    form.emptyDirection = () => Number(/** @type {HTMLInputElement | null} */ (node.querySelector("input:checked"))?.value ?? current);
+    return node;
+}
+
+// How often the mode sends, as a switch: on sends once per movement, off
+// with every step (the record's directionOutput, 1 and 0), so a mode that
+// sends every step, as every one did before, shows it off. What each means
+// is the step's info mark (editor.mjs).
+/** @param {Model} model @param {PresentedSlot} slot @param {FormControls["form"]} form @param {string} disabled */
+function sendsOnce(model, slot, form, disabled) {
+    const node = el(`<div class="field"><div class="pd-switches"><label class="sw"><input type="checkbox" data-f="pointing:${esc(slot.id)}:directionOutput"
+        ${slot.directionOutput === 1 ? "checked" : ""} ${esc(disabled)}><span class="track"></span><span class="txt">${esc(words(model).sendsOnce)}</span></label></div></div>`);
+    form.directionOutput = () => /** @type {HTMLInputElement} */ (node.querySelector("input")).checked ? 1 : 0;
     return node;
 }
 
@@ -51,23 +134,11 @@ function directions(model, slot, {choice, form, disabled}, stage) {
 // stored one until the picker or × changes it.
 /** @param {Model} model @param {PresentedSlot} slot @param {"directions" | "diagonals"} group @param {string} name @param {{form: FormControls["form"], disabled: string, stage: () => void}} controls */
 function directionKey(model, slot, group, name, {form, disabled, stage}) {
-    const code = Number(slot[group]?.[name]?.keycode ?? 0);
-    const key = `${group === "diagonals" ? "diag" : "dir"}:${name}`;
-    let held = keycodeName(model, code);
+    const key = directionField(group, name);
+    let held = keycodeName(model, Number(slot[group]?.[name]?.keycode ?? 0));
     form[key] = () => held;
     const label = tapPlaceWord(model, group, name);
-    const shown = code ? keyDisplayName(model, code) : "";
-    const macro = pointingMacro(model, code);
-    const notes = macro ? [
-        macro.empty ? "Empty macro: does nothing yet" : "",
-        slot.directionOutput === 0 ? "Busy triggers are dropped · try Once per movement" : "",
-    ].filter(Boolean) : [];
-    const node = el(`<div class="pd-arm ${esc(name)}" data-direction="${esc(name)}">
-        <span class="pd-arm-dir" aria-hidden="true">${ARROWS[name]} ${esc(label)}</span>
-        <span class="pd-keywrap"><button type="button" class="pd-key ${shown ? "" : "unset"}" data-direction-key="${esc(key)}" ${esc(disabled)}
-            aria-label="${esc(`${label}: ${shown || "no key"}`)}" data-tip="${esc(shown ? `${label} sends ${shown}${held && held !== shown ? `, stored as ${held}` : ""}. Click to change it.` : `Pick a key for ${label}. Mouse buttons 1–8 and macros are in the picker too.`)}">${shown ? esc(shown) : "+ Key"}</button>
-        ${shown ? `<button type="button" class="pd-key-clear" data-clear="${esc(key)}" aria-label="${esc(`Clear ${label}`)}" ${esc(disabled)}>×</button>` : ""}</span>
-        ${notes.map((note) => `<span class="note">${esc(note)}</span>`).join("")}</div>`);
+    const node = arm(model, slot, group, name, disabled);
     /** @type {HTMLButtonElement} */ (node.querySelector("[data-direction-key]")).addEventListener("click", () => {
         // Only what the keyboard sends from a pointing mode is offered
         // (model.pdModeEditing.tapKeys); a key is checked when it is staged.
@@ -83,11 +154,31 @@ function directionKey(model, slot, group, name, {form, disabled, stage}) {
     return node;
 }
 
+// A direction's form field, by where the record keeps it.
+/** @param {"directions" | "diagonals"} group @param {string} name */
+const directionField = (group, name) => `${group === "diagonals" ? "diag" : "dir"}:${name}`;
+
+// A direction's arm as the slot holds it: where it points, its key and × to
+// clear it. directionKey makes it work.
+/** @param {Model} model @param {PresentedSlot} slot @param {"directions" | "diagonals"} group @param {string} name @param {string} disabled */
+function arm(model, slot, group, name, disabled) {
+    const code = Number(slot[group]?.[name]?.keycode ?? 0);
+    const key = directionField(group, name);
+    const held = keycodeName(model, code);
+    const label = tapPlaceWord(model, group, name);
+    const shown = code ? keyDisplayName(model, code) : "";
+    return el(`<div class="pd-arm ${esc(name)}" data-direction="${esc(name)}">
+        <span class="pd-arm-dir" aria-hidden="true">${ARROWS[name]} ${esc(label)}</span>
+        <span class="pd-keywrap"><button type="button" class="pd-key ${shown ? "" : "unset"}" data-direction-key="${esc(key)}" ${esc(disabled)}
+            aria-label="${esc(`${label}: ${shown || "no key"}`)}" data-tip="${esc(shown ? `${label} sends ${shown}${held && held !== shown ? `, stored as ${held}` : ""}. Click to change it.` : `Pick a key for ${label}. Mouse buttons 1–8 and macros are in the picker too.`)}">${shown ? esc(shown) : "+ Key"}</button>
+        ${shown ? `<button type="button" class="pd-key-clear" data-clear="${esc(key)}" aria-label="${esc(`Clear ${label}`)}" ${esc(disabled)}>×</button>` : ""}</span></div>`);
+}
+
 // The scroll fields the step shows itself; Advanced shows the rest of the
 // record. A field drawn twice registers its reader twice, and the second
 // input silently wins, so the two never overlap (common.mjs SCROLL_LEAD).
 /** @param {Model} model @param {PresentedSlot} slot @param {FormControls} controls */
-function scrollingFields(model, slot, {field, choice, form, disabled, modifiers}) {
+function scrollingFields(model, slot, {field, choice, form, disabled}) {
     // Four columns, so every field heads a column: which way and reverse
     // over two each, then Speed's two fields and Feel's two under their
     // names.
@@ -107,10 +198,14 @@ function scrollingFields(model, slot, {field, choice, form, disabled, modifiers}
     for (const [key, unit] of SCROLL_LEAD) {
         group("fields").append(field(scrollLabel(model, key, unit), slot.scroll?.[key], `scroll:${key}`, {unit, tip: tipFor(model, key)}));
     }
-    const held = modifiers(words(model).heldModifiers, slot.heldModifiers, "heldModifiers");
-    held.setAttribute("data-tip", tipFor(model, "heldModifiers"));
-    node.append(held);
     return node;
+}
+
+// A scrolling mode's held modifiers, the step after How it scrolls: the grid
+// alone, the step's title naming it and its info mark saying what it does.
+/** @param {Model} model @param {PresentedSlot} slot @param {FormControls} controls */
+export function heldModifiers(model, slot, {modifiers}) {
+    return modifiers(words(model).heldModifiers, slot.heldModifiers, "heldModifiers", {hideLabel: true});
 }
 
 // Reverse scrolling is one switch per axis, named as the vocabulary names

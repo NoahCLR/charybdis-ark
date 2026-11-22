@@ -40,7 +40,7 @@ const health = (extra) => ({device: {connected: true, label: "K", health: {halve
 test("a save the keyboard is finishing reads as a save in progress, not a recovery copy", () => {
     assert.equal(SAVE_IN_PROGRESS.label, "Save in progress");
     assert.equal(SAVE_IN_PROGRESS.detail, "A save is in progress on the keyboard: it keeps its previous profile until both halves confirm the new one.");
-    assert.ok(keyboardControl(health({recoveryPending: true})).dot.tip.includes(SAVE_IN_PROGRESS.detail), "the rail's dot and the Keyboard screen say it in the same words");
+    assert.ok(keyboardControl(health({recoveryPending: true})).dot.tip.includes(SAVE_IN_PROGRESS.detail), "the rail's dot and the About screen say it in the same words");
     assert.doesNotMatch(`${SAVE_IN_PROGRESS.label} ${SAVE_IN_PROGRESS.detail}`, /recovery/i);
 });
 
@@ -51,16 +51,16 @@ test("a restart the keyboard needs is said ahead of the rest; otherwise, and in 
     assert.doesNotMatch(keyboardControl({...health({recoveryPending: true, restartNeeded: true}), demo: {active: true}}).dot.tip, /Restart the keyboard|Save in progress/);
 });
 
-test("a slave half that missed a cancelled save reads the same on the rail and the Keyboard screen", () => {
+test("a slave half that missed a cancelled save reads the same on the rail and the About screen", () => {
     const tip = keyboardControl(health({restartNeeded: true})).dot.tip;
-    assert.ok(tip.includes([RESTART_NEEDED.detail, ...RESTART_NEEDED.steps].join(" ")), "the rail says what the Keyboard screen's callout says");
+    assert.ok(tip.includes([RESTART_NEEDED.detail, ...RESTART_NEEDED.steps].join(" ")), "the rail says what the About screen's callout says");
     assert.match(RESTART_NEEDED.detail, /^The slave half did not confirm a cancelled save/);
     assert.match(RESTART_NEEDED.steps[0], /^Unplug the USB cable from the master half \(not the cable between the halves\)/,
         "the unplug steps stay, for where the bar's Restart is not offered");
     assert.doesNotMatch([RESTART_NEEDED.detail, ...RESTART_NEEDED.steps].join(" "), /\b(left|right|other) half\b/i, "the halves are named by role");
 });
 
-test("the Keyboard screen names the halves by role, with the side as detail", () => {
+test("the About screen names the halves by role, with the side as detail", () => {
     const rows = (halves, connected = true) => halvesRows({device: {connected, health: {halves}}});
     assert.deepEqual(rows("agree").map(row => [row.half, row.side, row.ok]),
         [["Master half", "right, USB and trackball", true], ["Slave half", "left", true]]);

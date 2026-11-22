@@ -205,7 +205,7 @@ test("the picker refuses a key a shortcut cannot hold", async ({page}) => {
 
 // A modifier key is its modifier and a shifted symbol is Shift and its key,
 // both of which a shortcut holds, so the shortcut picker's board, Symbols and
-// More keys are the Keys screen's. Picked, `!` is the 1 key with Left Shift
+// Common keys are the Keys screen's. Picked, `!` is the 1 key with Left Shift
 // lit, and reopens that way; the board's Shift key is the Shift button.
 test("the shortcut picker offers the modifier keys and shifted symbols, as modifiers and their key", async ({page}) => {
     const keysOf = (selector) => page.locator(selector).evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-pick")));

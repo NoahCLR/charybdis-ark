@@ -1,7 +1,7 @@
 // @ts-check
 "use strict";
 
-// Each half's flash pauses (GET 0x0D, firmware D-F29) for the Keyboard
+// Each half's flash pauses (GET 0x0D, firmware D-F29) for the About
 // screen's Diagnostics, read as the firmware's spec says to get fresh ones:
 // read page 1, give the master half time to pull the slave half's figures
 // over the split link, and read it again. The panel asks when the fold

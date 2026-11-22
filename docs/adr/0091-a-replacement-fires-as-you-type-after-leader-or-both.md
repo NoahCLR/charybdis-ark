@@ -2,6 +2,15 @@
 
 Cited as D-L91.
 
+Amended (2026-11-21): the switch on a replacement's editor, and its field in
+review, is named **Trigger**, no longer **Fires** (Noah). How a replacement
+fires stays the verb in sentences, and files still say `fires`.
+
+Amended 2026-11-22 (D-L109): the switch keys have a picker section of their
+own, **Switch keys**, and the Leader key follows text replacement's three
+switch keys in its **Text replacement** group there, no longer a group of its
+own in Other QMK.
+
 The firmware's leader (firmware D-F71) holds what is typed after its Leader
 key and sends a replacement when what was typed is one of its inputs. How a
 replacement fires is the replacement's own: **as you type** (as a word ends),
@@ -29,7 +38,7 @@ the choice onto the replacement (D-F71 amended).
 
 ## How it is shown
 
-A replacement's editor has **Fires** above its inputs: **As you type**, **After
+A replacement's editor has **Trigger** above its inputs: **As you type**, **After
 Leader** or **Both** (vocabulary `inputModes`), posted as
 `updateAutocorrectTrigger` the moment it is chosen. A new replacement has the
 same switch, and its first input's add carries it (`trigger`). While a
@@ -39,7 +48,7 @@ says where its sniping keys are) and **Place on a key →**, as a macro's and
 a pointing mode's editors have it (Noah, 2026-11-12). Every replacement's line in the bank is tagged
 with how it fires, in the switch's words, After Leader and Both in full text
 colour and As you type quiet: a single mark for Leader could not tell After
-Leader from Both (Noah, 2026-11-12). Review says a switch in its own words ("Fires: As you type
+Leader from Both (Noah, 2026-11-12). Review says a switch in its own words ("Trigger: As you type
 → After Leader"), and says how an added or removed replacement fires only
 when it fires after Leader.
 

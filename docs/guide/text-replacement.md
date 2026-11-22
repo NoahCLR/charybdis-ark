@@ -120,7 +120,7 @@ choose. After Leader, the keyboard holds back what you type and sends the
 replacement, so nothing you typed reaches the computer; a replacement that
 fires after Leader alone is left as you typed it when you finish its input
 as a word. Put Leader on a key, in a behaviour's tap or hold, or as a combo's
-output; the picker has it under **Other QMK**, in **Text replacement**, and
+output; the picker has it under **Switch keys**, in **Text replacement**, and
 searching for "leader" finds it. A replacement's editor says where it is
 while the replacement fires after Leader, with **Place on a key →**. Then press Leader and type `pn`, and your
 phone number is all the computer sees.
@@ -174,8 +174,8 @@ the keyboard restarts, save nothing, and can't turn on what is off in Typing.
 That is why the switch says **↺ keyboard keys change this too**, and
 **turned off by key** while a key has it off; the ⓘ beside its section's
 title says what each means. The picker lists them under
-**Other QMK**, in **Switch keys**, beside those for combos, behaviours and
-auto-mouse; searching it for "autocorrect" finds them too.
+**Switch keys**, in **Text replacement**, beside those for combos, behaviours
+and auto-mouse; searching it for "autocorrect" finds them too.
 
 ## The replacements
 
@@ -233,7 +233,7 @@ steps yet, Pick… is off and **Make one in Macros →** goes there.
 or change its steps. Choosing Text or Macro changes nothing until you type
 the text or pick the macro, and a line under the choice says so until then.
 
-The ⓘ beside **Replacement**, **Fires**, **Inputs** and **Try it** sums up how each
+The ⓘ beside **Replacement**, **Trigger**, **Inputs** and **Try it** sums up how each
 works: when the keyboard replaces, capitals, Backspace and macros; what each
 way of firing means; how an
 input is written with `*`, the wildcard, with examples and where it may go;
@@ -243,7 +243,7 @@ or tab elsewhere or press Escape; resting the pointer on it shows it while it
 stays. In a small window the list opens
 where there is room, and scrolls when it is taller than that.
 
-### Fires
+### Trigger
 
 **As you type**, **After Leader** or **Both** says how this replacement
 fires: as you finish a word, after the [Leader key](#after-the-leader-key),
@@ -475,7 +475,7 @@ used of the 20,480, with a bar, how many are free, and your replacements and
 inputs. Whichever limit is met first refuses the next edit.
 
 The list is stored with the rest of the profile; the
-[Keyboard screen](connecting.md#the-keyboard-screen)'s **Memory** panel
+[About screen](connecting.md#the-about-screen)'s **Memory** panel
 shows **Text replacement inputs** among the counts and **Text replacement
 memory** after Macro memory, its bar as full as the one here.
 

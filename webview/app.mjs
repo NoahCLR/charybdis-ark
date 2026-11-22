@@ -189,14 +189,17 @@ function readPlaceholder(read, model) {
 /** @param {string} tone */
 const exploreButton = (tone) => `<button class="btn ${tone}" data-act="explore-demo" data-tip="${esc(DEMO_WORDS.exploreTip)}">${esc(DEMO_WORDS.explore)}</button>`;
 
-// The demo's strip across the window: it is a demo, nothing is connected, and
-// the two things only the demo has, another file and the way out.
+// The demo's strip across the window: it is a demo, nothing is connected,
+// where the firmware a keyboard needs comes from, and the two things only the
+// demo has, another file and the way out.
 /** @param {ReturnType<typeof demoOf>} demo */
 function demoBanner(demo) {
     const node = el(`<div class="demo-banner" role="status">
         <i class="dot demo" aria-hidden="true"></i><strong>${esc(DEMO_WORDS.status)}</strong>
         <span class="copy">${esc(DEMO_WORDS.banner)}${demo.fileName ? ` <span class="mono">${esc(demo.fileName)}</span>` : ""}</span>
-        <span class="acts"><button class="btn tiny" data-act="open-demo-profile"
+        <span class="acts"><a class="btn tiny ghost" data-act="firmware-releases" href="${esc(FIRMWARE_NEEDED.href)}" target="_blank" rel="noopener"
+                data-tip="${esc(DEMO_WORDS.firmwareTip)}">${esc(FIRMWARE_NEEDED.label)} <span aria-hidden="true">↗</span></a>
+            <button class="btn tiny" data-act="open-demo-profile"
                 data-tip="Open one of your exported .charybdis.json backups in the demo, in place of this profile.">Open a backup…</button>
             <button class="btn tiny ghost" data-act="leave-demo" data-tip="Close the demo and go back to connecting a keyboard.">Leave demo</button></span>
     </div>`);

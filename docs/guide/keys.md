@@ -54,9 +54,12 @@ a board labelled for your computer's keyboard layout (set in
 Option or AltGr on the right. Below it are sections by task: **Letters and
 digits**, **Symbols**, **Numpad**, **Common keys**, then the things you own,
 **Layers**, **Macros**, **Custom keys** and **Pointing modes**, then **Mouse**,
-**Media**, **More keys**, **Lighting** and **Other QMK**, which holds Magic
-and the [switch keys](behaviours.md#switch-keys) for combos, text replacement,
-behaviours and auto-mouse, in **Switch keys**.
+**Media**, **Switch keys**, **Lighting** and **Other QMK**. **Switch keys**
+holds the [switch keys](behaviours.md#switch-keys) for combos, text
+replacement, behaviours and auto-mouse, a group for each, with text
+replacement's Leader key after its own. **Other QMK** holds the rest: editing,
+international and system keys, Magic (but not its N-key rollover keys, which
+the keyboard doesn't build), the firmware keys and the rarely used keys.
 Keys sit in named groups, such as Arrows, Function and Modifiers, and **No key**
 in Common keys holds N/A and Transparent. **All keycodes** lists every key the
 picker offers, section by section, in the same groups. The ⓘ beside the

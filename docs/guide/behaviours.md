@@ -241,7 +241,7 @@ behaviour leaves the Tap empty, a tap switches. While behaviours are off a
 key does what it would without one, so `BH_ON` and `BH_TOGG` turn them back
 on even with a behaviour of their own. A behaviour already holding something
 when behaviours go off keeps it until you let go. The picker lists all twelve
-under **Other QMK**, in **Switch keys**.
+in **Switch keys**, a group for each feature.
 
 ## Behaviour settings
 

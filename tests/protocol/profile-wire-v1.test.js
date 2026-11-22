@@ -15,6 +15,7 @@ const {
     decodeProfileResponse,
     decodeStatusPages,
     PROFILE_ACTIVE_KIND,
+    PROFILE_ORIGIN_COMPILED,
     profileResponseMatcher,
     readProfileCapabilities,
 } = require("../../core/protocol/profile-wire-v1");
@@ -412,6 +413,42 @@ test("decoders reject unknown masks, active kinds, and invalid ranges", () => {
     const invalidOrigin = Buffer.alloc(25);
     invalidOrigin[4] = 2;
     assert.throws(() => decodeStatusPages([statusIdentity, invalidOrigin]), /origin half/);
+});
+
+// The status a keyboard that never saved a profile sent while it ran unsaved
+// live edits, byte for byte: no half saved the working copy's base, so its
+// generation is 0 and its origin half 255 (Profile Wire, "Profile status").
+test("status reads a working copy over the compiled defaults, whose origin is no half", () => {
+    assert.equal(PROFILE_ORIGIN_COMPILED, 255);
+    const pages = () => [Buffer.from("010230001d6fac1d1d6fac1d03000000000000000000000004", "hex"),
+        Buffer.from("00000000ff0000000000000000000000000000000000000000", "hex")];
+    const decoded = decodeStatusPages(pages());
+    assert.deepEqual([decoded.activeKind, decoded.activeDigest, decoded.activeGeneration, decoded.activeOriginHalf],
+        [PROFILE_ACTIVE_KIND.WORKING, 3, 0, PROFILE_ORIGIN_COMPILED]);
+    assert.deepEqual([decoded.committedGeneration, decoded.committedOriginHalf, decoded.slaveKnown, decoded.slaveConverged, decoded.lastError], [0, 0, true, true, 0]);
+    // Firmware sets the origin before it reports pending and zeroes only the
+    // digest and generation, so a keyboard whose activation failed while it
+    // ran such a working copy keeps 255 there: that status is read too.
+    const [pending, kept] = pages();
+    pending[24] = PROFILE_ACTIVE_KIND.PENDING; pending.writeUInt16LE(PROFILE_STATE_FLAGS.DIGESTS_UNAVAILABLE | PROFILE_STATE_FLAGS.PEER_KNOWN, 2); pending.writeUInt32LE(0, 12);
+    assert.deepEqual([decodeStatusPages([pending, kept]).activeKind, decodeStatusPages([pending, kept]).activeOriginHalf], [PROFILE_ACTIVE_KIND.PENDING, PROFILE_ORIGIN_COMPILED]);
+    // Only there: a saved profile, the compiled defaults themselves and a
+    // working copy over a saved generation each name a half, and so do the
+    // saved profile's and the slave half's origins.
+    for (const kind of [PROFILE_ACTIVE_KIND.COMPILED_ONLY, PROFILE_ACTIVE_KIND.COMMITTED, PROFILE_ACTIVE_KIND.PREVIEW]) {
+        const [identity, generation] = pages(); identity[24] = kind;
+        assert.throws(() => decodeStatusPages([identity, generation]), error => error.code === "MALFORMED_RESPONSE" && /active origin half/.test(error.message), `kind ${kind}`);
+    }
+    const [identity, saved] = pages(); saved.writeUInt32LE(42, 0);
+    assert.throws(() => decodeStatusPages([identity, saved]), error => error.code === "MALFORMED_RESPONSE" && /active origin half/.test(error.message));
+    saved[4] = 1;
+    assert.equal(decodeStatusPages([identity, saved]).activeOriginHalf, 1);
+    for (const [offset, label] of [[9, /committed origin half/], [14, /slave half's generation origin/]]) {
+        const [first, second] = pages(); second[offset] = 255;
+        assert.throws(() => decodeStatusPages([first, second]), label);
+    }
+    const [, other] = pages(); other[4] = 254;
+    assert.throws(() => decodeStatusPages([identity, other]), /active origin half/);
 });
 
 test("capability read alone reports the firmware identity, with no VIA command", async () => {

@@ -406,6 +406,8 @@ test("explore the demo: edit on several screens, review with no Apply, export, o
     const banner = page.locator(".demo-banner");
     await expect(banner).toContainText("Demo · no keyboard");
     await expect(banner).toContainText("Edits stay in this tab");
+    await expect(banner.locator('a[data-act="firmware-releases"]')).toHaveAttribute("href", "https://github.com/NoahCLR/charybdis-4x6/releases");
+    await expect(banner.locator('a[data-act="firmware-releases"]')).toHaveAttribute("target", "_blank");
     await expect(page.locator(".rail-product")).toHaveText("Demo");
     await expect(page.locator(".rail-keyboard .dot.demo")).toHaveCount(1);
     await expect(page.locator(".rail-keyboard")).not.toContainText(/Connected|halves|Recovery/);
@@ -750,6 +752,62 @@ test("in Live preview + save an edit reaches the keyboard at once, and review an
     await expect(page.locator(".commit.live")).toHaveCount(0);
     expect(keyboard.events).toContain("reverted");
     expect(errors).toEqual([]);
+    ownFilesOnly();
+});
+
+// A keyboard that never saved a profile, as every keyboard is after a firmware
+// update whose compiled defaults changed: a backup dropped in Live preview +
+// save runs on it unsaved, over its compiled defaults, which no half saved
+// (profile status then names origin half 255). The page reads that keyboard
+// again, opens on it afresh after a reload, and saves its first profile.
+test("a backup brought into a never-saved keyboard in Live preview + save is read again, opened afresh and saved", async ({page, context, baseURL}) => {
+    test.setTimeout(90000);
+    const keyboard = liveKeyboard({document: pdDocument(), compiledOnly: true});
+    const {ownFilesOnly} = await withKeyboard(context, baseURL, 1, keyboard);
+    const errors = await open(page);
+    await page.locator('.read-placeholder [data-act="choose-keyboard"]').click();
+    await ready(page);
+    expect(await currentEditMode(page)).toBe(2);
+    expect(keyboard.generation).toBe(0);
+
+    await page.locator('[data-screen="profile"]').click();
+    const backup = pdDocument();
+    editLayers(backup, layers => {for (let position = 6; position < 30; position++) layers[0][position] = 0x04 + position;});
+    await dropFiles(page, [{name: "mine.charybdis.json", text: JSON.stringify(backup), type: ""}]);
+    await expect(page.locator(".import-sheet")).toContainText("mine.charybdis.json");
+    await page.locator('[data-act="restore"]').click();
+    await expect(page.locator(".commit.live")).toContainText(/\d+ unsaved changes?\s+running on the keyboard/, {timeout: 20000});
+    expect(keyboard.working?.equals(Buffer.from(backup.profile, "base64")), "the keyboard runs the backup, unsaved").toBe(true);
+
+    // Read keyboard, and the watch's looks, meet a working copy over the defaults.
+    await page.waitForTimeout(2 * LIVE_WATCH_MS);
+    await page.locator('[data-screen="device"]').click();
+    await page.locator('.device-pad [data-act="read"]').click();
+    await expect(page.locator('.device-pad [data-act="read"]')).toBeEnabled({timeout: 20000});
+    await expect(page.locator(".commit.live")).toContainText(/unsaved changes?\s+running on the keyboard/);
+    await expect(page.locator(".rail-message", {hasText: "Failed"})).toHaveCount(0);
+
+    // Opened afresh on a keyboard already in that state.
+    const sent = keyboard.mutations.length;
+    page.on("dialog", (dialog) => {void dialog.accept();});
+    await page.reload();
+    await ready(page);
+    await expect(page.locator(".commit.live")).toContainText(/unsaved changes?\s+running on the keyboard/, {timeout: 20000});
+    await expect(page.locator(".rail-message", {hasText: "Failed"})).toHaveCount(0);
+    expect(keyboard.mutations.length, "opening sends the keyboard nothing").toBe(sent);
+
+    await page.locator('.commit.live [data-act="review"]').click();
+    const save = page.locator('.sheet [data-act="apply"]');
+    await expect(save).toBeEnabled();
+    await save.click();
+    const confirm = page.locator('[data-act="apply-anyway"]');
+    if (await confirm.count()) await confirm.click();
+    await expect(page.locator(".rail-message")).toContainText("Saved on both halves", {timeout: 20000});
+    expect(keyboard.generation).toBe(1);
+    expect(keyboard.working).toBe(null);
+    expect(keyboard.saved.equals(Buffer.from(backup.profile, "base64"))).toBe(true);
+    await expect(page.locator(".commit.live")).toHaveCount(0);
+    expect(errors.filter((text) => !/beforeunload/i.test(text))).toEqual([]);
     ownFilesOnly();
 });
 

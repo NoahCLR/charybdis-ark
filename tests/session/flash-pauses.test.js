@@ -1,5 +1,5 @@
 "use strict";
-// Each half's flash pauses (GET 0x0D) on the Keyboard screen's Diagnostics:
+// Each half's flash pauses (GET 0x0D) on the About screen's Diagnostics:
 // read only while that fold is open or by its Read keyboard, never by the
 // live watch, and never alongside another operation.
 const assert = require("node:assert/strict");

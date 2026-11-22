@@ -141,7 +141,7 @@ Each pointing mode can light while it runs, over whatever the layer paints.
 A mode linked to layers paints beneath the lowest of them that is on instead
 (a layer that starts it or one its key turns on),
 however the mode started: those layers' own colours show over it, and higher
-layers cover both (see [Pointing](pointing.md#3-what-starts-it)). Pick a mode,
+layers cover both (see [Pointing](pointing.md#what-starts-it)). Pick a mode,
 give it a colour, and choose where it paints. The empty slots are folded at
 the list's end, as the empty layers are in Layer colours: click the **Empty
 slots** band to show them.
@@ -402,6 +402,6 @@ different LED sets across every stage (Ark uses whatever the connected
 keyboard reports): accents that light the same LEDs share one set, and a set no accent
 lights any more is freed. Each list shows how many the keyboard uses, **On
 the keyboard** (also **Accents** and **LED sets** under **Memory** on the
-Keyboard screen). Adding one more is
+About screen). Adding one more is
 refused in the draft, saying which is full, before the keyboard sees it;
 remove one first.

@@ -183,7 +183,7 @@ function firmwareRelease(version) {
     return `v${year}.${two(month)}.${two(day)}${n ? `.${n}` : ""}`;
 }
 
-// What the connected firmware says about itself, for the Keyboard screen: the
+// What the connected firmware says about itself, for the About screen: the
 // release it includes, whether this Ark works with it, and the ceilings it
 // was compiled with. Only what the keyboard reports, or Ark's own schema
 // limits; never a guess. Nothing without capabilities.

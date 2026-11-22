@@ -414,7 +414,7 @@ test("how a replacement fires is switched alone, its inputs kept, and a new one 
     assert.deepEqual([view.entries[0].fires, view.usage.leaders], ["leader", 2]);
     // Review says the switch in its own words, and only it.
     const [reviewed] = require("../../core/model/profile-review").profileReview(current, leading, CURRENT_CAPABILITIES).filter(item => item.area === "Text replacement");
-    assert.deepEqual(reviewed.fields.map(field => [field.label, field.status, field.before, field.after]), [["Fires", "changed", "As you type", "After Leader"]]);
+    assert.deepEqual(reviewed.fields.map(field => [field.label, field.status, field.before, field.after]), [["Trigger", "changed", "As you type", "After Leader"]]);
     assert.equal(autocorrectEditorView(edit(leading, {type: "updateAutocorrectTrigger", correction: "the", trigger: "both"}), CURRENT_CAPABILITIES).entries[0].fires, "both");
     assert.equal(autocorrectEditorView(edit(leading, {type: "updateAutocorrectTrigger", correction: "the", trigger: "word"}), CURRENT_CAPABILITIES).entries[0].fires, "word");
     const made = edit(current, {type: "addAutocorrectTypos", correction: "Kind regards", inputs: "kr", trigger: "leader"});

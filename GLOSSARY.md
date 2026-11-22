@@ -33,7 +33,7 @@ _Avoid_: locked, view-only, disabled
 
 **Flash pauses**:
 How long each half stopped to work on its flash since it started, as it
-measures them, shown under Diagnostics on the Keyboard screen (with
+measures them, shown under Diagnostics on the About screen (with
 `?diagnostics` in the address).
 _Avoid_: stalls, latency, flash timing
 
@@ -182,7 +182,7 @@ _Avoid_: reset, wipe, factory reset (for this)
 One of Ark's top-level views chosen from the rail, in three groups: Keymap,
 Lighting, Macros, Text replacement, Custom keys and Pointing modes under
 Configure; Behaviours, Combos, Typing and Pointer under Settings; Backups and
-Keyboard under Keyboard. Outside the rail, a Settings screen is named with "settings" after
+About under Keyboard (D-L108). Outside the rail, a Settings screen is named with "settings" after
 it (Behaviour settings, Combo settings, Typing settings, Pointer settings),
 since nothing around a link or a tip says it is one.
 _Avoid_: page, tab, area (for this), surface, panel
@@ -228,20 +228,23 @@ that says `typed` is still read), typo (as the term; a misspelling is still a
 typo, and "typo fixes" says so), variation, trigger, abbreviation (as the
 term), pattern
 
-**Fires** (how a replacement fires):
+**Trigger** (how a replacement fires):
 Whether a replacement's inputs fire **As you type** (as a word ends), **After
 Leader**, or **Both** (D-L91): the replacement's, never an input's, so
-switching it leaves its inputs as they are. The switch is **Fires** on its
-editor; a file says `fires`. The firmware calls it the correction's trigger,
-bits 1–2 of its row's kind byte.
-_Avoid_: mode, trigger (in anything a person reads), input kind
+switching it leaves its inputs as they are. The switch is **Trigger** on its
+editor, and review names it so; a sentence still says how a replacement
+fires ("fires after Leader"), and a file says `fires`. The firmware calls it
+the correction's trigger, bits 1–2 of its row's kind byte.
+_Avoid_: Fires (as the switch's name; Ark's word before), mode, input kind,
+trigger for an input (an input is what is typed; the trigger is the
+replacement's)
 
 **Leader**:
 Text replacement's own key, QMK's `QK_LEADER` (firmware D-F71): after it, what
 is typed is held on the keyboard and sent only as the replacement of an
 input that fires after it. It goes wherever a switch key goes, and the
-picker offers it in **Other QMK**, **Text replacement**, beside **Switch
-keys**; it is not a switch key.
+picker offers it in **Switch keys**, **Text replacement**, after that
+feature's switch keys (D-L109); it is not a switch key.
 _Avoid_: leader sequence, Leader mode, QMK Leader
 
 **Leader input**:
@@ -274,7 +277,7 @@ may be called **the wildcard** ("Add *, the wildcard, where other letters
 may go"), and an input written with one "catches" the words it matches.
 _Avoid_: whole word, start of word, end of word, anywhere (as a choice or a
 label), match type, boundary; fires (for a word an input matches: an input
-catches a word, and the keyboard replaces it; **Fires** is when a
+catches a word, and the keyboard replaces it; **Trigger** is when a
 replacement fires, as you type or after Leader)
 
 **Try it**:

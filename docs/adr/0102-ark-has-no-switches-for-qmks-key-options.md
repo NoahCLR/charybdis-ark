@@ -3,6 +3,12 @@
 Cited as D-L102. Amends D-L87: the Settings screen that holds Text
 replacement's switch is **Typing**, and the switch is its last card.
 
+Amended 2026-11-22: Magic's three N-key rollover keys leave the picker. The
+keyboard does not build NKRO, so they only flip a stored bit nothing reads;
+the picker leaves them out with the other keys for features it does not build
+(`core/data/offered-keycodes.js`), and a key already holding one still reads
+back by name.
+
 Host had a card, **Key swaps & typing**, with a switch for each of QMK's key
 options the keyboard stores (firmware `settings-domain.md`): swap left Ctrl
 and Caps Lock, Caps Lock as left Ctrl, swap Alt and GUI on either side,

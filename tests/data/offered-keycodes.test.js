@@ -5,7 +5,7 @@ const keycodes = require("../../core/schema/keycodes");
 
 test("keycodes for QMK features this firmware does not build are offered nowhere", () => {
     const built = [
-        {name: "QK_RGB_MATRIX_TOGGLE", group: "rgb_matrix"}, {name: "QK_MAGIC_TOGGLE_NKRO", group: "magic"},
+        {name: "QK_RGB_MATRIX_TOGGLE", group: "rgb_matrix"}, {name: "QK_MAGIC_TOGGLE_GUI", group: "magic"},
         {name: "QK_BOOTLOADER", group: "quantum"}, {name: "QK_GRAVE_ESCAPE", group: "quantum"},
         {name: "QK_COMBO_TOGGLE", group: "quantum"},
         // QMK's switch keys for autocorrect, which the firmware's own engine runs (firmware D-F69).
@@ -25,6 +25,8 @@ test("keycodes for QMK features this firmware does not build are offered nowhere
         {name: "QK_REPEAT_KEY", group: "quantum"}, {name: "QK_LAYER_LOCK", group: "quantum"},
         {name: "QK_UNICODE_MODE_MACOS", group: "quantum"}, {name: "KC_LOCKING_CAPS_LOCK", group: "basic"},
         {name: "QK_KB_8", group: "kb"},
+        // Magic's N-key rollover keys: the build has no NKRO.
+        {name: "QK_MAGIC_NKRO_ON", group: "magic"}, {name: "QK_MAGIC_NKRO_OFF", group: "magic"}, {name: "QK_MAGIC_TOGGLE_NKRO", group: "magic"},
     ];
     for (const entry of built) assert.ok(offered(entry), entry.name);
     for (const entry of unbuilt) assert.ok(!offered(entry), entry.name);

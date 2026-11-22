@@ -75,15 +75,16 @@ moment, or unplug it and plug it back in.
 If the keyboard runs firmware other than the current one, Ark stops there
 and says **This keyboard's firmware is not current, and Ark supports only
 current firmware. Update both halves, then read the keyboard again.** Every
-control that edits, and the Keyboard screen, says so too. Nothing on the
-keyboard changes. The Keyboard screen links to the firmware's releases.
+control that edits, and the About screen, says so too. Nothing on the
+keyboard changes. The About screen links to the firmware's releases.
 
 If Ark can show the keyboard but can't read its complete profile, the editing
 screens say **Keyboard not ready for edits** and offer **Read keyboard** to
-try again. **Flash the firmware first** shows under it too, as it does under
-firmware that isn't current, since a keyboard without the firmware, or with an
-old release of it, can't be read either. The usual cause is a missing half: check the cable between the
-halves.
+try again. The usual cause is a missing half, and the screen then says to
+check the cable between the halves. When the read fails for another reason,
+**Flash the firmware first** shows under it too, as it does under firmware
+that isn't current, since a keyboard without the firmware, or with an old
+release of it, can't be read either.
 
 ## The rail
 
@@ -117,7 +118,7 @@ The column on the left is the rail. From the top:
 - The screens: **Keymap**, **Lighting**, **Macros**, **Custom keys** and
   **Pointing modes** under Configure; **Behaviours**, **Combos**, **Typing**
   and **Pointer** under Settings, each showing all its settings at once;
-  **Backups** and **Keyboard** under Keyboard. Elsewhere Ark calls those four
+  **Backups** and **About** under Keyboard. Elsewhere Ark calls those four
   Behaviour settings, Combo settings, Typing settings and Pointer settings.
 - Messages from Ark. One that only says what happened, such as a read or an
   export, closes by itself after a few seconds, or longer for a long one: the
@@ -164,7 +165,9 @@ profile with nothing connected: 16 layers, 32 pointing modes, 128 macros and
 128 custom keys. Every screen works, and every edit shows up in Review. Only
 saving needs a keyboard.
 
-A strip across the top says **Demo · no keyboard**. It has two buttons:
+A strip across the top says **Demo · no keyboard**. It links to the
+**Firmware releases**, where a keyboard gets the firmware Ark edits, and has
+two buttons:
 
 - **Open a backup…** puts one of your backups in place of the demo
   profile.
@@ -177,9 +180,10 @@ and offers **Export profile…**.
 
 The demo is offered only when no keyboard is connected.
 
-## The Keyboard screen
+## The About screen
 
-The Keyboard screen is about the keyboard itself.
+The About screen describes the keyboard: its name, its firmware and halves,
+and how full it is.
 
 **Its name.** The title is the keyboard's name. Click it to rename the
 keyboard, Enter to finish, Escape to put it back. Leave it empty for the
@@ -221,7 +225,7 @@ again.
 Ark hides its **Diagnostics** unless you ask for them: open Ark with
 `?diagnostics` at the end of its address (for example
 `https://ark.ncleroy.dev/?diagnostics`) and they appear at the bottom
-of the Keyboard screen. They are for looking into a fault, not for using the
+of the About screen. They are for looking into a fault, not for using the
 keyboard. They hold the details of the last read. Under them are the last few things Ark noted while
 talking to the keyboard: connecting, a disconnect, an answer it set aside, and
 a failure's own error with its code, which the message beside the rail leaves

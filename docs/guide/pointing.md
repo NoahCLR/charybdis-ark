@@ -71,8 +71,9 @@ locks from an empty Tap.
 The mode's name is the editor's title: click it to rename, up to 32 bytes
 (an accented letter takes two). The tag beside it names the slot, such as
 **Pointing mode 0**, which is also what the mode is called until you name it. **Place on a key →** beside it puts the
-mode's hold key on a key you pick on the board. **Duplicate** copies the mode
-into the first empty slot, and **Clear mode** empties the slot.
+mode's hold key on a key you pick on the board, and **Clear pointing mode**
+empties the slot. To copy a mode, open an empty slot and pick it under **Or
+copy a mode**.
 
 Under the title, chips name the layers that start the mode and how: a key, a
 behaviour, a combo, or the layer itself when the mode is linked to it
@@ -80,8 +81,10 @@ behaviour, a combo, or the layer itself when the mode is linked to it
 tab. An empty slot shows the keys still bound to it, which do nothing until it
 holds a mode.
 
-The editor runs in four steps, top to bottom. The ⓘ beside a step's title
-says what each of its choices does; a click keeps it open.
+The editor runs in numbered steps, top to bottom: four for a mode that sends
+keys, five for one that scrolls, whose held modifiers have a step of their
+own. The ⓘ beside a step's title says what each of its choices does; a click
+keeps it open.
 
 ### Starting a mode
 
@@ -95,38 +98,47 @@ mode, and its key on the board reads by the slot's number, such as **Pointing mo
 hold (empty)**. So you can lay out the keys first and fill in the modes later,
 and clearing a slot doesn't break the keys that use it.
 
-### 1. What the ball does
+### What the ball does
 
 **Scroll** or **Send keys**. Switching redraws the steps below for the other
 movement; nothing is saved to your draft until you change one of its settings.
 
-### 2. What each direction sends
+### What each direction sends
 
 For a mode that sends keys, each direction it reads is a key drawn where the
 ball sends it, around the ball. Click a key to pick another; hover it and
-click **×** to clear it. A direction with no key shows **+ Key**.
+click **×** to clear it. A direction with no key shows **+ Key**. Its options
+stand in a column beside the ball (above it in a narrow window):
 
-- **Reads**: **Dominant axis**, **Eight directions** (adds the diagonals),
-  **Vertical only** or **Horizontal only**.
+- **Reads**: a row of shapes, each a drawing of the directions it
+  reads: **Eight directions** (adds the diagonals), **Dominant axis** (the
+  four straight ones), **Vertical only** and **Horizontal only**. Hover one
+  for its name; the one picked is named beside them.
 - The picker offers only what a pointing mode can send, and its search finds
   a key by its QMK name or alias too. A key shows as the picker names it:
   "Mouse Button 3", a macro by its name. A stored keycode QMK has no name for
   shows as its hex value, such as `0x1004`, and saves back unchanged.
-- **When a direction has no key**: its neighbours take over, send both
-  neighbours (eight directions only), or nothing.
-- **How often it sends**: **Every step** sends again each time the ball moves
-  a threshold further. **Once per movement** sends once, however far the ball
-  goes, and again when it moves back the other way or after a short pause.
+- **When a direction has no key**: **The nearest direction takes over**
+  sends the one direction with a key nearest the way the ball leans, never
+  two, so moving straight at the empty direction sends little or nothing.
+  **Send both neighbours** sends the two directions either side of it (eight
+  directions only; elsewhere the nearest direction takes over). **Nothing**
+  sends nothing.
+- **Send only once per movement**: on, a direction sends once, however far the
+  ball goes, and again when it moves back the other way or after a short
+  pause (**Once per movement**). Off, it sends again each time the ball moves
+  a threshold further (**Every step**). Review names it by those words,
+  under **How often it sends**.
 
 A direction can also click a mouse button, **Mouse Button 1** to **8**, or play
 a macro. Both are in the picker. It can't move the pointer, scroll, or change
 layers or modes.
 
 The keyboard plays one macro at a time, and a trigger while one is playing is
-dropped; the key says so under it. For a longer macro, **Once per movement**
-is usually the better fit.
+dropped. For a longer macro, turning on **Send only once per movement** is
+usually the better fit.
 
-### 2. How it scrolls
+### How it scrolls
 
 For a scrolling mode:
 
@@ -139,10 +151,15 @@ For a scrolling mode:
 - **Feel**: **Fastest repeat** is the shortest time between two scroll steps,
   and **Axis kept after the ball stops** is how long a scroll keeps its axis
   once the ball stops: move again within it and it carries on the same way.
-- **Hold modifiers while scrolling**, for example Shift to scroll sideways in
-  some apps.
 
-### 3. What starts it
+### Modifiers it holds down during scrolling
+
+For a scrolling mode, the step after **How it scrolls**: the modifiers held
+down while it scrolls, a switch for each, left and right. Some apps scroll
+differently with one held: Shift to scroll sideways in some, Command or Ctrl
+to zoom in others.
+
+### What starts it
 
 **Its keys** shows the mode's hold and lock keys, by the mode's name. Where
 they sit is in the chips under the title.
@@ -213,10 +230,11 @@ asks before sending the edit that makes it. Leave the lock key showing
 through (transparent) on those layers, or put the mode's lock or hold key on
 them.
 
-**Duplicate** copies the layers a mode's key turns on, but not the layers
-that start it, since a layer starts only one mode; set those on the copy.
+A copy (**Or copy a mode**) takes the layers a mode's key turns on, but not
+the layers that start it, since a layer starts only one mode; set those on
+the copy.
 
-### 4. While it runs
+### While it runs
 
 - **Pointer speed**: the mode's own DPI, or **Normal pointer speed** to keep
   the one set on Pointer settings.
@@ -261,6 +279,6 @@ Your computer decides what each button number does.
 
 Modes once had mouse button overrides, which made buttons 1–3 do something
 else while the mode ran. The keyboard no longer has them; a linked layer does
-that job (see [What starts it](#3-what-starts-it)). A backup made on firmware that
+that job (see [What starts it](#what-starts-it)). A backup made on firmware that
 had them is from older firmware, and Ark refuses it (see
 [Backups](backups.md)).
