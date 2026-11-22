@@ -18,7 +18,7 @@ const names = (/** @type {{name: string}[]} */ groups) => groups.map((group) => 
 
 test("All keycodes lists every key a field takes, section by section", () => {
     const groups = listedSections(model, picker());
-    assert.deepEqual(names(groups), ["Letters and digits", "Symbols", "Numpad", "Common keys", "Layers", "Macros", "Custom keys", "Pointing modes", "Mouse", "Media", "More keys", "Lighting", "Other QMK"]);
+    assert.deepEqual(names(groups), ["Letters and digits", "Symbols", "Numpad", "Common keys", "Layers", "Macros", "Custom keys", "Pointing modes", "Mouse", "Media", "Switch keys", "Lighting", "Other QMK"]);
     const shown = new Set(values(groups));
     assert.equal(shown.size, values(groups).length, "each once");
     for (const entry of model.qmkKeycodes.filter(pickable)) assert.ok(shown.has(entry.value), entry.value);

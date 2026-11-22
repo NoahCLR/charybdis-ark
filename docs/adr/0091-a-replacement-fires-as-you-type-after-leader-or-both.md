@@ -6,6 +6,11 @@ Amended (2026-11-21): the switch on a replacement's editor, and its field in
 review, is named **Trigger**, no longer **Fires** (Noah). How a replacement
 fires stays the verb in sentences, and files still say `fires`.
 
+Amended 2026-11-22 (D-L109): the switch keys have a picker section of their
+own, **Switch keys**, and the Leader key follows text replacement's three
+switch keys in its **Text replacement** group there, no longer a group of its
+own in Other QMK.
+
 The firmware's leader (firmware D-F71) holds what is typed after its Leader
 key and sends a replacement when what was typed is one of its inputs. How a
 replacement fires is the replacement's own: **as you type** (as a word ends),
